@@ -1,0 +1,526 @@
+diff --git a/docs/cli_commands.md b/docs/cli_commands.md
+index 66a9b77..709929f 100644
+--- a/docs/cli_commands.md
++++ b/docs/cli_commands.md
+@@ -88,6 +88,72 @@ This document provides an overview of CLI commands that can be sent to MeshCore
+ 
+ ---
+ 
++### Start an Over-The-Air (OTA) firmware update via hotspot download
++**Usage:**
++- `start ota url <url>`
++
++**Parameters:**
++- `url`: HTTP(S) URL of the firmware `.bin` to download and flash
++
++**Note:** Requires `ota.wifi` to be set first (see below). Joins the configured WiFi network as a
++station, downloads the file, verifies it against `ota.sha256` (or a `<url>.sha256` sidecar fetched
++automatically if `ota.sha256` isn't set), and reboots on success. Does not reboot on failure.
++
++**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
++
++---
++
++#### View or change the hotspot WiFi credentials used by `start ota url`
++**Usage:**
++- `set ota.wifi <ssid>,<password>`
++
++**Parameters:**
++- `ssid`: WiFi network name
++- `password`: WiFi network password
++
++**Note:** Persists across firmware updates (stored separately from node prefs). Set once; does not
++need to be resupplied for future updates unless the hotspot's credentials change.
++
++**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
++
++---
++
++#### View or change the manually-supplied firmware hash used by `start ota url`
++**Usage:**
++- `set ota.sha256 <hex>`
++- `set ota.sha256 clear`
++
++**Parameters:**
++- `hex`: 64-character lowercase hex SHA-256 digest of the target firmware `.bin`
++
++**Note:** Once set, this hash is used to verify the download and is **not** overridden by a
++`<url>.sha256` sidecar, even if one is found. `set ota.sha256 clear` removes it, allowing sidecar-fetch
++to take effect again. A stale hash from a previous update will block a correct sidecar for a new one if
++left set — clear it before pointing `start ota url` at a different firmware image.
++
++**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
++
++---
++
++#### View or manually control the GPIO47 hotspot power switch
++**Usage:**
++- `get ota.pwr`
++- `set ota.pwr <on|off>`
++
++**Parameters:**
++- `on` / `off`: Drives GPIO47 (the hotspot power-switch control pin) directly
++
++**Note:** Diagnostic and recovery command, entirely independent of `start ota url` — does not join WiFi,
++download, or flash anything. Use `get ota.pwr` to confirm the rail is off after an update completes or
++fails, and `set ota.pwr off` to force it off manually if ever in doubt (e.g. after an unexpected reset
++during an update). `HotspotOTA::run()` already drops this pin on every failure path it controls; this
++command exists for the cases outside that function's control, such as a crash or watchdog reset
++mid-update.
++
++**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
++
++---
++
+ ### Erase/Factory Reset
+ **Usage:**
+ - `erase`
+diff --git a/src/MeshCore.h b/src/MeshCore.h
+index cfa33cf..2a827ad 100644
+--- a/src/MeshCore.h
++++ b/src/MeshCore.h
+@@ -64,6 +64,7 @@ public:
+   virtual uint8_t getStartupReason() const = 0;
+   virtual bool getBootloaderVersion(char* version, size_t max_len) { return false; }
+   virtual bool startOTAUpdate(const char* id, char reply[]) { return false; }   // not supported
++  virtual bool startOTAUpdateFromURL(const char* url, char reply[]) { return false; }   // not supported
+ 
+   // Power management interface (boards with power management override these)
+   virtual bool isExternalPowered() { return false; }
+diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
+index b78ad6e..9831607 100644
+--- a/src/helpers/CommonCLI.cpp
++++ b/src/helpers/CommonCLI.cpp
+@@ -5,6 +5,10 @@
+ #include "TxtDataHelpers.h"
+ #include <RTClib.h>
+ 
++#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
++#include <helpers/esp32/HotspotOTA.h>
++#endif
++
+ #ifndef BRIDGE_MAX_BAUD
+ #define BRIDGE_MAX_BAUD 115200
+ #endif
+@@ -239,6 +243,10 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+       } else {
+         strcpy(reply, "ERR: clock cannot go backwards");
+       }
++    } else if (memcmp(command, "start ota url ", 14) == 0) {
++      if (!_board->startOTAUpdateFromURL(&command[14], reply)) {
++        // reply[] already carries the specific error from HotspotOTA::run
++      }
+     } else if (memcmp(command, "start ota", 9) == 0) {
+       if (!_board->startOTAUpdate(_prefs->node_name, reply)) {
+         strcpy(reply, "Error");
+@@ -536,6 +544,49 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+     StrHelper::strncpy(_prefs->guest_password, &config[15], sizeof(_prefs->guest_password));
+     savePrefs();
+     strcpy(reply, "OK");
++#if defined(WITH_HOTSPOT_OTA)
++  } else if (memcmp(config, "ota.wifi ", 9) == 0) {
++    // format: set ota.wifi <ssid>,<password>
++    HotspotOtaConfig cfg;
++    HotspotOTA::loadConfig(cfg);
++    char* comma = strchr(&config[9], ',');
++    if (comma) {
++      *comma = 0;
++      StrHelper::strncpy(cfg.ssid, &config[9], sizeof(cfg.ssid));
++      StrHelper::strncpy(cfg.password, comma + 1, sizeof(cfg.password));
++      HotspotOTA::saveConfig(cfg);
++      strcpy(reply, "OK");
++    } else {
++      strcpy(reply, "ERR: expected <ssid>,<password>");
++    }
++  } else if (memcmp(config, "ota.sha256 ", 11) == 0) {
++    // Manual hash is the source of truth once set -- it is NOT overridden by a `.sha256` sidecar
++    // fetch (see HotspotOTA::resolveExpectedHash). Use `set ota.sha256 clear` to remove it and
++    // fall back to sidecar-fetch behavior again -- important when moving to a new firmware image,
++    // since a stale manual hash from a previous update will otherwise block a correct sidecar.
++    HotspotOtaConfig cfg;
++    HotspotOTA::loadConfig(cfg);
++    if (memcmp(&config[11], "clear", 5) == 0) {
++      cfg.sha256_hex[0] = 0;
++    } else {
++      StrHelper::strncpy(cfg.sha256_hex, &config[11], sizeof(cfg.sha256_hex));
++    }
++    HotspotOTA::saveConfig(cfg);
++    strcpy(reply, "OK");
++  } else if (memcmp(config, "ota.pwr ", 8) == 0) {
++    // Manual, direct control of the GPIO47 hotspot power switch, entirely independent of
++    // HotspotOTA::run(). Diagnostic/recovery command -- use to confirm or force the rail off if
++    // an update ever leaves its state in doubt (e.g. after a crash or watchdog reset mid-update).
++    if (memcmp(&config[8], "on", 2) == 0) {
++      HotspotOTA::setPower(true);
++      strcpy(reply, "OK");
++    } else if (memcmp(&config[8], "off", 3) == 0) {
++      HotspotOTA::setPower(false);
++      strcpy(reply, "OK");
++    } else {
++      strcpy(reply, "ERR: expected on|off");
++    }
++#endif
+   } else if (memcmp(config, "prv.key ", 8) == 0) {
+     uint8_t prv_key[PRV_KEY_SIZE];
+     bool success = mesh::Utils::fromHex(prv_key, PRV_KEY_SIZE, &config[8]);
+@@ -925,6 +976,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+     sprintf(reply, "> %u mV", _board->getBootVoltage());
+ #else
+     strcpy(reply, "ERROR: Power management not supported");
++#endif
++#if defined(WITH_HOTSPOT_OTA)
++  } else if (memcmp(config, "ota.pwr", 7) == 0) {
++    sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
+ #endif
+   } else {
+     sprintf(reply, "??: %s", config);
+diff --git a/src/helpers/ESP32Board.cpp b/src/helpers/ESP32Board.cpp
+index e0ca1d0..11e9fc5 100644
+--- a/src/helpers/ESP32Board.cpp
++++ b/src/helpers/ESP32Board.cpp
+@@ -38,10 +38,32 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
+   return true;
+ }
+ 
++#if defined(WITH_HOTSPOT_OTA)
++#include <helpers/esp32/HotspotOTA.h>
++
++bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
++  HotspotOtaConfig cfg;
++  HotspotOTA::loadConfig(cfg);
++  StrHelper::strncpy(cfg.url, url, sizeof(cfg.url));
++
++  inhibit_sleep = true;
++  bool ok = HotspotOTA::run(cfg, reply);   // owns GPIO47 power-switch sequencing internally
++  if (ok) reboot();                        // doesn't return
++  return ok;
++}
++#else
++bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
++  return false; // not supported
++}
++#endif
++
+ #else
+ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
+   return false; // not supported
+ }
++bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
++  return false; // not supported
++}
+ #endif
+ 
+ #endif
+diff --git a/src/helpers/ESP32Board.h b/src/helpers/ESP32Board.h
+index a4cbf2a..8b9198f 100644
+--- a/src/helpers/ESP32Board.h
++++ b/src/helpers/ESP32Board.h
+@@ -151,6 +151,7 @@ public:
+   }
+ 
+   bool startOTAUpdate(const char* id, char reply[]) override;
++  bool startOTAUpdateFromURL(const char* url, char reply[]) override;
+ 
+   void setInhibitSleep(bool inhibit) {
+     inhibit_sleep = inhibit;
+diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
+new file mode 100644
+index 0000000..bc3cb0d
+--- /dev/null
++++ b/src/helpers/esp32/HotspotOTA.cpp
+@@ -0,0 +1,243 @@
++#include "HotspotOTA.h"
++#include <WiFi.h>
++#include <HTTPClient.h>
++#include <Update.h>
++#include <SPIFFS.h>
++#include <mbedtls/sha256.h>
++#include <helpers/StrHelper.h>
++
++// The hotspot's WiFi network can take up to ~60s to appear after GPIO47 is asserted (cellular modem
++// boot time). These constants give 6 attempts at 15s each, with a 5s pause between attempts, for a
++// worst-case total budget of 6*15000 + 5*5000 = 115000ms (~1m55s) before giving up -- comfortably
++// past the ~60s worst-case network-appearance time, so an attempt starting after the network is up
++// still gets its full 15s to associate and get a DHCP lease.
++#define OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS   15000
++#define OTA_WIFI_JOIN_RETRY_DELAY_MS        5000
++#define OTA_WIFI_JOIN_MAX_ATTEMPTS             6
++#define OTA_HTTP_TIMEOUT_MS                20000
++
++// WAN reachability check, run once WiFi association succeeds. Advisory only -- see checkWanConnectivity()
++// below. 3 attempts (1 initial + 2 retries), 10s apart: accounts for cellular modems commonly showing
++// WiFi association (L2 link) up before the actual data session (PDP context/NAT) has finished negotiating.
++#define OTA_WAN_CHECK_ATTEMPTS                 3
++#define OTA_WAN_CHECK_RETRY_DELAY_MS       10000
++#define OTA_WAN_CHECK_HOST       "google.com"   // stable, near-100%-uptime anchor -- deliberately NOT the
++                                                 // target firmware host, so a WAN-down failure and a
++                                                 // target-specific failure can be told apart (see below)
++
++#define PIN_HOTSPOT_PWR   47   // GPIO47, confirmed clean on Heltec V4.3.1 (GPIO48 = fallback)
++
++static bool joinWifiStation(const char* ssid, const char* pwd, char reply[]) {
++  WiFi.mode(WIFI_STA);
++  for (int attempt = 0; attempt < OTA_WIFI_JOIN_MAX_ATTEMPTS; attempt++) {
++    WiFi.begin(ssid, pwd);
++    uint32_t start = millis();
++    while (WiFi.status() != WL_CONNECTED && millis() - start < OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS) {
++      delay(250);
++    }
++    if (WiFi.status() == WL_CONNECTED) return true;
++    WiFi.disconnect(true);
++    if (attempt < OTA_WIFI_JOIN_MAX_ATTEMPTS - 1) {
++      delay(OTA_WIFI_JOIN_RETRY_DELAY_MS);   // give the hotspot more time to fully come up
++                                              // before hammering it with another association attempt
++    }
++  }
++  strcpy(reply, "ERR: could not join hotspot WiFi");
++  return false;   // caller (HotspotOTA::run) drops GPIO47 immediately on this return
++}
++
++// Advisory only -- does NOT gate the update. A false result never aborts run() by itself; it's only
++// consulted afterward to pick a more specific error message if a later network step also fails,
++// distinguishing "WAN is down" from "WAN is fine, this specific host/URL has a problem" -- today those
++// collapse into the same generic HTTPClient error. Deliberately targets a stable third-party host
++// (OTA_WAN_CHECK_HOST) rather than the firmware URL's own host, so a problem specific to the firmware
++// host doesn't get misreported as "no WAN".
++static bool checkWanConnectivity() {
++  IPAddress ip;
++  for (int attempt = 0; attempt < OTA_WAN_CHECK_ATTEMPTS; attempt++) {
++    if (WiFi.hostByName(OTA_WAN_CHECK_HOST, ip)) return true;
++    if (attempt < OTA_WAN_CHECK_ATTEMPTS - 1) delay(OTA_WAN_CHECK_RETRY_DELAY_MS);
++  }
++  return false;
++}
++
++// Resolves the expected SHA-256 for cfg.url. Precedence: a manually-set hash (`set ota.sha256`) is the
++// source of truth whenever present -- it is NOT overridden by a sidecar fetch, since the sidecar travels
++// over the same unauthenticated HTTP connection as the firmware itself and offers no independent guarantee.
++// The "<url>.sha256" sidecar fetch (over local WiFi, not the LoRa CLI path) is used only when no manual
++// hash is set.
++static bool resolveExpectedHash(const char* url, const char* manual_hex, uint8_t expect[32], char reply[]) {
++  if (manual_hex[0] != 0) {
++    return mesh::Utils::fromHex(expect, 32, manual_hex);
++  }
++
++  char sidecar_url[160];
++  snprintf(sidecar_url, sizeof(sidecar_url), "%s.sha256", url);
++
++  HTTPClient sidecar_http;
++  if (sidecar_http.begin(sidecar_url) && sidecar_http.GET() == HTTP_CODE_OK) {
++    String hex = sidecar_http.getString();
++    hex.trim();
++    sidecar_http.end();
++    if (hex.length() == 64 && mesh::Utils::fromHex(expect, 32, hex.c_str())) {
++      return true;
++    }
++  } else {
++    sidecar_http.end();
++  }
++
++  strcpy(reply, "ERR: no ota.sha256 set and no .sha256 sidecar found");
++  return false;
++}
++
++bool HotspotOTA::run(const HotspotOtaConfig& cfg, char reply[]) {
++  if (cfg.ssid[0] == 0 || cfg.url[0] == 0) {
++    strcpy(reply, "ERR: ota.wifi/ota.url not configured");
++    return false;
++  }
++
++  pinMode(PIN_HOTSPOT_PWR, OUTPUT);
++  digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // must stay HIGH for the whole network phase --
++                                          // TPS22995-class load switches are not latches
++
++  if (!joinWifiStation(cfg.ssid, cfg.password, reply)) {
++    digitalWrite(PIN_HOTSPOT_PWR, LOW);
++    return false;
++  }
++
++  // Advisory only -- see checkWanConnectivity(). Does not gate anything below; run() proceeds
++  // identically regardless of the result. Only consulted to pick a more specific error message if
++  // resolveExpectedHash() or the main HTTP GET also fail.
++  bool wan_ok = checkWanConnectivity();
++
++  uint8_t expect[32];
++  if (!resolveExpectedHash(cfg.url, cfg.sha256_hex, expect, reply)) {
++    if (!wan_ok) strcpy(reply, "ERR: WiFi joined but no WAN connectivity");
++    digitalWrite(PIN_HOTSPOT_PWR, LOW);
++    WiFi.disconnect(true);
++    return false;
++  }
++
++  HTTPClient http;
++  http.setTimeout(OTA_HTTP_TIMEOUT_MS);
++  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);   // GitHub release URLs 302 to a
++                                                              // presigned release-assets.githubusercontent.com
++                                                              // link -- without this the GET below returns
++                                                              // 302, not the firmware bytes
++  if (!http.begin(cfg.url)) {
++    strcpy(reply, "ERR: could not open URL");
++    digitalWrite(PIN_HOTSPOT_PWR, LOW);
++    WiFi.disconnect(true);
++    return false;
++  }
++
++  int code = http.GET();
++  if (code != HTTP_CODE_OK) {
++    if (!wan_ok) {
++      strcpy(reply, "ERR: WiFi joined but no WAN connectivity");
++    } else {
++      sprintf(reply, "ERR: HTTP GET failed (%d)", code);
++    }
++    http.end();
++    digitalWrite(PIN_HOTSPOT_PWR, LOW);
++    WiFi.disconnect(true);
++    return false;
++  }
++
++  int len = http.getSize();   // -1 if server didn't send Content-Length
++  if (!Update.begin(len > 0 ? (size_t)len : UPDATE_SIZE_UNKNOWN, U_FLASH)) {
++    strcpy(reply, "ERR: Update.begin failed");
++    http.end();
++    digitalWrite(PIN_HOTSPOT_PWR, LOW);
++    WiFi.disconnect(true);
++    return false;
++  }
++
++  mbedtls_sha256_context sha_ctx;
++  mbedtls_sha256_init(&sha_ctx);
++  mbedtls_sha256_starts(&sha_ctx, 0);
++
++  WiFiClient* stream = http.getStreamPtr();
++  uint8_t buf[1024];
++  int written = 0;
++  while (http.connected() && (len < 0 || written < len)) {
++    size_t avail = stream->available();
++    if (!avail) { delay(1); continue; }
++    int n = stream->readBytes(buf, min(avail, sizeof(buf)));
++    if (n <= 0) break;
++    if (Update.write(buf, n) != (size_t)n) {
++      strcpy(reply, "ERR: flash write failed");
++      Update.abort();
++      http.end();
++      digitalWrite(PIN_HOTSPOT_PWR, LOW);
++      WiFi.disconnect(true);
++      return false;
++    }
++    mbedtls_sha256_update(&sha_ctx, buf, n);
++    written += n;
++  }
++  http.end();
++
++  if (len > 0 && written != len) {
++    strcpy(reply, "ERR: download incomplete");
++    Update.abort();
++    digitalWrite(PIN_HOTSPOT_PWR, LOW);
++    WiFi.disconnect(true);
++    return false;
++  }
++
++  uint8_t digest[32];
++  mbedtls_sha256_finish(&sha_ctx, digest);
++  if (memcmp(digest, expect, 32) != 0) {
++    strcpy(reply, "ERR: SHA-256 mismatch");
++    Update.abort();
++    digitalWrite(PIN_HOTSPOT_PWR, LOW);   // no reason to keep the hotspot up once we know it's bad
++    WiFi.disconnect(true);
++    return false;
++  }
++
++  // Hash verified. All bytes are already sitting in the *inactive* OTA partition -- writing them
++  // there as they streamed in cannot corrupt the currently-running firmware, since ESP32's OTA
++  // scheme never touches the active/booting partition until Update.end() flips the pointer. So the
++  // network dependency genuinely ends here: drop hotspot power now, then finalize locally.
++  digitalWrite(PIN_HOTSPOT_PWR, LOW);
++  WiFi.disconnect(true);
++
++  if (!Update.end(true)) {   // local-only from here: validates size/CRC, flips boot partition pointer
++    strcpy(reply, "ERR: Update.end failed");
++    return false;
++  }
++
++  strcpy(reply, "OK - rebooting");
++  return true;   // caller reboots
++}
++
++bool HotspotOTA::loadConfig(HotspotOtaConfig& cfg) {
++  memset(&cfg, 0, sizeof(cfg));
++  File f = SPIFFS.open("/ota_hotspot", "r");
++  if (!f) return false;
++  f.read((uint8_t*)&cfg, sizeof(cfg));
++  f.close();
++  return true;
++}
++
++bool HotspotOTA::saveConfig(const HotspotOtaConfig& cfg) {
++  File f = SPIFFS.open("/ota_hotspot", "w");
++  if (!f) return false;
++  f.write((const uint8_t*)&cfg, sizeof(cfg));
++  f.close();
++  return true;
++}
++
++void HotspotOTA::setPower(bool on) {
++  pinMode(PIN_HOTSPOT_PWR, OUTPUT);
++  digitalWrite(PIN_HOTSPOT_PWR, on ? HIGH : LOW);
++}
++
++bool HotspotOTA::getPower() {
++  // No pinMode() call here deliberately -- reading shouldn't have side effects. digitalRead() on
++  // ESP32 reads the actual pin level regardless of current pinMode, including on a pin currently
++  // driven as OUTPUT. On a fresh boot before setPower()/run() has ever touched this pin, this reads
++  // whatever the pin defaults to -- LOW/off given the hardware pulldown recommended in the design notes.
++  return digitalRead(PIN_HOTSPOT_PWR) == HIGH;
++}
+diff --git a/src/helpers/esp32/HotspotOTA.h b/src/helpers/esp32/HotspotOTA.h
+new file mode 100644
+index 0000000..43b0f2d
+--- /dev/null
++++ b/src/helpers/esp32/HotspotOTA.h
+@@ -0,0 +1,30 @@
++#pragma once
++#include <Arduino.h>
++
++// Persisted alongside (but separate from) NodePrefs, in its own small file on SPIFFS,
++// so we don't touch the cross-board NodePrefs binary layout.
++struct HotspotOtaConfig {
++  // Set once via `set ota.wifi`, then persists across every future OTA (same SPIFFS
++  // guarantee that already protects NodePrefs and the node's identity).
++  char ssid[32];
++  char password[64];
++  // Supplied fresh with each `start ota url` command; tied to a specific firmware
++  // image, not a credential.
++  char url[128];
++  char sha256_hex[65];   // source of truth once set via `set ota.sha256`; NOT overridden by a sidecar
++                          // fetch. `set ota.sha256 clear` empties this to fall back to sidecar-fetch.
++};
++
++namespace HotspotOTA {
++  bool loadConfig(HotspotOtaConfig& cfg);                 // reads /ota_hotspot
++  bool saveConfig(const HotspotOtaConfig& cfg);            // writes /ota_hotspot
++
++  // Joins WiFi as a station, GETs cfg.url, streams into Update.*, reboots on success.
++  // Returns false (and fills reply[]) on any failure; does NOT reboot on failure.
++  bool run(const HotspotOtaConfig& cfg, char reply[]);
++
++  // Manual, direct control of the GPIO47 hotspot power switch, entirely independent of run().
++  // Diagnostic/recovery only -- see `set ota.pwr <on|off>` / `get ota.pwr`.
++  void setPower(bool on);
++  bool getPower();
++}
+diff --git a/variants/heltec_v4/platformio.ini b/variants/heltec_v4/platformio.ini
+index fabf382..f5b83be 100644
+--- a/variants/heltec_v4/platformio.ini
++++ b/variants/heltec_v4/platformio.ini
+@@ -92,9 +92,11 @@ build_flags =
+   -D ADVERT_LON=0.0
+   -D ADMIN_PASSWORD='"password"'
+   -D MAX_NEIGHBOURS=50
++  -D WITH_HOTSPOT_OTA=1
+ ;  -D MESH_PACKET_LOGGING=1
+ ;  -D MESH_DEBUG=1
+ build_src_filter = ${heltec_v4_oled.build_src_filter}
++  +<helpers/esp32/HotspotOTA.cpp>
+   +<helpers/ui/SSD1306Display.cpp>
+   +<../examples/simple_repeater>
+ lib_deps =
