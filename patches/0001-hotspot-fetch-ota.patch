@@ -480,6 +480,7 @@ index 0000000..43b0f2d
 @@ -0,0 +1,30 @@
 +#pragma once
 +#include <Arduino.h>
++#include <helpers/StrHelper.h>
 +
 +// Persisted alongside (but separate from) NodePrefs, in its own small file on SPIFFS,
 +// so we don't touch the cross-board NodePrefs binary layout.
