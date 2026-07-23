@@ -175,15 +175,16 @@ index b78ad6e..9831607 100644
    } else {
      sprintf(reply, "??: %s", config);
 diff --git a/src/helpers/ESP32Board.cpp b/src/helpers/ESP32Board.cpp
-index e0ca1d0..11e9fc5 100644
+index e0ca1d0..3b832b9 100644
 --- a/src/helpers/ESP32Board.cpp
 +++ b/src/helpers/ESP32Board.cpp
-@@ -38,10 +38,32 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
+@@ -38,10 +38,33 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
    return true;
  }
  
 +#if defined(WITH_HOTSPOT_OTA)
 +#include <helpers/esp32/HotspotOTA.h>
++#include <helpers/TxtDataHelpers.h>   // StrHelper -- there is no standalone StrHelper.h
 +
 +bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
 +  HotspotOtaConfig cfg;
@@ -225,17 +226,19 @@ index a4cbf2a..8b9198f 100644
      inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..bc3cb0d
+index 0000000..2c1bd3c
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,243 @@
+@@ -0,0 +1,245 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
 +#include <Update.h>
 +#include <SPIFFS.h>
 +#include <mbedtls/sha256.h>
-+#include <helpers/StrHelper.h>
++#include <Utils.h>                    // mesh::Utils::fromHex
++#include <helpers/TxtDataHelpers.h>   // StrHelper -- there is no standalone StrHelper.h; the class
++                                       // lives here (confirmed against how CommonCLI.cpp reaches it)
 +
 +// The hotspot's WiFi network can take up to ~60s to appear after GPIO47 is asserted (cellular modem
 +// boot time). These constants give 6 attempts at 15s each, with a 5s pause between attempts, for a
@@ -480,7 +483,6 @@ index 0000000..43b0f2d
 @@ -0,0 +1,30 @@
 +#pragma once
 +#include <Arduino.h>
-+#include "../StrHelper.h"
 +
 +// Persisted alongside (but separate from) NodePrefs, in its own small file on SPIFFS,
 +// so we don't touch the cross-board NodePrefs binary layout.
