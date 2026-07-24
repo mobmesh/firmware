@@ -1,6 +1,6 @@
 # MeshCore Hotspot OTA
 
-Adds a self-hosted, WiFi-hotspot-based over-the-air update path to [MeshCore](https://github.com/meshcore-dev/MeshCore) firmware for the Heltec V4, and automatically tracks upstream releases.
+Adds a WiFi-hotspot-based over-the-air update path to [MeshCore](https://github.com/meshcore-dev/MeshCore) firmware for the Heltec V4, and automatically tracks upstream releases.
 
 MeshCore's built-in `start ota` command turns the device into a WiFi access point and waits for someone to upload a `.bin` file through a web page. This project adds a second path: the device instead joins an existing WiFi hotspot as a client, downloads the firmware from a URL, verifies it, and flashes itself — no laptop or phone required at the update site.
 
