@@ -82,6 +82,24 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.pick.outputs.release_tag }}")
           if [ "$STATUS" = "200" ]; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
 
+      - name: Fetch upstream release notes
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          BODY=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases/tags/${{ steps.pick.outputs.ref }}" \
+            | jq -r '.body // ""')
+          {
+            echo "Built from [\`${{ steps.pick.outputs.ref }}\`](https://github.com/${{ env.UPSTREAM_REPO }}/releases/tag/${{ steps.pick.outputs.ref }}) of upstream MeshCore."
+            echo ""
+            echo "## Upstream release notes"
+            echo ""
+            if [ -n "$BODY" ]; then
+              echo "$BODY"
+            else
+              echo "_Upstream published no release notes for this tag._"
+            fi
+          } > release-notes.md
+
       - name: Checkout upstream at resolved ref
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
@@ -162,6 +180,7 @@ jobs:
         with:
           tag_name: ${{ steps.pick.outputs.release_tag }}
           name: "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - hotspot ota mod"
+          body_path: release-notes.md
           files: |
             ${{ steps.artifact.outputs.name }}
             ${{ steps.artifact.outputs.name }}.sha256
