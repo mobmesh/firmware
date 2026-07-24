@@ -527,3 +527,15 @@ index fabf382..f5b83be 100644
    +<helpers/ui/SSD1306Display.cpp>
    +<../examples/simple_repeater>
  lib_deps =
+@@ -156,9 +156,11 @@
+   -D ADVERT_LON=0.0
+   -D ADMIN_PASSWORD='"password"'
+   -D ROOM_PASSWORD='"hello"'
++  -D WITH_HOTSPOT_OTA=1
+ ;  -D MESH_PACKET_LOGGING=1
+ ;  -D MESH_DEBUG=1
+ build_src_filter = ${heltec_v4_oled.build_src_filter}
++  +<helpers/esp32/HotspotOTA.cpp>
+   +<helpers/ui/SSD1306Display.cpp>
+   +<../examples/simple_room_server>
+ lib_deps =
