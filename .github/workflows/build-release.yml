@@ -37,7 +37,7 @@ jobs:
           - id: room_server
             build_env: heltec_v4_room_server
             upstream_tag_prefix: room-server
-            release_title: Room Server
+            release_title: Room
             asset_basename: heltec_v4_room_ota_mod
             sync_docs: false
     runs-on: ubuntu-latest
