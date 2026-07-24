@@ -109,8 +109,8 @@ jobs:
         id: artifact
         run: |
           cd upstream-src
-          BIN=$(find .pio/build/${{ env.BUILD_ENV }} -maxdepth 1 -name "*.bin" ! -name "*merged*" | head -1)
-          test -n "$BIN"
+          BIN=".pio/build/${{ env.BUILD_ENV }}/firmware.bin"
+          test -f "$BIN"
           VERSION="${{ needs.resolve-ref.outputs.ref }}"
           VERSION="${VERSION#repeater-}"   # strip the "repeater-" tag prefix, keep just "vX.Y.Z"
           NAME="heltec_v4_rep_ota_mod-${VERSION}.bin"
