@@ -25,6 +25,7 @@ jobs:
     outputs:
       ref: ${{ steps.pick.outputs.ref }}
       release_tag: ${{ steps.pick.outputs.release_tag }}
+      version: ${{ steps.pick.outputs.version }}
       already_built: ${{ steps.check.outputs.exists }}
     steps:
       - id: pick
@@ -38,6 +39,7 @@ jobs:
           fi
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
           echo "release_tag=hotspot-ota-$REF" >> "$GITHUB_OUTPUT"
+          echo "version=${REF#repeater-}" >> "$GITHUB_OUTPUT"
       - id: check
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -125,7 +127,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.resolve-ref.outputs.release_tag }}
-          name: "Hotspot-OTA build (${{ needs.resolve-ref.outputs.ref }})"
+          name: "Repeater ${{ needs.resolve-ref.outputs.version }} - hotspot ota mod"
           files: |
             ${{ steps.artifact.outputs.name }}
             ${{ steps.artifact.outputs.name }}.sha256
