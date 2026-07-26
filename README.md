@@ -36,7 +36,7 @@ Builds also run on demand via the Actions tab (**Run workflow**), optionally tar
 
 ## Releases
 
-Each release is named after the variant and the upstream MeshCore release it was built from, e.g. **"Repeater v1.16.0 - hotspot ota mod"** or **"Room v1.16.0 - hotspot ota mod"**, and contains:
+Each release is named after the variant and the upstream MeshCore release it was built from, e.g. **"Repeater v1.16.0 - ota_mod"** or **"Room v1.16.0 - ota_mod"**, and contains:
 
 - `<asset-basename>-vX.Y.Z.bin` — the firmware image (see the variant table above for exact asset names)
 - `<asset-basename>-vX.Y.Z.bin.sha256` — its SHA-256 checksum

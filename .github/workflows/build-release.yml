@@ -250,7 +250,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.pick.outputs.release_tag }}
-          name: "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - hotspot ota mod"
+          name: "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - ota_mod"
           body_path: release-notes.md
           files: |
             ${{ steps.artifact.outputs.name }}
