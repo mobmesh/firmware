@@ -58,7 +58,7 @@ These are available on any device running firmware built from these patches, in 
 | `start ota join` / `start ota leave` | Pre-flight: join the configured WiFi hotspot only (no download), or disconnect and drop hotspot power. |
 | `get ota.wan` | Pre-flight: check WAN reachability once `start ota join` has joined. |
 | `get ota.pwr` / `set ota.pwr <on\|off>` | Diagnostic/recovery command to read or directly force the hotspot power switch, independent of `start ota url`. |
-| `get ota.rollback` | Status of the post-update rollback guard as `active: <A\|B> - <state>`, e.g. `active: A - valid`. `<A\|B>` is the currently-running OTA slot; `<state>` is `pending` (on probation), `valid` (confirmed or n/a), or `n/a`. |
+| `get ota.active` | The currently-running OTA slot and rollback status as `active: <A\|B> - <state>`, e.g. `active: A - valid`. `<state>` is `pending` (on probation), `valid` (confirmed or n/a), or `n/a`. |
 | `set ota.active <A\|B>` | Point the bootloader at the other OTA slot and reboot into it, without reflashing. Refuses if that slot is already active or has no valid image. |
 
 Example:

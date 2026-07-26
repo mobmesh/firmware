@@ -1,14 +1,14 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index bd78b22..6edb95e 100644
+index bd78b22..a18f434 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
 @@ -153,6 +153,41 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
  
  ---
  
-+#### View the post-update rollback confirmation status
++#### View the active OTA slot and post-update rollback confirmation status
 +**Usage:**
-+- `get ota.rollback`
++- `get ota.active`
 +
 +**Returns:** `active: <A|B> - <state>`, e.g. `active: A - valid`. `<A|B>` is which OTA slot is
 +currently running (`A` = `ota_0`, `B` = `ota_1`). `<state>` is one of:
@@ -30,7 +30,7 @@ index bd78b22..6edb95e 100644
 +- `set ota.active <A|B>`
 +
 +**Parameters:**
-+- `A` / `B`: The OTA slot to boot into next (`A` = `ota_0`, `B` = `ota_1`) -- see `get ota.rollback`.
++- `A` / `B`: The OTA slot to boot into next (`A` = `ota_0`, `B` = `ota_1`) -- see `get ota.active`.
 +
 +**Note:** Points the bootloader at the requested slot and reboots into it without touching flash
 +contents -- useful when a USB flash lands on the currently-inactive slot (e.g. after an earlier
@@ -147,7 +147,7 @@ index a3798b2..ba0420d 100644
 +#endif
  }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index ee1eb42..e007431 100644
+index ee1eb42..44a6ac2 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -15,6 +15,10 @@
@@ -180,7 +180,7 @@ index ee1eb42..e007431 100644
      HotspotOTA::checkWan(reply);
 +#endif
 +#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
-+  } else if (memcmp(config, "ota.rollback", 12) == 0) {
++  } else if (memcmp(config, "ota.active", 10) == 0) {
 +    sprintf(reply, "> %s", RollbackGuard::status());
  #endif
    } else {
@@ -328,7 +328,7 @@ index 0000000..2b1f534
 +}
 diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
 new file mode 100644
-index 0000000..296262f
+index 0000000..f847c656
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.h
 @@ -0,0 +1,37 @@
@@ -360,7 +360,7 @@ index 0000000..296262f
 +  // return.
 +  void onRadioInitFailure();
 +
-+  // For `get ota.rollback` -- "active: A - <state>" / "active: B - <state>", state being "pending",
++  // For `get ota.active` -- "active: A - <state>" / "active: B - <state>", state being "pending",
 +  // "valid" (confirmed or n/a to this boot), or "n/a" (feature unavailable for this partition).
 +  const char* status();
 +
