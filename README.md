@@ -70,7 +70,7 @@ start ota url https://example.com/firmware/heltec_v4_repeater-v1.16.0.bin
 
 If a file named `<url>.sha256` exists alongside the firmware, it's fetched automatically and used to verify the download — no manual checksum needed. Full parameter and usage details for these commands, in the same format as upstream's own CLI reference, are in [`docs/cli-additions.md`](docs/cli-additions.md). See [`docs/cli_commands.md`](https://github.com/meshcore-dev/MeshCore/blob/main/docs/cli_commands.md) in upstream MeshCore for the complete standard CLI reference.
 
-**`start ota url` does not reply until it finishes.** Unlike most CLI commands, there is no immediate acknowledgment and no progress update — the device is joining WiFi, downloading, verifying, and flashing before it sends anything back, which can take up to about two minutes. The device will reboot and mount the new firmware image in a probation mode. You can check the testing status of the firmware using the 'get ota.active' detailed above. 
+**`start ota url` does not reply until it finishes.** Unlike most CLI commands, there is no immediate acknowledgment and no progress update — the device is joining WiFi, downloading, verifying, and flashing before it sends anything back, which can take up to about two minutes. The device will reboot and mount the new firmware image and begin automatic rollback protection testing. 
 
 ## Automatic rollback protection
 
