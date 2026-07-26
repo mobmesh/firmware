@@ -55,6 +55,8 @@ These are available on any device running firmware built from these patches, in 
 | `set ota.sha256 <hex>` | Manually specify the expected SHA-256 of the next firmware download. Takes precedence over an automatically-fetched checksum. |
 | `set ota.sha256 clear` | Clear a manually-set checksum so an automatically-fetched one can be used again. |
 | `start ota url <url>` | Join the configured WiFi hotspot, download the firmware at `<url>`, verify it, and flash it. |
+| `start ota wifi.join` / `start ota wifi.leave` | Pre-flight: join the configured WiFi hotspot only (no download), or disconnect and drop hotspot power. |
+| `get ota.wan` | Pre-flight: check WAN reachability once `start ota wifi.join` has joined. |
 | `get ota.pwr` / `set ota.pwr <on\|off>` | Diagnostic/recovery command to read or directly force the hotspot power switch, independent of `start ota url`. |
 | `get ota.rollback` | Read-only status of the post-update rollback guard: `pending` (on probation, not yet confirmed), `valid` (confirmed, or not applicable to this boot), or `n/a`. |
 
