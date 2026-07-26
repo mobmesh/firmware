@@ -1,8 +1,8 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index bd78b22..a18f434 100644
+index bd78b22..407211d 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -153,6 +153,41 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
+@@ -153,6 +153,46 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
  
  ---
  
@@ -10,13 +10,18 @@ index bd78b22..a18f434 100644
 +**Usage:**
 +- `get ota.active`
 +
-+**Returns:** `active: <A|B> - <state>`, e.g. `active: A - valid`. `<A|B>` is which OTA slot is
-+currently running (`A` = `ota_0`, `B` = `ota_1`). `<state>` is one of:
++**Returns:** `active: <A|B> - <state> | <A|B>: <state>`, e.g. `active: A - valid | B: valid`. The
++first `<A|B>` is the currently-running slot (`A` = `ota_0`, `B` = `ota_1`); its `<state>` is one of:
 +- `pending`: This boot is on probation after an OTA update (via either `start ota` or `start ota url`).
 +  The device will automatically confirm itself as valid ~90 seconds after boot if the radio initializes
 +  correctly; an unconfirmed reset before then reverts to the previous firmware automatically.
 +- `valid`: Already confirmed, or this boot isn't the result of an OTA update in the first place.
 +- `n/a`: Rollback state could not be queried for the running partition.
++
++The second `<A|B>: <state>` reports the *other* slot's persisted state, read the same way regardless
++of which slot is currently running: `valid` (confirmed good), `invalid` (rejected by a previous
++rollback), `aborted` (an update to it never finished), `new` (flashed but not yet booted), or `n/a`
++(never involved in an OTA update, e.g. a factory/USB-only flash).
 +
 +**Note:** Confirms automatically after the confirm delay with a working radio; rejects immediately
 +(rollback + reboot) if `radio_init()` fails on a probationary boot.
@@ -187,10 +192,10 @@ index ee1eb42..44a6ac2 100644
      sprintf(reply, "??: %s", config);
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
-index 0000000..2b1f534
+index 0000000..ecdbe11
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.cpp
-@@ -0,0 +1,135 @@
+@@ -0,0 +1,155 @@
 +#include "RollbackGuard.h"
 +#include <esp_ota_ops.h>
 +#include <esp_partition.h>
@@ -234,6 +239,19 @@ index 0000000..2b1f534
 +static const esp_partition_t* findPartitionByLetter(char letter) {
 +  esp_partition_subtype_t subtype = (letter == 'A') ? ESP_PARTITION_SUBTYPE_APP_OTA_0 : ESP_PARTITION_SUBTYPE_APP_OTA_1;
 +  return esp_partition_find_first(ESP_PARTITION_TYPE_APP, subtype, NULL);
++}
++
++// esp_ota_get_state_partition() reads state persisted in the otadata partition, not something only
++// the running image can see -- any partition's recorded state is readable from either slot.
++static const char* stateLabel(esp_ota_img_states_t state) {
++  switch (state) {
++    case ESP_OTA_IMG_VALID: return "valid";
++    case ESP_OTA_IMG_PENDING_VERIFY: return "pending";
++    case ESP_OTA_IMG_INVALID: return "invalid";
++    case ESP_OTA_IMG_ABORTED: return "aborted";
++    case ESP_OTA_IMG_NEW: return "new";
++    default: return "n/a";   // ESP_OTA_IMG_UNDEFINED -- never went through OTA (e.g. factory/USB flash)
++  }
 +}
 +
 +static uint8_t readFailCount() {
@@ -286,10 +304,17 @@ index 0000000..2b1f534
 +}
 +
 +const char* RollbackGuard::status() {
-+  static char buf[24];
++  static char buf[40];
 +  esp_ota_img_states_t state;
 +  const char* verdict = isPendingVerify(&state) ? "pending" : (state == ESP_OTA_IMG_VALID ? "valid" : "n/a");
-+  sprintf(buf, "active: %c - %s", partitionLetter(esp_ota_get_running_partition()), verdict);
++  char active_letter = partitionLetter(esp_ota_get_running_partition());
++
++  char other_letter = (active_letter == 'A') ? 'B' : 'A';
++  const esp_partition_t* other = findPartitionByLetter(other_letter);
++  esp_ota_img_states_t other_state = ESP_OTA_IMG_UNDEFINED;
++  if (other) esp_ota_get_state_partition(other, &other_state);
++
++  sprintf(buf, "active: %c - %s | %c: %s", active_letter, verdict, other_letter, stateLabel(other_state));
 +  return buf;
 +}
 +
@@ -328,10 +353,10 @@ index 0000000..2b1f534
 +}
 diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
 new file mode 100644
-index 0000000..f847c656
+index 0000000..070697c
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.h
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,38 @@
 +#pragma once
 +#include <Arduino.h>
 +
@@ -360,8 +385,9 @@ index 0000000..f847c656
 +  // return.
 +  void onRadioInitFailure();
 +
-+  // For `get ota.active` -- "active: A - <state>" / "active: B - <state>", state being "pending",
-+  // "valid" (confirmed or n/a to this boot), or "n/a" (feature unavailable for this partition).
++  // For `get ota.active` -- "active: <A|B> - <state> | <A|B>: <state>", the running slot first
++  // (state: "pending"/"valid"/"n/a" for that boot) then the other slot's persisted state ("valid",
++  // "invalid", "aborted", "new", or "n/a" if never involved in an OTA).
 +  const char* status();
 +
 +  // For `set ota.active <A|B>` -- points the bootloader at the other OTA slot without touching flash
