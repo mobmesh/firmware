@@ -82,6 +82,8 @@ This is added behavior, not something stock MeshCore does.
 
 **Why:** MeshCore's default behavior of just halting on a radio initialization failure is a real risk especially for a node that's physically remote and can't be walked over to and re-flashed. Without this patch, any bad firmware update can brick a node, leaving it non-responsive to any radio commands. With this patch, the device can self-recover.
 
+**Fragility note:** this depends on overriding Arduino-ESP32 core's weak `verifyRollbackLater()` symbol (see `RollbackGuard.cpp`) with an exact name and signature match. If a future Arduino-ESP32 core bump ever renames or changes that hook, the override silently stops linking — no build error, no runtime error. The failure mode is benign (every image just auto-confirms immediately again, i.e. stock upstream's original behavior before this patch existed), but it's a silent loss of the safety net, not a loud one. Worth a periodic sanity check (flash a build that would fail `radio_init()` and confirm it actually rolls back) after any core version bump.
+
 ## Requirements
 
 - Heltec V4 hardware (GPIO47 is confirmed clean for this on the V4.3.1 revision; GPIO48 is a documented fallback if 47 is unavailable), with an external switch controlling power to a WiFi hotspot device.

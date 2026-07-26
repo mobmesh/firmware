@@ -17,6 +17,11 @@ on:
         description: 'Limit this run to a single variant id, e.g. repeater or room_server (blank = build all variants)'
         required: false
         default: ''
+      force_rebuild:
+        description: 'Rebuild and republish even if a release already exists for the resolved tag (manual runs only -- the scheduled poll always respects the existing-release check)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   UPSTREAM_REPO: meshcore-dev/MeshCore
@@ -76,6 +81,10 @@ jobs:
         name: Check if already built
         if: steps.filter.outputs.skip == 'false'
         run: |
+          if [ "${{ github.event.inputs.force_rebuild }}" = "true" ]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.pick.outputs.release_tag }}")

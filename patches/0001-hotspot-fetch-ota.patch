@@ -266,7 +266,7 @@ index a4cbf2a..8b9198f 100644
      inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..a29638e
+index 0000000..2870346
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
 @@ -0,0 +1,262 @@
@@ -338,7 +338,7 @@ index 0000000..a29638e
 +    return mesh::Utils::fromHex(expect, 32, manual_hex);
 +  }
 +
-+  char sidecar_url[160];
++  char sidecar_url[sizeof(HotspotOtaConfig::url) + 7];   // + strlen(".sha256")
 +  snprintf(sidecar_url, sizeof(sidecar_url), "%s.sha256", url);
 +
 +  HTTPClient sidecar_http;
@@ -534,12 +534,13 @@ index 0000000..a29638e
 +}
 diff --git a/src/helpers/esp32/HotspotOTA.h b/src/helpers/esp32/HotspotOTA.h
 new file mode 100644
-index 0000000..768983a
+index 0000000..bd26514
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.h
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,35 @@
 +#pragma once
 +#include <Arduino.h>
++#include <helpers/BaseChatMesh.h>   // MAX_TEXT_LEN
 +
 +// Persisted separately from NodePrefs, its own SPIFFS file.
 +struct HotspotOtaConfig {
@@ -549,6 +550,11 @@ index 0000000..768983a
 +                    // the LoRa CLI message budget, not a round number
 +  char sha256_hex[65];   // manual hash; `set ota.sha256 clear` falls back to sidecar-fetch
 +};
++
++// Catches MAX_TEXT_LEN drifting out from under url[]'s hand-derived size -- silently truncating
++// long URLs again -- as a compile error instead.
++static_assert(sizeof(HotspotOtaConfig::url) == MAX_TEXT_LEN - 14 + 1,
++              "HotspotOtaConfig.url must track MAX_TEXT_LEN minus the \"start ota url \" prefix");
 +
 +namespace HotspotOTA {
 +  bool loadConfig(HotspotOtaConfig& cfg);
