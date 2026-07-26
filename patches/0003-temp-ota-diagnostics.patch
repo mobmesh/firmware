@@ -138,13 +138,20 @@ index 0000000..0000000 100644
      } else if (memcmp(command, "start ota", 9) == 0) {
        if (!_board->startOTAUpdate(_prefs->node_name, reply)) {
          strcpy(reply, "Error");
-@@ -993,6 +1010,9 @@
+@@ -993,6 +1010,16 @@
  #if defined(WITH_HOTSPOT_OTA)
    } else if (memcmp(config, "ota.pwr", 7) == 0) {
      sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
 +  } else if (memcmp(config, "ota.wan", 7) == 0) {
 +    // TEMPORARY diagnostic -- see `start ota.wifi`. Remove alongside HotspotOTA::checkWan().
 +    HotspotOTA::checkWan(reply);
++  } else if (memcmp(config, "ota.wifi", 8) == 0) {
++    // TEMPORARY diagnostic -- confirms exactly what `set ota.wifi` stored (SSID may contain
++    // characters, e.g. spaces, worth double-checking survived parsing/storage intact). Password
++    // shown by length only, never in plaintext, since this still gets echoed back over serial/BLE.
++    HotspotOtaConfig cfg;
++    HotspotOTA::loadConfig(cfg);
++    sprintf(reply, "> ssid=\"%s\" pwd_len=%d", cfg.ssid, (int)strlen(cfg.password));
  #endif
  #if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
    } else if (memcmp(config, "ota.rollback", 12) == 0) {
