@@ -138,7 +138,7 @@ index 0000000..0000000 100644
      } else if (memcmp(command, "start ota", 9) == 0) {
        if (!_board->startOTAUpdate(_prefs->node_name, reply)) {
          strcpy(reply, "Error");
-@@ -993,6 +1010,16 @@
+@@ -993,6 +1010,21 @@
  #if defined(WITH_HOTSPOT_OTA)
    } else if (memcmp(config, "ota.pwr", 7) == 0) {
      sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
@@ -149,7 +149,12 @@ index 0000000..0000000 100644
 +    // TEMPORARY diagnostic -- confirms exactly what `set ota.wifi` stored (SSID may contain
 +    // characters, e.g. spaces, worth double-checking survived parsing/storage intact). Password
 +    // shown by length only, never in plaintext, since this still gets echoed back over serial/BLE.
-+    HotspotOtaConfig cfg;
++    // `cfg` is static, not a stack local -- handleGetCmd() is a large single function with many
++    // branches, and on hardware, adding a 289-byte stack local here reproduced a boot loop
++    // (USB CDC repeatedly dropping) that a same-sized local in the much shorter wifiConnect()
++    // did not; moving it off the stack avoids the risk entirely rather than chasing the exact
++    // stack-margin cause.
++    static HotspotOtaConfig cfg;
 +    HotspotOTA::loadConfig(cfg);
 +    sprintf(reply, "> ssid=\"%s\" pwd_len=%d", cfg.ssid, (int)strlen(cfg.password));
  #endif
