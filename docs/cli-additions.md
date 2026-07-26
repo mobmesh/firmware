@@ -123,6 +123,11 @@ contents -- useful when a USB flash lands on the currently-inactive slot (e.g. a
 `start ota url` update flipped which slot is active) and appears not to take effect. Refuses if the
 requested slot is already active, doesn't exist, or has no valid app image flashed to it.
 
+Switching also re-arms rollback probation for the target slot, even if it was previously `valid` --
+ESP-IDF marks any newly-selected boot partition `new`, which the bootloader promotes to `pending` on
+that boot. `get ota.active` will report `pending` right after the swap; this is expected, not a fault,
+and confirms `valid` again after the normal ~90s confirm delay.
+
 **Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag (Heltec V4 repeater/room server only)
 
 ---
