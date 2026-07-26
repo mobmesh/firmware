@@ -1,8 +1,8 @@
 # MeshCore Hotspot OTA
 
-Adds a WiFi-hotspot-based over-the-air update path to [MeshCore](https://github.com/meshcore-dev/MeshCore) firmware for the Heltec V4, and automatically tracks upstream releases.
+Adds a hotspot-based over-the-air update path to [MeshCore](https://github.com/meshcore-dev/MeshCore) firmware for the Heltec V4, and automatically tracks upstream MeshCore releases.
 
-MeshCore's built-in `start ota` command turns the device into a WiFi access point and waits for someone to upload a `.bin` file through a web page. This project adds a second path: the device instead joins an existing WiFi hotspot as a client, downloads the firmware from a URL, verifies it, and flashes itself — no laptop or phone required at the update site. A rollback guard confirms every update actually works before committing to it, automatically reverting to the previous firmware if it doesn't.
+MeshCore's built-in `start ota` command turns the device into a self-hosted WiFi access point and waits for someone to upload a `.bin` file through a web page in local proximity to the device. This project adds a second path: the device instead joins an existing WiFi hotspot as a client, downloads the firmware from a URL, verifies it, and flashes itself — no laptop or phone required at the update site. A rollback guard confirms every update actually works before committing to it, automatically reverting to the previous firmware if it doesn't.
 
 This repository does **not** contain a fork of MeshCore's source. It contains a series of patches and a GitHub Actions workflow that applies them to a fresh copy of upstream MeshCore on every build, so it stays in sync with upstream automatically rather than drifting out of date.
 
@@ -23,7 +23,7 @@ Patches are applied in numeric order. If a patch fails to apply against the curr
 | Repeater | `repeater-v*` | `heltec_v4_rep_ota-vX.Y.Z.bin` |
 | Room Server | `room-server-v*` | `heltec_v4_room_ota-vX.Y.Z.bin` |
 
-Each variant is tracked and released independently, since upstream versions them on separate tag sequences. Adding another variant (a different board, or another role on an existing board) is a matter of extending the workflow's build matrix and, if needed, the patches — see the workflow file for the current matrix definition.
+Each variant is tracked and released independently, since MeshCore versions them on separate tag sequences. Adding another variant (a different board, or another role on an existing board) is a matter of extending the workflow's build matrix and, if needed, the patches — see the workflow file for the current matrix definition.
 
 ## How it works
 
@@ -70,7 +70,7 @@ start ota url https://example.com/firmware/heltec_v4_repeater-v1.16.0.bin
 
 If a file named `<url>.sha256` exists alongside the firmware, it's fetched automatically and used to verify the download — no manual checksum needed. Full parameter and usage details for these commands, in the same format as upstream's own CLI reference, are in [`docs/cli-additions.md`](docs/cli-additions.md). See [`docs/cli_commands.md`](https://github.com/meshcore-dev/MeshCore/blob/main/docs/cli_commands.md) in upstream MeshCore for the complete standard CLI reference.
 
-**`start ota url` does not reply until it finishes.** Unlike most CLI commands, there is no immediate acknowledgment and no progress update — the device is joining WiFi, downloading, verifying, and flashing before it sends anything back, which can take up to about two minutes. A single final reply arrives when it succeeds or fails; silence in between is expected, not a sign the command was lost.
+**`start ota url` does not reply until it finishes.** Unlike most CLI commands, there is no immediate acknowledgment and no progress update — the device is joining WiFi, downloading, verifying, and flashing before it sends anything back, which can take up to about two minutes. The device will reboot and mount the new firmware image in a probation mode. You can check the testing status of the firmware using the 'get ota.active' detailed above. 
 
 ## Automatic rollback protection
 
