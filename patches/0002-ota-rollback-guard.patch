@@ -1,5 +1,5 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index bd78b22..407211d 100644
+index bd78b22..92d37a1 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
 @@ -153,6 +153,46 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
@@ -10,18 +10,18 @@ index bd78b22..407211d 100644
 +**Usage:**
 +- `get ota.active`
 +
-+**Returns:** `active: <A|B> - <state> | <A|B>: <state>`, e.g. `active: A - valid | B: valid`. The
-+first `<A|B>` is the currently-running slot (`A` = `ota_0`, `B` = `ota_1`); its `<state>` is one of:
++**Returns:** `A (active, <state>) - B (<state>)`, or `A (<state>) - B (active, <state>)` if `B` is
++the running slot (`A` = `ota_0`, `B` = `ota_1`). The active slot's `<state>` is one of:
 +- `pending`: This boot is on probation after an OTA update (via either `start ota` or `start ota url`).
 +  The device will automatically confirm itself as valid ~90 seconds after boot if the radio initializes
 +  correctly; an unconfirmed reset before then reverts to the previous firmware automatically.
 +- `valid`: Already confirmed, or this boot isn't the result of an OTA update in the first place.
 +- `n/a`: Rollback state could not be queried for the running partition.
 +
-+The second `<A|B>: <state>` reports the *other* slot's persisted state, read the same way regardless
-+of which slot is currently running: `valid` (confirmed good), `invalid` (rejected by a previous
-+rollback), `aborted` (an update to it never finished), `new` (flashed but not yet booted), or `n/a`
-+(never involved in an OTA update, e.g. a factory/USB-only flash).
++The other (non-active) slot's `<state>` is read the same way regardless of which slot is running:
++`valid` (confirmed good), `invalid` (rejected by a previous rollback), `aborted` (an update to it
++never finished), `new` (flashed but not yet booted), or `n/a` (never involved in an OTA update, e.g.
++a factory/USB-only flash).
 +
 +**Note:** Confirms automatically after the confirm delay with a working radio; rejects immediately
 +(rollback + reboot) if `radio_init()` fails on a probationary boot.
@@ -192,10 +192,10 @@ index ee1eb42..44a6ac2 100644
      sprintf(reply, "??: %s", config);
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
-index 0000000..ecdbe11
+index 0000000..5209256
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.cpp
-@@ -0,0 +1,155 @@
+@@ -0,0 +1,156 @@
 +#include "RollbackGuard.h"
 +#include <esp_ota_ops.h>
 +#include <esp_partition.h>
@@ -305,16 +305,17 @@ index 0000000..ecdbe11
 +
 +const char* RollbackGuard::status() {
 +  static char buf[40];
-+  esp_ota_img_states_t state;
-+  const char* verdict = isPendingVerify(&state) ? "pending" : (state == ESP_OTA_IMG_VALID ? "valid" : "n/a");
 +  char active_letter = partitionLetter(esp_ota_get_running_partition());
 +
-+  char other_letter = (active_letter == 'A') ? 'B' : 'A';
-+  const esp_partition_t* other = findPartitionByLetter(other_letter);
-+  esp_ota_img_states_t other_state = ESP_OTA_IMG_UNDEFINED;
-+  if (other) esp_ota_get_state_partition(other, &other_state);
++  const esp_partition_t* a = findPartitionByLetter('A');
++  const esp_partition_t* b = findPartitionByLetter('B');
++  esp_ota_img_states_t state_a = ESP_OTA_IMG_UNDEFINED, state_b = ESP_OTA_IMG_UNDEFINED;
++  if (a) esp_ota_get_state_partition(a, &state_a);
++  if (b) esp_ota_get_state_partition(b, &state_b);
 +
-+  sprintf(buf, "active: %c - %s | %c: %s", active_letter, verdict, other_letter, stateLabel(other_state));
++  sprintf(buf, "A (%s%s) - B (%s%s)",
++          active_letter == 'A' ? "active, " : "", stateLabel(state_a),
++          active_letter == 'B' ? "active, " : "", stateLabel(state_b));
 +  return buf;
 +}
 +
@@ -353,7 +354,7 @@ index 0000000..ecdbe11
 +}
 diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
 new file mode 100644
-index 0000000..070697c
+index 0000000..7a8d045
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.h
 @@ -0,0 +1,38 @@
@@ -385,9 +386,9 @@ index 0000000..070697c
 +  // return.
 +  void onRadioInitFailure();
 +
-+  // For `get ota.active` -- "active: <A|B> - <state> | <A|B>: <state>", the running slot first
-+  // (state: "pending"/"valid"/"n/a" for that boot) then the other slot's persisted state ("valid",
-+  // "invalid", "aborted", "new", or "n/a" if never involved in an OTA).
++  // For `get ota.active` -- "A (active, <state>) - B (<state>)" (or B active), each state one of
++  // "pending" (only possible for the running slot), "valid", "invalid", "aborted", "new", or "n/a"
++  // (never involved in an OTA).
 +  const char* status();
 +
 +  // For `set ota.active <A|B>` -- points the bootloader at the other OTA slot without touching flash
