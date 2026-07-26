@@ -202,7 +202,7 @@ new file mode 100644
 index 0000000..0000000
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,380 @@
+@@ -0,0 +1,310 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -212,11 +212,6 @@ index 0000000..0000000
 +#include <Utils.h>                    // mesh::Utils::fromHex
 +#include <helpers/TxtDataHelpers.h>   // StrHelper -- there is no standalone StrHelper.h; the class
 +                                       // lives here (confirmed against how CommonCLI.cpp reaches it)
-+#include <target.h>                   // the board's global `sensors` (EnvironmentSensorManager) --
-+                                       // needed only to check GPS-detected state before touching the
-+                                       // shared LED/GPS pin below
-+#include <esp32-hal-rmt.h>             // TEMPORARY -- see setTestLed()'s direct rmtInit() call below
-+#include <driver/gpio.h>               // gpio_reset_pin() -- see ledPrepare() below
 +
 +// The hotspot's WiFi network can take up to ~60s to appear after GPIO47 is asserted (cellular modem
 +// boot time). These constants give 6 attempts at 15s each, with a 5s pause between attempts, for a
@@ -239,56 +234,37 @@ index 0000000..0000000
 +
 +#define PIN_HOTSPOT_PWR   47   // GPIO47, confirmed clean on Heltec V4.3.1 (GPIO48 = fallback)
 +
-+// Heltec V4's onboard WS2812 NeoPixel data line (per the official schematic) is electrically shared
-+// with the GNSS module's UART RX line -- both nets land on GPIO38. MeshCore's own GPS auto-detection
-+// (EnvironmentSensorManager::initBasicGPS(), which runs unconditionally from sensors.begin() before
-+// this code ever executes) already tells us definitively which one is actually in use: if no GPS
-+// hardware answered the boot-time detection probe, `sensors.gps_detected` is false and GPIO38 is safe
-+// to reclaim as an LED. If a real GPS module is attached, this LED sequence is skipped entirely --
-+// `start ota url` proceeds exactly as it did before this feature existed, silently.
-+#define OTA_LED_PIN         38
-+#define OTA_LED_HOLD_MS   2000   // how long a terminal Red/White stays lit before being turned off,
-+                                  // long enough to actually be seen, short enough not to meaningfully
-+                                  // delay an already ~2-minute operation
++// Confirmed directly against Heltec's V4.3 schematic (HTIT-WB32LAF_V4.3.pdf): GPIO38 is wired
++// straight to RX_GPS and nowhere else -- there is no WS2812/NeoPixel/RGB LED anywhere on this board.
++// The only GPIO-controlled LED that exists is LED3 (White), whose net is simply named "LED" and
++// traces directly to GPIO35 -- the exact pin this codebase already calls P_LORA_TX_LED and toggles
++// from HeltecV4Board::onBeforeTransmit()/onAfterTransmit() to show LoRa TX activity. It's a plain
++// single-color LED (no WS2812 driver involved), so status here is conveyed via blink count and hold
++// duration instead of color. Reusing it is safe: run() blocks the main loop for its entire duration,
++// so there's no concurrent LoRa TX to contend with it.
++#define OTA_LED_HOLD_MS   2000   // how long the final success/fail indication stays lit before being
++                                  // turned off, long enough to actually be seen, short enough not to
++                                  // meaningfully delay an already ~2-minute operation
 +
-+// EnvironmentSensorManager only exposes a "gps" setting at all once GPS is detected (see
-+// getNumSettings()/getSettingName() in EnvironmentSensorManager.cpp) -- so a NULL return here is
-+// itself the "not detected" signal, using only the class's existing public API. No new accessor
-+// needed on EnvironmentSensorManager.
-+static bool ledAvailable() {
-+  return sensors.getSettingByKey("gps") == NULL;
++// P_LORA_TX_LED is guaranteed defined here: HotspotOTA.cpp is only ever added to build_src_filter for
++// heltec_v4 environments (see variants/heltec_v4/platformio.ini), and Heltec_lora32_v4's build_flags
++// always set P_LORA_TX_LED=35.
++static void ledBlink(int times, uint32_t on_ms, uint32_t off_ms) {
++  for (int i = 0; i < times; i++) {
++    digitalWrite(P_LORA_TX_LED, HIGH);
++    delay(on_ms);
++    digitalWrite(P_LORA_TX_LED, LOW);
++    if (i < times - 1) delay(off_ms);
++  }
 +}
 +
-+// Releases GPIO38 from GPS-UART duty so it's safe to drive as a NeoPixel data line. Safe to call even
-+// when GPS was never using it -- both calls below are harmless no-ops on an unmounted/inactive port.
-+// Deliberately NOT cached/latched: this runs once per `start ota url` invocation (a rare, manual-ish
-+// operation, not a hot path), so the trivial cost of re-checking each time isn't worth the complexity
-+// of tracking whether it already ran.
-+//
-+// Serial1.end() only tears down the UART *driver* (deletes the queue/ISR); it does NOT necessarily
-+// undo uart_set_pin()'s GPIO-matrix routing of GPIO38 into the UART peripheral's RX input signal, nor
-+// reset the pad's own configuration. If that routing/config is still live when rmtInit() runs, the
-+// pad could still be electrically influenced by leftover UART pin state even though rmtInit() itself
-+// reports success (it has no way to know the pin wasn't cleanly idle). gpio_reset_pin() is the IDF
-+// API for a full hardware-level release: it disconnects any GPIO-matrix signal (input or output),
-+// disables input/output, and restores the pad to its default reset state -- a strictly more complete
-+// teardown than Serial1.end() alone, so rmtInit() then claims a genuinely blank pin.
-+static bool ledPrepare() {
-+  if (!ledAvailable()) return false;
-+  Serial1.end();
-+  gpio_reset_pin((gpio_num_t)OTA_LED_PIN);
-+  return true;
-+}
-+
-+// Shared terminal-failure sequence: solid red, held long enough to see, then off -- so a failed
-+// update never leaves the LED stuck on. Every failure exit in run() below calls this, regardless of
-+// which specific error occurred (WiFi join, hash resolution, HTTP, flash write, or hash mismatch);
-+// `reply[]` already carries the specific error text by the time this runs, this is purely the visual.
-+static void ledFail(bool led_ok) {
-+  if (!led_ok) return;
-+  neopixelWrite(OTA_LED_PIN, 255, 0, 0);
-+  delay(OTA_LED_HOLD_MS);
-+  neopixelWrite(OTA_LED_PIN, 0, 0, 0);
++// Shared terminal-failure sequence: a fast, unmistakably-different blink burst -- so a failed update
++// never leaves the LED stuck on, and never gets mistaken for a slower in-progress count. Every failure
++// exit in run() below calls this, regardless of which specific error occurred (WiFi join, hash
++// resolution, HTTP, flash write, or hash mismatch); `reply[]` already carries the specific error text
++// by the time this runs, this is purely the visual.
++static void ledFail() {
++  ledBlink(5, 80, 80);
 +}
 +
 +static bool joinWifiStation(const char* ssid, const char* pwd, char reply[]) {
@@ -360,21 +336,19 @@ index 0000000..0000000
 +    return false;
 +  }
 +
-+  bool led_ok = ledPrepare();
-+
 +  pinMode(PIN_HOTSPOT_PWR, OUTPUT);
 +  digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // must stay HIGH for the whole network phase --
 +                                          // TPS22995-class load switches are not latches
 +
-+  if (led_ok) neopixelWrite(OTA_LED_PIN, 255, 130, 0);   // orange -- joining WiFi
++  ledBlink(1, 150, 150);   // 1 blink -- joining WiFi
 +
 +  if (!joinWifiStation(cfg.ssid, cfg.password, reply)) {
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
-+    ledFail(led_ok);
++    ledFail();
 +    return false;
 +  }
 +
-+  if (led_ok) neopixelWrite(OTA_LED_PIN, 0, 0, 255);   // blue -- WiFi joined
++  ledBlink(2, 150, 150);   // 2 blinks -- WiFi joined
 +
 +  // Advisory only -- see checkWanConnectivity(). Does not gate anything below; run() proceeds
 +  // identically regardless of the result. Only consulted to pick a more specific error message if
@@ -386,7 +360,7 @@ index 0000000..0000000
 +    if (!wan_ok) strcpy(reply, "ERR: WiFi joined but no WAN connectivity");
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
-+    ledFail(led_ok);
++    ledFail();
 +    return false;
 +  }
 +
@@ -400,7 +374,7 @@ index 0000000..0000000
 +    strcpy(reply, "ERR: could not open URL");
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
-+    ledFail(led_ok);
++    ledFail();
 +    return false;
 +  }
 +
@@ -414,7 +388,7 @@ index 0000000..0000000
 +    http.end();
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
-+    ledFail(led_ok);
++    ledFail();
 +    return false;
 +  }
 +
@@ -424,11 +398,11 @@ index 0000000..0000000
 +    http.end();
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
-+    ledFail(led_ok);
++    ledFail();
 +    return false;
 +  }
 +
-+  if (led_ok) neopixelWrite(OTA_LED_PIN, 0, 255, 0);   // green -- downloading
++  ledBlink(3, 150, 150);   // 3 blinks -- downloading
 +
 +  mbedtls_sha256_context sha_ctx;
 +  mbedtls_sha256_init(&sha_ctx);
@@ -448,7 +422,7 @@ index 0000000..0000000
 +      http.end();
 +      digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +      WiFi.disconnect(true);
-+      ledFail(led_ok);
++      ledFail();
 +      return false;
 +    }
 +    mbedtls_sha256_update(&sha_ctx, buf, n);
@@ -461,7 +435,7 @@ index 0000000..0000000
 +    Update.abort();
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
-+    ledFail(led_ok);
++    ledFail();
 +    return false;
 +  }
 +
@@ -472,11 +446,11 @@ index 0000000..0000000
 +    Update.abort();
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);   // no reason to keep the hotspot up once we know it's bad
 +    WiFi.disconnect(true);
-+    ledFail(led_ok);
++    ledFail();
 +    return false;
 +  }
 +
-+  if (led_ok) neopixelWrite(OTA_LED_PIN, 255, 255, 255);   // white -- hash passed
++  digitalWrite(P_LORA_TX_LED, HIGH);   // solid on -- hash passed
 +
 +  // Hash verified. All bytes are already sitting in the *inactive* OTA partition -- writing them
 +  // there as they streamed in cannot corrupt the currently-running firmware, since ESP32's OTA
@@ -487,14 +461,12 @@ index 0000000..0000000
 +
 +  if (!Update.end(true)) {   // local-only from here: validates size/CRC, flips boot partition pointer
 +    strcpy(reply, "ERR: Update.end failed");
-+    ledFail(led_ok);
++    ledFail();
 +    return false;
 +  }
 +
-+  if (led_ok) {
-+    delay(OTA_LED_HOLD_MS);
-+    neopixelWrite(OTA_LED_PIN, 0, 0, 0);   // off -- don't leave it lit into the reboot
-+  }
++  delay(OTA_LED_HOLD_MS);
++  digitalWrite(P_LORA_TX_LED, LOW);   // off -- don't leave it lit into the reboot
 +
 +  strcpy(reply, "OK - rebooting");
 +  return true;   // caller reboots
@@ -530,65 +502,23 @@ index 0000000..0000000
 +  return digitalRead(PIN_HOTSPOT_PWR) == HIGH;
 +}
 +
-+// TEMPORARY, test-only. Reuses the exact same ledAvailable()/ledPrepare() gate and OTA_LED_PIN that
-+// run() uses, so a failure here means the gate itself is the problem (not something specific to the
-+// OTA flow) -- reply[] says so explicitly rather than just doing nothing, unlike run()'s silent
-+// led_ok-gated no-ops, since this command's entire purpose is diagnosing why the LED isn't lighting.
-+//
-+// Keeps board.periph_power (Vext) claimed regardless -- already tested and ruled out on real hardware,
-+// but harmless to leave claimed here since this is diagnostic-only and gets deleted once the real issue
-+// is found.
-+//
-+// Does its own direct rmtInit() call instead of calling the core's neopixelWrite() -- that function
-+// hides rmtInit()'s success/failure behind a log_e() call that produces no output at all if this
-+// build's Core Debug Level is "None" (a very likely default), so a silent internal failure there would
-+// look identical to a successful write from our side. Duplicating its body here (same WS2812 GRB
-+// encoding, same timing constants -- see arduino-esp32 2.0.17's esp32-hal-rgb-led.c, the exact pinned
-+// core version, verified before writing this) exposes that result directly in reply[].
++// TEMPORARY, test-only -- see `set led on|off`. Drives the real onboard LED (P_LORA_TX_LED, GPIO35)
++// directly with a plain digitalWrite, independent of running an OTA update, so the corrected LED pin
++// can be confirmed on real hardware before this command is removed. No RMT/WS2812 encoding involved
++// here -- unlike the GPIO38 NeoPixel this replaces (which never existed on this board -- confirmed
++// against Heltec's V4.3 schematic), P_LORA_TX_LED is a simple single-color LED already
++// pinMode(OUTPUT)'d by ESP32Board::begin().
 +bool HotspotOTA::setTestLed(bool on, char reply[]) {
-+  if (!ledPrepare()) {
-+    strcpy(reply, "ERR: LED unavailable (GPS detected on GPIO38)");
-+    return false;
-+  }
-+  board.periph_power.claim();
-+
-+  static rmt_obj_t* rmt_send = NULL;
-+  if (!rmt_send) {
-+    rmt_send = rmtInit(OTA_LED_PIN, RMT_TX_MODE, RMT_MEM_64);
-+    if (!rmt_send) {
-+      strcpy(reply, "ERR: rmtInit failed on GPIO38");
-+      return false;
-+    }
-+    rmtSetTick(rmt_send, 100);
-+  }
-+
-+  int color[3] = { 0, 0, on ? 255 : 0 };   // G, R, B -- WS2812's own wire order
-+  rmt_data_t led_data[24];
-+  int i = 0;
-+  for (int col = 0; col < 3; col++) {
-+    for (int bit = 0; bit < 8; bit++) {
-+      if (color[col] & (1 << (7 - bit))) {
-+        led_data[i].level0 = 1; led_data[i].duration0 = 8;   // "1" bit: T1H=0.8us
-+        led_data[i].level1 = 0; led_data[i].duration1 = 4;   //          T1L=0.4us
-+      } else {
-+        led_data[i].level0 = 1; led_data[i].duration0 = 4;   // "0" bit: T0H=0.4us
-+        led_data[i].level1 = 0; led_data[i].duration1 = 8;   //          T0L=0.8us
-+      }
-+      i++;
-+    }
-+  }
-+  bool wrote_ok = rmtWriteBlocking(rmt_send, led_data, 24);
-+
-+  if (!on) board.periph_power.release();
-+  sprintf(reply, "OK - rmtInit succeeded, rmtWriteBlocking %s", wrote_ok ? "succeeded" : "FAILED");
++  digitalWrite(P_LORA_TX_LED, on ? HIGH : LOW);
++  sprintf(reply, "OK - GPIO%d driven %s", P_LORA_TX_LED, on ? "HIGH" : "LOW");
 +  return true;
 +}
 diff --git a/src/helpers/esp32/HotspotOTA.h b/src/helpers/esp32/HotspotOTA.h
 new file mode 100644
-index 0000000..4705138
+index 0000000..0000000
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.h
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,35 @@
 +#pragma once
 +#include <Arduino.h>
 +
@@ -619,10 +549,9 @@ index 0000000..4705138
 +  void setPower(bool on);
 +  bool getPower();
 +
-+  // TEMPORARY, test-only -- see `set led on|off`. Exercises the exact same GPS-detection gate and
-+  // GPIO38 pin as run()'s status LED sequence, independent of actually running an OTA update, so LED
-+  // hardware/gate behavior can be tested on its own. Not meant to ship -- remove once LED behavior is
-+  // confirmed working on real hardware.
++  // TEMPORARY, test-only -- see `set led on|off`. Drives the real onboard LED (P_LORA_TX_LED,
++  // GPIO35) directly, independent of actually running an OTA update, so it can be confirmed on real
++  // hardware. Not meant to ship -- remove once confirmed working.
 +  bool setTestLed(bool on, char reply[]);
 +}
 diff --git a/variants/heltec_v4/platformio.ini b/variants/heltec_v4/platformio.ini
