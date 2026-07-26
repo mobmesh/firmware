@@ -75,6 +75,24 @@ mid-update.
 
 ---
 
+#### Pre-flight check the hotspot WiFi join and WAN connectivity before `start ota url`
+**Usage:**
+- `start ota wifi`
+- `get ota.wan`
+- `stop ota wifi`
+
+**Note:** `start ota wifi` joins the configured WiFi network only (no WAN check, no download) and
+returns quickly (a single join attempt, worst case ~15s) so a bad `ota.wifi` credential or an
+unreachable hotspot can be confirmed without waiting on `start ota url`'s full patient join budget
+(up to ~115s across retries) or committing to a download. `get ota.wan` checks WAN reachability on
+demand once joined, repeatable without rejoining. `stop ota wifi` disconnects and drops hotspot
+power for a clean retry. Running `start ota wifi` successfully and then `start ota url` immediately
+after skips `start ota url`'s own join step, since it detects the already-joined network.
+
+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
+
+---
+
 #### View the post-update rollback confirmation status
 **Usage:**
 - `get ota.rollback`
