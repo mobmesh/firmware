@@ -38,14 +38,12 @@ jobs:
             release_title: Repeater
             asset_basename: heltec_v4_rep_ota
             sync_docs: true
-            make_latest: "true"
           - id: room_server
             build_env: heltec_v4_room_server
             upstream_tag_prefix: room-server
             release_title: Room
             asset_basename: heltec_v4_room_ota
             sync_docs: false
-            make_latest: "false"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout this repo (patches only)
@@ -231,22 +229,6 @@ jobs:
         run: |
           sha256sum "${{ steps.artifact.outputs.name }}" | awk '{print $1}' > "${{ steps.artifact.outputs.name }}.sha256"
 
-      - name: Delete any existing release and tag (GitHub sorts releases by tag creation, which
-          plain release-object deletion doesn't refresh)
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
-        run: |
-          RELEASE_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.pick.outputs.release_tag }}" \
-            | jq -r '.id // empty')
-          if [ -n "$RELEASE_ID" ]; then
-            curl -s -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
-          fi
-          # curl doesn't fail on HTTP error status without -f, so a 404 here (tag never existed,
-          # e.g. first-ever publish for this variant) is silently fine.
-          curl -s -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/git/refs/tags/${{ steps.pick.outputs.release_tag }}"
-
       - name: Publish release with .bin + .sha256 sidecar
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
@@ -254,7 +236,6 @@ jobs:
           tag_name: ${{ steps.pick.outputs.release_tag }}
           name: "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - ota_mod"
           body_path: release-notes.md
-          make_latest: ${{ matrix.make_latest }}
           files: |
             ${{ steps.artifact.outputs.name }}
             ${{ steps.artifact.outputs.name }}.sha256
