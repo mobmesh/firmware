@@ -1,0 +1,29 @@
+diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
+index 0000000..0000000 100644
+--- a/src/helpers/CommonCLI.cpp
++++ b/src/helpers/CommonCLI.cpp
+@@ -13,6 +13,15 @@
+ #include <helpers/esp32/RollbackGuard.h>
+ #endif
+ 
++// Set via a CI build flag (see .github/workflows/build-release.yml) to the date this specific
++// hotspot-ota-patched build was compiled, in upstream's own "D Mon YYYY" style -- so `ver` can show
++// it distinctly from upstream's own FIRMWARE_BUILD_DATE below, rather than silently reporting an
++// unmodified build as if it were stock upstream firmware. Falls back to "unknown" for local/dev
++// builds that don't set it.
++#ifndef OTA_MOD_BUILD_DATE
++#define OTA_MOD_BUILD_DATE "unknown"
++#endif
++
+ #ifndef BRIDGE_MAX_BAUD
+ #define BRIDGE_MAX_BAUD 115200
+ #endif
+@@ -315,7 +324,7 @@
+       bool s = _callbacks->formatFileSystem();
+       sprintf(reply, "File system erase: %s", s ? "OK" : "Err");
+     } else if (memcmp(command, "ver", 3) == 0) {
+-      sprintf(reply, "%s (Build: %s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate());
++      sprintf(reply, "%s (Build: %s) + OTA-MOD (Build: %s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
+     } else if (memcmp(command, "board", 5) == 0) {
+       sprintf(reply, "%s", _board->getManufacturerName());
+     } else if (memcmp(command, "sensor get ", 11) == 0) {
