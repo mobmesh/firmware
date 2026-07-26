@@ -255,7 +255,7 @@ new file mode 100644
 index 0000000..0000000
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,245 @@
+@@ -0,0 +1,252 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -335,6 +335,13 @@ index 0000000..0000000
 +  snprintf(sidecar_url, sizeof(sidecar_url), "%s.sha256", url);
 +
 +  HTTPClient sidecar_http;
++  sidecar_http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);   // same GitHub release-URL 302
++                                                                     // redirect the main download
++                                                                     // works around below -- without
++                                                                     // this, GET() returns 302, not
++                                                                     // the sidecar's hash bytes, and
++                                                                     // a sidecar that genuinely exists
++                                                                     // gets reported as not found
 +  if (sidecar_http.begin(sidecar_url) && sidecar_http.GET() == HTTP_CODE_OK) {
 +    String hex = sidecar_http.getString();
 +    hex.trim();
