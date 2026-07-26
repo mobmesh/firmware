@@ -59,7 +59,7 @@ These are available on any device running firmware built from these patches, in 
 | `get ota.wan` | Pre-flight: check WAN reachability once `start ota join` has joined. |
 | `get ota.pwr` / `set ota.pwr <on\|off>` | Diagnostic/recovery command to read or directly force the hotspot power switch, independent of `start ota url`. |
 | `get ota.active` | Both OTA slots' state, e.g. `A (active, valid) - B (valid)`. Active slot's state is `pending`/`valid`/`n/a`; the other's is `valid`/`invalid`/`aborted`/`new`/`n/a`. |
-| `set ota.active <A\|B>` | Point the bootloader at the other OTA slot and reboot into it, without reflashing. Refuses if that slot is already active or has no valid image. |
+| `set ota.active <A\|B>` | Point the bootloader at the other OTA slot and reboot into it, without reflashing. Refuses if that slot is already active or has no valid image. Re-arms rollback probation for that slot even if it was previously `valid` -- expect `get ota.active` to briefly show `pending` right after. |
 
 Example:
 
