@@ -80,7 +80,7 @@ index cfa33cf..2a827ad 100644
 +  virtual bool startOTAUpdateFromURL(const char* url, char reply[]) { return false; }   // not supported
  
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index b78ad6e..9831607 100644
+index b78ad6e..db5f55b 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -7,2 +7,6 @@
@@ -97,7 +97,7 @@ index b78ad6e..9831607 100644
 +        // reply[] already carries the specific error from HotspotOTA::run
 +      }
      } else if (memcmp(command, "start ota", 9) == 0) {
-@@ -538,2 +546,45 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -538,2 +546,51 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
      strcpy(reply, "OK");
 +#if defined(WITH_HOTSPOT_OTA)
 +  } else if (memcmp(config, "ota.wifi ", 9) == 0) {
@@ -141,9 +141,15 @@ index b78ad6e..9831607 100644
 +    } else {
 +      strcpy(reply, "ERR: expected on|off");
 +    }
++  } else if (memcmp(config, "led on", 6) == 0) {
++    // TEMPORARY, test-only -- exercises run()'s LED gate/pin in isolation. Not meant to ship.
++    HotspotOTA::setTestLed(true, reply);
++  } else if (memcmp(config, "led off", 7) == 0) {
++    // TEMPORARY, test-only -- see "led on" above.
++    HotspotOTA::setTestLed(false, reply);
 +#endif
    } else if (memcmp(config, "prv.key ", 8) == 0) {
-@@ -927,2 +978,6 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -927,2 +984,6 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
      strcpy(reply, "ERROR: Power management not supported");
 +#endif
 +#if defined(WITH_HOTSPOT_OTA)
@@ -193,10 +199,10 @@ index a4cbf2a..8b9198f 100644
  
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..2d97854
+index 0000000..d7e4d16
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,314 @@
+@@ -0,0 +1,328 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -511,12 +517,26 @@ index 0000000..2d97854
 +  // whatever the pin defaults to -- LOW/off given the hardware pulldown recommended in the design notes.
 +  return digitalRead(PIN_HOTSPOT_PWR) == HIGH;
 +}
++
++// TEMPORARY, test-only. Reuses the exact same ledAvailable()/ledPrepare() gate and OTA_LED_PIN that
++// run() uses, so a failure here means the gate itself is the problem (not something specific to the
++// OTA flow) -- reply[] says so explicitly rather than just doing nothing, unlike run()'s silent
++// led_ok-gated no-ops, since this command's entire purpose is diagnosing why the LED isn't lighting.
++bool HotspotOTA::setTestLed(bool on, char reply[]) {
++  if (!ledPrepare()) {
++    strcpy(reply, "ERR: LED unavailable (GPS detected on GPIO38)");
++    return false;
++  }
++  neopixelWrite(OTA_LED_PIN, 0, 0, on ? 255 : 0);   // blue when on, off when off
++  strcpy(reply, "OK");
++  return true;
++}
 diff --git a/src/helpers/esp32/HotspotOTA.h b/src/helpers/esp32/HotspotOTA.h
 new file mode 100644
-index 0000000..43b0f2d
+index 0000000..4705138
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.h
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,36 @@
 +#pragma once
 +#include <Arduino.h>
 +
@@ -546,6 +566,12 @@ index 0000000..43b0f2d
 +  // Diagnostic/recovery only -- see `set ota.pwr <on|off>` / `get ota.pwr`.
 +  void setPower(bool on);
 +  bool getPower();
++
++  // TEMPORARY, test-only -- see `set led on|off`. Exercises the exact same GPS-detection gate and
++  // GPIO38 pin as run()'s status LED sequence, independent of actually running an OTA update, so LED
++  // hardware/gate behavior can be tested on its own. Not meant to ship -- remove once LED behavior is
++  // confirmed working on real hardware.
++  bool setTestLed(bool on, char reply[]);
 +}
 diff --git a/variants/heltec_v4/platformio.ini b/variants/heltec_v4/platformio.ini
 index fabf382..c0f750e 100644
