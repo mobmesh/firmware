@@ -91,13 +91,18 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
 **Usage:**
 - `get ota.active`
 
-**Returns:** `active: <A|B> - <state>`, e.g. `active: A - valid`. `<A|B>` is which OTA slot is
-currently running (`A` = `ota_0`, `B` = `ota_1`). `<state>` is one of:
+**Returns:** `A (active, <state>) - B (<state>)`, or `A (<state>) - B (active, <state>)` if `B` is
+the running slot (`A` = `ota_0`, `B` = `ota_1`). The active slot's `<state>` is one of:
 - `pending`: This boot is on probation after an OTA update (via either `start ota` or `start ota url`).
   The device will automatically confirm itself as valid ~90 seconds after boot if the radio initializes
   correctly; an unconfirmed reset before then reverts to the previous firmware automatically.
 - `valid`: Already confirmed, or this boot isn't the result of an OTA update in the first place.
 - `n/a`: Rollback state could not be queried for the running partition.
+
+The other (non-active) slot's `<state>` is read the same way regardless of which slot is running:
+`valid` (confirmed good), `invalid` (rejected by a previous rollback), `aborted` (an update to it
+never finished), `new` (flashed but not yet booted), or `n/a` (never involved in an OTA update, e.g.
+a factory/USB-only flash).
 
 **Note:** Confirms automatically after the confirm delay with a working radio; rejects immediately
 (rollback + reboot) if `radio_init()` fails on a probationary boot.
