@@ -12,6 +12,7 @@ This repository does **not** contain a fork of MeshCore's source. It contains a 
 |---|---|
 | `patches/0001-hotspot-fetch-ota.patch` | Adds the hotspot-fetch OTA feature to MeshCore |
 | `patches/0002-ota-rollback-guard.patch` | Adds automatic post-update rollback protection. **Depends on 0001** and cannot be applied alone |
+| `patches/0003-temp-ota-diagnostics.patch` | **Temporary.** Adds `ota.reboot`, `start`/`stop ota.wifi`, and `get ota.wan` CLI commands for exercising the reboot path and hotspot WiFi join/WAN-check independently of a full OTA update. Remove once hardware testing is done. |
 | `.github/workflows/build-release.yml` | Builds firmware for each supported variant against the latest matching upstream release and publishes it here |
 
 Patches are applied in numeric order. If a patch fails to apply against the current upstream release, the build fails and an issue is opened here identifying which patch broke — it does not attempt to auto-resolve the conflict.
@@ -28,7 +29,7 @@ Each variant is tracked and released independently, since upstream versions them
 ## How it works
 
 1. A scheduled workflow run checks upstream MeshCore for the newest release tag matching each variant (`repeater-v*`, `room-server-v*`).
-2. For any variant that hasn't been built yet at its current upstream tag, the workflow clones upstream at that release, applies `patches/0001-hotspot-fetch-ota.patch` and then `patches/0002-ota-rollback-guard.patch` in order, and compiles firmware for that variant's PlatformIO environment.
+2. For any variant that hasn't been built yet at its current upstream tag, the workflow clones upstream at that release, applies every patch in `patches/` in numeric order, and compiles firmware for that variant's PlatformIO environment.
 3. If a patch no longer applies cleanly (upstream changed a file it touches), the build fails and an issue is opened here automatically, naming the specific patch that failed.
 4. On a successful build, the compiled `.bin` and a matching `.sha256` checksum file are published as a release here, with upstream's own release notes for that tag included in the release body.
 
