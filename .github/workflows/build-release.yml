@@ -229,7 +229,8 @@ jobs:
         run: |
           sha256sum "${{ steps.artifact.outputs.name }}" | awk '{print $1}' > "${{ steps.artifact.outputs.name }}.sha256"
 
-      - name: Delete any existing release for this tag (refreshes published_at on republish)
+      - name: Delete any existing release and tag (GitHub sorts releases by tag creation, which
+          plain release-object deletion doesn't refresh)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
           RELEASE_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
@@ -239,6 +240,10 @@ jobs:
             curl -s -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
           fi
+          # curl doesn't fail on HTTP error status without -f, so a 404 here (tag never existed,
+          # e.g. first-ever publish for this variant) is silently fine.
+          curl -s -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/git/refs/tags/${{ steps.pick.outputs.release_tag }}"
 
       - name: Publish release with .bin + .sha256 sidecar
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
