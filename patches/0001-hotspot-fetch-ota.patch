@@ -1,8 +1,8 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index 9accb29..8540583 100644
+index 0000000..0000000 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -75,6 +75,72 @@ This document provides an overview of CLI commands that can be sent to MeshCore
+@@ -75,6 +75,90 @@
  
  ---
  
@@ -72,14 +72,32 @@ index 9accb29..8540583 100644
 +
 +---
 +
++#### Pre-flight check the hotspot WiFi join and WAN connectivity before `start ota url`
++**Usage:**
++- `start ota wifi`
++- `get ota.wan`
++- `stop ota wifi`
++
++**Note:** `start ota wifi` joins the configured WiFi network only (no WAN check, no download) and
++returns quickly (a single join attempt, worst case ~15s) so a bad `ota.wifi` credential or an
++unreachable hotspot can be confirmed without waiting on `start ota url`'s full patient join budget
++(up to ~115s across retries) or committing to a download. `get ota.wan` checks WAN reachability on
++demand once joined, repeatable without rejoining. `stop ota wifi` disconnects and drops hotspot
++power for a clean retry. Running `start ota wifi` successfully and then `start ota url` immediately
++after skips `start ota url`'s own join step, since it detects the already-joined network.
++
++**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
++
++---
++
  ### Erase/Factory Reset
  **Usage:**
  - `erase`
 diff --git a/src/MeshCore.h b/src/MeshCore.h
-index cfa33cf..2a827ad 100644
+index 0000000..0000000 100644
 --- a/src/MeshCore.h
 +++ b/src/MeshCore.h
-@@ -64,6 +64,7 @@ public:
+@@ -64,6 +64,7 @@
    virtual uint8_t getStartupReason() const = 0;
    virtual bool getBootloaderVersion(char* version, size_t max_len) { return false; }
    virtual bool startOTAUpdate(const char* id, char reply[]) { return false; }   // not supported
@@ -88,7 +106,7 @@ index cfa33cf..2a827ad 100644
    // Power management interface (boards with power management override these)
    virtual bool isExternalPowered() { return false; }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index b78ad6e..05a5904 100644
+index 0000000..0000000 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -5,6 +5,19 @@
@@ -111,7 +129,7 @@ index b78ad6e..05a5904 100644
  #ifndef BRIDGE_MAX_BAUD
  #define BRIDGE_MAX_BAUD 115200
  #endif
-@@ -239,6 +252,10 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+@@ -239,6 +252,20 @@
        } else {
          strcpy(reply, "ERR: clock cannot go backwards");
        }
@@ -119,10 +137,20 @@ index b78ad6e..05a5904 100644
 +      if (!_board->startOTAUpdateFromURL(&command[14], reply)) {
 +        // reply[] already carries the specific error from HotspotOTA::run
 +      }
++#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
++    } else if (memcmp(command, "start ota wifi", 14) == 0) {
++      // Pre-flight check -- joins WiFi only (no WAN check, no download), so `get ota.wan` can be
++      // repeated without rejoining each time, and `start ota url` can be run straight after without
++      // re-joining (see HotspotOTA::run()'s alreadyConnectedTo() check).
++      HotspotOTA::wifiConnect(reply);
++    } else if (memcmp(command, "stop ota wifi", 13) == 0) {
++      HotspotOTA::wifiDisconnect();
++      strcpy(reply, "OK - disconnected");
++#endif
      } else if (memcmp(command, "start ota", 9) == 0) {
        if (!_board->startOTAUpdate(_prefs->node_name, reply)) {
          strcpy(reply, "Error");
-@@ -303,7 +320,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+@@ -303,7 +330,7 @@
        bool s = _callbacks->formatFileSystem();
        sprintf(reply, "File system erase: %s", s ? "OK" : "Err");
      } else if (memcmp(command, "ver", 3) == 0) {
@@ -131,7 +159,7 @@ index b78ad6e..05a5904 100644
      } else if (memcmp(command, "board", 5) == 0) {
        sprintf(reply, "%s", _board->getManufacturerName());
      } else if (memcmp(command, "sensor get ", 11) == 0) {
-@@ -536,6 +553,49 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -536,6 +563,49 @@
      StrHelper::strncpy(_prefs->guest_password, &config[15], sizeof(_prefs->guest_password));
      savePrefs();
      strcpy(reply, "OK");
@@ -181,22 +209,26 @@ index b78ad6e..05a5904 100644
    } else if (memcmp(config, "prv.key ", 8) == 0) {
      uint8_t prv_key[PRV_KEY_SIZE];
      bool success = mesh::Utils::fromHex(prv_key, PRV_KEY_SIZE, &config[8]);
-@@ -925,6 +985,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
-     sprintf(reply, "> %u mV", _board->getBootVoltage());
+@@ -926,6 +996,14 @@
  #else
      strcpy(reply, "ERROR: Power management not supported");
-+#endif
+ #endif
 +#if defined(WITH_HOTSPOT_OTA)
 +  } else if (memcmp(config, "ota.pwr", 7) == 0) {
 +    sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
- #endif
++  } else if (memcmp(config, "ota.wan", 7) == 0) {
++    // Pre-flight check -- see `start ota wifi`. WAN reachability only; assumes WiFi is already
++    // joined. Split out from the join step so it can be re-run on demand without rejoining.
++    HotspotOTA::checkWan(reply);
++#endif
    } else {
      sprintf(reply, "??: %s", config);
+   }
 diff --git a/src/helpers/ESP32Board.cpp b/src/helpers/ESP32Board.cpp
-index e0ca1d0..3b832b9 100644
+index 0000000..0000000 100644
 --- a/src/helpers/ESP32Board.cpp
 +++ b/src/helpers/ESP32Board.cpp
-@@ -38,10 +38,41 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
+@@ -38,10 +38,41 @@
    return true;
  }
  
@@ -239,10 +271,10 @@ index e0ca1d0..3b832b9 100644
  
  #endif
 diff --git a/src/helpers/ESP32Board.h b/src/helpers/ESP32Board.h
-index a4cbf2a..8b9198f 100644
+index 0000000..0000000 100644
 --- a/src/helpers/ESP32Board.h
 +++ b/src/helpers/ESP32Board.h
-@@ -151,6 +151,7 @@ public:
+@@ -151,6 +151,7 @@
    }
  
    bool startOTAUpdate(const char* id, char reply[]) override;
@@ -255,7 +287,7 @@ new file mode 100644
 index 0000000..0000000
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,253 @@
+@@ -0,0 +1,307 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -276,6 +308,11 @@ index 0000000..0000000
 +#define OTA_WIFI_JOIN_MAX_ATTEMPTS             6
 +#define OTA_HTTP_TIMEOUT_MS                20000
 +
++// See the joinWifiStation() comment below. `start ota wifi` uses this instead of
++// OTA_WIFI_JOIN_MAX_ATTEMPTS: a single attempt, worst case ~15s (OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS)
++// instead of ~115s, since a failed attempt here just means re-running `start ota wifi`.
++#define OTA_DIAG_WIFI_JOIN_ATTEMPTS             1
++
 +// WAN reachability check, run once WiFi association succeeds. Advisory only -- see checkWanConnectivity()
 +// below. 3 attempts (1 initial + 2 retries), 10s apart: accounts for cellular modems commonly showing
 +// WiFi association (L2 link) up before the actual data session (PDP context/NAT) has finished negotiating.
@@ -287,9 +324,15 @@ index 0000000..0000000
 +
 +#define PIN_HOTSPOT_PWR   47   // GPIO47, confirmed clean on Heltec V4.3.1 (GPIO48 = fallback)
 +
-+static bool joinWifiStation(const char* ssid, const char* pwd, char reply[]) {
++// max_attempts is a parameter (not always OTA_WIFI_JOIN_MAX_ATTEMPTS) because every call to this
++// function runs synchronously inside CommonCLI::handleCommand(), which itself runs inline in the
++// single-threaded main loop() -- there is no task/queue behind the CLI, so loop() cannot read the
++// next Serial command (or do anything else) again until this function returns. run()'s unattended
++// background update can afford the full patient budget below; wifiConnect()'s interactive pre-flight
++// check cannot, so it passes 1 to fail fast instead of blocking the console for up to ~115s.
++static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int max_attempts) {
 +  WiFi.mode(WIFI_STA);
-+  for (int attempt = 0; attempt < OTA_WIFI_JOIN_MAX_ATTEMPTS; attempt++) {
++  for (int attempt = 0; attempt < max_attempts; attempt++) {
 +    WiFi.begin(ssid, pwd);
 +    uint32_t start = millis();
 +    while (WiFi.status() != WL_CONNECTED && millis() - start < OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS) {
@@ -297,13 +340,22 @@ index 0000000..0000000
 +    }
 +    if (WiFi.status() == WL_CONNECTED) return true;
 +    WiFi.disconnect(true);
-+    if (attempt < OTA_WIFI_JOIN_MAX_ATTEMPTS - 1) {
++    if (attempt < max_attempts - 1) {
 +      delay(OTA_WIFI_JOIN_RETRY_DELAY_MS);   // give the hotspot more time to fully come up
 +                                              // before hammering it with another association attempt
 +    }
 +  }
 +  strcpy(reply, "ERR: could not join hotspot WiFi");
 +  return false;   // caller (HotspotOTA::run) drops GPIO47 immediately on this return
++}
++
++// True only if already connected to cfg's specific network -- not just "connected to something".
++// Lets an admin run `start ota wifi` first (fast, ~15s worst case, confirms the join works) and then
++// `start ota url`, which skips straight past its own patient join. A stale connection from an
++// earlier `start ota wifi` against different credentials (if `set ota.wifi` changed since) must not
++// be silently reused, so this checks the actual connected SSID, not just WL_CONNECTED.
++static bool alreadyConnectedTo(const HotspotOtaConfig& cfg) {
++  return WiFi.status() == WL_CONNECTED && WiFi.SSID() == cfg.ssid;
 +}
 +
 +// Advisory only -- does NOT gate the update. A false result never aborts run() by itself; it's only
@@ -368,9 +420,11 @@ index 0000000..0000000
 +  digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // must stay HIGH for the whole network phase --
 +                                          // TPS22995-class load switches are not latches
 +
-+  if (!joinWifiStation(cfg.ssid, cfg.password, reply)) {
-+    digitalWrite(PIN_HOTSPOT_PWR, LOW);
-+    return false;
++  if (!alreadyConnectedTo(cfg)) {
++    if (!joinWifiStation(cfg.ssid, cfg.password, reply, OTA_WIFI_JOIN_MAX_ATTEMPTS)) {
++      digitalWrite(PIN_HOTSPOT_PWR, LOW);
++      return false;
++    }
 +  }
 +
 +  // Advisory only -- see checkWanConnectivity(). Does not gate anything below; run() proceeds
@@ -509,12 +563,44 @@ index 0000000..0000000
 +  // whatever the pin defaults to -- LOW/off given the hardware pulldown recommended in the design notes.
 +  return digitalRead(PIN_HOTSPOT_PWR) == HIGH;
 +}
++
++bool HotspotOTA::wifiConnect(char reply[]) {
++  HotspotOtaConfig cfg;
++  HotspotOTA::loadConfig(cfg);
++  if (cfg.ssid[0] == 0) {
++    strcpy(reply, "ERR: ota.wifi not configured");
++    return false;
++  }
++
++  pinMode(PIN_HOTSPOT_PWR, OUTPUT);
++  digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // hotspot needs power before its AP will even exist to join
++
++  if (!joinWifiStation(cfg.ssid, cfg.password, reply, OTA_DIAG_WIFI_JOIN_ATTEMPTS)) {
++    digitalWrite(PIN_HOTSPOT_PWR, LOW);
++    return false;
++  }
++
++  strcpy(reply, "OK - joined");
++  return true;
++}
++
++void HotspotOTA::wifiDisconnect() {
++  WiFi.disconnect(true);
++  WiFi.mode(WIFI_OFF);
++  digitalWrite(PIN_HOTSPOT_PWR, LOW);
++}
++
++bool HotspotOTA::checkWan(char reply[]) {
++  bool ok = checkWanConnectivity();
++  strcpy(reply, ok ? "WAN OK" : "WAN ERR");
++  return ok;
++}
 diff --git a/src/helpers/esp32/HotspotOTA.h b/src/helpers/esp32/HotspotOTA.h
 new file mode 100644
 index 0000000..0000000
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.h
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,44 @@
 +#pragma once
 +#include <Arduino.h>
 +
@@ -549,12 +635,21 @@ index 0000000..0000000
 +  // Diagnostic/recovery only -- see `set ota.pwr <on|off>` / `get ota.pwr`.
 +  void setPower(bool on);
 +  bool getPower();
++
++  // Pre-flight diagnostics -- see `start ota wifi` / `stop ota wifi` / `get ota.wan` in CommonCLI.cpp.
++  // Split out of run() so each phase can be exercised independently before committing to a full
++  // update: join WiFi without paying for a WAN check every time, confirm WAN on demand, then tear
++  // down to retry. Also lets an admin run `start ota wifi` first, then `start ota url` -- run()
++  // detects the already-joined state (see alreadyConnectedTo()) and skips its own join.
++  bool wifiConnect(char reply[]);   // powers the hotspot (GPIO47) and joins WiFi; does not check WAN
++  void wifiDisconnect();            // disconnects WiFi and drops hotspot power, for a clean retry
++  bool checkWan(char reply[]);      // WAN reachability only; assumes WiFi is already joined
 +}
 diff --git a/variants/heltec_v4/platformio.ini b/variants/heltec_v4/platformio.ini
-index fabf382..c0f750e 100644
+index 0000000..0000000 100644
 --- a/variants/heltec_v4/platformio.ini
 +++ b/variants/heltec_v4/platformio.ini
-@@ -92,9 +92,11 @@ build_flags =
+@@ -92,9 +92,11 @@
    -D ADVERT_LON=0.0
    -D ADMIN_PASSWORD='"password"'
    -D MAX_NEIGHBOURS=50
@@ -566,7 +661,7 @@ index fabf382..c0f750e 100644
    +<helpers/ui/SSD1306Display.cpp>
    +<../examples/simple_repeater>
  lib_deps =
-@@ -156,9 +158,11 @@ build_flags =
+@@ -156,9 +158,11 @@
    -D ADVERT_LON=0.0
    -D ADMIN_PASSWORD='"password"'
    -D ROOM_PASSWORD='"hello"'

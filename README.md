@@ -12,7 +12,6 @@ This repository does **not** contain a fork of MeshCore's source. It contains a 
 |---|---|
 | `patches/0001-hotspot-fetch-ota.patch` | Adds the hotspot-fetch OTA feature to MeshCore |
 | `patches/0002-ota-rollback-guard.patch` | Adds automatic post-update rollback protection. **Depends on 0001** and cannot be applied alone |
-| `patches/0003-temp-ota-diagnostics.patch` | **Temporary.** Adds `ota.reboot`, `start`/`stop ota.wifi`, and `get ota.wan` CLI commands for exercising the reboot path and hotspot WiFi join/WAN-check independently of a full OTA update. Remove once hardware testing is done. |
 | `.github/workflows/build-release.yml` | Builds firmware for each supported variant against the latest matching upstream release and publishes it here |
 
 Patches are applied in numeric order. If a patch fails to apply against the current upstream release, the build fails and an issue is opened here identifying which patch broke — it does not attempt to auto-resolve the conflict.

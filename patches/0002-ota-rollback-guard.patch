@@ -1,8 +1,10 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index 8540583..5ae36a0 100644
+index 0000000..0000000 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -143,2 +143,22 @@ mid-update.
+@@ -159,6 +159,26 @@
+ 
+ ---
  
 +#### View the post-update rollback confirmation status
 +**Usage:**
@@ -25,18 +27,26 @@ index 8540583..5ae36a0 100644
 +---
 +
  ### Erase/Factory Reset
+ **Usage:**
+ - `erase`
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
-index 2ce056f..bce7f97 100644
+index 0000000..0000000 100644
 --- a/examples/simple_repeater/main.cpp
 +++ b/examples/simple_repeater/main.cpp
-@@ -5,2 +5,6 @@
+@@ -3,6 +3,10 @@
+ 
+ #include "MyMesh.h"
  
 +#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
 +#include <helpers/esp32/RollbackGuard.h>
 +#endif
 +
  #ifdef DISPLAY_CLASS
-@@ -50,2 +54,25 @@ void setup() {
+   #include "UITask.h"
+   static UITask ui_task(display);
+@@ -48,10 +52,34 @@
+   }
+ #endif
  
 +#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
 +  // RollbackGuard's failure counter is SPIFFS-backed and needs the filesystem mounted before it's used --
@@ -62,29 +72,42 @@ index 2ce056f..bce7f97 100644
 +  RollbackGuard::begin();
 +#else
    if (!radio_init()) {
-@@ -54,2 +81,3 @@ void setup() {
+     MESH_DEBUG_PRINTLN("Radio init failed!");
+     halt();
    }
 +#endif
  
-@@ -154,2 +182,6 @@ void loop() {
+   fast_rng.begin(radio_driver.getRngSeed());
+ 
+@@ -152,6 +180,10 @@
+ #endif
+   rtc_clock.tick();
  
 +#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
 +  RollbackGuard::poll();
 +#endif
 +
    if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
+ #if defined(NRF52_PLATFORM)
+     board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
 diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
-index a3798b2..c7fad7a 100644
+index 0000000..0000000 100644
 --- a/examples/simple_room_server/main.cpp
 +++ b/examples/simple_room_server/main.cpp
-@@ -5,2 +5,6 @@
+@@ -3,6 +3,10 @@
+ 
+ #include "MyMesh.h"
  
 +#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
 +#include <helpers/esp32/RollbackGuard.h>
 +#endif
 +
  #ifdef DISPLAY_CLASS
-@@ -35,3 +39,26 @@ void setup() {
+   #include "UITask.h"
+   static UITask ui_task(display);
+@@ -33,7 +37,30 @@
+   }
+ #endif
  
 +#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
 +  // RollbackGuard's failure counter is SPIFFS-backed and needs the filesystem mounted before it's used --
@@ -111,7 +134,11 @@ index a3798b2..c7fad7a 100644
    if (!radio_init()) { halt(); }
 +#endif
  
-@@ -117,2 +144,6 @@ void loop() {
+   fast_rng.begin(radio_driver.getRngSeed());
+ 
+@@ -115,4 +142,8 @@
+   ui_task.loop();
+ #endif
    rtc_clock.tick();
 +
 +#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
@@ -119,26 +146,34 @@ index a3798b2..c7fad7a 100644
 +#endif
  }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index 9831607..6cb0b61 100644
+index 0000000..0000000 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
-@@ -11,2 +11,6 @@
+@@ -18,6 +18,10 @@
+ #define OTA_MOD_BUILD_DATE "unknown"
+ #endif
  
 +#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
 +#include <helpers/esp32/RollbackGuard.h>
 +#endif
 +
  #ifndef BRIDGE_MAX_BAUD
-@@ -982,2 +986,6 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
-     sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
-+#endif
+ #define BRIDGE_MAX_BAUD 115200
+ #endif
+@@ -1004,6 +1008,10 @@
+     // joined. Split out from the join step so it can be re-run on demand without rejoining.
+     HotspotOTA::checkWan(reply);
+ #endif
 +#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
 +  } else if (memcmp(config, "ota.rollback", 12) == 0) {
 +    sprintf(reply, "> %s", RollbackGuard::status());
- #endif
++#endif
+   } else {
+     sprintf(reply, "??: %s", config);
+   }
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
-index 0000000..498df73
+index 0000000..0000000
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.cpp
 @@ -0,0 +1,104 @@
@@ -248,7 +283,7 @@ index 0000000..498df73
 +}
 diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
 new file mode 100644
-index 0000000..233ca71
+index 0000000..0000000
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.h
 @@ -0,0 +1,46 @@
@@ -299,22 +334,32 @@ index 0000000..233ca71
 +  const char* status();
 +}
 diff --git a/variants/heltec_v4/platformio.ini b/variants/heltec_v4/platformio.ini
-index c0f750e..70cf945 100644
+index 0000000..0000000 100644
 --- a/variants/heltec_v4/platformio.ini
 +++ b/variants/heltec_v4/platformio.ini
-@@ -95,2 +95,3 @@ build_flags =
+@@ -93,10 +93,12 @@
+   -D ADMIN_PASSWORD='"password"'
+   -D MAX_NEIGHBOURS=50
    -D WITH_HOTSPOT_OTA=1
 +  -D WITH_OTA_ROLLBACK_GUARD=1
  ;  -D MESH_PACKET_LOGGING=1
-@@ -99,2 +100,3 @@ build_src_filter = ${heltec_v4_oled.build_src_filter}
+ ;  -D MESH_DEBUG=1
+ build_src_filter = ${heltec_v4_oled.build_src_filter}
    +<helpers/esp32/HotspotOTA.cpp>
 +  +<helpers/esp32/RollbackGuard.cpp>
    +<helpers/ui/SSD1306Display.cpp>
-@@ -161,2 +163,3 @@ build_flags =
+   +<../examples/simple_repeater>
+ lib_deps =
+@@ -159,10 +161,12 @@
+   -D ADMIN_PASSWORD='"password"'
+   -D ROOM_PASSWORD='"hello"'
    -D WITH_HOTSPOT_OTA=1
 +  -D WITH_OTA_ROLLBACK_GUARD=1
  ;  -D MESH_PACKET_LOGGING=1
-@@ -165,2 +168,3 @@ build_src_filter = ${heltec_v4_oled.build_src_filter}
+ ;  -D MESH_DEBUG=1
+ build_src_filter = ${heltec_v4_oled.build_src_filter}
    +<helpers/esp32/HotspotOTA.cpp>
 +  +<helpers/esp32/RollbackGuard.cpp>
    +<helpers/ui/SSD1306Display.cpp>
+   +<../examples/simple_room_server>
+ lib_deps =
