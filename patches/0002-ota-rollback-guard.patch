@@ -1,8 +1,8 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index bd78b22..00d52e1 100644
+index bd78b22..6edb95e 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -153,6 +153,24 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
+@@ -153,6 +153,41 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
  
  ---
  
@@ -10,15 +10,32 @@ index bd78b22..00d52e1 100644
 +**Usage:**
 +- `get ota.rollback`
 +
-+**Returns:**
++**Returns:** `active: <A|B> - <state>`, e.g. `active: A - valid`. `<A|B>` is which OTA slot is
++currently running (`A` = `ota_0`, `B` = `ota_1`). `<state>` is one of:
 +- `pending`: This boot is on probation after an OTA update (via either `start ota` or `start ota url`).
 +  The device will automatically confirm itself as valid ~90 seconds after boot if the radio initializes
 +  correctly; an unconfirmed reset before then reverts to the previous firmware automatically.
 +- `valid`: Already confirmed, or this boot isn't the result of an OTA update in the first place.
 +- `n/a`: Rollback state could not be queried for the running partition.
 +
-+**Note:** Read-only — no manual override. Confirms automatically after the confirm delay with a
-+working radio; rejects immediately (rollback + reboot) if `radio_init()` fails on a probationary boot.
++**Note:** Confirms automatically after the confirm delay with a working radio; rejects immediately
++(rollback + reboot) if `radio_init()` fails on a probationary boot.
++
++**Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag (Heltec V4 repeater/room server only)
++
++---
++
++#### Manually switch which OTA slot boots
++**Usage:**
++- `set ota.active <A|B>`
++
++**Parameters:**
++- `A` / `B`: The OTA slot to boot into next (`A` = `ota_0`, `B` = `ota_1`) -- see `get ota.rollback`.
++
++**Note:** Points the bootloader at the requested slot and reboots into it without touching flash
++contents -- useful when a USB flash lands on the currently-inactive slot (e.g. after an earlier
++`start ota url` update flipped which slot is active) and appears not to take effect. Refuses if the
++requested slot is already active, doesn't exist, or has no valid app image flashed to it.
 +
 +**Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag (Heltec V4 repeater/room server only)
 +
@@ -130,7 +147,7 @@ index a3798b2..ba0420d 100644
 +#endif
  }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index ee1eb42..7ecf643 100644
+index ee1eb42..e007431 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -15,6 +15,10 @@
@@ -144,7 +161,20 @@ index ee1eb42..7ecf643 100644
  #ifndef BRIDGE_MAX_BAUD
  #define BRIDGE_MAX_BAUD 115200
  #endif
-@@ -994,6 +998,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -597,6 +601,12 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+     } else {
+       strcpy(reply, "ERR: expected on|off");
+     }
++#endif
++#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
++  } else if (memcmp(config, "ota.active ", 11) == 0) {
++    if (RollbackGuard::setActivePartition(config[11], reply)) {
++      _board->reboot();  // doesn't return
++    }
+ #endif
+   } else if (memcmp(config, "prv.key ", 8) == 0) {
+     uint8_t prv_key[PRV_KEY_SIZE];
+@@ -994,6 +1004,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
    } else if (memcmp(config, "ota.wan", 7) == 0) {
      // Pre-flight check -- see `start ota join`. Assumes WiFi already joined.
      HotspotOTA::checkWan(reply);
@@ -157,12 +187,13 @@ index ee1eb42..7ecf643 100644
      sprintf(reply, "??: %s", config);
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
-index 0000000..e879127
+index 0000000..2b1f534
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.cpp
-@@ -0,0 +1,88 @@
+@@ -0,0 +1,135 @@
 +#include "RollbackGuard.h"
 +#include <esp_ota_ops.h>
++#include <esp_partition.h>
 +#include <esp_system.h>   // esp_restart()
 +#include <SPIFFS.h>
 +
@@ -191,6 +222,18 @@ index 0000000..e879127
 +  esp_ota_get_state_partition(running, &state);
 +  if (out_state) *out_state = state;
 +  return state == ESP_OTA_IMG_PENDING_VERIFY;
++}
++
++// 'A'/'B' labels for ota_0/ota_1 -- friendlier than raw partition names over a CLI.
++static char partitionLetter(const esp_partition_t* p) {
++  if (p->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_0) return 'A';
++  if (p->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1) return 'B';
++  return '?';
++}
++
++static const esp_partition_t* findPartitionByLetter(char letter) {
++  esp_partition_subtype_t subtype = (letter == 'A') ? ESP_PARTITION_SUBTYPE_APP_OTA_0 : ESP_PARTITION_SUBTYPE_APP_OTA_1;
++  return esp_partition_find_first(ESP_PARTITION_TYPE_APP, subtype, NULL);
 +}
 +
 +static uint8_t readFailCount() {
@@ -243,18 +286,52 @@ index 0000000..e879127
 +}
 +
 +const char* RollbackGuard::status() {
++  static char buf[24];
 +  esp_ota_img_states_t state;
-+  if (!isPendingVerify(&state)) {
-+    return (state == ESP_OTA_IMG_VALID) ? "valid" : "n/a";
++  const char* verdict = isPendingVerify(&state) ? "pending" : (state == ESP_OTA_IMG_VALID ? "valid" : "n/a");
++  sprintf(buf, "active: %c - %s", partitionLetter(esp_ota_get_running_partition()), verdict);
++  return buf;
++}
++
++bool RollbackGuard::setActivePartition(char letter, char reply[]) {
++  if (letter >= 'a' && letter <= 'z') letter -= 32;   // uppercase, no <ctype.h> needed for one char
++  if (letter != 'A' && letter != 'B') {
++    strcpy(reply, "ERR: expected A or B");
++    return false;
 +  }
-+  return "pending";
++
++  const esp_partition_t* running = esp_ota_get_running_partition();
++  if (partitionLetter(running) == letter) {
++    sprintf(reply, "ERR: %c already active", letter);
++    return false;
++  }
++
++  const esp_partition_t* target = findPartitionByLetter(letter);
++  if (!target) {
++    sprintf(reply, "ERR: partition %c not found", letter);
++    return false;
++  }
++
++  uint8_t magic = 0;
++  if (esp_partition_read(target, 0, &magic, 1) != ESP_OK || magic != 0xE9) {   // ESP_IMAGE_HEADER_MAGIC
++    sprintf(reply, "ERR: %c has no valid image", letter);
++    return false;
++  }
++
++  if (esp_ota_set_boot_partition(target) != ESP_OK) {
++    strcpy(reply, "ERR: could not set boot partition");
++    return false;
++  }
++
++  strcpy(reply, "OK - rebooting");
++  return true;   // caller reboots
 +}
 diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
 new file mode 100644
-index 0000000..2693188
+index 0000000..296262f
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.h
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,37 @@
 +#pragma once
 +#include <Arduino.h>
 +
@@ -283,9 +360,14 @@ index 0000000..2693188
 +  // return.
 +  void onRadioInitFailure();
 +
-+  // For `get ota.rollback` -- "pending", "valid" (confirmed or n/a to this boot), or "n/a" (feature
-+  // unavailable for this partition).
++  // For `get ota.rollback` -- "active: A - <state>" / "active: B - <state>", state being "pending",
++  // "valid" (confirmed or n/a to this boot), or "n/a" (feature unavailable for this partition).
 +  const char* status();
++
++  // For `set ota.active <A|B>` -- points the bootloader at the other OTA slot without touching flash
++  // contents. Refuses if the target is already active, doesn't exist, or has no valid app image.
++  // Fills reply[] either way; caller reboots on true.
++  bool setActivePartition(char letter, char reply[]);
 +}
 diff --git a/variants/heltec_v4/platformio.ini b/variants/heltec_v4/platformio.ini
 index c0f750e..70cf945 100644
