@@ -19,7 +19,55 @@ diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 index 0000000..0000000 100644
 --- a/src/helpers/esp32/HotspotOTA.cpp
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -243,3 +243,35 @@
+@@ -18,6 +18,11 @@
+ #define OTA_WIFI_JOIN_MAX_ATTEMPTS             6
+ #define OTA_HTTP_TIMEOUT_MS                20000
+ 
++// TEMPORARY -- see the joinWifiStation() comment below. `start ota.wifi` uses this instead of
++// OTA_WIFI_JOIN_MAX_ATTEMPTS: a single attempt, worst case ~15s (OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS)
++// instead of ~115s, since a failed attempt here just means re-running `start ota.wifi`.
++#define OTA_DIAG_WIFI_JOIN_ATTEMPTS             1
++
+ // WAN reachability check, run once WiFi association succeeds. Advisory only -- see checkWanConnectivity()
+ // below. 3 attempts (1 initial + 2 retries), 10s apart: accounts for cellular modems commonly showing
+ // WiFi association (L2 link) up before the actual data session (PDP context/NAT) has finished negotiating.
+@@ -29,9 +34,15 @@
+ 
+ #define PIN_HOTSPOT_PWR   47   // GPIO47, confirmed clean on Heltec V4.3.1 (GPIO48 = fallback)
+ 
+-static bool joinWifiStation(const char* ssid, const char* pwd, char reply[]) {
++// max_attempts is a parameter (not always OTA_WIFI_JOIN_MAX_ATTEMPTS) because every call to this
++// function runs synchronously inside CommonCLI::handleCommand(), which itself runs inline in the
++// single-threaded main loop() -- there is no task/queue behind the CLI, so loop() cannot read the
++// next Serial command (or do anything else) again until this function returns. run()'s unattended
++// background update can afford the full patient budget below; wifiConnect()'s interactive diagnostic
++// cannot, so it passes 1 to fail fast instead of blocking the console for up to ~115s.
++static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int max_attempts) {
+   WiFi.mode(WIFI_STA);
+-  for (int attempt = 0; attempt < OTA_WIFI_JOIN_MAX_ATTEMPTS; attempt++) {
++  for (int attempt = 0; attempt < max_attempts; attempt++) {
+     WiFi.begin(ssid, pwd);
+     uint32_t start = millis();
+     while (WiFi.status() != WL_CONNECTED && millis() - start < OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS) {
+@@ -39,7 +50,7 @@
+     }
+     if (WiFi.status() == WL_CONNECTED) return true;
+     WiFi.disconnect(true);
+-    if (attempt < OTA_WIFI_JOIN_MAX_ATTEMPTS - 1) {
++    if (attempt < max_attempts - 1) {
+       delay(OTA_WIFI_JOIN_RETRY_DELAY_MS);   // give the hotspot more time to fully come up
+                                               // before hammering it with another association attempt
+     }
+@@ -102,7 +113,7 @@
+   digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // must stay HIGH for the whole network phase --
+                                           // TPS22995-class load switches are not latches
+ 
+-  if (!joinWifiStation(cfg.ssid, cfg.password, reply)) {
++  if (!joinWifiStation(cfg.ssid, cfg.password, reply, OTA_WIFI_JOIN_MAX_ATTEMPTS)) {
+     digitalWrite(PIN_HOTSPOT_PWR, LOW);
+     return false;
+   }
+@@ -243,3 +254,35 @@
    // whatever the pin defaults to -- LOW/off given the hardware pulldown recommended in the design notes.
    return digitalRead(PIN_HOTSPOT_PWR) == HIGH;
  }
@@ -35,7 +83,7 @@ index 0000000..0000000 100644
 +  pinMode(PIN_HOTSPOT_PWR, OUTPUT);
 +  digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // hotspot needs power before its AP will even exist to join
 +
-+  if (!joinWifiStation(cfg.ssid, cfg.password, reply)) {
++  if (!joinWifiStation(cfg.ssid, cfg.password, reply, OTA_DIAG_WIFI_JOIN_ATTEMPTS)) {
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    return false;
 +  }
