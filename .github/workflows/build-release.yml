@@ -229,6 +229,17 @@ jobs:
         run: |
           sha256sum "${{ steps.artifact.outputs.name }}" | awk '{print $1}' > "${{ steps.artifact.outputs.name }}.sha256"
 
+      - name: Delete any existing release for this tag (refreshes published_at on republish)
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          RELEASE_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.pick.outputs.release_tag }}" \
+            | jq -r '.id // empty')
+          if [ -n "$RELEASE_ID" ]; then
+            curl -s -X DELETE -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
+          fi
+
       - name: Publish release with .bin + .sha256 sidecar
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
