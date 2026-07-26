@@ -1,5 +1,5 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index 2653fd4..bd32316 100644
+index bd78b22..00d52e1 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
 @@ -153,6 +153,24 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
@@ -130,7 +130,7 @@ index a3798b2..ba0420d 100644
 +#endif
  }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index 5114149..e503e85 100644
+index ee1eb42..7ecf643 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -15,6 +15,10 @@
@@ -146,7 +146,7 @@ index 5114149..e503e85 100644
  #endif
 @@ -994,6 +998,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
    } else if (memcmp(config, "ota.wan", 7) == 0) {
-     // Pre-flight check -- see `start ota wifi.join`. Assumes WiFi already joined.
+     // Pre-flight check -- see `start ota join`. Assumes WiFi already joined.
      HotspotOTA::checkWan(reply);
 +#endif
 +#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)

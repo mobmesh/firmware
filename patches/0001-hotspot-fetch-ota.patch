@@ -1,5 +1,5 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index 9accb29..2653fd4 100644
+index 9accb29..bd78b22 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
 @@ -75,6 +75,84 @@ This document provides an overview of CLI commands that can be sent to MeshCore
@@ -70,15 +70,15 @@ index 9accb29..2653fd4 100644
 +
 +#### Pre-flight check the hotspot WiFi join and WAN connectivity before `start ota url`
 +**Usage:**
-+- `start ota wifi.join`
++- `start ota join`
 +- `get ota.wan`
-+- `start ota wifi.leave`
++- `start ota leave`
 +
-+**Note:** `start ota wifi.join` joins the configured WiFi network only (no WAN check, no download),
++**Note:** `start ota join` joins the configured WiFi network only (no WAN check, no download),
 +returning in one quick attempt (~15s worst case) instead of `start ota url`'s full patient join
 +budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable without rejoining.
-+`start ota wifi.leave` disconnects and drops hotspot power for a clean retry. A successful
-+`start ota wifi.join` lets `start ota url` skip its own join step right after.
++`start ota leave` disconnects and drops hotspot power for a clean retry. A successful
++`start ota join` lets `start ota url` skip its own join step right after.
 +
 +**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 +
@@ -100,7 +100,7 @@ index cfa33cf..2a827ad 100644
    // Power management interface (boards with power management override these)
    virtual bool isExternalPowered() { return false; }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index b78ad6e..5114149 100644
+index b78ad6e..ee1eb42 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -5,6 +5,16 @@
@@ -129,11 +129,11 @@ index b78ad6e..5114149 100644
 +        // reply[] already carries the specific error from HotspotOTA::run
 +      }
 +#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
-+    } else if (memcmp(command, "start ota wifi.join", 19) == 0) {
++    } else if (memcmp(command, "start ota join", 14) == 0) {
 +      // Pre-flight check -- joins WiFi only, so `get ota.wan` can be repeated without rejoining, and
 +      // `start ota url` skips its own join after this (see alreadyConnectedTo()).
 +      HotspotOTA::wifiConnect(reply);
-+    } else if (memcmp(command, "start ota wifi.leave", 20) == 0) {
++    } else if (memcmp(command, "start ota leave", 15) == 0) {
 +      HotspotOTA::wifiDisconnect();
 +      strcpy(reply, "OK - disconnected");
 +#endif
@@ -204,7 +204,7 @@ index b78ad6e..5114149 100644
 +  } else if (memcmp(config, "ota.pwr", 7) == 0) {
 +    sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
 +  } else if (memcmp(config, "ota.wan", 7) == 0) {
-+    // Pre-flight check -- see `start ota wifi.join`. Assumes WiFi already joined.
++    // Pre-flight check -- see `start ota join`. Assumes WiFi already joined.
 +    HotspotOTA::checkWan(reply);
  #endif
    } else {
@@ -266,7 +266,7 @@ index a4cbf2a..8b9198f 100644
      inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..659ffdf
+index 0000000..a29638e
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
 @@ -0,0 +1,262 @@
@@ -286,7 +286,7 @@ index 0000000..659ffdf
 +#define OTA_WIFI_JOIN_MAX_ATTEMPTS             6
 +#define OTA_HTTP_TIMEOUT_MS                20000
 +
-+// `start ota wifi.join` uses this instead: 1 attempt (~15s) so it can't block the CLI for ~115s.
++// `start ota join` uses this instead: 1 attempt (~15s) so it can't block the CLI for ~115s.
 +#define OTA_DIAG_WIFI_JOIN_ATTEMPTS             1
 +
 +// Advisory WAN check -- cellular modems often show L2 link up before the data session negotiates.
@@ -316,7 +316,7 @@ index 0000000..659ffdf
 +}
 +
 +// Checks the actual connected SSID, not just WL_CONNECTED -- a stale connection from an earlier
-+// `start ota wifi.join` against different credentials must not be silently reused.
++// `start ota join` against different credentials must not be silently reused.
 +static bool alreadyConnectedTo(const HotspotOtaConfig& cfg) {
 +  return WiFi.status() == WL_CONNECTED && WiFi.SSID() == cfg.ssid;
 +}
@@ -534,7 +534,7 @@ index 0000000..659ffdf
 +}
 diff --git a/src/helpers/esp32/HotspotOTA.h b/src/helpers/esp32/HotspotOTA.h
 new file mode 100644
-index 0000000..ab4ab5f
+index 0000000..768983a
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.h
 @@ -0,0 +1,29 @@
@@ -561,8 +561,8 @@ index 0000000..ab4ab5f
 +  void setPower(bool on);   // manual GPIO47 control, independent of run()
 +  bool getPower();
 +
-+  // Pre-flight versions of run()'s join/WAN-check steps -- see `start ota wifi.join` / `get ota.wan` /
-+  // `start ota wifi.leave`. run() skips its own join if already connected via alreadyConnectedTo().
++  // Pre-flight versions of run()'s join/WAN-check steps -- see `start ota join` / `get ota.wan` /
++  // `start ota leave`. run() skips its own join if already connected via alreadyConnectedTo().
 +  bool wifiConnect(char reply[]);
 +  void wifiDisconnect();
 +  bool checkWan(char reply[]);
