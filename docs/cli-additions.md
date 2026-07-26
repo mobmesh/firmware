@@ -47,10 +47,9 @@ need to be resupplied for future updates unless the hotspot's credentials change
 **Parameters:**
 - `hex`: 64-character lowercase hex SHA-256 digest of the target firmware `.bin`
 
-**Note:** Once set, this hash is used to verify the download and is **not** overridden by a
-`<url>.sha256` sidecar, even if one is found. `set ota.sha256 clear` removes it, allowing sidecar-fetch
-to take effect again. A stale hash from a previous update will block a correct sidecar for a new one if
-left set — clear it before pointing `start ota url` at a different firmware image.
+**Note:** Once set, this hash verifies the download and is **not** overridden by a `<url>.sha256`
+sidecar. `set ota.sha256 clear` removes it so sidecar-fetch takes effect again — do this before
+pointing `start ota url` at a different firmware image, or a stale hash will block its sidecar.
 
 **Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 
@@ -64,12 +63,9 @@ left set — clear it before pointing `start ota url` at a different firmware im
 **Parameters:**
 - `on` / `off`: Drives GPIO47 (the hotspot power-switch control pin) directly
 
-**Note:** Diagnostic and recovery command, entirely independent of `start ota url` — does not join WiFi,
-download, or flash anything. Use `get ota.pwr` to confirm the rail is off after an update completes or
-fails, and `set ota.pwr off` to force it off manually if ever in doubt (e.g. after an unexpected reset
-during an update). `HotspotOTA::run()` already drops this pin on every failure path it controls; this
-command exists for the cases outside that function's control, such as a crash or watchdog reset
-mid-update.
+**Note:** Diagnostic and recovery command, independent of `start ota url` — does not join WiFi,
+download, or flash anything. Use to confirm or force the rail off if state is ever in doubt (e.g.
+after a crash or watchdog reset mid-update).
 
 **Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 
@@ -77,17 +73,15 @@ mid-update.
 
 #### Pre-flight check the hotspot WiFi join and WAN connectivity before `start ota url`
 **Usage:**
-- `start ota wifi`
+- `start ota wifi.join`
 - `get ota.wan`
-- `stop ota wifi`
+- `start ota wifi.leave`
 
-**Note:** `start ota wifi` joins the configured WiFi network only (no WAN check, no download) and
-returns quickly (a single join attempt, worst case ~15s) so a bad `ota.wifi` credential or an
-unreachable hotspot can be confirmed without waiting on `start ota url`'s full patient join budget
-(up to ~115s across retries) or committing to a download. `get ota.wan` checks WAN reachability on
-demand once joined, repeatable without rejoining. `stop ota wifi` disconnects and drops hotspot
-power for a clean retry. Running `start ota wifi` successfully and then `start ota url` immediately
-after skips `start ota url`'s own join step, since it detects the already-joined network.
+**Note:** `start ota wifi.join` joins the configured WiFi network only (no WAN check, no download),
+returning in one quick attempt (~15s worst case) instead of `start ota url`'s full patient join
+budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable without rejoining.
+`start ota wifi.leave` disconnects and drops hotspot power for a clean retry. A successful
+`start ota wifi.join` lets `start ota url` skip its own join step right after.
 
 **Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 
@@ -104,10 +98,8 @@ after skips `start ota url`'s own join step, since it detects the already-joined
 - `valid`: Already confirmed, or this boot isn't the result of an OTA update in the first place.
 - `n/a`: Rollback state could not be queried for the running partition.
 
-**Note:** Read-only status command — there is no manual override. Confirmation happens automatically once
-the device has run stably for the confirm delay with a working radio; rejection happens automatically and
-immediately if `radio_init()` fails on a probationary boot (forces an immediate rollback + reboot rather
-than hanging).
+**Note:** Read-only — no manual override. Confirms automatically after the confirm delay with a
+working radio; rejects immediately (rollback + reboot) if `radio_init()` fails on a probationary boot.
 
 **Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag (Heltec V4 repeater/room server only)
 
