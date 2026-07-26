@@ -31,13 +31,13 @@ jobs:
             build_env: heltec_v4_repeater
             upstream_tag_prefix: repeater
             release_title: Repeater
-            asset_basename: heltec_v4_rep_ota_mod
+            asset_basename: heltec_v4_rep_ota
             sync_docs: true
           - id: room_server
             build_env: heltec_v4_room_server
             upstream_tag_prefix: room-server
             release_title: Room
-            asset_basename: heltec_v4_room_ota_mod
+            asset_basename: heltec_v4_room_ota
             sync_docs: false
     runs-on: ubuntu-latest
     steps:
@@ -70,7 +70,7 @@ jobs:
           fi
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
           echo "version=${REF#${{ matrix.upstream_tag_prefix }}-}" >> "$GITHUB_OUTPUT"
-          echo "release_tag=hotspot-ota-$REF" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${REF}-ota_mod" >> "$GITHUB_OUTPUT"
 
       - id: check
         name: Check if already built

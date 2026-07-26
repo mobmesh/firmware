@@ -21,8 +21,8 @@ Patches are applied in numeric order. If a patch fails to apply against the curr
 
 | Variant | Upstream tag tracked | Release asset |
 |---|---|---|
-| Repeater | `repeater-v*` | `heltec_v4_rep_ota_mod-vX.Y.Z.bin` |
-| Room Server | `room-server-v*` | `heltec_v4_room_ota_mod-vX.Y.Z.bin` |
+| Repeater | `repeater-v*` | `heltec_v4_rep_ota-vX.Y.Z.bin` |
+| Room Server | `room-server-v*` | `heltec_v4_room_ota-vX.Y.Z.bin` |
 
 Each variant is tracked and released independently, since upstream versions them on separate tag sequences. Adding another variant (a different board, or another role on an existing board) is a matter of extending the workflow's build matrix and, if needed, the patches — see the workflow file for the current matrix definition.
 
