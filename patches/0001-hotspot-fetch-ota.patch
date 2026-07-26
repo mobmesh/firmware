@@ -199,10 +199,10 @@ index a4cbf2a..8b9198f 100644
  
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..d073ec4
+index 0000000..0000000
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,369 @@
+@@ -0,0 +1,380 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -216,6 +216,7 @@ index 0000000..d073ec4
 +                                       // needed only to check GPS-detected state before touching the
 +                                       // shared LED/GPS pin below
 +#include <esp32-hal-rmt.h>             // TEMPORARY -- see setTestLed()'s direct rmtInit() call below
++#include <driver/gpio.h>               // gpio_reset_pin() -- see ledPrepare() below
 +
 +// The hotspot's WiFi network can take up to ~60s to appear after GPIO47 is asserted (cellular modem
 +// boot time). These constants give 6 attempts at 15s each, with a 5s pause between attempts, for a
@@ -259,13 +260,23 @@ index 0000000..d073ec4
 +}
 +
 +// Releases GPIO38 from GPS-UART duty so it's safe to drive as a NeoPixel data line. Safe to call even
-+// when GPS was never using it -- Serial1.end() on an unmounted/inactive port is a harmless no-op.
++// when GPS was never using it -- both calls below are harmless no-ops on an unmounted/inactive port.
 +// Deliberately NOT cached/latched: this runs once per `start ota url` invocation (a rare, manual-ish
 +// operation, not a hot path), so the trivial cost of re-checking each time isn't worth the complexity
 +// of tracking whether it already ran.
++//
++// Serial1.end() only tears down the UART *driver* (deletes the queue/ISR); it does NOT necessarily
++// undo uart_set_pin()'s GPIO-matrix routing of GPIO38 into the UART peripheral's RX input signal, nor
++// reset the pad's own configuration. If that routing/config is still live when rmtInit() runs, the
++// pad could still be electrically influenced by leftover UART pin state even though rmtInit() itself
++// reports success (it has no way to know the pin wasn't cleanly idle). gpio_reset_pin() is the IDF
++// API for a full hardware-level release: it disconnects any GPIO-matrix signal (input or output),
++// disables input/output, and restores the pad to its default reset state -- a strictly more complete
++// teardown than Serial1.end() alone, so rmtInit() then claims a genuinely blank pin.
 +static bool ledPrepare() {
 +  if (!ledAvailable()) return false;
 +  Serial1.end();
++  gpio_reset_pin((gpio_num_t)OTA_LED_PIN);
 +  return true;
 +}
 +
