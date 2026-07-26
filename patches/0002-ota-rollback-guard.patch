@@ -1,0 +1,320 @@
+diff --git a/docs/cli_commands.md b/docs/cli_commands.md
+index 8540583..5ae36a0 100644
+--- a/docs/cli_commands.md
++++ b/docs/cli_commands.md
+@@ -143,2 +143,22 @@ mid-update.
+ 
++#### View the post-update rollback confirmation status
++**Usage:**
++- `get ota.rollback`
++
++**Returns:**
++- `pending`: This boot is on probation after an OTA update (via either `start ota` or `start ota url`).
++  The device will automatically confirm itself as valid ~90 seconds after boot if the radio initializes
++  correctly; an unconfirmed reset before then reverts to the previous firmware automatically.
++- `valid`: Already confirmed, or this boot isn't the result of an OTA update in the first place.
++- `n/a`: Rollback state could not be queried for the running partition.
++
++**Note:** Read-only status command — there is no manual override. Confirmation happens automatically once
++the device has run stably for the confirm delay with a working radio; rejection happens automatically and
++immediately if `radio_init()` fails on a probationary boot (forces an immediate rollback + reboot rather
++than hanging).
++
++**Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag (Heltec V4 repeater/room server only)
++
++---
++
+ ### Erase/Factory Reset
+diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
+index 2ce056f..bce7f97 100644
+--- a/examples/simple_repeater/main.cpp
++++ b/examples/simple_repeater/main.cpp
+@@ -5,2 +5,6 @@
+ 
++#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
++#include <helpers/esp32/RollbackGuard.h>
++#endif
++
+ #ifdef DISPLAY_CLASS
+@@ -50,2 +54,25 @@ void setup() {
+ 
++#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
++  // RollbackGuard's failure counter is SPIFFS-backed and needs the filesystem mounted before it's used --
++  // the shared cross-platform mount further down in setup() runs too late for that. SPIFFS.begin() is
++  // safe to call twice (it checks esp_spiffs_mounted() and just returns true if already mounted, verified
++  // against the actual core source, not assumed) so this doesn't conflict with or duplicate work done by
++  // the later call.
++  SPIFFS.begin(true);
++
++  // Most radio_init() failures get exactly one attempt with no other retry margin (confirmed by reading
++  // CustomSX1262.h's std_init() -- its only built-in retry is a narrow TCXO-voltage workaround for one
++  // specific error pair, not a general retry). A few immediate, same-boot attempts catch a transient
++  // glitch cheaply before falling back to the cross-boot retry-with-cap in onRadioInitFailure().
++  bool radio_ok = false;
++  for (int attempt = 0; attempt < 3; attempt++) {
++    if (radio_init()) { radio_ok = true; break; }
++    delay(500);
++  }
++  if (!radio_ok) {
++    MESH_DEBUG_PRINTLN("Radio init failed!");
++    RollbackGuard::onRadioInitFailure();   // does not return
++  }
++  RollbackGuard::begin();
++#else
+   if (!radio_init()) {
+@@ -54,2 +81,3 @@ void setup() {
+   }
++#endif
+ 
+@@ -154,2 +182,6 @@ void loop() {
+ 
++#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
++  RollbackGuard::poll();
++#endif
++
+   if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
+diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
+index a3798b2..c7fad7a 100644
+--- a/examples/simple_room_server/main.cpp
++++ b/examples/simple_room_server/main.cpp
+@@ -5,2 +5,6 @@
+ 
++#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
++#include <helpers/esp32/RollbackGuard.h>
++#endif
++
+ #ifdef DISPLAY_CLASS
+@@ -35,3 +39,26 @@ void setup() {
+ 
++#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
++  // RollbackGuard's failure counter is SPIFFS-backed and needs the filesystem mounted before it's used --
++  // the shared cross-platform mount further down in setup() runs too late for that. SPIFFS.begin() is
++  // safe to call twice (it checks esp_spiffs_mounted() and just returns true if already mounted, verified
++  // against the actual core source, not assumed) so this doesn't conflict with or duplicate work done by
++  // the later call.
++  SPIFFS.begin(true);
++
++  // Most radio_init() failures get exactly one attempt with no other retry margin (confirmed by reading
++  // CustomSX1262.h's std_init() -- its only built-in retry is a narrow TCXO-voltage workaround for one
++  // specific error pair, not a general retry). A few immediate, same-boot attempts catch a transient
++  // glitch cheaply before falling back to the cross-boot retry-with-cap in onRadioInitFailure().
++  bool radio_ok = false;
++  for (int attempt = 0; attempt < 3; attempt++) {
++    if (radio_init()) { radio_ok = true; break; }
++    delay(500);
++  }
++  if (!radio_ok) {
++    RollbackGuard::onRadioInitFailure();   // does not return
++  }
++  RollbackGuard::begin();
++#else
+   if (!radio_init()) { halt(); }
++#endif
+ 
+@@ -117,2 +144,6 @@ void loop() {
+   rtc_clock.tick();
++
++#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
++  RollbackGuard::poll();
++#endif
+ }
+diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
+index 9831607..6cb0b61 100644
+--- a/src/helpers/CommonCLI.cpp
++++ b/src/helpers/CommonCLI.cpp
+@@ -11,2 +11,6 @@
+ 
++#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
++#include <helpers/esp32/RollbackGuard.h>
++#endif
++
+ #ifndef BRIDGE_MAX_BAUD
+@@ -982,2 +986,6 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+     sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
++#endif
++#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
++  } else if (memcmp(config, "ota.rollback", 12) == 0) {
++    sprintf(reply, "> %s", RollbackGuard::status());
+ #endif
+diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
+new file mode 100644
+index 0000000..498df73
+--- /dev/null
++++ b/src/helpers/esp32/RollbackGuard.cpp
+@@ -0,0 +1,104 @@
++#include "RollbackGuard.h"
++#include <esp_ota_ops.h>
++#include <esp_system.h>   // esp_restart()
++#include <SPIFFS.h>
++
++// How long the new firmware has to run, stable, before it's confirmed valid and rollback protection is
++// cancelled. Long enough to catch an immediate boot-loop or early crash; short enough not to leave the
++// device on probation for excessive time on top of the ~2 minutes a hotspot-fetch update can already take.
++#define OTA_ROLLBACK_CONFIRM_DELAY_MS   90000
++
++// Cross-boot retry cap for onRadioInitFailure(). Most real radio_init() failures get exactly one attempt
++// per boot with no other retry margin (confirmed by reading CustomSX1262.h's std_init() -- its only
++// built-in retry is a narrow TCXO-voltage workaround for one specific error pair, not a general retry).
++// This gives a transient failure (marginal power rail settling, brief SPI noise) several full boot
++// attempts to clear before giving up -- while still bottoming out at a permanent halt for a genuinely
++// dead radio, rather than an infinite reboot loop. Deliberately NOT using RTC memory for the counter --
++// real-world reports of RTC_DATA_ATTR/RTC_NOINIT_ATTR surviving esp_restart() specifically (as opposed to
++// deep sleep) are inconsistent across ESP-IDF versions/chips, and this wasn't verified against this
++// project's exact pinned version. SPIFFS is used instead -- already proven reliable across resets in this
++// exact project (the HotspotOTA config file).
++#define RADIO_INIT_RESET_CAP   5
++#define RADIO_FAIL_COUNT_PATH  "/radio_fail_count"
++
++// Deferred from Arduino core's own default rollback-confirmation hook, which runs inside initArduino() --
++// before setup(), too early to judge anything meaningful (e.g. whether the radio actually works). This
++// override must be extern "C": the weak symbol it replaces is declared in a plain .c file in the Arduino
++// core, and C++ name-mangling would otherwise make this a different, unrelated symbol that never gets
++// linked in place of the original -- the override would silently do nothing.
++extern "C" bool verifyRollbackLater() { return true; }
++
++static uint32_t boot_time_ms = 0;
++static bool confirmed_or_not_applicable = false;
++
++static bool isPendingVerify(esp_ota_img_states_t* out_state = nullptr) {
++  esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;   // safe default if the query below fails
++  const esp_partition_t* running = esp_ota_get_running_partition();
++  esp_ota_get_state_partition(running, &state);   // leaves `state` at its default on failure
++  if (out_state) *out_state = state;
++  return state == ESP_OTA_IMG_PENDING_VERIFY;
++}
++
++static uint8_t readFailCount() {
++  File f = SPIFFS.open(RADIO_FAIL_COUNT_PATH, "r");
++  if (!f) return 0;
++  uint8_t count = 0;
++  f.read(&count, 1);
++  f.close();
++  return count;
++}
++
++static void writeFailCount(uint8_t count) {
++  File f = SPIFFS.open(RADIO_FAIL_COUNT_PATH, "w");
++  if (!f) return;
++  f.write(&count, 1);
++  f.close();
++}
++
++void RollbackGuard::begin() {
++  boot_time_ms = millis();
++  confirmed_or_not_applicable = !isPendingVerify();   // nothing to do if we're not on probation
++  writeFailCount(0);   // successful boot -- clear any prior failure streak so future failures count fresh
++}
++
++void RollbackGuard::poll() {
++  if (confirmed_or_not_applicable) return;   // cheap no-op on every normal boot after this point
++  if (millis() - boot_time_ms < OTA_ROLLBACK_CONFIRM_DELAY_MS) return;
++  esp_ota_mark_app_valid_cancel_rollback();
++  confirmed_or_not_applicable = true;
++}
++
++bool RollbackGuard::reportUnhealthy() {
++  if (!isPendingVerify()) return false;   // not on probation -- nothing meaningful to roll back to/from
++  return esp_ota_mark_app_invalid_rollback_and_reboot() == ESP_OK;   // doesn't return if it succeeds
++}
++
++void RollbackGuard::onRadioInitFailure() {
++  // OTA-probation case first: a radio failure right after an update is real evidence the update is bad.
++  // Forces an immediate rollback + reboot to the previous firmware. Does not return on success.
++  reportUnhealthy();
++
++  // Not on probation (or reportUnhealthy() had nothing to roll back to/from) -- this is either a normal
++  // boot with a transient or genuine radio failure, unrelated to any pending update. Cross-boot
++  // retry-with-cap rather than hanging forever on the very first attempt.
++  uint8_t count = readFailCount();
++  if (count < RADIO_INIT_RESET_CAP) {
++    writeFailCount(count + 1);
++    esp_restart();   // does not return
++  }
++
++  // Cap exhausted -- same terminal behavior as before this feature existed. Deliberately not resetting
++  // the counter here: if this firmware is later confirmed/booted successfully (begin() runs), it clears
++  // naturally; if the device is simply power-cycled without ever fixing anything, staying at the cap
++  // means it goes straight back to a permanent halt rather than silently re-granting a fresh set of
++  // retries to a still-broken radio.
++  while (1) ;
++}
++
++const char* RollbackGuard::status() {
++  esp_ota_img_states_t state;
++  if (!isPendingVerify(&state)) {
++    return (state == ESP_OTA_IMG_VALID) ? "valid" : "n/a";
++  }
++  return "pending";
++}
+diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
+new file mode 100644
+index 0000000..233ca71
+--- /dev/null
++++ b/src/helpers/esp32/RollbackGuard.h
+@@ -0,0 +1,46 @@
++#pragma once
++#include <Arduino.h>
++
++// Confirms or rejects the currently-running firmware during the post-OTA "pending verify" window that
++// ESP-IDF's app-rollback feature provides (already compiled into this project's bootloader -- see design
++// notes). Every function here is a no-op on a normal, already-confirmed boot; they only do anything when
++// the running partition is genuinely in ESP_OTA_IMG_PENDING_VERIFY state, i.e. this is the first boot
++// after an OTA update (either the native upload path or hotspot-fetch).
++//
++// Arduino's own core startup (initArduino(), which runs before setup()) would otherwise auto-confirm
++// every new image immediately via a weak `verifyOta()` hook that defaults to `return true`, before any
++// of this project's code has run -- see RollbackGuard.cpp's `verifyRollbackLater()` override, which defers
++// that decision to here instead.
++namespace RollbackGuard {
++  // Call once from setup(), after radio_init() succeeds. Records the boot timestamp used by poll(), and
++  // clears the persisted cross-boot radio-failure counter (see onRadioInitFailure()) -- a successful boot
++  // means whatever caused any prior failures either wasn't recurring or has been resolved, so a future,
++  // unrelated failure should count fresh rather than inherit an unrelated past streak.
++  void begin();
++
++  // Call every loop() iteration. Once the confirm delay has elapsed since begin() and the partition is
++  // still pending, marks the running image valid (cancels rollback). No-op otherwise, and a cheap no-op
++  // forever after the first successful confirmation -- safe to call unconditionally every iteration.
++  void poll();
++
++  // Call from a failure path (e.g. radio_init() returning false) to report the firmware as unhealthy.
++  // If the running partition is pending-verify, forces an immediate rollback + reboot to the previous
++  // firmware (does not return on success). If there's no previous firmware to roll back to (e.g. this is
++  // the very first flash via USB, not an OTA update) or the partition isn't pending-verify at all (a
++  // transient failure on an already-confirmed boot -- not evidence the firmware itself is bad), returns
++  // false so the caller can fall back to its own failure handling instead.
++  bool reportUnhealthy();
++
++  // Call from the radio_init() failure path, after in-boot retries (see main.cpp) are already exhausted.
++  // Tries reportUnhealthy() first (forces rollback if this boot is on OTA probation, doesn't return on
++  // success). If not applicable, falls back to a persisted, cross-boot retry-with-cap: resets and tries
++  // the whole boot again (up to a small cap) rather than hanging forever on the first failure, since most
++  // radio failures get exactly one attempt per boot with no other retry margin (see design notes). Once
++  // the cap is exhausted, halts permanently -- same terminal behavior as before this feature existed, not
++  // an infinite reboot loop. Does not return.
++  void onRadioInitFailure();
++
++  // For `get ota.rollback` -- "pending" (awaiting confirmation), "valid" (already confirmed or rollback
++  // not applicable to this boot), or "n/a" (rollback feature unavailable for this partition).
++  const char* status();
++}
+diff --git a/variants/heltec_v4/platformio.ini b/variants/heltec_v4/platformio.ini
+index c0f750e..70cf945 100644
+--- a/variants/heltec_v4/platformio.ini
++++ b/variants/heltec_v4/platformio.ini
+@@ -95,2 +95,3 @@ build_flags =
+   -D WITH_HOTSPOT_OTA=1
++  -D WITH_OTA_ROLLBACK_GUARD=1
+ ;  -D MESH_PACKET_LOGGING=1
+@@ -99,2 +100,3 @@ build_src_filter = ${heltec_v4_oled.build_src_filter}
+   +<helpers/esp32/HotspotOTA.cpp>
++  +<helpers/esp32/RollbackGuard.cpp>
+   +<helpers/ui/SSD1306Display.cpp>
+@@ -161,2 +163,3 @@ build_flags =
+   -D WITH_HOTSPOT_OTA=1
++  -D WITH_OTA_ROLLBACK_GUARD=1
+ ;  -D MESH_PACKET_LOGGING=1
+@@ -165,2 +168,3 @@ build_src_filter = ${heltec_v4_oled.build_src_filter}
+   +<helpers/esp32/HotspotOTA.cpp>
++  +<helpers/esp32/RollbackGuard.cpp>
+   +<helpers/ui/SSD1306Display.cpp>

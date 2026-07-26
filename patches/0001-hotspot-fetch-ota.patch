@@ -1,10 +1,8 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index 66a9b77..709929f 100644
+index 9accb29..8540583 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -88,6 +88,72 @@ This document provides an overview of CLI commands that can be sent to MeshCore
- 
- ---
+@@ -77,2 +77,68 @@ This document provides an overview of CLI commands that can be sent to MeshCore
  
 +### Start an Over-The-Air (OTA) firmware update via hotspot download
 +**Usage:**
@@ -73,49 +71,33 @@ index 66a9b77..709929f 100644
 +---
 +
  ### Erase/Factory Reset
- **Usage:**
- - `erase`
 diff --git a/src/MeshCore.h b/src/MeshCore.h
 index cfa33cf..2a827ad 100644
 --- a/src/MeshCore.h
 +++ b/src/MeshCore.h
-@@ -64,6 +64,7 @@ public:
-   virtual uint8_t getStartupReason() const = 0;
-   virtual bool getBootloaderVersion(char* version, size_t max_len) { return false; }
+@@ -66,2 +66,3 @@ public:
    virtual bool startOTAUpdate(const char* id, char reply[]) { return false; }   // not supported
 +  virtual bool startOTAUpdateFromURL(const char* url, char reply[]) { return false; }   // not supported
  
-   // Power management interface (boards with power management override these)
-   virtual bool isExternalPowered() { return false; }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
 index b78ad6e..9831607 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
-@@ -5,6 +5,10 @@
- #include "TxtDataHelpers.h"
- #include <RTClib.h>
+@@ -7,2 +7,6 @@
  
 +#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
 +#include <helpers/esp32/HotspotOTA.h>
 +#endif
 +
  #ifndef BRIDGE_MAX_BAUD
- #define BRIDGE_MAX_BAUD 115200
- #endif
-@@ -239,6 +243,10 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
-       } else {
-         strcpy(reply, "ERR: clock cannot go backwards");
+@@ -241,2 +245,6 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
        }
 +    } else if (memcmp(command, "start ota url ", 14) == 0) {
 +      if (!_board->startOTAUpdateFromURL(&command[14], reply)) {
 +        // reply[] already carries the specific error from HotspotOTA::run
 +      }
      } else if (memcmp(command, "start ota", 9) == 0) {
-       if (!_board->startOTAUpdate(_prefs->node_name, reply)) {
-         strcpy(reply, "Error");
-@@ -536,6 +544,49 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
-     StrHelper::strncpy(_prefs->guest_password, &config[15], sizeof(_prefs->guest_password));
-     savePrefs();
+@@ -538,2 +546,45 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
      strcpy(reply, "OK");
 +#if defined(WITH_HOTSPOT_OTA)
 +  } else if (memcmp(config, "ota.wifi ", 9) == 0) {
@@ -161,26 +143,18 @@ index b78ad6e..9831607 100644
 +    }
 +#endif
    } else if (memcmp(config, "prv.key ", 8) == 0) {
-     uint8_t prv_key[PRV_KEY_SIZE];
-     bool success = mesh::Utils::fromHex(prv_key, PRV_KEY_SIZE, &config[8]);
-@@ -925,6 +976,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
-     sprintf(reply, "> %u mV", _board->getBootVoltage());
- #else
+@@ -927,2 +978,6 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
      strcpy(reply, "ERROR: Power management not supported");
 +#endif
 +#if defined(WITH_HOTSPOT_OTA)
 +  } else if (memcmp(config, "ota.pwr", 7) == 0) {
 +    sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
  #endif
-   } else {
-     sprintf(reply, "??: %s", config);
 diff --git a/src/helpers/ESP32Board.cpp b/src/helpers/ESP32Board.cpp
 index e0ca1d0..3b832b9 100644
 --- a/src/helpers/ESP32Board.cpp
 +++ b/src/helpers/ESP32Board.cpp
-@@ -38,10 +38,33 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
-   return true;
- }
+@@ -40,2 +40,22 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
  
 +#if defined(WITH_HOTSPOT_OTA)
 +#include <helpers/esp32/HotspotOTA.h>
@@ -203,33 +177,26 @@ index e0ca1d0..3b832b9 100644
 +#endif
 +
  #else
- bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
-   return false; // not supported
+@@ -44,2 +64,5 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
  }
 +bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
 +  return false; // not supported
 +}
  #endif
- 
- #endif
 diff --git a/src/helpers/ESP32Board.h b/src/helpers/ESP32Board.h
 index a4cbf2a..8b9198f 100644
 --- a/src/helpers/ESP32Board.h
 +++ b/src/helpers/ESP32Board.h
-@@ -151,6 +151,7 @@ public:
-   }
- 
+@@ -153,2 +153,3 @@ public:
    bool startOTAUpdate(const char* id, char reply[]) override;
 +  bool startOTAUpdateFromURL(const char* url, char reply[]) override;
  
-   void setInhibitSleep(bool inhibit) {
-     inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..2c1bd3c
+index 0000000..2d97854
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,245 @@
+@@ -0,0 +1,314 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -239,6 +206,9 @@ index 0000000..2c1bd3c
 +#include <Utils.h>                    // mesh::Utils::fromHex
 +#include <helpers/TxtDataHelpers.h>   // StrHelper -- there is no standalone StrHelper.h; the class
 +                                       // lives here (confirmed against how CommonCLI.cpp reaches it)
++#include <target.h>                   // the board's global `sensors` (EnvironmentSensorManager) --
++                                       // needed only to check GPS-detected state before touching the
++                                       // shared LED/GPS pin below
 +
 +// The hotspot's WiFi network can take up to ~60s to appear after GPIO47 is asserted (cellular modem
 +// boot time). These constants give 6 attempts at 15s each, with a 5s pause between attempts, for a
@@ -260,6 +230,48 @@ index 0000000..2c1bd3c
 +                                                 // target-specific failure can be told apart (see below)
 +
 +#define PIN_HOTSPOT_PWR   47   // GPIO47, confirmed clean on Heltec V4.3.1 (GPIO48 = fallback)
++
++// Heltec V4's onboard WS2812 NeoPixel data line (per the official schematic) is electrically shared
++// with the GNSS module's UART RX line -- both nets land on GPIO38. MeshCore's own GPS auto-detection
++// (EnvironmentSensorManager::initBasicGPS(), which runs unconditionally from sensors.begin() before
++// this code ever executes) already tells us definitively which one is actually in use: if no GPS
++// hardware answered the boot-time detection probe, `sensors.gps_detected` is false and GPIO38 is safe
++// to reclaim as an LED. If a real GPS module is attached, this LED sequence is skipped entirely --
++// `start ota url` proceeds exactly as it did before this feature existed, silently.
++#define OTA_LED_PIN         38
++#define OTA_LED_HOLD_MS   2000   // how long a terminal Red/White stays lit before being turned off,
++                                  // long enough to actually be seen, short enough not to meaningfully
++                                  // delay an already ~2-minute operation
++
++// EnvironmentSensorManager only exposes a "gps" setting at all once GPS is detected (see
++// getNumSettings()/getSettingName() in EnvironmentSensorManager.cpp) -- so a NULL return here is
++// itself the "not detected" signal, using only the class's existing public API. No new accessor
++// needed on EnvironmentSensorManager.
++static bool ledAvailable() {
++  return sensors.getSettingByKey("gps") == NULL;
++}
++
++// Releases GPIO38 from GPS-UART duty so it's safe to drive as a NeoPixel data line. Safe to call even
++// when GPS was never using it -- Serial1.end() on an unmounted/inactive port is a harmless no-op.
++// Deliberately NOT cached/latched: this runs once per `start ota url` invocation (a rare, manual-ish
++// operation, not a hot path), so the trivial cost of re-checking each time isn't worth the complexity
++// of tracking whether it already ran.
++static bool ledPrepare() {
++  if (!ledAvailable()) return false;
++  Serial1.end();
++  return true;
++}
++
++// Shared terminal-failure sequence: solid red, held long enough to see, then off -- so a failed
++// update never leaves the LED stuck on. Every failure exit in run() below calls this, regardless of
++// which specific error occurred (WiFi join, hash resolution, HTTP, flash write, or hash mismatch);
++// `reply[]` already carries the specific error text by the time this runs, this is purely the visual.
++static void ledFail(bool led_ok) {
++  if (!led_ok) return;
++  neopixelWrite(OTA_LED_PIN, 255, 0, 0);
++  delay(OTA_LED_HOLD_MS);
++  neopixelWrite(OTA_LED_PIN, 0, 0, 0);
++}
 +
 +static bool joinWifiStation(const char* ssid, const char* pwd, char reply[]) {
 +  WiFi.mode(WIFI_STA);
@@ -330,14 +342,21 @@ index 0000000..2c1bd3c
 +    return false;
 +  }
 +
++  bool led_ok = ledPrepare();
++
 +  pinMode(PIN_HOTSPOT_PWR, OUTPUT);
 +  digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // must stay HIGH for the whole network phase --
 +                                          // TPS22995-class load switches are not latches
 +
++  if (led_ok) neopixelWrite(OTA_LED_PIN, 255, 130, 0);   // orange -- joining WiFi
++
 +  if (!joinWifiStation(cfg.ssid, cfg.password, reply)) {
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
++    ledFail(led_ok);
 +    return false;
 +  }
++
++  if (led_ok) neopixelWrite(OTA_LED_PIN, 0, 0, 255);   // blue -- WiFi joined
 +
 +  // Advisory only -- see checkWanConnectivity(). Does not gate anything below; run() proceeds
 +  // identically regardless of the result. Only consulted to pick a more specific error message if
@@ -349,6 +368,7 @@ index 0000000..2c1bd3c
 +    if (!wan_ok) strcpy(reply, "ERR: WiFi joined but no WAN connectivity");
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
++    ledFail(led_ok);
 +    return false;
 +  }
 +
@@ -362,6 +382,7 @@ index 0000000..2c1bd3c
 +    strcpy(reply, "ERR: could not open URL");
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
++    ledFail(led_ok);
 +    return false;
 +  }
 +
@@ -375,6 +396,7 @@ index 0000000..2c1bd3c
 +    http.end();
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
++    ledFail(led_ok);
 +    return false;
 +  }
 +
@@ -384,8 +406,11 @@ index 0000000..2c1bd3c
 +    http.end();
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
++    ledFail(led_ok);
 +    return false;
 +  }
++
++  if (led_ok) neopixelWrite(OTA_LED_PIN, 0, 255, 0);   // green -- downloading
 +
 +  mbedtls_sha256_context sha_ctx;
 +  mbedtls_sha256_init(&sha_ctx);
@@ -405,6 +430,7 @@ index 0000000..2c1bd3c
 +      http.end();
 +      digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +      WiFi.disconnect(true);
++      ledFail(led_ok);
 +      return false;
 +    }
 +    mbedtls_sha256_update(&sha_ctx, buf, n);
@@ -417,6 +443,7 @@ index 0000000..2c1bd3c
 +    Update.abort();
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
++    ledFail(led_ok);
 +    return false;
 +  }
 +
@@ -427,8 +454,11 @@ index 0000000..2c1bd3c
 +    Update.abort();
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);   // no reason to keep the hotspot up once we know it's bad
 +    WiFi.disconnect(true);
++    ledFail(led_ok);
 +    return false;
 +  }
++
++  if (led_ok) neopixelWrite(OTA_LED_PIN, 255, 255, 255);   // white -- hash passed
 +
 +  // Hash verified. All bytes are already sitting in the *inactive* OTA partition -- writing them
 +  // there as they streamed in cannot corrupt the currently-running firmware, since ESP32's OTA
@@ -439,7 +469,13 @@ index 0000000..2c1bd3c
 +
 +  if (!Update.end(true)) {   // local-only from here: validates size/CRC, flips boot partition pointer
 +    strcpy(reply, "ERR: Update.end failed");
++    ledFail(led_ok);
 +    return false;
++  }
++
++  if (led_ok) {
++    delay(OTA_LED_HOLD_MS);
++    neopixelWrite(OTA_LED_PIN, 0, 0, 0);   // off -- don't leave it lit into the reboot
 +  }
 +
 +  strcpy(reply, "OK - rebooting");
@@ -512,30 +548,22 @@ index 0000000..43b0f2d
 +  bool getPower();
 +}
 diff --git a/variants/heltec_v4/platformio.ini b/variants/heltec_v4/platformio.ini
-index fabf382..f5b83be 100644
+index fabf382..c0f750e 100644
 --- a/variants/heltec_v4/platformio.ini
 +++ b/variants/heltec_v4/platformio.ini
-@@ -92,9 +92,11 @@ build_flags =
-   -D ADVERT_LON=0.0
-   -D ADMIN_PASSWORD='"password"'
+@@ -94,2 +94,3 @@ build_flags =
    -D MAX_NEIGHBOURS=50
 +  -D WITH_HOTSPOT_OTA=1
  ;  -D MESH_PACKET_LOGGING=1
- ;  -D MESH_DEBUG=1
+@@ -97,2 +98,3 @@ build_flags =
  build_src_filter = ${heltec_v4_oled.build_src_filter}
 +  +<helpers/esp32/HotspotOTA.cpp>
    +<helpers/ui/SSD1306Display.cpp>
-   +<../examples/simple_repeater>
- lib_deps =
-@@ -156,9 +156,11 @@
-   -D ADVERT_LON=0.0
-   -D ADMIN_PASSWORD='"password"'
+@@ -158,2 +160,3 @@ build_flags =
    -D ROOM_PASSWORD='"hello"'
 +  -D WITH_HOTSPOT_OTA=1
  ;  -D MESH_PACKET_LOGGING=1
- ;  -D MESH_DEBUG=1
+@@ -161,2 +164,3 @@ build_flags =
  build_src_filter = ${heltec_v4_oled.build_src_filter}
 +  +<helpers/esp32/HotspotOTA.cpp>
    +<helpers/ui/SSD1306Display.cpp>
-   +<../examples/simple_room_server>
- lib_deps =
