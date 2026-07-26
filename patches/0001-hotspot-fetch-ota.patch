@@ -199,10 +199,10 @@ index a4cbf2a..8b9198f 100644
  
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..d7e4d16
+index 0000000..1443b12
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,328 @@
+@@ -0,0 +1,339 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -522,12 +522,23 @@ index 0000000..d7e4d16
 +// run() uses, so a failure here means the gate itself is the problem (not something specific to the
 +// OTA flow) -- reply[] says so explicitly rather than just doing nothing, unlike run()'s silent
 +// led_ok-gated no-ops, since this command's entire purpose is diagnosing why the LED isn't lighting.
++//
++// Also claims/releases board.periph_power (Vext) around the write -- testing whether the onboard
++// NeoPixel is powered through the same switched rail as the OLED/other peripherals. Neither run()'s
++// real LED sequence nor this command originally did this; if claiming Vext is what makes the LED
++// actually visible, that's the real bug (in both places, not just here) and run() needs the same fix.
 +bool HotspotOTA::setTestLed(bool on, char reply[]) {
 +  if (!ledPrepare()) {
 +    strcpy(reply, "ERR: LED unavailable (GPS detected on GPIO38)");
 +    return false;
 +  }
-+  neopixelWrite(OTA_LED_PIN, 0, 0, on ? 255 : 0);   // blue when on, off when off
++  if (on) {
++    board.periph_power.claim();
++    neopixelWrite(OTA_LED_PIN, 0, 0, 255);
++  } else {
++    neopixelWrite(OTA_LED_PIN, 0, 0, 0);
++    board.periph_power.release();
++  }
 +  strcpy(reply, "OK");
 +  return true;
 +}
