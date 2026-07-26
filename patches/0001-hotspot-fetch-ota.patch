@@ -199,10 +199,10 @@ index a4cbf2a..8b9198f 100644
  
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..1443b12
+index 0000000..d073ec4
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,339 @@
+@@ -0,0 +1,369 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -215,6 +215,7 @@ index 0000000..1443b12
 +#include <target.h>                   // the board's global `sensors` (EnvironmentSensorManager) --
 +                                       // needed only to check GPS-detected state before touching the
 +                                       // shared LED/GPS pin below
++#include <esp32-hal-rmt.h>             // TEMPORARY -- see setTestLed()'s direct rmtInit() call below
 +
 +// The hotspot's WiFi network can take up to ~60s to appear after GPIO47 is asserted (cellular modem
 +// boot time). These constants give 6 attempts at 15s each, with a 5s pause between attempts, for a
@@ -523,23 +524,52 @@ index 0000000..1443b12
 +// OTA flow) -- reply[] says so explicitly rather than just doing nothing, unlike run()'s silent
 +// led_ok-gated no-ops, since this command's entire purpose is diagnosing why the LED isn't lighting.
 +//
-+// Also claims/releases board.periph_power (Vext) around the write -- testing whether the onboard
-+// NeoPixel is powered through the same switched rail as the OLED/other peripherals. Neither run()'s
-+// real LED sequence nor this command originally did this; if claiming Vext is what makes the LED
-+// actually visible, that's the real bug (in both places, not just here) and run() needs the same fix.
++// Keeps board.periph_power (Vext) claimed regardless -- already tested and ruled out on real hardware,
++// but harmless to leave claimed here since this is diagnostic-only and gets deleted once the real issue
++// is found.
++//
++// Does its own direct rmtInit() call instead of calling the core's neopixelWrite() -- that function
++// hides rmtInit()'s success/failure behind a log_e() call that produces no output at all if this
++// build's Core Debug Level is "None" (a very likely default), so a silent internal failure there would
++// look identical to a successful write from our side. Duplicating its body here (same WS2812 GRB
++// encoding, same timing constants -- see arduino-esp32 2.0.17's esp32-hal-rgb-led.c, the exact pinned
++// core version, verified before writing this) exposes that result directly in reply[].
 +bool HotspotOTA::setTestLed(bool on, char reply[]) {
 +  if (!ledPrepare()) {
 +    strcpy(reply, "ERR: LED unavailable (GPS detected on GPIO38)");
 +    return false;
 +  }
-+  if (on) {
-+    board.periph_power.claim();
-+    neopixelWrite(OTA_LED_PIN, 0, 0, 255);
-+  } else {
-+    neopixelWrite(OTA_LED_PIN, 0, 0, 0);
-+    board.periph_power.release();
++  board.periph_power.claim();
++
++  static rmt_obj_t* rmt_send = NULL;
++  if (!rmt_send) {
++    rmt_send = rmtInit(OTA_LED_PIN, RMT_TX_MODE, RMT_MEM_64);
++    if (!rmt_send) {
++      strcpy(reply, "ERR: rmtInit failed on GPIO38");
++      return false;
++    }
++    rmtSetTick(rmt_send, 100);
 +  }
-+  strcpy(reply, "OK");
++
++  int color[3] = { 0, 0, on ? 255 : 0 };   // G, R, B -- WS2812's own wire order
++  rmt_data_t led_data[24];
++  int i = 0;
++  for (int col = 0; col < 3; col++) {
++    for (int bit = 0; bit < 8; bit++) {
++      if (color[col] & (1 << (7 - bit))) {
++        led_data[i].level0 = 1; led_data[i].duration0 = 8;   // "1" bit: T1H=0.8us
++        led_data[i].level1 = 0; led_data[i].duration1 = 4;   //          T1L=0.4us
++      } else {
++        led_data[i].level0 = 1; led_data[i].duration0 = 4;   // "0" bit: T0H=0.4us
++        led_data[i].level1 = 0; led_data[i].duration1 = 8;   //          T0L=0.8us
++      }
++      i++;
++    }
++  }
++  bool wrote_ok = rmtWriteBlocking(rmt_send, led_data, 24);
++
++  if (!on) board.periph_power.release();
++  sprintf(reply, "OK - rmtInit succeeded, rmtWriteBlocking %s", wrote_ok ? "succeeded" : "FAILED");
 +  return true;
 +}
 diff --git a/src/helpers/esp32/HotspotOTA.h b/src/helpers/esp32/HotspotOTA.h
