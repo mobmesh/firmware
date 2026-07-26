@@ -38,12 +38,14 @@ jobs:
             release_title: Repeater
             asset_basename: heltec_v4_rep_ota
             sync_docs: true
+            make_latest: "true"
           - id: room_server
             build_env: heltec_v4_room_server
             upstream_tag_prefix: room-server
             release_title: Room
             asset_basename: heltec_v4_room_ota
             sync_docs: false
+            make_latest: "false"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout this repo (patches only)
@@ -252,6 +254,7 @@ jobs:
           tag_name: ${{ steps.pick.outputs.release_tag }}
           name: "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - ota_mod"
           body_path: release-notes.md
+          make_latest: ${{ matrix.make_latest }}
           files: |
             ${{ steps.artifact.outputs.name }}
             ${{ steps.artifact.outputs.name }}.sha256
