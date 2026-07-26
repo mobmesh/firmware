@@ -140,7 +140,8 @@ jobs:
           PLATFORMIO_BUILD_FLAGS="-D 'OTA_MOD_BUILD_DATE=\"$OTA_MOD_DATE\"'" \
             pio run -e ${{ matrix.build_env }}
 
-      - name: Verify RollbackGuard's core hook still exists and is called (catches silent drift before it ships)
+      - id: rollback_check
+        name: Verify RollbackGuard's core hook still exists and is called (catches silent drift before it ships)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
           FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
@@ -150,9 +151,31 @@ jobs:
           # A count of 1 means it's declared but no longer referenced anywhere -- our override would
           # link fine and simply never run, which link success alone would not catch.
           if [ -z "$FRAMEWORK_DIR" ] || [ "$HITS" -lt 2 ]; then
-            echo "::error::verifyRollbackLater() found $HITS time(s) in the installed Arduino-ESP32 core ($FRAMEWORK_DIR), expected >=2 (declaration + call site). RollbackGuard.cpp's override depends on this hook existing AND being called -- see README's rollback fragility note before publishing this build."
+            echo "::error::verifyRollbackLater() found $HITS time(s) in the installed Arduino-ESP32 core ($FRAMEWORK_DIR), expected >=2 (declaration + call site)."
+            echo "failed=true" >> "$GITHUB_OUTPUT"
             exit 1
           fi
+
+      - name: Notify on rollback-guard hook drift
+        if: failure() && steps.rollback_check.outputs.failed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[${{ matrix.id }}] verifyRollbackLater() no longer found/called in the Arduino-ESP32 core`,
+              body: [
+                `The \`${{ matrix.id }}\` build failed because the installed Arduino-ESP32 core no longer declares and calls \`verifyRollbackLater()\` (see \`src/helpers/esp32/RollbackGuard.cpp\`). This usually means a core version bump changed how OTA rollback confirmation works, and \`RollbackGuard\`'s override may have silently stopped taking effect.`,
+                ``,
+                `**To fix:**`,
+                `1. Check the installed core's \`cores/esp32/esp32-hal-misc.c\` (or wherever \`initArduino()\` now lives) for how it confirms/defers OTA rollback.`,
+                `2. Update \`verifyRollbackLater()\` in \`RollbackGuard.cpp\` to match the new mechanism, if an equivalent hook still exists.`,
+                `3. If the core dropped app-rollback confirmation control entirely, this feature needs a bigger rework -- see "Automatic rollback protection" in README.md.`,
+                ``,
+                `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              ].join('\n')
+            });
 
       - name: Sync docs/cli-additions.md from the patches' actual effect
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.sync_docs
@@ -218,7 +241,7 @@ jobs:
             ${{ steps.artifact.outputs.name }}.sha256
 
       - name: Notify on patch/build failure
-        if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && steps.rollback_check.outputs.failed != 'true'
         uses: actions/github-script@v7
         with:
           script: |
