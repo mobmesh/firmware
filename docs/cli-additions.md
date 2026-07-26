@@ -87,9 +87,9 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
 
 ---
 
-#### View the post-update rollback confirmation status
+#### View the active OTA slot and post-update rollback confirmation status
 **Usage:**
-- `get ota.rollback`
+- `get ota.active`
 
 **Returns:** `active: <A|B> - <state>`, e.g. `active: A - valid`. `<A|B>` is which OTA slot is
 currently running (`A` = `ota_0`, `B` = `ota_1`). `<state>` is one of:
@@ -111,7 +111,7 @@ currently running (`A` = `ota_0`, `B` = `ota_1`). `<state>` is one of:
 - `set ota.active <A|B>`
 
 **Parameters:**
-- `A` / `B`: The OTA slot to boot into next (`A` = `ota_0`, `B` = `ota_1`) -- see `get ota.rollback`.
+- `A` / `B`: The OTA slot to boot into next (`A` = `ota_0`, `B` = `ota_1`) -- see `get ota.active`.
 
 **Note:** Points the bootloader at the requested slot and reboots into it without touching flash
 contents -- useful when a USB flash lands on the currently-inactive slot (e.g. after an earlier
