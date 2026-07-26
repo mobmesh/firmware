@@ -140,6 +140,15 @@ jobs:
           PLATFORMIO_BUILD_FLAGS="-D 'OTA_MOD_BUILD_DATE=\"$OTA_MOD_DATE\"'" \
             pio run -e ${{ matrix.build_env }}
 
+      - name: Verify RollbackGuard's core hook still exists (catches silent drift before it ships)
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
+          if [ -z "$FRAMEWORK_DIR" ] || ! grep -rq "verifyRollbackLater" "$FRAMEWORK_DIR"; then
+            echo "::error::verifyRollbackLater() not found in the installed Arduino-ESP32 core ($FRAMEWORK_DIR). RollbackGuard.cpp's override depends on this exact weak symbol -- it may silently no longer link, which build/link success alone would not catch. See README's rollback fragility note before publishing this build."
+            exit 1
+          fi
+
       - name: Sync docs/cli-additions.md from the patches' actual effect
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.sync_docs
         run: |
