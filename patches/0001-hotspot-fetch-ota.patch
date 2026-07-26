@@ -196,7 +196,7 @@ diff --git a/src/helpers/ESP32Board.cpp b/src/helpers/ESP32Board.cpp
 index e0ca1d0..3b832b9 100644
 --- a/src/helpers/ESP32Board.cpp
 +++ b/src/helpers/ESP32Board.cpp
-@@ -38,10 +38,33 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
+@@ -38,10 +38,41 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
    return true;
  }
  
@@ -207,6 +207,14 @@ index e0ca1d0..3b832b9 100644
 +bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
 +  HotspotOtaConfig cfg;
 +  HotspotOTA::loadConfig(cfg);
++  // Reject outright rather than silently truncate (StrHelper::strncpy below would otherwise cut
++  // a too-long URL down to fit, sending the admin off to fetch the wrong path with no indication
++  // anything was cut -- just a confusing HTTP error later). sizeof(cfg.url)-1 is the max URL
++  // length that still leaves room for the null terminator.
++  if (strlen(url) >= sizeof(cfg.url)) {
++    sprintf(reply, "ERR: URL too long (max %d chars)", (int)sizeof(cfg.url) - 1);
++    return false;
++  }
 +  StrHelper::strncpy(cfg.url, url, sizeof(cfg.url));
 +
 +  inhibit_sleep = true;
@@ -498,7 +506,7 @@ new file mode 100644
 index 0000000..0000000
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.h
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,35 @@
 +#pragma once
 +#include <Arduino.h>
 +
@@ -510,8 +518,13 @@ index 0000000..0000000
 +  char ssid[32];
 +  char password[64];
 +  // Supplied fresh with each `start ota url` command; tied to a specific firmware
-+  // image, not a credential.
-+  char url[128];
++  // image, not a credential. Sized to the actual constraint, not a round number: the whole
++  // command has to fit in one LoRa CLI message -- MAX_TEXT_LEN (BaseChatMesh.h, 160 bytes,
++  // the PAYLOAD_TYPE_TXT_MSG budget the admin-CLI login path reuses) minus the 14-byte
++  // "start ota url " prefix leaves 146 usable characters, so this needs 146 + 1 for the null
++  // terminator. (128 previously chosen without this constraint in mind actually truncated
++  // this project's own real release URLs at exactly 128 characters.)
++  char url[147];
 +  char sha256_hex[65];   // source of truth once set via `set ota.sha256`; NOT overridden by a sidecar
 +                          // fetch. `set ota.sha256 clear` empties this to fall back to sidecar-fetch.
 +};
