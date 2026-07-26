@@ -91,15 +91,32 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
 **Usage:**
 - `get ota.rollback`
 
-**Returns:**
+**Returns:** `active: <A|B> - <state>`, e.g. `active: A - valid`. `<A|B>` is which OTA slot is
+currently running (`A` = `ota_0`, `B` = `ota_1`). `<state>` is one of:
 - `pending`: This boot is on probation after an OTA update (via either `start ota` or `start ota url`).
   The device will automatically confirm itself as valid ~90 seconds after boot if the radio initializes
   correctly; an unconfirmed reset before then reverts to the previous firmware automatically.
 - `valid`: Already confirmed, or this boot isn't the result of an OTA update in the first place.
 - `n/a`: Rollback state could not be queried for the running partition.
 
-**Note:** Read-only — no manual override. Confirms automatically after the confirm delay with a
-working radio; rejects immediately (rollback + reboot) if `radio_init()` fails on a probationary boot.
+**Note:** Confirms automatically after the confirm delay with a working radio; rejects immediately
+(rollback + reboot) if `radio_init()` fails on a probationary boot.
+
+**Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag (Heltec V4 repeater/room server only)
+
+---
+
+#### Manually switch which OTA slot boots
+**Usage:**
+- `set ota.active <A|B>`
+
+**Parameters:**
+- `A` / `B`: The OTA slot to boot into next (`A` = `ota_0`, `B` = `ota_1`) -- see `get ota.rollback`.
+
+**Note:** Points the bootloader at the requested slot and reboots into it without touching flash
+contents -- useful when a USB flash lands on the currently-inactive slot (e.g. after an earlier
+`start ota url` update flipped which slot is active) and appears not to take effect. Refuses if the
+requested slot is already active, doesn't exist, or has no valid app image flashed to it.
 
 **Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag (Heltec V4 repeater/room server only)
 
