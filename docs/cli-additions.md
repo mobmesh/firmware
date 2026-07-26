@@ -73,15 +73,15 @@ after a crash or watchdog reset mid-update).
 
 #### Pre-flight check the hotspot WiFi join and WAN connectivity before `start ota url`
 **Usage:**
-- `start ota wifi.join`
+- `start ota join`
 - `get ota.wan`
-- `start ota wifi.leave`
+- `start ota leave`
 
-**Note:** `start ota wifi.join` joins the configured WiFi network only (no WAN check, no download),
+**Note:** `start ota join` joins the configured WiFi network only (no WAN check, no download),
 returning in one quick attempt (~15s worst case) instead of `start ota url`'s full patient join
 budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable without rejoining.
-`start ota wifi.leave` disconnects and drops hotspot power for a clean retry. A successful
-`start ota wifi.join` lets `start ota url` skip its own join step right after.
+`start ota leave` disconnects and drops hotspot power for a clean retry. A successful
+`start ota join` lets `start ota url` skip its own join step right after.
 
 **Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 
