@@ -100,7 +100,7 @@ index cfa33cf..2a827ad 100644
    // Power management interface (boards with power management override these)
    virtual bool isExternalPowered() { return false; }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index b78ad6e..ee1eb42 100644
+index b78ad6e..5cafd18 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -5,6 +5,16 @@
@@ -145,7 +145,7 @@ index b78ad6e..ee1eb42 100644
        sprintf(reply, "File system erase: %s", s ? "OK" : "Err");
      } else if (memcmp(command, "ver", 3) == 0) {
 -      sprintf(reply, "%s (Build: %s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate());
-+      sprintf(reply, "%s (Build: %s) + OTA-MOD (Build: %s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
++      sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
      } else if (memcmp(command, "board", 5) == 0) {
        sprintf(reply, "%s", _board->getManufacturerName());
      } else if (memcmp(command, "sensor get ", 11) == 0) {

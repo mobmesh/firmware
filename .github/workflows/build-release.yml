@@ -148,7 +148,7 @@ jobs:
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
           cd upstream-src
-          OTA_MOD_DATE="$(date -u +"%-d %b %Y") $(git -C .. rev-parse --short HEAD)"
+          OTA_MOD_DATE="$(date -u +"%-d %b %Y") - $(git -C .. rev-parse --short HEAD)"
           PLATFORMIO_BUILD_FLAGS="-D 'OTA_MOD_BUILD_DATE=\"$OTA_MOD_DATE\"'" \
             pio run -e ${{ matrix.build_env }}
 
