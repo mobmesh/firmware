@@ -231,11 +231,13 @@ input.field {
   z-index: 20;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 2.4rem;
-  height: 2.4rem;
-  border-radius: 999px;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 1.1rem;
   color: var(--fg);
+  text-decoration: none;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
