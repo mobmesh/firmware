@@ -32,8 +32,11 @@ function currentVariant() {
   return currentBoard().variants[state.variantId];
 }
 
+// no-store on everything that can change between commits (board config, binaries, checksums) --
+// CI vendors a fresh firmware.bin on every build, and a browser silently serving a cached copy of
+// it here means flashing outdated firmware without any indication that's what happened.
 async function loadBoards() {
-  const res = await fetch("./boards.json");
+  const res = await fetch("./boards.json", { cache: "no-store" });
   if (!res.ok) throw new Error(`Could not load boards.json (${res.status})`);
   boards = await res.json();
 }
@@ -43,7 +46,7 @@ async function loadBoards() {
 // served from a host (release-assets.githubusercontent.com) that sends no CORS headers at all, so
 // this page's fetch() can never read them cross-origin. Same-origin avoids that entirely.
 async function verifySha256(data, shaPath, label) {
-  const res = await fetch(`./${shaPath}`);
+  const res = await fetch(`./${shaPath}`, { cache: "no-store" });
   if (!res.ok) return; // no sidecar committed for this build yet -- proceed unverified
   const expected = (await res.text()).trim().toLowerCase();
   const digest = await crypto.subtle.digest("SHA-256", data);
@@ -54,7 +57,7 @@ async function verifySha256(data, shaPath, label) {
 }
 
 async function loadLocalBinary(path) {
-  const res = await fetch(`./${path}`);
+  const res = await fetch(`./${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Could not load ${path}`);
   return new Uint8Array(await res.arrayBuffer());
 }
