@@ -169,6 +169,24 @@ button.btn {
   min-height: 1.2em;
 }
 
+.step-log {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+
+.step-log li {
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.step-log li:last-child {
+  border-bottom: none;
+  color: var(--fg);
+}
+
 .error-box {
   background: rgba(232, 99, 122, 0.08);
   border: 1px solid rgba(232, 99, 122, 0.35);

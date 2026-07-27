@@ -252,26 +252,39 @@ function renderConnect() {
   });
 }
 
+// Wraps a step so a failure names the step it happened in -- "Failed to fetch" alone doesn't say
+// which of several fetch() calls in this function failed, and the status line only ever shows the
+// most recent line (see onStatus/renderFlashing's log), so a fast failure can blow past several
+// steps before the user can read any of them.
+async function step(label, fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    const msg = (err && err.message) || String(err);
+    throw new Error(`${label}: ${msg}`);
+  }
+}
+
 async function runFlash(onProgress, onStatus) {
   const board = currentBoard();
   const variant = currentVariant();
   onStatus("Looking up the latest release...");
-  const release = await fetchLatestRelease(variant.assetBasename);
+  const release = await step("Looking up the latest release", () => fetchLatestRelease(variant.assetBasename));
 
   onStatus(`Downloading ${release.bin.name}...`);
-  const firmware = await downloadBinary(release.bin);
-  await verifySha256(firmware, release.sha, release.bin.name);
+  const firmware = await step(`Downloading ${release.bin.name}`, () => downloadBinary(release.bin));
+  await step(`Verifying ${release.bin.name}`, () => verifySha256(firmware, release.sha, release.bin.name));
 
   const fileArray = [];
   let eraseAll = false;
 
   if (state.mode === "new") {
     onStatus("Loading bootloader...");
-    const bootloader = await loadLocalBinary(board.bootloaderFile);
+    const bootloader = await step("Loading bootloader", () => loadLocalBinary(board.bootloaderFile));
     onStatus("Loading partition table...");
-    const partitions = await loadLocalBinary(board.partitionsFile);
+    const partitions = await step("Loading partition table", () => loadLocalBinary(board.partitionsFile));
     onStatus("Preparing boot selector...");
-    const bootApp0 = await loadLocalBinary(board.bootApp0);
+    const bootApp0 = await step("Preparing boot selector", () => loadLocalBinary(board.bootApp0));
 
     fileArray.push({ data: bootloader, address: hex(board.offsets.bootloader) });
     fileArray.push({ data: partitions, address: hex(board.offsets.partitions) });
@@ -284,15 +297,17 @@ async function runFlash(onProgress, onStatus) {
   }
 
   onStatus("Flashing...");
-  await connection.esploader.writeFlash({
-    fileArray,
-    flashMode: board.flashMode,
-    flashFreq: board.flashFreq,
-    flashSize: board.flashSize,
-    eraseAll,
-    compress: true,
-    reportProgress: (fileIndex, written, total) => onProgress(written / total),
-  });
+  await step("Flashing", () =>
+    connection.esploader.writeFlash({
+      fileArray,
+      flashMode: board.flashMode,
+      flashFreq: board.flashFreq,
+      flashSize: board.flashSize,
+      eraseAll,
+      compress: true,
+      reportProgress: (fileIndex, written, total) => onProgress(written / total),
+    })
+  );
 }
 
 function renderFlashing() {
@@ -300,17 +315,24 @@ function renderFlashing() {
     <h2 class="step-title">Flashing</h2>
     <div class="progress-track"><div class="progress-fill" id="fill"></div></div>
     <p class="status-text" id="status">Starting...</p>
+    <ul class="step-log" id="steplog"></ul>
   `);
 
   const fill = wizard.querySelector("#fill");
   const status = wizard.querySelector("#status");
+  const log = wizard.querySelector("#steplog");
 
   runFlash(
     (fraction) => {
       fill.style.width = `${Math.round(fraction * 100)}%`;
     },
     (text) => {
+      // Appended, not overwritten -- a fast run of several steps otherwise blows past each status
+      // line before it's readable, leaving only the last one visible if something then fails.
       status.textContent = text;
+      const li = document.createElement("li");
+      li.textContent = text;
+      log.appendChild(li);
     }
   )
     .then(renderDone)
