@@ -382,11 +382,7 @@ async function loadBuildInfo() {
     if (!commit) return;
     const date = new Date(commit.commit.committer.date);
     const sha = commit.sha.slice(0, 7);
-    const tick = () => {
-      el.textContent = `Page last updated ${formatAgo(date)} (commit ${sha})`;
-    };
-    tick();
-    setInterval(tick, 1000);
+    el.textContent = `Page last updated ${formatAgo(date)} (commit ${sha})`;
   } catch {
     // best-effort only -- leave the footer line blank if this fails
   }
