@@ -354,6 +354,25 @@ function renderError(err, retryStep) {
   wizard.querySelector("#retry").addEventListener("click", retryStep);
 }
 
+function formatAgo(date) {
+  let remaining = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  const days = Math.floor(remaining / 86400);
+  remaining -= days * 86400;
+  const hours = Math.floor(remaining / 3600);
+  remaining -= hours * 3600;
+  const mins = Math.floor(remaining / 60);
+  const secs = remaining - mins * 60;
+
+  const unit = (n, label) => `${n} ${label}${n === 1 ? "" : "s"}`;
+  const parts = [];
+  if (days) parts.push(unit(days, "day"));
+  if (days || hours) parts.push(unit(hours, "hr"));
+  if (days || hours || mins) parts.push(unit(mins, "min"));
+  parts.push(unit(secs, "sec"));
+
+  return `${parts.join(" ")} ago`;
+}
+
 async function loadBuildInfo() {
   const el = document.getElementById("build-info");
   try {
@@ -362,12 +381,12 @@ async function loadBuildInfo() {
     const [commit] = await res.json();
     if (!commit) return;
     const date = new Date(commit.commit.committer.date);
-    const formatted = date.toLocaleString("en-US", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "UTC",
-    });
-    el.textContent = `Page last updated ${formatted} UTC (commit ${commit.sha.slice(0, 7)})`;
+    const sha = commit.sha.slice(0, 7);
+    const tick = () => {
+      el.textContent = `Page last updated ${formatAgo(date)} (commit ${sha})`;
+    };
+    tick();
+    setInterval(tick, 1000);
   } catch {
     // best-effort only -- leave the footer line blank if this fails
   }
