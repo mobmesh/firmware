@@ -1,0 +1,27 @@
+{
+  "heltec_v4": {
+    "label": "Heltec V4",
+    "bootApp0": "heltec_v4/boot_app0.bin",
+    "flashMode": "qio",
+    "flashFreq": "80m",
+    "flashSize": "16MB",
+    "offsets": {
+      "bootloader": "0x0",
+      "partitions": "0x8000",
+      "otadata": "0xe000",
+      "app0": "0x10000",
+      "app1": "0x650000",
+      "appMaxSize": "0x640000"
+    },
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "heltec_v4_rep_ota"
+      },
+      "room_server": {
+        "label": "Room Server",
+        "assetBasename": "heltec_v4_room_ota"
+      }
+    }
+  }
+}

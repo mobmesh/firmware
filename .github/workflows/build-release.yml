@@ -33,6 +33,7 @@ jobs:
       matrix:
         include:
           - id: repeater
+            board_id: heltec_v4
             build_env: heltec_v4_repeater
             upstream_tag_prefix: repeater
             release_title: Repeater
@@ -40,6 +41,7 @@ jobs:
             sync_docs: true
             make_latest: "true"
           - id: room_server
+            board_id: heltec_v4
             build_env: heltec_v4_room_server
             upstream_tag_prefix: room-server
             release_title: Room
@@ -59,6 +61,14 @@ jobs:
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Verify docs/flasher/boards.json has an entry for this board
+        if: steps.filter.outputs.skip == 'false'
+        run: |
+          jq -e --arg id "${{ matrix.board_id }}" 'has($id)' docs/flasher/boards.json > /dev/null || {
+            echo "::error::docs/flasher/boards.json has no entry for board '${{ matrix.board_id }}'. Add one (offsets + variant) before this board can build -- the web flasher can't offer a board it doesn't know the layout of."
+            exit 1
+          }
 
       - id: pick
         name: Resolve upstream ref for ${{ matrix.id }}
@@ -226,12 +236,90 @@ jobs:
           cp "$BIN" "../$NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
+      - name: Locate bootloader.bin and partitions.bin (needed for the browser-based full-flash tool)
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        id: flash_parts
+        run: |
+          cd upstream-src
+          BOOT=".pio/build/${{ matrix.build_env }}/bootloader.bin"
+          PART=".pio/build/${{ matrix.build_env }}/partitions.bin"
+          test -f "$BOOT"
+          test -f "$PART"
+          BOOT_NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}-bootloader.bin"
+          PART_NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}-partitions.bin"
+          cp "$BOOT" "../$BOOT_NAME"
+          cp "$PART" "../$PART_NAME"
+          echo "bootloader_name=$BOOT_NAME" >> "$GITHUB_OUTPUT"
+          echo "partitions_name=$PART_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Verify firmware.bin fits within its OTA app partition
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          MAX_HEX=$(jq -r '.["${{ matrix.board_id }}"].offsets.appMaxSize' docs/flasher/boards.json)
+          MAX=$((MAX_HEX))
+          SIZE=$(stat -c%s "${{ steps.artifact.outputs.name }}")
+          echo "firmware.bin size: $SIZE bytes; app partition max: $MAX bytes"
+          if [ "$SIZE" -gt "$MAX" ]; then
+            echo "::error::firmware.bin ($SIZE bytes) exceeds the ${{ matrix.board_id }} app partition size ($MAX bytes, from docs/flasher/boards.json). Flashing this into an OTA slot would overrun into the next partition."
+            exit 1
+          fi
+
+      - id: partition_check
+        name: Verify partitions.bin layout matches docs/flasher/boards.json (catches upstream partition-scheme drift before the web flasher writes to the wrong offset)
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          GEN_TOOL=$(find "$HOME/.platformio/packages" -iname 'gen_esp32part.py' | head -1)
+          if [ -z "$GEN_TOOL" ]; then
+            echo "::error::gen_esp32part.py not found in the installed PlatformIO packages -- can't verify partition layout."
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          CSV=$(python "$GEN_TOOL" "${{ steps.flash_parts.outputs.partitions_name }}" -)
+          echo "$CSV"
+          FAILED=false
+          for entry in "otadata:ota:otadata" "app0:ota_0:app0" "app1:ota_1:app1"; do
+            KEY="${entry%%:*}"; rest="${entry#*:}"; SUBTYPE="${rest%%:*}"
+            ACTUAL_HEX=$(echo "$CSV" | awk -F', *' -v st="$SUBTYPE" '$3==st {print $4}')
+            if [ -z "$ACTUAL_HEX" ]; then
+              echo "::error::No partition with subtype '$SUBTYPE' found in partitions.bin (expected for boards.json key '$KEY')."
+              FAILED=true
+              continue
+            fi
+            EXPECTED_HEX=$(jq -r ".[\"${{ matrix.board_id }}\"].offsets[\"$KEY\"]" docs/flasher/boards.json)
+            if [ "$((ACTUAL_HEX))" != "$((EXPECTED_HEX))" ]; then
+              echo "::error::partitions.bin's $KEY (subtype $SUBTYPE) is at $ACTUAL_HEX, but docs/flasher/boards.json expects ${{ matrix.board_id }}.offsets.$KEY = $EXPECTED_HEX."
+              FAILED=true
+            fi
+          done
+          if [ "$FAILED" = "true" ]; then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+      - name: Notify on partition-layout drift
+        if: failure() && steps.partition_check.outputs.failed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[${{ matrix.id }}] Partition layout no longer matches docs/flasher/boards.json`,
+              body: [
+                `The \`${{ matrix.id }}\` build failed because the compiled partition table no longer matches the offsets recorded for board \`${{ matrix.board_id }}\` in \`docs/flasher/boards.json\`. This usually means upstream changed the partition scheme (a different \`board_build.partitions\` CSV, or a resized partition).`,
+                ``,
+                `**To fix:** update the \`${{ matrix.board_id }}\` entry in \`docs/flasher/boards.json\` to match the new layout, then double-check the browser flasher (\`docs/flasher/flasher.js\`) still writes to the right offsets for both the "new device" and "update existing" flows.`,
+                ``,
+                `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              ].join('\n')
+            });
+
       - name: Generate SHA-256 sidecar
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
           sha256sum "${{ steps.artifact.outputs.name }}" | awk '{print $1}' > "${{ steps.artifact.outputs.name }}.sha256"
 
-      - name: Publish release with .bin + .sha256 sidecar
+      - name: Publish release with .bin + .sha256 sidecar + bootloader/partitions for the web flasher
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
@@ -242,9 +330,11 @@ jobs:
           files: |
             ${{ steps.artifact.outputs.name }}
             ${{ steps.artifact.outputs.name }}.sha256
+            ${{ steps.flash_parts.outputs.bootloader_name }}
+            ${{ steps.flash_parts.outputs.partitions_name }}
 
       - name: Notify on patch/build failure
-        if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && steps.rollback_check.outputs.failed != 'true'
+        if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && steps.rollback_check.outputs.failed != 'true' && steps.partition_check.outputs.failed != 'true'
         uses: actions/github-script@v7
         with:
           script: |

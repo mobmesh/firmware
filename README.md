@@ -13,6 +13,7 @@ This repository does **not** contain a fork of MeshCore's source. It contains a 
 | `patches/0001-hotspot-fetch-ota.patch` | Adds the hotspot-fetch OTA feature to MeshCore |
 | `patches/0002-ota-rollback-guard.patch` | Adds automatic post-update rollback protection. **Depends on 0001** and cannot be applied alone |
 | `.github/workflows/build-release.yml` | Builds firmware for each supported variant against the latest matching upstream release and publishes it here |
+| `docs/flasher/` | Browser-based USB flasher (GitHub Pages), see "Web-based flasher" below |
 
 Patches are applied in numeric order. If a patch fails to apply against the current upstream release, the build fails and an issue is opened here identifying which patch broke — it does not attempt to auto-resolve the conflict.
 
@@ -40,10 +41,22 @@ Each release is named after the variant and the upstream MeshCore release it was
 
 - `<asset-basename>-vX.Y.Z.bin` — the firmware image (see the variant table above for exact asset names)
 - `<asset-basename>-vX.Y.Z.bin.sha256` — its SHA-256 checksum
+- `<asset-basename>-vX.Y.Z-bootloader.bin` and `<asset-basename>-vX.Y.Z-partitions.bin` — bootloader and partition table for that build, needed only for flashing a brand-new or bricked board from scratch (see "Web-based flasher" below); not needed for a normal update
 
 The release body includes upstream's own release notes for the exact tag the build was made from.
 
-Flash the `.bin` the same way you would an official MeshCore firmware release for that variant.
+Flash the `.bin` the same way you would an official MeshCore firmware release for that variant, or use the web-based flasher below.
+
+## Web-based flasher
+
+[**Open the flasher**](https://heyvern.github.io/meshcore-hotspot-ota/flasher/) — flashes a Heltec V4 straight from your browser over USB (Chrome, Edge, or Opera; requires Web Serial). No PlatformIO or other dev tools needed. It always uses the latest published release for whichever variant you pick.
+
+Two flows:
+
+- **New device** — for a blank board, or one that's bricked. Fully erases the chip and writes bootloader, partition table, and firmware from scratch.
+- **Update existing device** — for a board already running MeshCore. Writes firmware into a chosen OTA slot (A or B) without erasing anything else. This is the only way to target a specific slot from outside the device's own CLI; it doesn't change which slot the device boots from — use `set ota.active <A|B>` on-device for that.
+
+This is unofficial, community tooling built for this project's own release feed and slot-targeting needs — distinct from MeshCore's own official web flasher.
 
 ## CLI commands added
 
