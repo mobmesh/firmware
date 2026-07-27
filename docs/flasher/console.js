@@ -8,6 +8,7 @@ const input = document.getElementById("console-input");
 
 let port = null;
 let reader = null;
+let readableClosed = null;
 let keepReading = false;
 
 function log(text) {
@@ -17,7 +18,7 @@ function log(text) {
 
 async function readLoop() {
   const decoder = new TextDecoderStream();
-  port.readable.pipeTo(decoder.writable).catch(() => {});
+  readableClosed = port.readable.pipeTo(decoder.writable);
   reader = decoder.readable.getReader();
   try {
     while (keepReading) {
@@ -53,6 +54,12 @@ async function disconnect() {
   if (reader) {
     await reader.cancel().catch(() => {});
     reader = null;
+  }
+  if (readableClosed) {
+    // port.readable stays locked (by the pipeTo below) until this settles --
+    // port.close() throws if the lock isn't released first.
+    await readableClosed.catch(() => {});
+    readableClosed = null;
   }
   if (port) {
     await port.close().catch(() => {});
