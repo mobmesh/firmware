@@ -263,7 +263,7 @@ input.field {
 
 .console-modal {
   width: 100%;
-  max-width: 560px;
+  max-width: 900px;
   background: var(--bg-elevated);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -298,6 +298,15 @@ input.field {
   word-break: break-word;
   margin: 1rem 0;
   color: var(--fg);
+}
+
+.console-modal .actions {
+  margin-top: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.console-form {
+  margin: 0;
 }
 
 .console-form input.field {

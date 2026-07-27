@@ -89,7 +89,6 @@ form.addEventListener("submit", (event) => {
   event.preventDefault();
   const text = input.value;
   if (!text) return;
-  log(`> ${text}\n`);
-  send(text);
+  send(text); // the device echoes the command itself, so no local echo here
   input.value = "";
 });
