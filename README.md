@@ -49,14 +49,14 @@ Flash the `.bin` the same way you would an official MeshCore firmware release fo
 
 ## Web-based flasher
 
-[**Open the flasher**](https://heyvern.github.io/meshcore-hotspot-ota/flasher/) — flashes a Heltec V4 straight from your browser over USB (Chrome, Edge, or Opera; requires Web Serial). No PlatformIO or other dev tools needed. It always uses the latest published release for whichever variant you pick.
+<a href="https://heyvern.github.io/meshcore-hotspot-ota/flasher/" target="_blank" rel="noopener"><strong>Open the flasher</strong></a> — flashes a Heltec V4 straight from your browser over USB (Chrome, Edge, or Opera; requires Web Serial). No PlatformIO or other dev tools needed. It always uses the latest published release for whichever variant you pick.
 
 Two flows:
 
 - **New device** — for a blank board, or one that's bricked. Fully erases the chip and writes bootloader, partition table, and firmware from scratch.
 - **Update existing device** — for a board already running MeshCore. Writes firmware into a chosen OTA slot (A or B) without erasing anything else. This is the only way to target a specific slot from outside the device's own CLI; it doesn't change which slot the device boots from — use `set ota.active <A|B>` on-device for that.
 
-This is unofficial, community tooling built for this project's own release feed and slot-targeting needs — distinct from MeshCore's own official web flasher.
+This isn't MeshCore's own flasher — it's built for this repo's own releases, plus the OTA slot targeting above that MeshCore's flasher doesn't do.
 
 ## CLI commands added
 
