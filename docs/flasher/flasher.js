@@ -1,5 +1,4 @@
 const REPO = "HeyVern/meshcore-hotspot-ota";
-const RELEASES_API = `https://api.github.com/repos/${REPO}/releases`;
 // Vendored rather than loaded from a CDN (e.g. esm.sh): esm.sh re-bundles the package's raw
 // source itself, including a separate dynamic import of each chip's stub-loader JSON (large
 // embedded base64 blobs) -- that re-bundling step was corrupting the ESP32-S3 stub's base64 and
@@ -39,34 +38,14 @@ async function loadBoards() {
   boards = await res.json();
 }
 
-async function fetchLatestRelease(assetBasename) {
-  const res = await fetch(RELEASES_API);
-  if (!res.ok) throw new Error(`GitHub API error (${res.status}) while looking up releases`);
-  const releases = await res.json();
-  const binPattern = new RegExp(`^${assetBasename}-v[0-9.]+\\.bin$`);
-
-  for (const release of releases) {
-    if (release.draft) continue;
-    const bin = release.assets.find((a) => binPattern.test(a.name));
-    if (!bin) continue;
-    return {
-      tag: release.tag_name,
-      bin,
-      sha: release.assets.find((a) => a.name === `${bin.name}.sha256`),
-    };
-  }
-  throw new Error(`No published release with a "${assetBasename}" asset was found.`);
-}
-
-async function downloadBinary(asset) {
-  const res = await fetch(asset.browser_download_url);
-  if (!res.ok) throw new Error(`Failed to download ${asset.name} (${res.status})`);
-  return new Uint8Array(await res.arrayBuffer());
-}
-
-async function verifySha256(data, shaAsset, label) {
-  if (!shaAsset) return; // no sidecar published for this asset -- proceed unverified
-  const expected = (await (await fetch(shaAsset.browser_download_url)).text()).trim().toLowerCase();
+// Firmware is vendored into docs/flasher/<board>/<variant>/ by CI on every successful build,
+// same as bootloader.bin/partitions.bin/boot_app0.bin already were -- GitHub Release assets are
+// served from a host (release-assets.githubusercontent.com) that sends no CORS headers at all, so
+// this page's fetch() can never read them cross-origin. Same-origin avoids that entirely.
+async function verifySha256(data, shaPath, label) {
+  const res = await fetch(`./${shaPath}`);
+  if (!res.ok) return; // no sidecar committed for this build yet -- proceed unverified
+  const expected = (await res.text()).trim().toLowerCase();
   const digest = await crypto.subtle.digest("SHA-256", data);
   const actual = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
   if (actual !== expected) {
@@ -268,12 +247,9 @@ async function step(label, fn) {
 async function runFlash(onProgress, onStatus) {
   const board = currentBoard();
   const variant = currentVariant();
-  onStatus("Looking up the latest release...");
-  const release = await step("Looking up the latest release", () => fetchLatestRelease(variant.assetBasename));
-
-  onStatus(`Downloading ${release.bin.name}...`);
-  const firmware = await step(`Downloading ${release.bin.name}`, () => downloadBinary(release.bin));
-  await step(`Verifying ${release.bin.name}`, () => verifySha256(firmware, release.sha, release.bin.name));
+  onStatus("Loading firmware...");
+  const firmware = await step("Loading firmware", () => loadLocalBinary(variant.firmwareFile));
+  await step("Verifying firmware", () => verifySha256(firmware, variant.firmwareShaFile, variant.firmwareFile));
 
   const fileArray = [];
   let eraseAll = false;
