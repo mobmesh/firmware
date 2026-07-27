@@ -2,6 +2,8 @@
   "heltec_v4": {
     "label": "Heltec V4",
     "bootApp0": "heltec_v4/boot_app0.bin",
+    "connectNote": "Put the board into flash mode first (hold PGM, tap RST, then release PGM), then connect over USB.",
+    "postFlashNote": "Press RST once to put the board back into normal operation.",
     "flashMode": "qio",
     "flashFreq": "80m",
     "flashSize": "16MB",

@@ -203,9 +203,10 @@ function renderSlot() {
 }
 
 function renderConnect() {
+  const board = currentBoard();
   render(`
     <h2 class="step-title">Connect your board</h2>
-    <p class="step-desc">Plug the board in over USB, then connect.</p>
+    <p class="step-desc">${board.connectNote}</p>
     <div class="actions" style="justify-content: space-between;">
       <button class="btn btn-secondary" id="back">Back</button>
       <button class="btn btn-primary" id="connect">Connect via USB</button>
@@ -317,6 +318,7 @@ function renderFlashing() {
 }
 
 function renderDone() {
+  const board = currentBoard();
   const updateNote =
     state.mode === "update"
       ? `<p class="step-desc">
@@ -328,7 +330,8 @@ function renderDone() {
       : "";
   render(`
     <h2 class="step-title">Done</h2>
-    <div class="success-box">Firmware written successfully. You can disconnect the board now.</div>
+    <div class="success-box">Firmware written successfully.</div>
+    <p class="step-desc">${board.postFlashNote}</p>
     ${updateNote}
     <div class="actions">
       <button class="btn btn-primary" id="restart">Flash another device</button>
