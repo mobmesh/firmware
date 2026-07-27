@@ -7,6 +7,8 @@
   --line: #192f49;
   --accent: #2dd1bd;
   --accent-strong: #11b6a4;
+  --accent-warm: #f9a228;
+  --accent-warm-strong: #f3820f;
   --danger: #e8637a;
   --radius: 1rem;
   --radius-sm: 0.6rem;
@@ -198,7 +200,8 @@ button.btn {
   color: var(--accent);
 }
 
-select.field {
+select.field,
+input.field {
   width: 100%;
   font: inherit;
   color: var(--fg);
@@ -207,4 +210,90 @@ select.field {
   border-radius: var(--radius-sm);
   padding: 0.6rem 0.8rem;
   margin-bottom: 1.5rem;
+}
+
+.btn-primary-warm {
+  background: linear-gradient(120deg, #fdd98c 0%, var(--accent-warm) 45%, var(--accent-warm-strong) 110%);
+  color: #2a1400;
+  box-shadow: 0 14px 40px -8px rgba(249, 162, 40, 0.55);
+}
+
+.console-toggle {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 20;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 1.1rem;
+  cursor: pointer;
+  background: linear-gradient(120deg, #fdd98c 0%, var(--accent-warm) 45%, var(--accent-warm-strong) 110%);
+  color: #2a1400;
+  box-shadow: 0 10px 30px -10px rgba(249, 162, 40, 0.45);
+  transition: box-shadow 0.15s ease;
+}
+
+.console-toggle:hover {
+  box-shadow: 0 14px 40px -8px rgba(249, 162, 40, 0.55);
+}
+
+.console-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(2, 5, 10, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.console-backdrop.hidden {
+  display: none;
+}
+
+.console-modal {
+  width: 100%;
+  max-width: 560px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
+    0 36px 90px -36px rgba(0, 0, 0, 0.8);
+  padding: 1.5rem;
+}
+
+.console-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.console-modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.console-output {
+  height: 220px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 1rem 0;
+  color: var(--fg);
+}
+
+.console-form input.field {
+  margin-bottom: 0;
 }

@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <button id="console-toggle" class="console-toggle" type="button">Serial Console</button>
+
   <div class="wrap">
     <header class="page-header">
       <h1>MeshCore Hotspot-OTA Flasher</h1>
@@ -25,6 +27,28 @@
     </footer>
   </div>
 
+  <div id="console-backdrop" class="console-backdrop hidden">
+    <div class="console-modal">
+      <div class="console-modal-header">
+        <h2>Serial Console</h2>
+        <button id="console-close" class="btn btn-secondary" type="button">Close</button>
+      </div>
+      <p class="step-desc">
+        Talk directly to a running device's CLI over USB -- independent of the
+        flashing wizard. Useful for commands like <code>set ota.wifi</code> or
+        <code>get ota.active</code> without a separate serial terminal app.
+      </p>
+      <pre id="console-output" class="console-output"></pre>
+      <div class="actions" style="justify-content: space-between;">
+        <button id="console-connect" class="btn btn-primary-warm" type="button">Connect</button>
+      </div>
+      <form id="console-form" class="console-form">
+        <input id="console-input" class="field" type="text" placeholder="Type a command and press Enter" autocomplete="off" />
+      </form>
+    </div>
+  </div>
+
   <script type="module" src="flasher.js"></script>
+  <script type="module" src="console.js"></script>
 </body>
 </html>
