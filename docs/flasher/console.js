@@ -68,7 +68,7 @@ async function send(text) {
   }
   const writer = port.writable.getWriter();
   try {
-    await writer.write(new TextEncoder().encode(`${text}\n`));
+    await writer.write(new TextEncoder().encode(`${text}\r\n`));
   } finally {
     writer.releaseLock();
   }
