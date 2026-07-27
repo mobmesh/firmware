@@ -1,6 +1,12 @@
 const REPO = "HeyVern/meshcore-hotspot-ota";
 const RELEASES_API = `https://api.github.com/repos/${REPO}/releases`;
-const ESPTOOL_JS_URL = "https://esm.sh/esptool-js@0.6.0";
+// Vendored rather than loaded from a CDN (e.g. esm.sh): esm.sh re-bundles the package's raw
+// source itself, including a separate dynamic import of each chip's stub-loader JSON (large
+// embedded base64 blobs) -- that re-bundling step was corrupting the ESP32-S3 stub's base64 and
+// throwing "atob ... not correctly encoded" during flashing. This is esptool-js's own official
+// prebuilt browser bundle straight from the npm package (bundle.js), with every chip's stub data
+// already compiled in -- no separate CDN transform step left to get it wrong.
+const ESPTOOL_JS_URL = "./vendor/esptool-js/bundle.js";
 
 const wizard = document.getElementById("wizard");
 
