@@ -92,10 +92,11 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
 - `get ota.active`
 
 **Returns:** `Slots: A=<ver> (active, <state>) | B=<ver> (<state>)`, or with `B` active if that's the
-running slot (`A` = `ota_0`, `B` = `ota_1`). `<ver>` is that slot's firmware version (e.g. `v1.16.0`),
-self-reported into SPIFFS the first time that slot actually boots -- a slot that's never booted (see
-`n/a` below) reports `v?` since nothing's been recorded for it yet. The active slot's `<state>` is one
-of:
+running slot (`A` = `ota_0`, `B` = `ota_1`). `<ver>` is that slot's firmware version plus the short
+build commit hash it came from (e.g. `v1.16.0-0f11a30`) -- the hash distinguishes two slots that
+happen to share the same version number but came from different builds. Self-reported into SPIFFS
+the first time that slot actually boots -- a slot that's never booted (see `n/a` below) reports `v?`
+since nothing's been recorded for it yet. The active slot's `<state>` is one of:
 - `pending`: This boot is on probation after an OTA update (via either `start ota` or `start ota url`).
   The device will automatically confirm itself as valid ~90 seconds after boot if the radio initializes
   correctly; an unconfirmed reset before then reverts to the previous firmware automatically.
