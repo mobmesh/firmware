@@ -81,7 +81,10 @@ async function send(text) {
   }
 }
 
-toggleBtn.addEventListener("click", () => backdrop.classList.remove("hidden"));
+toggleBtn.addEventListener("click", () => {
+  backdrop.classList.remove("hidden");
+  input.focus();
+});
 closeBtn.addEventListener("click", () => backdrop.classList.add("hidden"));
 connectBtn.addEventListener("click", () => (port ? disconnect() : connect()));
 
