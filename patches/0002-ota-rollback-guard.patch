@@ -160,7 +160,7 @@ index a3798b2..5580953 100644
 +#endif
  }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index ee1eb42..44a6ac2 100644
+index 5cafd18..3a88d43 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -15,6 +15,10 @@
@@ -200,10 +200,10 @@ index ee1eb42..44a6ac2 100644
      sprintf(reply, "??: %s", config);
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
-index 0000000..f537a1c
+index 0000000..397e8d7
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.cpp
-@@ -0,0 +1,199 @@
+@@ -0,0 +1,201 @@
 +#include "RollbackGuard.h"
 +#include <esp_ota_ops.h>
 +#include <esp_partition.h>
@@ -295,12 +295,14 @@ index 0000000..f537a1c
 +
 +static void readVersion(char letter, char* out, size_t out_len) {
 +  File f = SPIFFS.open(versionPath(letter), "r");
-+  if (f) {
-+    size_t n = f.readBytes(out, out_len - 1);
++  bool open_ok = (bool)f;   // captured before close() -- File::operator bool() goes false once closed
++  if (open_ok) {
++    int n = f.read((uint8_t*)out, out_len - 1);
++    if (n < 0) n = 0;
 +    out[n] = 0;
 +    f.close();
 +  }
-+  if (!f || out[0] == 0) strcpy(out, "v?");   // never booted -- nothing self-reported yet
++  if (!open_ok || out[0] == 0) strcpy(out, "v?");   // never booted -- nothing self-reported yet
 +}
 +
 +static void writeVersion(char letter, const char* version) {
