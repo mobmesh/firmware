@@ -200,10 +200,10 @@ index ee1eb42..44a6ac2 100644
      sprintf(reply, "??: %s", config);
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
-index 0000000..2a002c4
+index 0000000..f537a1c
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.cpp
-@@ -0,0 +1,185 @@
+@@ -0,0 +1,199 @@
 +#include "RollbackGuard.h"
 +#include <esp_ota_ops.h>
 +#include <esp_partition.h>
@@ -228,6 +228,14 @@ index 0000000..2a002c4
 +
 +static uint32_t boot_time_ms = 0;
 +static bool confirmed_or_not_applicable = false;
++
++// begin() runs synchronously inside setup(), already deep in MeshCore's own init call chain --
++// writing to SPIFFS there added enough extra stack-frame depth on top of that to reproduce the
++// same class of USB-CDC-flicker/boot instability as the handleGetCmd() stack incident (see
++// 987639c), even though no single variable here is anywhere near that large. Deferred to the
++// first poll() instead, which runs from loop()'s much shallower call depth.
++static char pending_version[16] = {0};
++static bool version_write_pending = false;
 +
 +static bool isPendingVerify(esp_ota_img_states_t* out_state = nullptr) {
 +  esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;
@@ -306,10 +314,16 @@ index 0000000..2a002c4
 +  boot_time_ms = millis();
 +  confirmed_or_not_applicable = !isPendingVerify();
 +  writeFailCount(0);   // successful boot -- clear any prior failure streak
-+  writeVersion(partitionLetter(esp_ota_get_running_partition()), version);
++  strncpy(pending_version, version, sizeof(pending_version) - 1);
++  pending_version[sizeof(pending_version) - 1] = 0;
++  version_write_pending = true;   // actually written on the first poll() -- see comment above
 +}
 +
 +void RollbackGuard::poll() {
++  if (version_write_pending) {
++    writeVersion(partitionLetter(esp_ota_get_running_partition()), pending_version);
++    version_write_pending = false;
++  }
 +  if (confirmed_or_not_applicable) return;
 +  if (millis() - boot_time_ms < OTA_ROLLBACK_CONFIRM_DELAY_MS) return;
 +  esp_ota_mark_app_valid_cancel_rollback();
@@ -346,7 +360,7 @@ index 0000000..2a002c4
 +  if (a) esp_ota_get_state_partition(a, &state_a);
 +  if (b) esp_ota_get_state_partition(b, &state_b);
 +
-+  char ver_a[16], ver_b[16];
++  static char ver_a[16], ver_b[16];   // off status()'s own stack frame too, for the same reason
 +  readVersion('A', ver_a, sizeof(ver_a));
 +  readVersion('B', ver_b, sizeof(ver_b));
 +
@@ -391,10 +405,10 @@ index 0000000..2a002c4
 +}
 diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
 new file mode 100644
-index 0000000..9ae9b87
+index 0000000..32d42de
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.h
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,46 @@
 +#pragma once
 +#include <Arduino.h>
 +
@@ -406,14 +420,17 @@ index 0000000..9ae9b87
 +namespace RollbackGuard {
 +  // Call once from setup(), after radio_init() succeeds. Records the boot time for poll() and
 +  // clears the persisted radio-failure counter so an unrelated future failure counts fresh.
-+  // `version` (FIRMWARE_VERSION, e.g. "v1.16.0") is persisted to SPIFFS keyed by the running
-+  // partition's letter, so status() can report it for a slot that isn't currently running -- the
-+  // compiled-in ESP-IDF app image header doesn't carry MeshCore's version (it's stamped with the
-+  // prebuilt Arduino core's own build info instead), so this is the only reliable source.
++  // `version` (FIRMWARE_VERSION, e.g. "v1.16.0") is recorded here but not written to SPIFFS until
++  // the first poll() call -- setup()'s call chain is already deep by this point, and writing here
++  // directly reproduced the same stack-depth boot instability as the handleGetCmd() incident.
++  // status() reports it for a slot that isn't currently running -- the compiled-in ESP-IDF app
++  // image header doesn't carry MeshCore's version (it's stamped with the prebuilt Arduino core's
++  // own build info instead), so this self-reported value is the only reliable source.
 +  void begin(const char* version);
 +
-+  // Call every loop() iteration. Marks the image valid once the confirm delay has elapsed since
-+  // begin(). No-op before that and a cheap no-op forever after confirmation.
++  // Call every loop() iteration. Writes the version passed to begin() to SPIFFS on its first call
++  // (deferred from begin() -- see above), then marks the image valid once the confirm delay has
++  // elapsed since begin(). Both are no-ops once done, forever after.
 +  void poll();
 +
 +  // Call from a failure path to report the firmware unhealthy. If this boot is pending-verify,
