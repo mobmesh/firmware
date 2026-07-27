@@ -133,7 +133,7 @@ function renderBoard() {
         .map(([id, b]) => `<button class="tile" data-board="${id}"><strong>${b.label}</strong></button>`)
         .join("")}
     </div>
-    <div class="actions">
+    <div class="actions" style="justify-content: flex-start;">
       <button class="btn btn-secondary" id="back">Back</button>
     </div>
   `);
@@ -158,7 +158,7 @@ function renderVariant() {
         .map(([id, v]) => `<button class="tile" data-variant="${id}"><strong>${v.label}</strong></button>`)
         .join("")}
     </div>
-    <div class="actions">
+    <div class="actions" style="justify-content: flex-start;">
       <button class="btn btn-secondary" id="back">Back</button>
     </div>
   `);
@@ -188,7 +188,7 @@ function renderSlot() {
       <button class="tile" data-slot="A"><strong>Slot A</strong></button>
       <button class="tile" data-slot="B"><strong>Slot B</strong></button>
     </div>
-    <div class="actions">
+    <div class="actions" style="justify-content: flex-start;">
       <button class="btn btn-secondary" id="back">Back</button>
     </div>
   `);
