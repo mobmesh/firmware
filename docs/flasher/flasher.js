@@ -269,6 +269,12 @@ async function runFlash(onProgress, onStatus) {
     fileArray.push({ data: partitions, address: hex(board.offsets.partitions) });
     fileArray.push({ data: bootApp0, address: hex(board.offsets.otadata) });
     fileArray.push({ data: firmware, address: hex(board.offsets.app0) });
+    // Also seed slot B with the same image -- otherwise it stays empty until the first OTA
+    // update (or a separate manual flash), and set ota.active B refuses until then since it
+    // requires a valid image header already present. A full erase is already happening here, so
+    // this costs nothing but a bit more data over serial; boot_app0.bin still defaults the
+    // active slot to A either way.
+    fileArray.push({ data: firmware, address: hex(board.offsets.app1) });
     eraseAll = true;
   } else {
     const slotOffset = state.slot === "A" ? board.offsets.app0 : board.offsets.app1;
