@@ -1,8 +1,8 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index bd78b22..2ce7ad0 100644
+index bd78b22..d9e938d 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -153,6 +153,54 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
+@@ -153,6 +153,55 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
  
  ---
  
@@ -11,10 +11,11 @@ index bd78b22..2ce7ad0 100644
 +- `get ota.active`
 +
 +**Returns:** `Slots: A=<ver> (active, <state>) | B=<ver> (<state>)`, or with `B` active if that's the
-+running slot (`A` = `ota_0`, `B` = `ota_1`). `<ver>` is that slot's firmware version (e.g. `v1.16.0`),
-+self-reported into SPIFFS the first time that slot actually boots -- a slot that's never booted (see
-+`n/a` below) reports `v?` since nothing's been recorded for it yet. The active slot's `<state>` is one
-+of:
++running slot (`A` = `ota_0`, `B` = `ota_1`). `<ver>` is that slot's firmware version plus the short
++build commit hash it came from (e.g. `v1.16.0-0f11a30`) -- the hash distinguishes two slots that
++happen to share the same version number but came from different builds. Self-reported into SPIFFS
++the first time that slot actually boots -- a slot that's never booted (see `n/a` below) reports `v?`
++since nothing's been recorded for it yet. The active slot's `<state>` is one of:
 +- `pending`: This boot is on probation after an OTA update (via either `start ota` or `start ota url`).
 +  The device will automatically confirm itself as valid ~90 seconds after boot if the radio initializes
 +  correctly; an unconfirmed reset before then reverts to the previous firmware automatically.
@@ -58,7 +59,7 @@ index bd78b22..2ce7ad0 100644
  **Usage:**
  - `erase`
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
-index 2ce056f..c2a7752 100644
+index 2ce056f..938c499 100644
 --- a/examples/simple_repeater/main.cpp
 +++ b/examples/simple_repeater/main.cpp
 @@ -3,6 +3,10 @@
@@ -90,7 +91,7 @@ index 2ce056f..c2a7752 100644
 +    MESH_DEBUG_PRINTLN("Radio init failed!");
 +    RollbackGuard::onRadioInitFailure();   // does not return
 +  }
-+  RollbackGuard::begin(FIRMWARE_VERSION);
++  RollbackGuard::begin(FIRMWARE_VERSION "-" OTA_MOD_SHORT_SHA);
 +#else
    if (!radio_init()) {
      MESH_DEBUG_PRINTLN("Radio init failed!");
@@ -112,7 +113,7 @@ index 2ce056f..c2a7752 100644
  #if defined(NRF52_PLATFORM)
      board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
 diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
-index a3798b2..5580953 100644
+index a3798b2..9eeba65 100644
 --- a/examples/simple_room_server/main.cpp
 +++ b/examples/simple_room_server/main.cpp
 @@ -3,6 +3,10 @@
@@ -143,7 +144,7 @@ index a3798b2..5580953 100644
 +  if (!radio_ok) {
 +    RollbackGuard::onRadioInitFailure();   // does not return
 +  }
-+  RollbackGuard::begin(FIRMWARE_VERSION);
++  RollbackGuard::begin(FIRMWARE_VERSION "-" OTA_MOD_SHORT_SHA);
 +#else
    if (!radio_init()) { halt(); }
 +#endif
@@ -200,10 +201,10 @@ index 5cafd18..3a88d43 100644
      sprintf(reply, "??: %s", config);
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
-index 0000000..397e8d7
+index 0000000..c9dae88
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.cpp
-@@ -0,0 +1,201 @@
+@@ -0,0 +1,203 @@
 +#include "RollbackGuard.h"
 +#include <esp_ota_ops.h>
 +#include <esp_partition.h>
@@ -234,7 +235,9 @@ index 0000000..397e8d7
 +// same class of USB-CDC-flicker/boot instability as the handleGetCmd() stack incident (see
 +// 987639c), even though no single variable here is anywhere near that large. Deferred to the
 +// first poll() instead, which runs from loop()'s much shallower call depth.
-+static char pending_version[16] = {0};
++// Sized for "<version>-<7-char hash>" (e.g. "v1.16.0-0f11a30" is 15 chars) with headroom for
++// longer version numbers down the line.
++static char pending_version[24] = {0};
 +static bool version_write_pending = false;
 +
 +static bool isPendingVerify(esp_ota_img_states_t* out_state = nullptr) {
@@ -362,7 +365,7 @@ index 0000000..397e8d7
 +  if (a) esp_ota_get_state_partition(a, &state_a);
 +  if (b) esp_ota_get_state_partition(b, &state_b);
 +
-+  static char ver_a[16], ver_b[16];   // off status()'s own stack frame too, for the same reason
++  static char ver_a[24], ver_b[24];   // off status()'s own stack frame too, for the same reason
 +  readVersion('A', ver_a, sizeof(ver_a));
 +  readVersion('B', ver_b, sizeof(ver_b));
 +
@@ -407,12 +410,20 @@ index 0000000..397e8d7
 +}
 diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
 new file mode 100644
-index 0000000..32d42de
+index 0000000..06f0e21
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.h
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,57 @@
 +#pragma once
 +#include <Arduino.h>
++
++// Set via the same CI build flag as OTA_MOD_BUILD_DATE (see CommonCLI.cpp), just the bare short
++// commit hash rather than the combined "<date> - <hash>" string -- lets begin() below tag each
++// slot's self-reported version with the exact build it came from. Falls back to "unknown" for
++// local/dev builds.
++#ifndef OTA_MOD_SHORT_SHA
++#define OTA_MOD_SHORT_SHA "unknown"
++#endif
 +
 +// Confirms or rejects the running firmware during ESP-IDF's post-OTA "pending verify" window. A
 +// no-op on any normal, already-confirmed boot -- only acts on the first boot after an OTA update.
@@ -422,12 +433,15 @@ index 0000000..32d42de
 +namespace RollbackGuard {
 +  // Call once from setup(), after radio_init() succeeds. Records the boot time for poll() and
 +  // clears the persisted radio-failure counter so an unrelated future failure counts fresh.
-+  // `version` (FIRMWARE_VERSION, e.g. "v1.16.0") is recorded here but not written to SPIFFS until
-+  // the first poll() call -- setup()'s call chain is already deep by this point, and writing here
-+  // directly reproduced the same stack-depth boot instability as the handleGetCmd() incident.
-+  // status() reports it for a slot that isn't currently running -- the compiled-in ESP-IDF app
-+  // image header doesn't carry MeshCore's version (it's stamped with the prebuilt Arduino core's
-+  // own build info instead), so this self-reported value is the only reliable source.
++  // `version` (e.g. "v1.16.0-0f11a30" -- FIRMWARE_VERSION plus OTA_MOD_SHORT_SHA, see call sites)
++  // is recorded here but not written to SPIFFS until the first poll() call -- setup()'s call chain
++  // is already deep by this point, and writing here directly reproduced the same stack-depth boot
++  // instability as the handleGetCmd() incident. status() reports it for a slot that isn't
++  // currently running -- the compiled-in ESP-IDF app image header doesn't carry this project's
++  // version or build hash (it's stamped with the prebuilt Arduino core's own build info instead),
++  // so this self-reported value is the only reliable source, and the appended hash is what
++  // distinguishes two slots that happen to share the same version number but came from different
++  // builds.
 +  void begin(const char* version);
 +
 +  // Call every loop() iteration. Writes the version passed to begin() to SPIFFS on its first call
