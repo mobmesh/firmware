@@ -48,11 +48,11 @@ Flash the `.bin` the same way you would an official MeshCore firmware release fo
 
 ## Web-based flasher
 
-[**Open the flasher**](https://heyvern.github.io/meshcore-hotspot-ota/flasher/) — flashes a Heltec V4 straight from your browser over USB (Chrome, Edge, or Opera; requires Web Serial). No PlatformIO or other dev tools needed. It always uses the latest published release for whichever variant you pick.
+[**Open the flasher**](https://heyvern.github.io/meshcore-hotspot-ota/flasher/) — flashes a Heltec V4 straight from your browser over USB (Chrome, Edge, or Opera; requires Web Serial). No PlatformIO or other dev tools needed. It always uses the most recently built firmware for whichever variant you pick.
 
 Two flows:
 
-- **New device** — for a blank board, or one that's bricked. Fully erases the chip and writes bootloader, partition table, and firmware from scratch.
+- **New device** — for a blank board, or one that's bricked. Fully erases the chip and writes bootloader, partition table, and firmware from scratch — into both OTA slots, so `set ota.active <A|B>` works right away instead of requiring a separate flash into the other slot first.
 - **Update existing device** — for a board already running MeshCore. Writes firmware into a chosen OTA slot (A or B) without erasing anything else. This is the only way to target a specific slot from outside the device's own CLI; it doesn't change which slot the device boots from — use `set ota.active <A|B>` on-device for that.
 
 This isn't MeshCore's own flasher — it's built for this repo's own releases, plus the OTA slot targeting above that MeshCore's flasher doesn't do.
@@ -70,7 +70,7 @@ These are available on any device running firmware built from these patches, in 
 | `start ota join` / `start ota leave` | Pre-flight: join the configured WiFi hotspot only (no download), or disconnect and drop hotspot power. |
 | `get ota.wan` | Pre-flight: check WAN reachability once `start ota join` has joined. |
 | `get ota.pwr` / `set ota.pwr <on\|off>` | Diagnostic/recovery command to read or directly force the hotspot power switch, independent of `start ota url`. |
-| `get ota.active` | Both OTA slots' version and state, e.g. `Slots: A=v1.16.0 (active, valid) \| B=v? (n/a)`. Version is `v?` for a slot that's never actually booted (self-reported into SPIFFS on first boot, since the compiled-in image header doesn't carry it). Active slot's state is `pending`/`valid`/`n/a`; the other's is `valid`/`invalid`/`aborted`/`new`/`n/a`. |
+| `get ota.active` | Both OTA slots' version and state, e.g. `Slots: A=v1.16.0-0f11a30 (active, valid) \| B=v? (n/a)`. Version includes the short build commit hash (distinguishes two slots sharing the same version number but from different builds) and is `v?` for a slot that's never actually booted (self-reported into SPIFFS on first boot, since the compiled-in image header doesn't carry it). Active slot's state is `pending`/`valid`/`n/a`; the other's is `valid`/`invalid`/`aborted`/`new`/`n/a`. |
 | `set ota.active <A\|B>` | Point the bootloader at the other OTA slot and reboot into it, without reflashing. Refuses if that slot is already active or has no valid image. Re-arms rollback probation for that slot even if it was previously `valid` -- expect `get ota.active` to briefly show `pending` right after. |
 
 Example:
