@@ -1,8 +1,8 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index bd78b22..b5e3918 100644
+index bd78b22..2ce7ad0 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -153,6 +153,51 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
+@@ -153,6 +153,54 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
  
  ---
  
@@ -10,8 +10,11 @@ index bd78b22..b5e3918 100644
 +**Usage:**
 +- `get ota.active`
 +
-+**Returns:** `A (active, <state>) - B (<state>)`, or `A (<state>) - B (active, <state>)` if `B` is
-+the running slot (`A` = `ota_0`, `B` = `ota_1`). The active slot's `<state>` is one of:
++**Returns:** `Slots: A=<ver> (active, <state>) | B=<ver> (<state>)`, or with `B` active if that's the
++running slot (`A` = `ota_0`, `B` = `ota_1`). `<ver>` is that slot's firmware version (e.g. `v1.16.0`),
++self-reported into SPIFFS the first time that slot actually boots -- a slot that's never booted (see
++`n/a` below) reports `v?` since nothing's been recorded for it yet. The active slot's `<state>` is one
++of:
 +- `pending`: This boot is on probation after an OTA update (via either `start ota` or `start ota url`).
 +  The device will automatically confirm itself as valid ~90 seconds after boot if the radio initializes
 +  correctly; an unconfirmed reset before then reverts to the previous firmware automatically.
@@ -55,7 +58,7 @@ index bd78b22..b5e3918 100644
  **Usage:**
  - `erase`
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
-index 2ce056f..262dab9 100644
+index 2ce056f..c2a7752 100644
 --- a/examples/simple_repeater/main.cpp
 +++ b/examples/simple_repeater/main.cpp
 @@ -3,6 +3,10 @@
@@ -87,7 +90,7 @@ index 2ce056f..262dab9 100644
 +    MESH_DEBUG_PRINTLN("Radio init failed!");
 +    RollbackGuard::onRadioInitFailure();   // does not return
 +  }
-+  RollbackGuard::begin();
++  RollbackGuard::begin(FIRMWARE_VERSION);
 +#else
    if (!radio_init()) {
      MESH_DEBUG_PRINTLN("Radio init failed!");
@@ -109,7 +112,7 @@ index 2ce056f..262dab9 100644
  #if defined(NRF52_PLATFORM)
      board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
 diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
-index a3798b2..ba0420d 100644
+index a3798b2..5580953 100644
 --- a/examples/simple_room_server/main.cpp
 +++ b/examples/simple_room_server/main.cpp
 @@ -3,6 +3,10 @@
@@ -140,7 +143,7 @@ index a3798b2..ba0420d 100644
 +  if (!radio_ok) {
 +    RollbackGuard::onRadioInitFailure();   // does not return
 +  }
-+  RollbackGuard::begin();
++  RollbackGuard::begin(FIRMWARE_VERSION);
 +#else
    if (!radio_init()) { halt(); }
 +#endif
@@ -197,10 +200,10 @@ index ee1eb42..44a6ac2 100644
      sprintf(reply, "??: %s", config);
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
-index 0000000..5209256
+index 0000000..2a002c4
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.cpp
-@@ -0,0 +1,156 @@
+@@ -0,0 +1,185 @@
 +#include "RollbackGuard.h"
 +#include <esp_ota_ops.h>
 +#include <esp_partition.h>
@@ -275,10 +278,35 @@ index 0000000..5209256
 +  f.close();
 +}
 +
-+void RollbackGuard::begin() {
++// The compiled-in ESP-IDF app image header doesn't carry FIRMWARE_VERSION -- it's stamped with the
++// prebuilt Arduino core's own build info instead -- so each slot's version is self-reported into
++// SPIFFS the first time it actually boots, keyed by slot letter, and read back for the other slot.
++static const char* versionPath(char letter) {
++  return (letter == 'A') ? "/ota_ver_a" : "/ota_ver_b";
++}
++
++static void readVersion(char letter, char* out, size_t out_len) {
++  File f = SPIFFS.open(versionPath(letter), "r");
++  if (f) {
++    size_t n = f.readBytes(out, out_len - 1);
++    out[n] = 0;
++    f.close();
++  }
++  if (!f || out[0] == 0) strcpy(out, "v?");   // never booted -- nothing self-reported yet
++}
++
++static void writeVersion(char letter, const char* version) {
++  File f = SPIFFS.open(versionPath(letter), "w");
++  if (!f) return;
++  f.write((const uint8_t*)version, strlen(version));
++  f.close();
++}
++
++void RollbackGuard::begin(const char* version) {
 +  boot_time_ms = millis();
 +  confirmed_or_not_applicable = !isPendingVerify();
 +  writeFailCount(0);   // successful boot -- clear any prior failure streak
++  writeVersion(partitionLetter(esp_ota_get_running_partition()), version);
 +}
 +
 +void RollbackGuard::poll() {
@@ -309,7 +337,7 @@ index 0000000..5209256
 +}
 +
 +const char* RollbackGuard::status() {
-+  static char buf[40];
++  static char buf[96];
 +  char active_letter = partitionLetter(esp_ota_get_running_partition());
 +
 +  const esp_partition_t* a = findPartitionByLetter('A');
@@ -318,9 +346,13 @@ index 0000000..5209256
 +  if (a) esp_ota_get_state_partition(a, &state_a);
 +  if (b) esp_ota_get_state_partition(b, &state_b);
 +
-+  sprintf(buf, "A (%s%s) - B (%s%s)",
-+          active_letter == 'A' ? "active, " : "", stateLabel(state_a),
-+          active_letter == 'B' ? "active, " : "", stateLabel(state_b));
++  char ver_a[16], ver_b[16];
++  readVersion('A', ver_a, sizeof(ver_a));
++  readVersion('B', ver_b, sizeof(ver_b));
++
++  sprintf(buf, "Slots: A=%s (%s%s) | B=%s (%s%s)",
++          ver_a, active_letter == 'A' ? "active, " : "", stateLabel(state_a),
++          ver_b, active_letter == 'B' ? "active, " : "", stateLabel(state_b));
 +  return buf;
 +}
 +
@@ -359,10 +391,10 @@ index 0000000..5209256
 +}
 diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
 new file mode 100644
-index 0000000..7a8d045
+index 0000000..9ae9b87
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.h
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,43 @@
 +#pragma once
 +#include <Arduino.h>
 +
@@ -374,7 +406,11 @@ index 0000000..7a8d045
 +namespace RollbackGuard {
 +  // Call once from setup(), after radio_init() succeeds. Records the boot time for poll() and
 +  // clears the persisted radio-failure counter so an unrelated future failure counts fresh.
-+  void begin();
++  // `version` (FIRMWARE_VERSION, e.g. "v1.16.0") is persisted to SPIFFS keyed by the running
++  // partition's letter, so status() can report it for a slot that isn't currently running -- the
++  // compiled-in ESP-IDF app image header doesn't carry MeshCore's version (it's stamped with the
++  // prebuilt Arduino core's own build info instead), so this is the only reliable source.
++  void begin(const char* version);
 +
 +  // Call every loop() iteration. Marks the image valid once the confirm delay has elapsed since
 +  // begin(). No-op before that and a cheap no-op forever after confirmation.
@@ -391,9 +427,10 @@ index 0000000..7a8d045
 +  // return.
 +  void onRadioInitFailure();
 +
-+  // For `get ota.active` -- "A (active, <state>) - B (<state>)" (or B active), each state one of
-+  // "pending" (only possible for the running slot), "valid", "invalid", "aborted", "new", or "n/a"
-+  // (never involved in an OTA).
++  // For `get ota.active` -- "Slots: A=<ver> (active, <state>) | B=<ver> (<state>)" (or B active),
++  // each state one of "pending" (only possible for the running slot), "valid", "invalid",
++  // "aborted", "new", or "n/a" (never involved in an OTA). <ver> is "v?" for a slot that's never
++  // actually booted (nothing persisted for it yet) -- the same slots this reports "n/a" for.
 +  const char* status();
 +
 +  // For `set ota.active <A|B>` -- points the bootloader at the other OTA slot without touching flash
