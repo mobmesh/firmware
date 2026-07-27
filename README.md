@@ -41,7 +41,6 @@ Each release is named after the variant and the upstream MeshCore release it was
 
 - `<asset-basename>-vX.Y.Z.bin` — the firmware image (see the variant table above for exact asset names)
 - `<asset-basename>-vX.Y.Z.bin.sha256` — its SHA-256 checksum
-- `<asset-basename>-vX.Y.Z-bootloader.bin` and `<asset-basename>-vX.Y.Z-partitions.bin` — bootloader and partition table for that build, needed only for flashing a brand-new or bricked board from scratch (see "Web-based flasher" below); not needed for a normal update
 
 The release body includes upstream's own release notes for the exact tag the build was made from.
 

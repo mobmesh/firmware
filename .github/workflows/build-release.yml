@@ -208,15 +208,28 @@ jobs:
             git diff HEAD -- docs/cli_commands.md | grep '^+' | grep -v '^+++' | sed 's/^+//'
           } > ../docs/cli-additions.md
 
-      - name: Commit updated docs/cli-additions.md if changed
+      - name: Update docs/flasher's bootloader.bin/partitions.bin for the web flasher
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.sync_docs
+        run: |
+          cd upstream-src
+          BOOT=".pio/build/${{ matrix.build_env }}/bootloader.bin"
+          PART=".pio/build/${{ matrix.build_env }}/partitions.bin"
+          test -f "$BOOT"
+          test -f "$PART"
+          DEST="../docs/flasher/${{ matrix.board_id }}"
+          mkdir -p "$DEST"
+          cp "$BOOT" "$DEST/bootloader.bin"
+          cp "$PART" "$DEST/partitions.bin"
+
+      - name: Commit docs/flasher and docs/cli-additions.md updates if changed
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.sync_docs
         continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/cli-additions.md
+          git add docs/cli-additions.md "docs/flasher/${{ matrix.board_id }}/bootloader.bin" "docs/flasher/${{ matrix.board_id }}/partitions.bin"
           if ! git diff --staged --quiet; then
-            git commit -m "docs: sync cli-additions.md with ${{ steps.pick.outputs.ref }}"
+            git commit -m "docs: sync cli-additions.md and ${{ matrix.board_id }} flasher assets with ${{ steps.pick.outputs.ref }}"
             for i in 1 2 3 4 5; do
               git push && break
               git fetch origin "${{ github.ref_name }}"
@@ -236,7 +249,7 @@ jobs:
           cp "$BIN" "../$NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Locate bootloader.bin and partitions.bin (needed for the browser-based full-flash tool)
+      - name: Locate bootloader.bin and partitions.bin (needed for the partition-layout drift check below)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         id: flash_parts
         run: |
@@ -319,7 +332,7 @@ jobs:
         run: |
           sha256sum "${{ steps.artifact.outputs.name }}" | awk '{print $1}' > "${{ steps.artifact.outputs.name }}.sha256"
 
-      - name: Publish release with .bin + .sha256 sidecar + bootloader/partitions for the web flasher
+      - name: Publish release with .bin + .sha256 sidecar
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
@@ -330,8 +343,6 @@ jobs:
           files: |
             ${{ steps.artifact.outputs.name }}
             ${{ steps.artifact.outputs.name }}.sha256
-            ${{ steps.flash_parts.outputs.bootloader_name }}
-            ${{ steps.flash_parts.outputs.partitions_name }}
 
       - name: Notify on patch/build failure
         if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && steps.rollback_check.outputs.failed != 'true' && steps.partition_check.outputs.failed != 'true'

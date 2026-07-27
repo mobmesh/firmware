@@ -43,13 +43,10 @@ async function fetchLatestRelease(assetBasename) {
     if (release.draft) continue;
     const bin = release.assets.find((a) => binPattern.test(a.name));
     if (!bin) continue;
-    const base = bin.name.replace(/\.bin$/, "");
     return {
       tag: release.tag_name,
       bin,
       sha: release.assets.find((a) => a.name === `${bin.name}.sha256`),
-      bootloader: release.assets.find((a) => a.name === `${base}-bootloader.bin`),
-      partitions: release.assets.find((a) => a.name === `${base}-partitions.bin`),
     };
   }
   throw new Error(`No published release with a "${assetBasename}" asset was found.`);
@@ -71,9 +68,9 @@ async function verifySha256(data, shaAsset, label) {
   }
 }
 
-async function loadBootApp0(board) {
-  const res = await fetch(`./${board.bootApp0}`);
-  if (!res.ok) throw new Error(`Could not load ${board.bootApp0}`);
+async function loadLocalBinary(path) {
+  const res = await fetch(`./${path}`);
+  if (!res.ok) throw new Error(`Could not load ${path}`);
   return new Uint8Array(await res.arrayBuffer());
 }
 
@@ -263,15 +260,12 @@ async function runFlash(onProgress, onStatus) {
   let eraseAll = false;
 
   if (state.mode === "new") {
-    if (!release.bootloader || !release.partitions) {
-      throw new Error("This release is missing bootloader/partitions assets needed for a new-device flash.");
-    }
-    onStatus(`Downloading ${release.bootloader.name}...`);
-    const bootloader = await downloadBinary(release.bootloader);
-    onStatus(`Downloading ${release.partitions.name}...`);
-    const partitions = await downloadBinary(release.partitions);
+    onStatus("Loading bootloader...");
+    const bootloader = await loadLocalBinary(board.bootloaderFile);
+    onStatus("Loading partition table...");
+    const partitions = await loadLocalBinary(board.partitionsFile);
     onStatus("Preparing boot selector...");
-    const bootApp0 = await loadBootApp0(board);
+    const bootApp0 = await loadLocalBinary(board.bootApp0);
 
     fileArray.push({ data: bootloader, address: hex(board.offsets.bootloader) });
     fileArray.push({ data: partitions, address: hex(board.offsets.partitions) });
