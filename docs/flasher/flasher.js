@@ -351,8 +351,29 @@ function renderError(err, retryStep) {
   wizard.querySelector("#retry").addEventListener("click", retryStep);
 }
 
+async function loadBuildInfo() {
+  const el = document.getElementById("build-info");
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/commits?path=docs/flasher&per_page=1`);
+    if (!res.ok) return;
+    const [commit] = await res.json();
+    if (!commit) return;
+    const date = new Date(commit.commit.committer.date);
+    const formatted = date.toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "UTC",
+    });
+    el.textContent = `Page last updated ${formatted} UTC (commit ${commit.sha.slice(0, 7)})`;
+  } catch {
+    // best-effort only -- leave the footer line blank if this fails
+  }
+}
+
 // ---- Boot --------------------------------------------------------------
 
 loadBoards()
   .then(renderIntro)
   .catch((err) => renderError(err, renderIntro));
+
+loadBuildInfo();
