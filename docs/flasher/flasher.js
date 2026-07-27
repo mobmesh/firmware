@@ -127,7 +127,7 @@ function renderBoard() {
   const entries = Object.entries(boards);
   render(`
     <h2 class="step-title">Select your hardware</h2>
-    <p class="step-desc">Only boards this project builds firmware for are listed.</p>
+    <p class="step-desc">Only boards this repo builds firmware for are listed.</p>
     <div class="tiles">
       ${entries
         .map(([id, b]) => `<button class="tile" data-board="${id}"><strong>${b.label}</strong></button>`)
