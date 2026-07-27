@@ -46,6 +46,8 @@ async function connect() {
   }
   keepReading = true;
   connectBtn.textContent = "Disconnect";
+  input.disabled = false;
+  input.focus();
   readLoop();
 }
 
@@ -66,6 +68,7 @@ async function disconnect() {
     port = null;
   }
   connectBtn.textContent = "Connect";
+  input.disabled = true;
 }
 
 async function send(text) {
@@ -83,7 +86,7 @@ async function send(text) {
 
 toggleBtn.addEventListener("click", () => {
   backdrop.classList.remove("hidden");
-  input.focus();
+  (port ? input : connectBtn).focus();
 });
 closeBtn.addEventListener("click", () => backdrop.classList.add("hidden"));
 connectBtn.addEventListener("click", () => (port ? disconnect() : connect()));
