@@ -49,7 +49,7 @@ Flash the `.bin` the same way you would an official MeshCore firmware release fo
 
 ## Web-based flasher
 
-<a href="https://heyvern.github.io/meshcore-hotspot-ota/flasher/" target="_blank" rel="noopener"><strong>Open the flasher</strong></a> — flashes a Heltec V4 straight from your browser over USB (Chrome, Edge, or Opera; requires Web Serial). No PlatformIO or other dev tools needed. It always uses the latest published release for whichever variant you pick.
+[**Open the flasher**](https://heyvern.github.io/meshcore-hotspot-ota/flasher/) — flashes a Heltec V4 straight from your browser over USB (Chrome, Edge, or Opera; requires Web Serial). No PlatformIO or other dev tools needed. It always uses the latest published release for whichever variant you pick.
 
 Two flows:
 

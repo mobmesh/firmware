@@ -224,6 +224,28 @@ input.field {
   box-shadow: 0 14px 40px -8px rgba(249, 162, 40, 0.55);
 }
 
+.github-link {
+  position: fixed;
+  top: 1.25rem;
+  left: 1.25rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.github-link:hover {
+  border-color: var(--accent);
+  box-shadow: 0 14px 40px -8px rgba(45, 209, 189, 0.5);
+}
+
 .console-toggle {
   position: fixed;
   top: 1.25rem;
