@@ -14,6 +14,8 @@ This repository does **not** contain a fork of MeshCore's source. It contains a 
 | `patches/0002-ota-rollback-guard.patch` | Adds automatic post-update rollback protection. **Depends on 0001** and cannot be applied alone |
 | `.github/workflows/build-release.yml` | Builds firmware for each supported variant against the latest matching upstream release and publishes it here |
 | `docs/flasher/` | Browser-based USB flasher (GitHub Pages), see "Web-based flasher" below |
+| `docs/firmware-patch-guidelines.md` | Rules for editing `patches/*.patch` / `src/helpers/esp32/`, motivated by real hardware failures -- read before touching either |
+| `docs/incidents.md` | Log of hardware-reproduced bugs in this project's patches and their fixes |
 
 Patches are applied in numeric order. If a patch fails to apply against the current upstream release, the build fails and an issue is opened here identifying which patch broke — it does not attempt to auto-resolve the conflict.
 
