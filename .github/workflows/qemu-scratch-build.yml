@@ -66,8 +66,11 @@ jobs:
           cp .pio/build/heltec_v4_repeater/bootloader.bin ../out/
           cp .pio/build/heltec_v4_repeater/partitions.bin ../out/
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: heltec_v4_repeater-qemu-uart-console
-          path: out/
-          retention-days: 7
+      - name: Push build outputs to a scratch branch (Actions artifacts aren't reachable from the dev sandbox)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B qemu-scratch-output
+          git add -f out/
+          git commit -m "qemu-scratch-build output ($(date -u +%FT%TZ))"
+          git push -f origin qemu-scratch-output
