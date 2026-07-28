@@ -20,9 +20,13 @@ This is the exact documentation `patches/*.patch` adds to MeshCore's own
 station, downloads the file, verifies it against `ota.sha256` (or a `<url>.sha256` sidecar fetched
 automatically if `ota.sha256` isn't set), confirms the download is actually a build of this project
 (refuses otherwise, even if the checksum matches -- catches `<url>` mistakenly pointing at a
-different, unmodified MeshCore build; aborts within the first 64KB rather than pulling the whole
-file over what may be a metered cellular connection), and reboots on success. Does not reboot on
-failure.
+different, unmodified MeshCore build), and reboots on success. Does not reboot on failure.
+
+The authenticity check aborts as soon as it's clear the download isn't a match, rather than pulling
+the whole file over what may be a metered cellular connection -- normally within the first 64KB, or
+however far in a `<url>.sha256` sidecar says to look (a `<hash>:<offset>` sidecar, generated
+automatically by this project's own release builds, carries the exact position for that specific
+build). See `set ota.force` below for the rare case where neither applies.
 
 **Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 
@@ -54,6 +58,24 @@ need to be resupplied for future updates unless the hotspot's credentials change
 **Note:** Once set, this hash verifies the download and is **not** overridden by a `<url>.sha256`
 sidecar. `set ota.sha256 clear` removes it so sidecar-fetch takes effect again — do this before
 pointing `start ota url` at a different firmware image, or a stale hash will block its sidecar.
+
+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
+
+---
+
+#### Bypass `start ota url`'s authenticity check for one attempt
+**Usage:**
+- `set ota.force <on|off>`
+
+**Parameters:**
+- `on` / `off`: Arms or disarms the bypass
+
+**Note:** RAM-only and one-time — consumed by the very next `start ota url` call regardless of
+outcome, and always starts `off` on every boot (never persisted, never survives a reboot). Last
+resort for a download that fails the authenticity check with no `<url>.sha256` offset available to
+explain why (self-hosted firmware not built by this project's own release pipeline, for example) —
+not intended for routine use, since it skips the check that exists specifically to catch a
+mistaken `<url>`.
 
 **Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 
