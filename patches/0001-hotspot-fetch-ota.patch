@@ -126,7 +126,7 @@ index cfa33cf..2a827ad 100644
    // Power management interface (boards with power management override these)
    virtual bool isExternalPowered() { return false; }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index b78ad6e..baedfb7 100644
+index b78ad6e..9167d46 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -5,6 +5,16 @@
@@ -175,7 +175,7 @@ index b78ad6e..baedfb7 100644
      } else if (memcmp(command, "board", 5) == 0) {
        sprintf(reply, "%s", _board->getManufacturerName());
      } else if (memcmp(command, "sensor get ", 11) == 0) {
-@@ -536,6 +559,59 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -536,6 +559,56 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
      StrHelper::strncpy(_prefs->guest_password, &config[15], sizeof(_prefs->guest_password));
      savePrefs();
      strcpy(reply, "OK");
@@ -218,10 +218,7 @@ index b78ad6e..baedfb7 100644
 +      strcpy(reply, "ERR: expected on|off");
 +    }
 +  } else if (memcmp(config, "ota.force ", 10) == 0) {
-+    // RAM-only, one-time -- consumed by the very next start ota url regardless of outcome, and
-+    // never persists across a reboot. Last-resort escape hatch for a download whose authenticity
-+    // marker isn't within the scan window and has no .sha256-sidecar offset hint either (see
-+    // HotspotOTA::run()) -- not meant for routine use.
++    // Last resort -- see HotspotOTA::setScanBypass()
 +    if (memcmp(&config[10], "on", 2) == 0) {
 +      HotspotOTA::setScanBypass(true);
 +      strcpy(reply, "OK");
@@ -235,7 +232,7 @@ index b78ad6e..baedfb7 100644
    } else if (memcmp(config, "prv.key ", 8) == 0) {
      uint8_t prv_key[PRV_KEY_SIZE];
      bool success = mesh::Utils::fromHex(prv_key, PRV_KEY_SIZE, &config[8]);
-@@ -925,6 +1001,13 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -925,6 +998,13 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
      sprintf(reply, "> %u mV", _board->getBootVoltage());
  #else
      strcpy(reply, "ERROR: Power management not supported");
@@ -306,10 +303,10 @@ index a4cbf2a..8b9198f 100644
      inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..8490263
+index 0000000..96ec7ba
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,377 @@
+@@ -0,0 +1,338 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -336,45 +333,18 @@ index 0000000..8490263
 +
 +#define PIN_HOTSPOT_PWR   47   // confirmed clean on Heltec V4.3.1 (GPIO48 = fallback)
 +
-+// Every build of this project's firmware contains this exact byte sequence somewhere in flash
-+// (any source file compiled from these patches will do -- this one is as good as any). Checked
-+// against the downloaded bytes below before Update.end() ever flips the boot partition: a
-+// download that passes its own SHA-256 check but isn't actually a build of this project (e.g.
-+// start ota url mistakenly pointed at an unmodified upstream MeshCore release -- same mistake,
-+// no download corruption involved) gets aborted instead of silently replacing the only remaining
-+// copy of this project's own remote-update capability with firmware that can't perform it.
-+// Deliberately NOT tied to a CLI-facing string (those get reworded), a per-build value like
-+// OTA_MOD_BUILD_DATE (different in every build, by design, so it can't be what's searched for
-+// here), or anything resembling a version number -- this string must stay byte-for-byte identical
-+// across every future build forever, since it's checked by whatever's currently running against
-+// whatever's being downloaded; if this value itself ever needed to change, older firmware would
-+// stop recognizing newer legitimate releases as legitimate.
-+static const char OTA_MOD_MARKER[] = "H0TSP0T";
-+#define OTA_MOD_MARKER_LEN   (sizeof(OTA_MOD_MARKER) - 1)   // exclude the implicit null terminator
++static const char OTA_MOD_MARKER[] = "H0TSP0T";   // must never change
++#define OTA_MOD_MARKER_LEN   (sizeof(OTA_MOD_MARKER) - 1)
 +
-+// Fallback only -- used when the .sha256 sidecar doesn't carry a real measured offset (see
-+// resolveExpectedHash() below) and ota.force isn't armed. The marker's actual position in a real
-+// build is verified by CI to land well inside this window (see build-release.yml) -- if it ever
-+// doesn't, that's a build-time failure there, not a surprise here.
 +#define OTA_MOD_MARKER_SCAN_WINDOW   65536
-+
-+// Added on top of a sidecar-supplied offset (see resolveExpectedHash()) purely as insurance
-+// against an off-by-one at the boundary -- CI measures the exact position in the exact binary
-+// being published, so this isn't compensating for any real imprecision in that number.
 +#define OTA_MOD_MARKER_OFFSET_CUSHION   256
 +
-+// RAM-only, one-time bypass of the marker check entirely -- see HotspotOTA::setScanBypass() and
-+// `set ota.force` in CommonCLI.cpp. Always starts false on every boot (C++ static initialization
-+// guarantees this runs before any of our code does -- never "undefined").
-+static bool scan_bypass = false;
++static bool scan_bypass = false;   // RAM-only, one-time
 +
 +void HotspotOTA::setScanBypass(bool on) {
 +  scan_bypass = on;
 +}
 +
-+// Scans a download for OTA_MOD_MARKER as it streams past in fixed-size chunks, without needing
-+// the whole file buffered at once -- carries just enough of each chunk's tail into the next feed()
-+// call to still catch a marker split across a chunk boundary.
 +struct MarkerScanner {
 +  uint8_t tail[OTA_MOD_MARKER_LEN - 1];
 +  size_t tail_len = 0;
@@ -439,14 +409,7 @@ index 0000000..8490263
 +  return false;
 +}
 +
-+// A manual hash (`set ota.sha256`) always wins over the sidecar fetch, which travels the same
-+// unauthenticated connection as the firmware and offers no independent guarantee.
-+//
-+// The sidecar body is either just the hash (64 hex chars, as always) or "<hash>:<offset>", where
-+// <offset> is the exact byte offset CI measured OTA_MOD_MARKER at in that specific build (see
-+// build-release.yml) -- backward compatible with older sidecars that only ever had the hash.
-+// *out_offset is set to that value, or left at -1 if the sidecar has no offset (older sidecar, or
-+// manual_hex was used, which never touches the sidecar at all).
++// sidecar body: "<hash>" or "<hash>:<offset>"; *out_offset is -1 if absent
 +static bool resolveExpectedHash(const char* url, const char* manual_hex, uint8_t expect[32], char reply[], long* out_offset) {
 +  *out_offset = -1;
 +
@@ -489,9 +452,8 @@ index 0000000..8490263
 +    return false;
 +  }
 +
-+  // Consumed here, unconditionally, regardless of what happens below -- one-time no matter what.
 +  bool bypass_marker_check = scan_bypass;
-+  scan_bypass = false;
++  scan_bypass = false;   // one-time
 +
 +  pinMode(PIN_HOTSPOT_PWR, OUTPUT);
 +  digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // must stay HIGH throughout -- load switch, not a latch
@@ -514,8 +476,6 @@ index 0000000..8490263
 +    return false;
 +  }
 +
-+  // Prefer the sidecar's measured offset (exact, for this specific build) over the compiled-in
-+  // default; ota.force skips the marker check (and this window) entirely.
 +  size_t marker_scan_window = (marker_offset_hint >= 0)
 +    ? (size_t)marker_offset_hint + OTA_MOD_MARKER_LEN + OTA_MOD_MARKER_OFFSET_CUSHION
 +    : OTA_MOD_MARKER_SCAN_WINDOW;
@@ -577,8 +537,6 @@ index 0000000..8490263
 +    marker.feed(buf, n);
 +    written += n;
 +
-+    // Give up as soon as it's clear this isn't this project's firmware, rather than pulling the
-+    // rest of a multi-hundred-KB download over what may be a metered cellular hotspot connection.
 +    if (!bypass_marker_check && !marker.found && written >= marker_scan_window) {
 +      strcpy(reply, "ERR: not a hotspot ota build (missing marker), would lose remote-update ability -- aborting");
 +      Update.abort();
@@ -689,10 +647,10 @@ index 0000000..8490263
 +}
 diff --git a/src/helpers/esp32/HotspotOTA.h b/src/helpers/esp32/HotspotOTA.h
 new file mode 100644
-index 0000000..92f173a
+index 0000000..58b6e67
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.h
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,37 @@
 +#pragma once
 +#include <Arduino.h>
 +#include <helpers/BaseChatMesh.h>   // MAX_TEXT_LEN
@@ -722,10 +680,7 @@ index 0000000..92f173a
 +  void setPower(bool on);   // manual GPIO47 control, independent of run()
 +  bool getPower();
 +
-+  // RAM-only, one-time bypass of run()'s authenticity marker check -- see `set ota.force` in
-+  // CommonCLI.cpp. Consumed (reset to false) by the very next run() call regardless of outcome,
-+  // and always starts false on every boot; never persisted.
-+  void setScanBypass(bool on);
++  void setScanBypass(bool on);   // RAM-only, one-time -- see `set ota.force`
 +
 +  // Pre-flight versions of run()'s join/WAN-check steps -- see `start ota join` / `get ota.wan` /
 +  // `start ota leave`. run() skips its own join if already connected via alreadyConnectedTo().

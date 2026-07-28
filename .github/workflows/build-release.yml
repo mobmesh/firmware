@@ -349,9 +349,6 @@ jobs:
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
           HASH=$(sha256sum "${{ steps.artifact.outputs.name }}" | awk '{print $1}')
-          # ":<offset>" lets HotspotOTA::run() scan exactly as far as this build's marker actually
-          # sits, instead of relying on the compiled-in default -- see resolveExpectedHash() in
-          # HotspotOTA.cpp. Older parsers (and older sidecars) only ever see/expect the hash alone.
           echo "$HASH:${{ steps.marker_check.outputs.offset }}" > "${{ steps.artifact.outputs.name }}.sha256"
 
       - name: Vendor firmware.bin for the web flasher (GitHub Release assets have no CORS headers, so the page's fetch() can't read them cross-origin)

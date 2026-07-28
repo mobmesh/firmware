@@ -1,8 +1,8 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index bd78b22..d9e938d 100644
+index f37e9ae..bc44335 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -153,6 +153,55 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
+@@ -179,6 +179,55 @@ budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable with
  
  ---
  
@@ -161,7 +161,7 @@ index a3798b2..9eeba65 100644
 +#endif
  }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index 5cafd18..3a88d43 100644
+index 9167d46..596ced6 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -15,6 +15,10 @@
@@ -175,7 +175,7 @@ index 5cafd18..3a88d43 100644
  #ifndef BRIDGE_MAX_BAUD
  #define BRIDGE_MAX_BAUD 115200
  #endif
-@@ -597,6 +601,12 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -608,6 +612,12 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
      } else {
        strcpy(reply, "ERR: expected on|off");
      }
@@ -188,7 +188,7 @@ index 5cafd18..3a88d43 100644
  #endif
    } else if (memcmp(config, "prv.key ", 8) == 0) {
      uint8_t prv_key[PRV_KEY_SIZE];
-@@ -994,6 +1004,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -1005,6 +1015,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
    } else if (memcmp(config, "ota.wan", 7) == 0) {
      // Pre-flight check -- see `start ota join`. Assumes WiFi already joined.
      HotspotOTA::checkWan(reply);
@@ -201,10 +201,10 @@ index 5cafd18..3a88d43 100644
      sprintf(reply, "??: %s", config);
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
-index 0000000..c9dae88
+index 0000000..8246a20
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.cpp
-@@ -0,0 +1,203 @@
+@@ -0,0 +1,201 @@
 +#include "RollbackGuard.h"
 +#include <esp_ota_ops.h>
 +#include <esp_partition.h>
@@ -235,8 +235,6 @@ index 0000000..c9dae88
 +// same class of USB-CDC-flicker/boot instability as the handleGetCmd() stack incident (see
 +// 987639c), even though no single variable here is anywhere near that large. Deferred to the
 +// first poll() instead, which runs from loop()'s much shallower call depth.
-+// Sized for "<version>-<7-char hash>" (e.g. "v1.16.0-0f11a30" is 15 chars) with headroom for
-+// longer version numbers down the line.
 +static char pending_version[24] = {0};
 +static bool version_write_pending = false;
 +
@@ -410,17 +408,13 @@ index 0000000..c9dae88
 +}
 diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
 new file mode 100644
-index 0000000..06f0e21
+index 0000000..e893662
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.h
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,47 @@
 +#pragma once
 +#include <Arduino.h>
 +
-+// Set via the same CI build flag as OTA_MOD_BUILD_DATE (see CommonCLI.cpp), just the bare short
-+// commit hash rather than the combined "<date> - <hash>" string -- lets begin() below tag each
-+// slot's self-reported version with the exact build it came from. Falls back to "unknown" for
-+// local/dev builds.
 +#ifndef OTA_MOD_SHORT_SHA
 +#define OTA_MOD_SHORT_SHA "unknown"
 +#endif
@@ -433,15 +427,9 @@ index 0000000..06f0e21
 +namespace RollbackGuard {
 +  // Call once from setup(), after radio_init() succeeds. Records the boot time for poll() and
 +  // clears the persisted radio-failure counter so an unrelated future failure counts fresh.
-+  // `version` (e.g. "v1.16.0-0f11a30" -- FIRMWARE_VERSION plus OTA_MOD_SHORT_SHA, see call sites)
-+  // is recorded here but not written to SPIFFS until the first poll() call -- setup()'s call chain
-+  // is already deep by this point, and writing here directly reproduced the same stack-depth boot
-+  // instability as the handleGetCmd() incident. status() reports it for a slot that isn't
-+  // currently running -- the compiled-in ESP-IDF app image header doesn't carry this project's
-+  // version or build hash (it's stamped with the prebuilt Arduino core's own build info instead),
-+  // so this self-reported value is the only reliable source, and the appended hash is what
-+  // distinguishes two slots that happen to share the same version number but came from different
-+  // builds.
++  // `version` (e.g. "v1.16.0-0f11a30", see call sites) is recorded here but not written to SPIFFS
++  // until the first poll() call -- setup()'s call chain is already deep by this point, and writing
++  // here directly reproduced the same stack-depth boot instability as the handleGetCmd() incident.
 +  void begin(const char* version);
 +
 +  // Call every loop() iteration. Writes the version passed to begin() to SPIFFS on its first call

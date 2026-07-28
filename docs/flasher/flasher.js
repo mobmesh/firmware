@@ -1,11 +1,5 @@
 const REPO = "HeyVern/meshcore-hotspot-ota";
-// Vendored rather than loaded from a CDN (e.g. esm.sh): esm.sh re-bundles the package's raw
-// source itself, including a separate dynamic import of each chip's stub-loader JSON (large
-// embedded base64 blobs) -- that re-bundling step was corrupting the ESP32-S3 stub's base64 and
-// throwing "atob ... not correctly encoded" during flashing. This is esptool-js's own official
-// prebuilt browser bundle straight from the npm package (bundle.js), with every chip's stub data
-// already compiled in -- no separate CDN transform step left to get it wrong.
-const ESPTOOL_JS_URL = "./vendor/esptool-js/bundle.js";
+const ESPTOOL_JS_URL = "./vendor/esptool-js/bundle.js";   // vendored, not CDN-loaded
 
 const wizard = document.getElementById("wizard");
 
@@ -32,26 +26,17 @@ function currentVariant() {
   return currentBoard().variants[state.variantId];
 }
 
-// no-store on everything that can change between commits (board config, binaries, checksums) --
-// CI vendors a fresh firmware.bin on every build, and a browser silently serving a cached copy of
-// it here means flashing outdated firmware without any indication that's what happened.
 async function loadBoards() {
   const res = await fetch("./boards.json", { cache: "no-store" });
   if (!res.ok) throw new Error(`Could not load boards.json (${res.status})`);
   boards = await res.json();
 }
 
-// Firmware is vendored into docs/flasher/<board>/<variant>/ by CI on every successful build,
-// same as bootloader.bin/partitions.bin/boot_app0.bin already were -- GitHub Release assets are
-// served from a host (release-assets.githubusercontent.com) that sends no CORS headers at all, so
-// this page's fetch() can never read them cross-origin. Same-origin avoids that entirely.
 async function verifySha256(data, shaPath, label) {
   const res = await fetch(`./${shaPath}`, { cache: "no-store" });
   if (!res.ok) return; // no sidecar committed for this build yet -- proceed unverified
-  // Body is "<hash>" or "<hash>:<offset>" -- the offset (if present) is a hint for the device's
-  // own authenticity-marker scan (see HotspotOTA.cpp resolveExpectedHash()), not used here.
   const body = (await res.text()).trim();
-  const expected = body.split(":")[0].toLowerCase();
+  const expected = body.split(":")[0].toLowerCase();   // "<hash>" or "<hash>:<offset>"
   const digest = await crypto.subtle.digest("SHA-256", data);
   const actual = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
   if (actual !== expected) {
@@ -237,10 +222,7 @@ function renderConnect() {
   });
 }
 
-// Wraps a step so a failure names the step it happened in -- "Failed to fetch" alone doesn't say
-// which of several fetch() calls in this function failed, and the status line only ever shows the
-// most recent line (see onStatus/renderFlashing's log), so a fast failure can blow past several
-// steps before the user can read any of them.
+// Prefixes an error with which step it came from
 async function step(label, fn) {
   try {
     return await fn();
@@ -272,12 +254,7 @@ async function runFlash(onProgress, onStatus) {
     fileArray.push({ data: partitions, address: hex(board.offsets.partitions) });
     fileArray.push({ data: bootApp0, address: hex(board.offsets.otadata) });
     fileArray.push({ data: firmware, address: hex(board.offsets.app0) });
-    // Also seed slot B with the same image -- otherwise it stays empty until the first OTA
-    // update (or a separate manual flash), and set ota.active B refuses until then since it
-    // requires a valid image header already present. A full erase is already happening here, so
-    // this costs nothing but a bit more data over serial; boot_app0.bin still defaults the
-    // active slot to A either way.
-    fileArray.push({ data: firmware, address: hex(board.offsets.app1) });
+    fileArray.push({ data: firmware, address: hex(board.offsets.app1) });   // seed B too
     eraseAll = true;
   } else {
     const slotOffset = state.slot === "A" ? board.offsets.app0 : board.offsets.app1;
@@ -315,8 +292,6 @@ function renderFlashing() {
       fill.style.width = `${Math.round(fraction * 100)}%`;
     },
     (text) => {
-      // Appended, not overwritten -- a fast run of several steps otherwise blows past each status
-      // line before it's readable, leaving only the last one visible if something then fails.
       status.textContent = text;
       const li = document.createElement("li");
       li.textContent = text;
