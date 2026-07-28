@@ -1,8 +1,8 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index 9accb29..c3ef9b3 100644
+index 9accb29..4ed7bd0 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -75,6 +75,86 @@ This document provides an overview of CLI commands that can be sent to MeshCore
+@@ -75,6 +75,88 @@ This document provides an overview of CLI commands that can be sent to MeshCore
  
  ---
  
@@ -17,7 +17,9 @@ index 9accb29..c3ef9b3 100644
 +station, downloads the file, verifies it against `ota.sha256` (or a `<url>.sha256` sidecar fetched
 +automatically if `ota.sha256` isn't set), confirms the download is actually a build of this project
 +(refuses otherwise, even if the checksum matches -- catches `<url>` mistakenly pointing at a
-+different, unmodified MeshCore build), and reboots on success. Does not reboot on failure.
++different, unmodified MeshCore build; aborts within the first 64KB rather than pulling the whole
++file over what may be a metered cellular connection), and reboots on success. Does not reboot on
++failure.
 +
 +**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 +
@@ -268,10 +270,10 @@ index a4cbf2a..8b9198f 100644
      inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..b74e38c
+index 0000000..2cd506e
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,317 @@
+@@ -0,0 +1,337 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -304,12 +306,21 @@ index 0000000..b74e38c
 +// download that passes its own SHA-256 check but isn't actually a build of this project (e.g.
 +// start ota url mistakenly pointed at an unmodified upstream MeshCore release -- same mistake,
 +// no download corruption involved) gets aborted instead of silently replacing the only remaining
-+// copy of this project's own remote-update capability with firmware that can't perform it. Fixed
-+// and hand-picked rather than tied to a CLI-facing string (those get reworded) or a per-build
-+// value like OTA_MOD_BUILD_DATE (which is different in every build, by design, so it can't be
-+// what's searched for here).
-+static const char OTA_MOD_MARKER[] = "MESHCORE-HOTSPOT-OTA-MOD-v1";
++// copy of this project's own remote-update capability with firmware that can't perform it.
++// Deliberately NOT tied to a CLI-facing string (those get reworded), a per-build value like
++// OTA_MOD_BUILD_DATE (different in every build, by design, so it can't be what's searched for
++// here), or anything resembling a version number -- this string must stay byte-for-byte identical
++// across every future build forever, since it's checked by whatever's currently running against
++// whatever's being downloaded; if this value itself ever needed to change, older firmware would
++// stop recognizing newer legitimate releases as legitimate.
++static const char OTA_MOD_MARKER[] = "H0TSP0T";
 +#define OTA_MOD_MARKER_LEN   (sizeof(OTA_MOD_MARKER) - 1)   // exclude the implicit null terminator
++
++// The marker's actual position in a real build is verified by CI to land well inside this window
++// (see build-release.yml) -- if it ever doesn't, that's a build-time failure there, not a surprise
++// here. Keeping the scan bounded lets a download that isn't this project's firmware be aborted
++// almost immediately instead of pulling the full ~1.3MB over what may be a metered cellular link.
++#define OTA_MOD_MARKER_SCAN_WINDOW   65536
 +
 +// Scans a download for OTA_MOD_MARKER as it streams past in fixed-size chunks, without needing
 +// the whole file buffered at once -- carries just enough of each chunk's tail into the next feed()
@@ -489,6 +500,17 @@ index 0000000..b74e38c
 +    mbedtls_sha256_update(&sha_ctx, buf, n);
 +    marker.feed(buf, n);
 +    written += n;
++
++    // Give up as soon as it's clear this isn't this project's firmware, rather than pulling the
++    // rest of a multi-hundred-KB download over what may be a metered cellular hotspot connection.
++    if (!marker.found && written >= OTA_MOD_MARKER_SCAN_WINDOW) {
++      strcpy(reply, "ERR: not a build of this project (marker not found) -- refusing to install");
++      Update.abort();
++      http.end();
++      digitalWrite(PIN_HOTSPOT_PWR, LOW);
++      WiFi.disconnect(true);
++      return false;
++    }
 +  }
 +  http.end();
 +
