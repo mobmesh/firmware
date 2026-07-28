@@ -1,8 +1,8 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index 9accb29..bd78b22 100644
+index 9accb29..c3ef9b3 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -75,6 +75,84 @@ This document provides an overview of CLI commands that can be sent to MeshCore
+@@ -75,6 +75,86 @@ This document provides an overview of CLI commands that can be sent to MeshCore
  
  ---
  
@@ -15,7 +15,9 @@ index 9accb29..bd78b22 100644
 +
 +**Note:** Requires `ota.wifi` to be set first (see below). Joins the configured WiFi network as a
 +station, downloads the file, verifies it against `ota.sha256` (or a `<url>.sha256` sidecar fetched
-+automatically if `ota.sha256` isn't set), and reboots on success. Does not reboot on failure.
++automatically if `ota.sha256` isn't set), confirms the download is actually a build of this project
++(refuses otherwise, even if the checksum matches -- catches `<url>` mistakenly pointing at a
++different, unmodified MeshCore build), and reboots on success. Does not reboot on failure.
 +
 +**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 +
@@ -266,10 +268,10 @@ index a4cbf2a..8b9198f 100644
      inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..2870346
+index 0000000..b74e38c
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,262 @@
+@@ -0,0 +1,317 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -295,6 +297,51 @@ index 0000000..2870346
 +#define OTA_WAN_CHECK_HOST       "google.com"   // 3rd-party host, distinct from the firmware host
 +
 +#define PIN_HOTSPOT_PWR   47   // confirmed clean on Heltec V4.3.1 (GPIO48 = fallback)
++
++// Every build of this project's firmware contains this exact byte sequence somewhere in flash
++// (any source file compiled from these patches will do -- this one is as good as any). Checked
++// against the downloaded bytes below before Update.end() ever flips the boot partition: a
++// download that passes its own SHA-256 check but isn't actually a build of this project (e.g.
++// start ota url mistakenly pointed at an unmodified upstream MeshCore release -- same mistake,
++// no download corruption involved) gets aborted instead of silently replacing the only remaining
++// copy of this project's own remote-update capability with firmware that can't perform it. Fixed
++// and hand-picked rather than tied to a CLI-facing string (those get reworded) or a per-build
++// value like OTA_MOD_BUILD_DATE (which is different in every build, by design, so it can't be
++// what's searched for here).
++static const char OTA_MOD_MARKER[] = "MESHCORE-HOTSPOT-OTA-MOD-v1";
++#define OTA_MOD_MARKER_LEN   (sizeof(OTA_MOD_MARKER) - 1)   // exclude the implicit null terminator
++
++// Scans a download for OTA_MOD_MARKER as it streams past in fixed-size chunks, without needing
++// the whole file buffered at once -- carries just enough of each chunk's tail into the next feed()
++// call to still catch a marker split across a chunk boundary.
++struct MarkerScanner {
++  uint8_t tail[OTA_MOD_MARKER_LEN - 1];
++  size_t tail_len = 0;
++  bool found = false;
++
++  void feed(const uint8_t* data, size_t n) {
++    if (found || n == 0) return;
++
++    if (tail_len > 0) {
++      uint8_t boundary[sizeof(tail) + OTA_MOD_MARKER_LEN];
++      size_t head = min(n, (size_t)OTA_MOD_MARKER_LEN);
++      memcpy(boundary, tail, tail_len);
++      memcpy(boundary + tail_len, data, head);
++      size_t blen = tail_len + head;
++      for (size_t i = 0; i + OTA_MOD_MARKER_LEN <= blen; i++) {
++        if (memcmp(boundary + i, OTA_MOD_MARKER, OTA_MOD_MARKER_LEN) == 0) { found = true; break; }
++      }
++    }
++
++    for (size_t i = 0; !found && i + OTA_MOD_MARKER_LEN <= n; i++) {
++      if (memcmp(data + i, OTA_MOD_MARKER, OTA_MOD_MARKER_LEN) == 0) { found = true; break; }
++    }
++
++    size_t keep = min(n, sizeof(tail));
++    memcpy(tail, data + n - keep, keep);
++    tail_len = keep;
++  }
++};
 +
 +// run() is unattended and can be patient; wifiConnect() runs inline in the CLI and must fail fast.
 +static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int max_attempts) {
@@ -421,6 +468,7 @@ index 0000000..2870346
 +  mbedtls_sha256_context sha_ctx;
 +  mbedtls_sha256_init(&sha_ctx);
 +  mbedtls_sha256_starts(&sha_ctx, 0);
++  MarkerScanner marker;
 +
 +  WiFiClient* stream = http.getStreamPtr();
 +  uint8_t buf[1024];
@@ -439,12 +487,21 @@ index 0000000..2870346
 +      return false;
 +    }
 +    mbedtls_sha256_update(&sha_ctx, buf, n);
++    marker.feed(buf, n);
 +    written += n;
 +  }
 +  http.end();
 +
 +  if (len > 0 && written != len) {
 +    strcpy(reply, "ERR: download incomplete");
++    Update.abort();
++    digitalWrite(PIN_HOTSPOT_PWR, LOW);
++    WiFi.disconnect(true);
++    return false;
++  }
++
++  if (!marker.found) {
++    strcpy(reply, "ERR: not a build of this project (marker not found) -- refusing to install");
 +    Update.abort();
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
