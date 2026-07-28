@@ -278,7 +278,8 @@ jobs:
             exit 1
           fi
 
-      - name: Verify the OTA authenticity marker lands within HotspotOTA's early-abort scan window
+      - id: marker_check
+        name: Verify the OTA authenticity marker lands within HotspotOTA's early-abort scan window
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
           WINDOW=65536   # must match OTA_MOD_MARKER_SCAN_WINDOW in src/helpers/esp32/HotspotOTA.cpp
@@ -292,6 +293,7 @@ jobs:
             echo "::error::H0TSP0T marker found at byte offset $OFFSET, past HotspotOTA.cpp's $WINDOW-byte early-abort scan window. A legitimate build of this project would fail its own 'start ota url' authenticity check. Either whatever pushed the marker later needs addressing, or OTA_MOD_MARKER_SCAN_WINDOW in HotspotOTA.cpp needs widening to match."
             exit 1
           fi
+          echo "offset=$OFFSET" >> "$GITHUB_OUTPUT"
 
       - id: partition_check
         name: Verify partitions.bin layout matches docs/flasher/boards.json (catches upstream partition-scheme drift before the web flasher writes to the wrong offset)
@@ -346,7 +348,11 @@ jobs:
       - name: Generate SHA-256 sidecar
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
-          sha256sum "${{ steps.artifact.outputs.name }}" | awk '{print $1}' > "${{ steps.artifact.outputs.name }}.sha256"
+          HASH=$(sha256sum "${{ steps.artifact.outputs.name }}" | awk '{print $1}')
+          # ":<offset>" lets HotspotOTA::run() scan exactly as far as this build's marker actually
+          # sits, instead of relying on the compiled-in default -- see resolveExpectedHash() in
+          # HotspotOTA.cpp. Older parsers (and older sidecars) only ever see/expect the hash alone.
+          echo "$HASH:${{ steps.marker_check.outputs.offset }}" > "${{ steps.artifact.outputs.name }}.sha256"
 
       - name: Vendor firmware.bin for the web flasher (GitHub Release assets have no CORS headers, so the page's fetch() can't read them cross-origin)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'

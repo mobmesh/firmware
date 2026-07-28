@@ -48,7 +48,10 @@ async function loadBoards() {
 async function verifySha256(data, shaPath, label) {
   const res = await fetch(`./${shaPath}`, { cache: "no-store" });
   if (!res.ok) return; // no sidecar committed for this build yet -- proceed unverified
-  const expected = (await res.text()).trim().toLowerCase();
+  // Body is "<hash>" or "<hash>:<offset>" -- the offset (if present) is a hint for the device's
+  // own authenticity-marker scan (see HotspotOTA.cpp resolveExpectedHash()), not used here.
+  const body = (await res.text()).trim();
+  const expected = body.split(":")[0].toLowerCase();
   const digest = await crypto.subtle.digest("SHA-256", data);
   const actual = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
   if (actual !== expected) {
