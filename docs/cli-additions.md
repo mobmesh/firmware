@@ -20,7 +20,9 @@ This is the exact documentation `patches/*.patch` adds to MeshCore's own
 station, downloads the file, verifies it against `ota.sha256` (or a `<url>.sha256` sidecar fetched
 automatically if `ota.sha256` isn't set), confirms the download is actually a build of this project
 (refuses otherwise, even if the checksum matches -- catches `<url>` mistakenly pointing at a
-different, unmodified MeshCore build), and reboots on success. Does not reboot on failure.
+different, unmodified MeshCore build; aborts within the first 64KB rather than pulling the whole
+file over what may be a metered cellular connection), and reboots on success. Does not reboot on
+failure.
 
 **Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 
