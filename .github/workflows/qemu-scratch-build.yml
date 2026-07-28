@@ -1,9 +1,11 @@
 name: qemu-scratch-build
 
-# Scratch, manual-only build for QEMU console testing. Not part of the release process --
-# builds heltec_v4_repeater with the console forced onto UART0 (real hardware uses native
-# USB-CDC, which this QEMU fork's USB-Serial-JTAG device doesn't emulate) so serial output
-# is actually visible when booted under qemu-system-xtensa. Artifact only, no release.
+# Scratch, manual-only build for QEMU testing. Not part of the release process -- builds
+# heltec_v4_repeater with two QEMU-only overrides real builds never set: console forced onto
+# UART0 (real hardware uses native USB-CDC, which this QEMU fork's USB-Serial-JTAG device
+# doesn't emulate), and RollbackGuard's radio-init-failure handling turned into a no-op via
+# QEMU_TEST_BUILD (see src/helpers/esp32/RollbackGuard.cpp -- there's no real LoRa radio in
+# QEMU, so without this the firmware reboot-loops forever and setup() never finishes).
 
 permissions:
   contents: write
@@ -55,10 +57,10 @@ jobs:
       - name: Set up PlatformIO
         run: pip install --upgrade platformio
 
-      - name: Build (console forced onto UART0 for QEMU visibility)
+      - name: Build (console forced onto UART0, radio-init failure bypassed -- both QEMU-only)
         run: |
           cd upstream-src
-          PLATFORMIO_BUILD_FLAGS="-DARDUINO_USB_CDC_ON_BOOT=0" \
+          PLATFORMIO_BUILD_FLAGS="-DARDUINO_USB_CDC_ON_BOOT=0 -DQEMU_TEST_BUILD=1" \
             pio run -e heltec_v4_repeater
 
       - name: Collect build outputs
