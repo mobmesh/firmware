@@ -18,7 +18,9 @@ This is the exact documentation `patches/*.patch` adds to MeshCore's own
 
 **Note:** Requires `ota.wifi` to be set first (see below). Joins the configured WiFi network as a
 station, downloads the file, verifies it against `ota.sha256` (or a `<url>.sha256` sidecar fetched
-automatically if `ota.sha256` isn't set), and reboots on success. Does not reboot on failure.
+automatically if `ota.sha256` isn't set), confirms the download is actually a build of this project
+(refuses otherwise, even if the checksum matches -- catches `<url>` mistakenly pointing at a
+different, unmodified MeshCore build), and reboots on success. Does not reboot on failure.
 
 **Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 
