@@ -5,6 +5,9 @@ name: qemu-scratch-build
 # USB-CDC, which this QEMU fork's USB-Serial-JTAG device doesn't emulate) so serial output
 # is actually visible when booted under qemu-system-xtensa. Artifact only, no release.
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
