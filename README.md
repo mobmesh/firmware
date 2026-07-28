@@ -67,7 +67,7 @@ These are available on any device running firmware built from these patches, in 
 | `set ota.sha256 <hex>` | Manually specify the expected SHA-256 of the next firmware download. Takes precedence over an automatically-fetched checksum. |
 | `set ota.sha256 clear` | Clear a manually-set checksum so an automatically-fetched one can be used again. |
 | `start ota url <url>` | Join the configured WiFi hotspot, download the firmware at `<url>`, verify it, confirm it's actually a build of this project (refuses otherwise, even if the checksum matches), and flash it. |
-| `set ota.force <on\|off>` | RAM-only, one-time bypass of the authenticity check above — consumed by the next `start ota url` regardless of outcome, never persisted. Last resort for firmware hosted outside this project's own release pipeline. |
+| `set ota.force <on\|off>` | One-time, RAM-only bypass of the authenticity check above for the next `start ota url` — never persisted, always off after a reboot. Use with care: if the download turns out not to be a build of this project, this node loses remote OTA capability until it's reflashed locally (USB or on-site). |
 | `start ota join` / `start ota leave` | Pre-flight: join the configured WiFi hotspot only (no download), or disconnect and drop hotspot power. |
 | `get ota.wan` | Pre-flight: check WAN reachability once `start ota join` has joined. |
 | `get ota.pwr` / `set ota.pwr <on\|off>` | Diagnostic/recovery command to read or directly force the hotspot power switch, independent of `start ota url`. |
