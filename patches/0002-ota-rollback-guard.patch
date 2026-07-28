@@ -201,10 +201,10 @@ index 9167d46..596ced6 100644
      sprintf(reply, "??: %s", config);
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
-index 0000000..8246a20
+index 0000000..be54582
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.cpp
-@@ -0,0 +1,201 @@
+@@ -0,0 +1,204 @@
 +#include "RollbackGuard.h"
 +#include <esp_ota_ops.h>
 +#include <esp_partition.h>
@@ -339,6 +339,9 @@ index 0000000..8246a20
 +}
 +
 +void RollbackGuard::onRadioInitFailure() {
++#if defined(QEMU_TEST_BUILD)
++  return;   // no LoRa hardware under QEMU -- let setup() continue so the CLI still comes up for testing
++#endif
 +  reportUnhealthy();   // OTA-probation case: forces rollback + reboot, doesn't return on success
 +
 +  // Not on probation -- transient or genuine radio failure unrelated to any update. Retry with cap
@@ -408,10 +411,10 @@ index 0000000..8246a20
 +}
 diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
 new file mode 100644
-index 0000000..e893662
+index 0000000..0cb4ca9
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.h
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,48 @@
 +#pragma once
 +#include <Arduino.h>
 +
@@ -445,7 +448,8 @@ index 0000000..e893662
 +  // Call from radio_init() failure after in-boot retries are exhausted. Tries reportUnhealthy()
 +  // first; if not applicable, falls back to a persisted cross-boot retry-with-cap, then halts
 +  // permanently once exhausted -- same terminal behavior as before this feature existed. Does not
-+  // return.
++  // return, except when built with QEMU_TEST_BUILD defined (never set in real builds), where it's
++  // a no-op so setup() can continue without real radio hardware.
 +  void onRadioInitFailure();
 +
 +  // For `get ota.active` -- "Slots: A=<ver> (active, <state>) | B=<ver> (<state>)" (or B active),
