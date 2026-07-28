@@ -306,7 +306,7 @@ index a4cbf2a..8b9198f 100644
      inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..6c1733a
+index 0000000..78848ca
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
 @@ -0,0 +1,377 @@
@@ -580,7 +580,7 @@ index 0000000..6c1733a
 +    // Give up as soon as it's clear this isn't this project's firmware, rather than pulling the
 +    // rest of a multi-hundred-KB download over what may be a metered cellular hotspot connection.
 +    if (!bypass_marker_check && !marker.found && written >= marker_scan_window) {
-+      strcpy(reply, "ERR: not a build of this project (marker not found) -- refusing to install");
++      strcpy(reply, "ERR: not a hotspot ota enabled firmware, would result in loss of remote ota ability - aborting");
 +      Update.abort();
 +      http.end();
 +      digitalWrite(PIN_HOTSPOT_PWR, LOW);
@@ -599,7 +599,7 @@ index 0000000..6c1733a
 +  }
 +
 +  if (!bypass_marker_check && !marker.found) {
-+    strcpy(reply, "ERR: not a build of this project (marker not found) -- refusing to install");
++    strcpy(reply, "ERR: not a hotspot ota enabled firmware, would result in loss of remote ota ability - aborting");
 +    Update.abort();
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
