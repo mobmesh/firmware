@@ -201,14 +201,16 @@ index 9167d46..596ced6 100644
      sprintf(reply, "??: %s", config);
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
-index 0000000..be54582
+index 0000000..2af5533
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.cpp
-@@ -0,0 +1,204 @@
+@@ -0,0 +1,217 @@
 +#include "RollbackGuard.h"
 +#include <esp_ota_ops.h>
 +#include <esp_partition.h>
 +#include <esp_system.h>   // esp_restart()
++#include <esp_efuse.h>
++#include <esp_efuse_table.h>
 +#include <SPIFFS.h>
 +
 +// Long enough to catch an early crash/boot-loop; short enough not to add much to the ~2 minutes a
@@ -220,6 +222,17 @@ index 0000000..be54582
 +// of RTC memory (unreliable across esp_restart() on this chip/IDF combo).
 +#define RADIO_INIT_RESET_CAP   5
 +#define RADIO_FAIL_COUNT_PATH  "/radio_fail_count"
++
++// EFUSE_BLK3/USER_DATA is never burned by this project, MeshCore, or the Arduino-ESP32 core -- on
++// every real device it reads back all zeros, unconditionally. Only a deliberately crafted QEMU
++// eFuse image can make this match, so it's safe as a test-harness-only signal.
++static const char QEMU_BYPASS_MARKER[] = "MC-OTA-QEMU-TEST-BYPASS";
++
++static bool runningUnderQemuTestHarness() {
++  uint8_t user_data[32] = {0};
++  return esp_efuse_read_field_blob(ESP_EFUSE_USER_DATA, user_data, sizeof(user_data) * 8) == ESP_OK &&
++         memcmp(user_data, QEMU_BYPASS_MARKER, sizeof(QEMU_BYPASS_MARKER) - 1) == 0;
++}
 +
 +// Arduino's own rollback-confirmation hook runs inside initArduino(), before setup() -- too early to
 +// judge anything. This overrides it to defer to RollbackGuard instead. Must be extern "C": the weak
@@ -339,9 +352,9 @@ index 0000000..be54582
 +}
 +
 +void RollbackGuard::onRadioInitFailure() {
-+#if defined(QEMU_TEST_BUILD)
-+  return;   // no LoRa hardware under QEMU -- let setup() continue so the CLI still comes up for testing
-+#endif
++  if (runningUnderQemuTestHarness()) {
++    return;   // no LoRa hardware under QEMU -- let setup() continue so the CLI still comes up for testing
++  }
 +  reportUnhealthy();   // OTA-probation case: forces rollback + reboot, doesn't return on success
 +
 +  // Not on probation -- transient or genuine radio failure unrelated to any update. Retry with cap
@@ -411,10 +424,10 @@ index 0000000..be54582
 +}
 diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
 new file mode 100644
-index 0000000..0cb4ca9
+index 0000000..1ab506e
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.h
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,49 @@
 +#pragma once
 +#include <Arduino.h>
 +
@@ -448,8 +461,9 @@ index 0000000..0cb4ca9
 +  // Call from radio_init() failure after in-boot retries are exhausted. Tries reportUnhealthy()
 +  // first; if not applicable, falls back to a persisted cross-boot retry-with-cap, then halts
 +  // permanently once exhausted -- same terminal behavior as before this feature existed. Does not
-+  // return, except when built with QEMU_TEST_BUILD defined (never set in real builds), where it's
-+  // a no-op so setup() can continue without real radio hardware.
++  // return, except under a QEMU test harness (detected via a magic value in EFUSE_BLK3/USER_DATA,
++  // never burned on real hardware -- see RollbackGuard.cpp), where it's a no-op so setup() can
++  // continue without real radio hardware.
 +  void onRadioInitFailure();
 +
 +  // For `get ota.active` -- "Slots: A=<ver> (active, <state>) | B=<ver> (<state>)" (or B active),
