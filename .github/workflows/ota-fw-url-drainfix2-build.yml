@@ -1,0 +1,63 @@
+name: ota-fw-url-drainfix2-build
+
+# Scratch, manual-only build to compile-verify the reordered drainAndClose fix (attempt 2 --
+# close before Update.abort(), not after). Not part of the release process. Delete once
+# compile-verified.
+
+on:
+  push:
+    branches:
+      - ota-fw-url
+
+env:
+  UPSTREAM_REPO: meshcore-dev/MeshCore
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        build_env: [heltec_v4_repeater, heltec_v4_room_server]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo (patches only)
+        uses: actions/checkout@v4
+
+      - id: pick
+        name: Resolve upstream ref
+        run: |
+          REF=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases" \
+            | jq -r '[.[] | select(.tag_name | startswith("repeater-v"))][0].tag_name')
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout upstream at resolved ref
+        run: |
+          git clone --depth 50 https://github.com/${{ env.UPSTREAM_REPO }}.git upstream-src
+          cd upstream-src
+          git checkout "${{ steps.pick.outputs.ref }}"
+
+      - name: Apply maintained patches in order (fail loudly on drift)
+        run: |
+          cd upstream-src
+          for patch in ../patches/*.patch; do
+            git apply --check "$patch" || { echo "::error::$patch does not apply"; exit 1; }
+            git apply "$patch"
+          done
+
+      - name: Grep for the reordered fix
+        run: |
+          cd upstream-src
+          count=$(grep -B1 'Update.abort();' src/helpers/esp32/HotspotOTA.cpp | grep -c 'drainAndClose(http);')
+          if [ "$count" -ne 2 ]; then
+            echo "::error::expected 2 drainAndClose(http)-before-Update.abort() sites, found $count"
+            exit 1
+          fi
+          echo "reordered fix present at both sites"
+
+      - name: Set up PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Build
+        run: |
+          cd upstream-src
+          pio run -e ${{ matrix.build_env }}
