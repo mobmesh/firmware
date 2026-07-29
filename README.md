@@ -48,7 +48,7 @@ Flash the `.bin` the same way you would an official MeshCore firmware release fo
 
 ## Web-based flasher
 
-[**Open the flasher**](https://heyvern.github.io/meshcore-hotspot-ota/flasher/) — flashes a Heltec V4 straight from your browser over USB (Chrome, Edge, or Opera; requires Web Serial). No PlatformIO or other dev tools needed. It always uses the most recently built firmware for whichever variant you pick.
+[**Open the flasher**](https://mobmesh.github.io/meshcore-hotspot-ota/flasher/) — flashes a Heltec V4 straight from your browser over USB (Chrome, Edge, or Opera; requires Web Serial). No PlatformIO or other dev tools needed. It always uses the most recently built firmware for whichever variant you pick.
 
 Two flows:
 
@@ -88,7 +88,7 @@ If a file named `<url>.sha256` exists alongside the firmware, it's fetched autom
 For remote admin updates over LoRa, where every character sent counts, set `ota.fw.url` once to this project's own published firmware asset and use the short form after that:
 
 ```
-set ota.fw.url https://github.com/HeyVern/meshcore-hotspot-ota/raw/refs/heads/main/docs/flasher/heltec_v4/repeater/firmware.bin
+set ota.fw.url https://github.com/mobmesh/meshcore-hotspot-ota/raw/refs/heads/main/docs/flasher/heltec_v4/repeater/firmware.bin
 start ota wan update
 ```
 

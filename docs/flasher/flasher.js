@@ -1,4 +1,4 @@
-const REPO = "HeyVern/meshcore-hotspot-ota";
+const REPO = "mobmesh/meshcore-hotspot-ota";
 const ESPTOOL_JS_URL = "./vendor/esptool-js/bundle.js";   // vendored, not CDN-loaded
 
 const wizard = document.getElementById("wizard");
