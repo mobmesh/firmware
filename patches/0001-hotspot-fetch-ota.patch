@@ -362,10 +362,10 @@ index a4cbf2a..8b9198f 100644
      inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..7736176
+index 0000000..eaa275f
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,347 @@
+@@ -0,0 +1,370 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -514,6 +514,29 @@ index 0000000..7736176
 +  return false;
 +}
 +
++// Reads and discards the rest of an in-progress HTTP response before closing it. Closing mid-stream
++// with a large backlog of unread (and, over HTTPS, still-encrypted) data outstanding was observed on
++// real hardware to trip the task watchdog and panic-reset the chip, even though nothing in this
++// project's own code stalls -- something in the abrupt teardown itself doesn't yield long enough.
++// Draining first ensures http.end() always runs on an already-empty connection, the same shape a
++// normal completed download closes in, which was verified not to trigger this.
++//
++// Bounded by OTA_HTTP_TIMEOUT_MS overall (not per-byte, matching the ceiling already used for the
++// initial GET) so a server that stops sending mid-response can't hang this indefinitely -- worst
++// case, http.end() still runs, just no better off than before this fix.
++static void drainAndClose(HTTPClient& http) {
++  WiFiClient* stream = http.getStreamPtr();
++  uint8_t discard[512];
++  uint32_t start = millis();
++  while (http.connected() && millis() - start < OTA_HTTP_TIMEOUT_MS) {
++    size_t avail = stream->available();
++    if (!avail) { delay(1); continue; }
++    int n = stream->readBytes(discard, min(avail, sizeof(discard)));
++    if (n <= 0) break;
++  }
++  http.end();
++}
++
 +bool HotspotOTA::run(const HotspotOtaConfig& cfg, char reply[]) {
 +  if (cfg.ssid[0] == 0 || cfg.url[0] == 0) {
 +    strcpy(reply, "ERR: ota.wan.wifi not configured");
@@ -596,7 +619,7 @@ index 0000000..7736176
 +    if (Update.write(buf, n) != (size_t)n) {
 +      strcpy(reply, "ERR: flash write failed");
 +      Update.abort();
-+      http.end();
++      drainAndClose(http);
 +      digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +      WiFi.disconnect(true);
 +      return false;
@@ -608,7 +631,7 @@ index 0000000..7736176
 +    if (!bypass_marker_check && !marker.found && written >= marker_scan_window) {
 +      strcpy(reply, "ERR: not a hotspot ota build (missing marker), would lose remote-update ability -- aborting");
 +      Update.abort();
-+      http.end();
++      drainAndClose(http);
 +      digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +      WiFi.disconnect(true);
 +      return false;
