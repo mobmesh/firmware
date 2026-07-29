@@ -47,7 +47,7 @@ jobs:
       - name: Grep for stale pre-rename command names
         run: |
           cd upstream-src
-          if grep -rn 'ota\.active\|ota\.wifi\|ota\.sha256\|ota\.force\|start ota url\|start ota join\|start ota leave\|get ota\.wan\b' \
+          if grep -rnP 'ota\.active|ota\.wifi|ota\.sha256|ota\.force|start ota url|start ota join|start ota leave|get ota\.wan(?!\.)' \
               src/ docs/cli_commands.md; then
             echo "::error::stale pre-rename command name found above"
             exit 1
