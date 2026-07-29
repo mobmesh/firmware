@@ -52,8 +52,8 @@ Flash the `.bin` the same way you would an official MeshCore firmware release fo
 
 Two flows:
 
-- **New device** — for a blank board, or one that's bricked. Fully erases the chip and writes bootloader, partition table, and firmware from scratch — into both OTA slots, so `set ota.active <A|B>` works right away instead of requiring a separate flash into the other slot first.
-- **Update existing device** — for a board already running MeshCore. Writes firmware into a chosen OTA slot (A or B) without erasing anything else. This is the only way to target a specific slot from outside the device's own CLI; it doesn't change which slot the device boots from — use `set ota.active <A|B>` on-device for that.
+- **New device** — for a blank board, or one that's bricked. Fully erases the chip and writes bootloader, partition table, and firmware from scratch — into both OTA slots, so `ota slot boot <A|B>` works right away instead of requiring a separate flash into the other slot first.
+- **Update existing device** — for a board already running MeshCore. Writes firmware into a chosen OTA slot (A or B) without erasing anything else. This is the only way to target a specific slot from outside the device's own CLI; it doesn't change which slot the device boots from — use `ota slot boot <A|B>` on-device for that.
 
 This isn't MeshCore's own flasher — it's built for this repo's own releases, plus the OTA slot targeting above that MeshCore's flasher doesn't do.
 
@@ -63,27 +63,27 @@ These are available on any device running firmware built from these patches, in 
 
 | Command | Description |
 |---|---|
-| `set ota.wifi <ssid>,<password>` | Set the WiFi hotspot credentials used for future updates. Persists across firmware updates — set once. |
-| `set ota.sha256 <hex>` | Manually specify the expected SHA-256 of the next firmware download. Takes precedence over an automatically-fetched checksum. |
-| `set ota.sha256 clear` | Clear a manually-set checksum so an automatically-fetched one can be used again. |
-| `start ota url <url>` | Join the configured WiFi hotspot, download the firmware at `<url>`, verify it, confirm it's actually a build of this project (refuses otherwise, even if the checksum matches), and flash it. |
-| `set ota.force <on\|off>` | One-time, RAM-only bypass of the authenticity check above for the next `start ota url` — never persisted, always off after a reboot. Use with care: if the download turns out not to be a build of this project, this node loses remote OTA capability until it's reflashed locally (USB or on-site). |
-| `start ota join` / `start ota leave` | Pre-flight: join the configured WiFi hotspot only (no download), or disconnect and drop hotspot power. |
-| `get ota.wan` | Pre-flight: check WAN reachability once `start ota join` has joined. |
-| `get ota.pwr` / `set ota.pwr <on\|off>` | Diagnostic/recovery command to read or directly force the hotspot power switch, independent of `start ota url`. |
-| `get ota.active` | Both OTA slots' version and state, e.g. `Slots: A=v1.16.0-0f11a30 (active, valid) \| B=v? (n/a)`. Version includes the short build commit hash (distinguishes two slots sharing the same version number but from different builds) and is `v?` for a slot that's never actually booted (self-reported into SPIFFS on first boot, since the compiled-in image header doesn't carry it). Active slot's state is `pending`/`valid`/`n/a`; the other's is `valid`/`invalid`/`aborted`/`new`/`n/a`. |
-| `set ota.active <A\|B>` | Point the bootloader at the other OTA slot and reboot into it, without reflashing. Refuses if that slot is already active or has no valid image. Re-arms rollback probation for that slot even if it was previously `valid` -- expect `get ota.active` to briefly show `pending` right after. |
+| `set ota.wan.wifi <ssid>,<password>` | Set the WiFi credentials used for future updates. Persists across firmware updates — set once. |
+| `set ota.fw.sha256 <hex>` | Manually specify the expected SHA-256 of the next firmware download. Takes precedence over an automatically-fetched checksum. RAM-only — cleared on every boot. |
+| `set ota.fw.sha256 clear` | Clear a manually-set checksum so an automatically-fetched one can be used again. |
+| `start ota wan <url>` | Join the configured WiFi network, download the firmware at `<url>`, verify it, confirm it's actually a build of this project (refuses otherwise, even if the checksum matches), and flash it. |
+| `set ota.fw.marker <on\|off>` | Default `on` (marker/authenticity check enforced). One-time, RAM-only `off` bypasses that check above for the next `start ota wan` — never persisted, always back to `on` after a reboot. Never bypasses the sha256 check. Use with care: if the download turns out not to be a build of this project, this node loses remote OTA capability until it's reflashed locally (USB or on-site). |
+| `ota wan join` / `ota wan leave` | Pre-flight: join the configured WiFi network only (no download), or disconnect and drop WAN power. |
+| `ota wan check` | Pre-flight: check WAN reachability once `ota wan join` has joined. |
+| `get ota.wan.pwr` / `set ota.wan.pwr <on\|off>` | Diagnostic/recovery command to read or directly force the WAN power switch, independent of `start ota wan`. |
+| `get ota.slot` | Both OTA slots' version and state, e.g. `Slots: A=v1.16.0-0f11a30 (active, valid) \| B=v? (n/a)`. Version includes the short build commit hash (distinguishes two slots sharing the same version number but from different builds) and is `v?` for a slot that's never actually booted (self-reported into SPIFFS on first boot, since the compiled-in image header doesn't carry it). Active slot's state is `pending`/`valid`/`n/a`; the other's is `valid`/`invalid`/`aborted`/`new`/`n/a`. |
+| `ota slot boot <A\|B>` | Point the bootloader at the other OTA slot and reboot into it immediately, without reflashing. Refuses if that slot is already active or has no valid image. Re-arms rollback probation for that slot even if it was previously `valid` -- expect `get ota.slot` to briefly show `pending` right after. |
 
 Example:
 
 ```
-set ota.wifi MyHotspot,hunter2
-start ota url https://example.com/firmware/heltec_v4_repeater-v1.16.0.bin
+set ota.wan.wifi MyHotspot,hunter2
+start ota wan https://example.com/firmware/heltec_v4_repeater-v1.16.0.bin
 ```
 
 If a file named `<url>.sha256` exists alongside the firmware, it's fetched automatically and used to verify the download — no manual checksum needed. Full parameter and usage details for these commands, in the same format as upstream's own CLI reference, are in [`docs/cli-additions.md`](docs/cli-additions.md). See [`docs/cli_commands.md`](https://github.com/meshcore-dev/MeshCore/blob/main/docs/cli_commands.md) in upstream MeshCore for the complete standard CLI reference.
 
-**`start ota url` does not reply until it finishes.** Unlike most CLI commands, there is no immediate acknowledgment and no progress update — the device is joining WiFi, downloading, verifying, and flashing before it sends anything back, which can take up to about two minutes. The device will reboot and mount the new firmware image and begin automatic rollback protection testing. 
+**`start ota wan` does not reply until it finishes.** Unlike most CLI commands, there is no immediate acknowledgment and no progress update — the device is joining WiFi, downloading, verifying, and flashing before it sends anything back, which can take up to about two minutes. The device will reboot and mount the new firmware image and begin automatic rollback protection testing. 
 
 ## Automatic rollback protection
 
@@ -91,7 +91,7 @@ This is added behavior, not something stock MeshCore does.
 
 **Upstream MeshCore's default:** if a bad update boots and `radio_init()` fails, stock MeshCore just calls `halt()` — the device sits there, unresponsive, with no automatic path back to the last known-good firmware.
 
-**What this patch changes:** it defers that confirmation instead of letting it happen automatically. A newly-updated image (via either `start ota` or `start ota url`) is held on probation — not yet confirmed — until it's run stably for about 90 seconds with a working radio. If `radio_init()` fails while still on probation, that's treated as evidence the update itself is bad, and the device immediately rolls back and reboots into the previous working firmware instead of halting. Radio failures unrelated to an update still get a capped number of retry-reboots before permanently halting, rather than looping forever. No additional hardware is required — this relies entirely on ESP-IDF's app-rollback feature, which is already compiled into MeshCore's upstream toolchain.
+**What this patch changes:** it defers that confirmation instead of letting it happen automatically. A newly-updated image (via either `start ota` or `start ota wan`) is held on probation — not yet confirmed — until it's run stably for about 90 seconds with a working radio. If `radio_init()` fails while still on probation, that's treated as evidence the update itself is bad, and the device immediately rolls back and reboots into the previous working firmware instead of halting. Radio failures unrelated to an update still get a capped number of retry-reboots before permanently halting, rather than looping forever. No additional hardware is required — this relies entirely on ESP-IDF's app-rollback feature, which is already compiled into MeshCore's upstream toolchain.
 
 **Why:** MeshCore's default behavior of just halting on a radio initialization failure is a real risk especially for a node that's physically remote and can't be walked over to and re-flashed. Without this patch, any bad firmware update can brick a node, leaving it non-responsive to any radio commands. With this patch, the device can self-recover.
 

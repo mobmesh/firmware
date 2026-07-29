@@ -155,7 +155,7 @@ function renderSlot() {
     <p class="step-desc">
       The device keeps two firmware slots (A/B). Pick the one you want to
       overwrite -- this does not change which slot the device boots into;
-      use <code>set ota.active &lt;A|B&gt;</code> on-device for that.
+      use <code>ota slot boot &lt;A|B&gt;</code> on-device for that.
     </p>
     <div class="tiles">
       <button class="tile" data-slot="A"><strong>Slot A</strong></button>
@@ -308,8 +308,8 @@ function renderDone() {
     state.mode === "update"
       ? `<p class="step-desc">
            The device will run the new image on probation for about 90
-           seconds before confirming it. Use <code>get ota.active</code> to
-           check its state, and <code>set ota.active ${state.slot}</code> if
+           seconds before confirming it. Use <code>get ota.slot</code> to
+           check its state, and <code>ota slot boot ${state.slot}</code> if
            you need to boot into this slot.
          </p>`
       : "";

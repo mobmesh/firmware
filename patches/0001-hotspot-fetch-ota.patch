@@ -1,92 +1,94 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index 9accb29..f37e9ae 100644
+index 9accb29..0aa465f 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -75,6 +75,110 @@ This document provides an overview of CLI commands that can be sent to MeshCore
+@@ -75,6 +75,112 @@ This document provides an overview of CLI commands that can be sent to MeshCore
  
  ---
  
-+### Start an Over-The-Air (OTA) firmware update via hotspot download
++### Start an Over-The-Air (OTA) firmware update via a joined WiFi network
 +**Usage:**
-+- `start ota url <url>`
++- `start ota wan <url>`
 +
 +**Parameters:**
 +- `url`: HTTP(S) URL of the firmware `.bin` to download and flash
 +
-+**Note:** Requires `ota.wifi` to be set first (see below). Joins the configured WiFi network as a
-+station, downloads the file, verifies it against `ota.sha256` (or a `<url>.sha256` sidecar fetched
-+automatically if `ota.sha256` isn't set), confirms the download is actually a build of this project
-+(refuses otherwise, even if the checksum matches -- catches `<url>` mistakenly pointing at a
-+different, unmodified MeshCore build), and reboots on success. Does not reboot on failure.
++**Note:** Requires `ota.wan.wifi` to be set first (see below). Joins the configured WiFi network as
++a station, downloads the file, verifies it against `ota.fw.sha256` (or a `<url>.sha256` sidecar
++fetched automatically if `ota.fw.sha256` isn't set), confirms the download is actually a build of
++this project (refuses otherwise, even if the checksum matches -- catches `<url>` mistakenly pointing
++at a different, unmodified MeshCore build), and reboots on success. Does not reboot on failure.
 +
 +The authenticity check aborts as soon as it's clear the download isn't a match, rather than pulling
 +the whole file over what may be a metered cellular connection -- normally within the first 64KB, or
 +however far in a `<url>.sha256` sidecar says to look (a `<hash>:<offset>` sidecar, generated
 +automatically by this project's own release builds, carries the exact position for that specific
-+build). See `set ota.force` below for the rare case where neither applies.
++build). See `set ota.fw.marker` below for the rare case where neither applies.
 +
 +**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 +
 +---
 +
-+#### View or change the hotspot WiFi credentials used by `start ota url`
++#### View or change the WiFi credentials used by `start ota wan`
 +**Usage:**
-+- `set ota.wifi <ssid>,<password>`
++- `set ota.wan.wifi <ssid>,<password>`
 +
 +**Parameters:**
 +- `ssid`: WiFi network name
 +- `password`: WiFi network password
 +
 +**Note:** Persists across firmware updates (stored separately from node prefs). Set once; does not
-+need to be resupplied for future updates unless the hotspot's credentials change.
++need to be resupplied for future updates unless the network's credentials change.
 +
 +**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 +
 +---
 +
-+#### View or change the manually-supplied firmware hash used by `start ota url`
++#### View or change the manually-supplied firmware hash used by `start ota wan`
 +**Usage:**
-+- `set ota.sha256 <hex>`
-+- `set ota.sha256 clear`
++- `set ota.fw.sha256 <hex>`
++- `set ota.fw.sha256 clear`
 +
 +**Parameters:**
 +- `hex`: 64-character lowercase hex SHA-256 digest of the target firmware `.bin`
 +
-+**Note:** Once set, this hash verifies the download and is **not** overridden by a `<url>.sha256`
-+sidecar. `set ota.sha256 clear` removes it so sidecar-fetch takes effect again — do this before
-+pointing `start ota url` at a different firmware image, or a stale hash will block its sidecar.
++**Note:** RAM-only — cleared on every boot, never persisted. Once set, this hash verifies the
++download and is **not** overridden by a `<url>.sha256` sidecar. `set ota.fw.sha256 clear` removes it
++so sidecar-fetch takes effect again — do this before pointing `start ota wan` at a different
++firmware image, or a stale hash will block its sidecar.
 +
 +**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 +
 +---
 +
-+#### Bypass `start ota url`'s authenticity check for one attempt
++#### View or change whether `start ota wan` checks the download's authenticity marker
 +**Usage:**
-+- `set ota.force <on|off>`
++- `set ota.fw.marker <on|off>`
 +
 +**Parameters:**
-+- `on` / `off`: Arms or disarms the bypass
++- `on` / `off`: Enables or disables the marker/authenticity scan (default `on`)
 +
-+**Note:** RAM-only and one-time — consumed by the very next `start ota url` call regardless of
-+outcome, and always starts `off` on every boot (never persisted, never survives a reboot). Last
-+resort for a download that fails the authenticity check with no `<url>.sha256` offset available to
-+explain why (self-hosted firmware not built by this project's own release pipeline, for example) —
-+not intended for routine use, since it skips the check that exists specifically to catch a
-+mistaken `<url>`.
++**Note:** RAM-only and one-time — consumed by the very next `start ota wan` call regardless of
++outcome, and always starts back at `on` on every boot (never persisted, never survives a reboot).
++`off` is a last resort for a download that fails the authenticity check with no `<url>.sha256`
++offset available to explain why (self-hosted firmware not built by this project's own release
++pipeline, for example) — not intended for routine use, since it skips the check that exists
++specifically to catch a mistaken `<url>`. This only ever skips the marker scan — it never bypasses
++the `ota.fw.sha256` hash check, which is always enforced.
 +
 +**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 +
 +---
 +
-+#### View or manually control the GPIO47 hotspot power switch
++#### View or manually control the GPIO47 WAN power switch
 +**Usage:**
-+- `get ota.pwr`
-+- `set ota.pwr <on|off>`
++- `get ota.wan.pwr`
++- `set ota.wan.pwr <on|off>`
 +
 +**Parameters:**
-+- `on` / `off`: Drives GPIO47 (the hotspot power-switch control pin) directly
++- `on` / `off`: Drives GPIO47 (the WAN power-switch control pin) directly
 +
-+**Note:** Diagnostic and recovery command, independent of `start ota url` — does not join WiFi,
++**Note:** Diagnostic and recovery command, independent of `start ota wan` — does not join WiFi,
 +download, or flash anything. Use to confirm or force the rail off if state is ever in doubt (e.g.
 +after a crash or watchdog reset mid-update).
 +
@@ -94,17 +96,17 @@ index 9accb29..f37e9ae 100644
 +
 +---
 +
-+#### Pre-flight check the hotspot WiFi join and WAN connectivity before `start ota url`
++#### Pre-flight check the WiFi join and WAN connectivity before `start ota wan`
 +**Usage:**
-+- `start ota join`
-+- `get ota.wan`
-+- `start ota leave`
++- `ota wan join`
++- `ota wan check`
++- `ota wan leave`
 +
-+**Note:** `start ota join` joins the configured WiFi network only (no WAN check, no download),
-+returning in one quick attempt (~15s worst case) instead of `start ota url`'s full patient join
-+budget (~115s). `get ota.wan` checks WAN reachability on demand, repeatable without rejoining.
-+`start ota leave` disconnects and drops hotspot power for a clean retry. A successful
-+`start ota join` lets `start ota url` skip its own join step right after.
++**Note:** `ota wan join` joins the configured WiFi network only (no WAN check, no download),
++returning in one quick attempt (~15s worst case) instead of `start ota wan`'s full patient join
++budget (~115s). `ota wan check` checks WAN reachability on demand, repeatable without rejoining.
++`ota wan leave` disconnects and drops WAN power for a clean retry. A successful `ota wan join` lets
++`start ota wan` skip its own join step right after.
 +
 +**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 +
@@ -126,7 +128,7 @@ index cfa33cf..2a827ad 100644
    // Power management interface (boards with power management override these)
    virtual bool isExternalPowered() { return false; }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index b78ad6e..9167d46 100644
+index b78ad6e..fb42bf5 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -5,6 +5,16 @@
@@ -146,27 +148,30 @@ index b78ad6e..9167d46 100644
  #ifndef BRIDGE_MAX_BAUD
  #define BRIDGE_MAX_BAUD 115200
  #endif
-@@ -239,6 +249,19 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+@@ -239,6 +249,22 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
        } else {
          strcpy(reply, "ERR: clock cannot go backwards");
        }
-+    } else if (memcmp(command, "start ota url ", 14) == 0) {
++    } else if (memcmp(command, "start ota wan ", 14) == 0) {
 +      if (!_board->startOTAUpdateFromURL(&command[14], reply)) {
 +        // reply[] already carries the specific error from HotspotOTA::run
 +      }
 +#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
-+    } else if (memcmp(command, "start ota join", 14) == 0) {
-+      // Pre-flight check -- joins WiFi only, so `get ota.wan` can be repeated without rejoining, and
-+      // `start ota url` skips its own join after this (see alreadyConnectedTo()).
++    } else if (memcmp(command, "ota wan join", 12) == 0) {
++      // Pre-flight check -- joins WiFi only, so `ota wan check` can be repeated without rejoining,
++      // and `start ota wan` skips its own join after this (see alreadyConnectedTo()).
 +      HotspotOTA::wifiConnect(reply);
-+    } else if (memcmp(command, "start ota leave", 15) == 0) {
++    } else if (memcmp(command, "ota wan leave", 13) == 0) {
 +      HotspotOTA::wifiDisconnect();
 +      strcpy(reply, "OK - disconnected");
++    } else if (memcmp(command, "ota wan check", 13) == 0) {
++      // Pre-flight check -- see `ota wan join`. Assumes WiFi already joined.
++      HotspotOTA::checkWan(reply);
 +#endif
      } else if (memcmp(command, "start ota", 9) == 0) {
        if (!_board->startOTAUpdate(_prefs->node_name, reply)) {
          strcpy(reply, "Error");
-@@ -303,7 +326,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+@@ -303,7 +329,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
        bool s = _callbacks->formatFileSystem();
        sprintf(reply, "File system erase: %s", s ? "OK" : "Err");
      } else if (memcmp(command, "ver", 3) == 0) {
@@ -175,55 +180,54 @@ index b78ad6e..9167d46 100644
      } else if (memcmp(command, "board", 5) == 0) {
        sprintf(reply, "%s", _board->getManufacturerName());
      } else if (memcmp(command, "sensor get ", 11) == 0) {
-@@ -536,6 +559,56 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -536,6 +562,55 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
      StrHelper::strncpy(_prefs->guest_password, &config[15], sizeof(_prefs->guest_password));
      savePrefs();
      strcpy(reply, "OK");
 +#if defined(WITH_HOTSPOT_OTA)
-+  } else if (memcmp(config, "ota.wifi ", 9) == 0) {
-+    // format: set ota.wifi <ssid>,<password>
++  } else if (memcmp(config, "ota.wan.wifi ", 13) == 0) {
++    // format: set ota.wan.wifi <ssid>,<password>
 +    HotspotOtaConfig cfg;
 +    HotspotOTA::loadConfig(cfg);
-+    char* comma = strchr(&config[9], ',');
++    char* comma = strchr(&config[13], ',');
 +    if (comma) {
 +      *comma = 0;
-+      StrHelper::strncpy(cfg.ssid, &config[9], sizeof(cfg.ssid));
++      StrHelper::strncpy(cfg.ssid, &config[13], sizeof(cfg.ssid));
 +      StrHelper::strncpy(cfg.password, comma + 1, sizeof(cfg.password));
 +      HotspotOTA::saveConfig(cfg);
 +      strcpy(reply, "OK");
 +    } else {
 +      strcpy(reply, "ERR: expected <ssid>,<password>");
 +    }
-+  } else if (memcmp(config, "ota.sha256 ", 11) == 0) {
-+    // Manual hash takes precedence over a `.sha256` sidecar fetch. `set ota.sha256 clear` removes
-+    // it so a stale hash from a previous update doesn't block a new image's sidecar.
-+    HotspotOtaConfig cfg;
-+    HotspotOTA::loadConfig(cfg);
-+    if (memcmp(&config[11], "clear", 5) == 0) {
-+      cfg.sha256_hex[0] = 0;
++  } else if (memcmp(config, "ota.fw.sha256 ", 14) == 0) {
++    // Manual hash takes precedence over a `.sha256` sidecar fetch. `set ota.fw.sha256 clear`
++    // removes it so a stale hash from a previous update doesn't block a new image's sidecar.
++    // RAM-only -- cleared every boot, see HotspotOTA::setSha256Hex().
++    if (memcmp(&config[14], "clear", 5) == 0) {
++      HotspotOTA::setSha256Hex("");
 +    } else {
-+      StrHelper::strncpy(cfg.sha256_hex, &config[11], sizeof(cfg.sha256_hex));
++      HotspotOTA::setSha256Hex(&config[14]);
 +    }
-+    HotspotOTA::saveConfig(cfg);
 +    strcpy(reply, "OK");
-+  } else if (memcmp(config, "ota.pwr ", 8) == 0) {
++  } else if (memcmp(config, "ota.wan.pwr ", 12) == 0) {
 +    // Manual GPIO47 control, independent of HotspotOTA::run() -- for recovery if state is ever in doubt.
-+    if (memcmp(&config[8], "on", 2) == 0) {
++    if (memcmp(&config[12], "on", 2) == 0) {
 +      HotspotOTA::setPower(true);
 +      strcpy(reply, "OK");
-+    } else if (memcmp(&config[8], "off", 3) == 0) {
++    } else if (memcmp(&config[12], "off", 3) == 0) {
 +      HotspotOTA::setPower(false);
 +      strcpy(reply, "OK");
 +    } else {
 +      strcpy(reply, "ERR: expected on|off");
 +    }
-+  } else if (memcmp(config, "ota.force ", 10) == 0) {
-+    // Last resort -- see HotspotOTA::setScanBypass()
-+    if (memcmp(&config[10], "on", 2) == 0) {
-+      HotspotOTA::setScanBypass(true);
++  } else if (memcmp(config, "ota.fw.marker ", 14) == 0) {
++    // Default on (marker/authenticity scan active). "off" is the last resort -- see
++    // HotspotOTA::setMarkerBypass(). Only ever skips the marker scan, never the sha256 check.
++    if (memcmp(&config[14], "on", 2) == 0) {
++      HotspotOTA::setMarkerBypass(false);
 +      strcpy(reply, "OK");
-+    } else if (memcmp(&config[10], "off", 3) == 0) {
-+      HotspotOTA::setScanBypass(false);
++    } else if (memcmp(&config[14], "off", 3) == 0) {
++      HotspotOTA::setMarkerBypass(true);
 +      strcpy(reply, "OK");
 +    } else {
 +      strcpy(reply, "ERR: expected on|off");
@@ -232,17 +236,14 @@ index b78ad6e..9167d46 100644
    } else if (memcmp(config, "prv.key ", 8) == 0) {
      uint8_t prv_key[PRV_KEY_SIZE];
      bool success = mesh::Utils::fromHex(prv_key, PRV_KEY_SIZE, &config[8]);
-@@ -925,6 +998,13 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -925,6 +1000,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
      sprintf(reply, "> %u mV", _board->getBootVoltage());
  #else
      strcpy(reply, "ERROR: Power management not supported");
 +#endif
 +#if defined(WITH_HOTSPOT_OTA)
-+  } else if (memcmp(config, "ota.pwr", 7) == 0) {
++  } else if (memcmp(config, "ota.wan.pwr", 11) == 0) {
 +    sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
-+  } else if (memcmp(config, "ota.wan", 7) == 0) {
-+    // Pre-flight check -- see `start ota join`. Assumes WiFi already joined.
-+    HotspotOTA::checkWan(reply);
  #endif
    } else {
      sprintf(reply, "??: %s", config);
@@ -303,10 +304,10 @@ index a4cbf2a..8b9198f 100644
      inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..96ec7ba
+index 0000000..7736176
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,338 @@
+@@ -0,0 +1,347 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -323,7 +324,7 @@ index 0000000..96ec7ba
 +#define OTA_WIFI_JOIN_MAX_ATTEMPTS             6
 +#define OTA_HTTP_TIMEOUT_MS                20000
 +
-+// `start ota join` uses this instead: 1 attempt (~15s) so it can't block the CLI for ~115s.
++// `ota wan join` uses this instead: 1 attempt (~15s) so it can't block the CLI for ~115s.
 +#define OTA_DIAG_WIFI_JOIN_ATTEMPTS             1
 +
 +// Advisory WAN check -- cellular modems often show L2 link up before the data session negotiates.
@@ -339,10 +340,19 @@ index 0000000..96ec7ba
 +#define OTA_MOD_MARKER_SCAN_WINDOW   65536
 +#define OTA_MOD_MARKER_OFFSET_CUSHION   256
 +
-+static bool scan_bypass = false;   // RAM-only, one-time
++static bool marker_bypass = false;   // RAM-only, one-time
++static char manual_sha256_hex[65] = {0};   // RAM-only -- see `set ota.fw.sha256`
 +
-+void HotspotOTA::setScanBypass(bool on) {
-+  scan_bypass = on;
++void HotspotOTA::setMarkerBypass(bool on) {
++  marker_bypass = on;
++}
++
++void HotspotOTA::setSha256Hex(const char* hex) {
++  StrHelper::strncpy(manual_sha256_hex, hex, sizeof(manual_sha256_hex));
++}
++
++const char* HotspotOTA::getSha256Hex() {
++  return manual_sha256_hex;
 +}
 +
 +struct MarkerScanner {
@@ -394,7 +404,7 @@ index 0000000..96ec7ba
 +}
 +
 +// Checks the actual connected SSID, not just WL_CONNECTED -- a stale connection from an earlier
-+// `start ota join` against different credentials must not be silently reused.
++// `ota wan join` against different credentials must not be silently reused.
 +static bool alreadyConnectedTo(const HotspotOtaConfig& cfg) {
 +  return WiFi.status() == WL_CONNECTED && WiFi.SSID() == cfg.ssid;
 +}
@@ -442,18 +452,18 @@ index 0000000..96ec7ba
 +    sidecar_http.end();
 +  }
 +
-+  strcpy(reply, "ERR: no ota.sha256 set and no .sha256 sidecar found");
++  strcpy(reply, "ERR: no ota.fw.sha256 set and no .sha256 sidecar found");
 +  return false;
 +}
 +
 +bool HotspotOTA::run(const HotspotOtaConfig& cfg, char reply[]) {
 +  if (cfg.ssid[0] == 0 || cfg.url[0] == 0) {
-+    strcpy(reply, "ERR: ota.wifi/ota.url not configured");
++    strcpy(reply, "ERR: ota.wan.wifi not configured");
 +    return false;
 +  }
 +
-+  bool bypass_marker_check = scan_bypass;
-+  scan_bypass = false;   // one-time
++  bool bypass_marker_check = marker_bypass;
++  marker_bypass = false;   // one-time
 +
 +  pinMode(PIN_HOTSPOT_PWR, OUTPUT);
 +  digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // must stay HIGH throughout -- load switch, not a latch
@@ -469,7 +479,7 @@ index 0000000..96ec7ba
 +
 +  uint8_t expect[32];
 +  long marker_offset_hint;
-+  if (!resolveExpectedHash(cfg.url, cfg.sha256_hex, expect, reply, &marker_offset_hint)) {
++  if (!resolveExpectedHash(cfg.url, manual_sha256_hex, expect, reply, &marker_offset_hint)) {
 +    if (!wan_ok) strcpy(reply, "ERR: WiFi joined but no WAN connectivity");
 +    digitalWrite(PIN_HOTSPOT_PWR, LOW);
 +    WiFi.disconnect(true);
@@ -618,7 +628,7 @@ index 0000000..96ec7ba
 +  HotspotOtaConfig cfg;
 +  HotspotOTA::loadConfig(cfg);
 +  if (cfg.ssid[0] == 0) {
-+    strcpy(reply, "ERR: ota.wifi not configured");
++    strcpy(reply, "ERR: ota.wan.wifi not configured");
 +    return false;
 +  }
 +
@@ -647,27 +657,27 @@ index 0000000..96ec7ba
 +}
 diff --git a/src/helpers/esp32/HotspotOTA.h b/src/helpers/esp32/HotspotOTA.h
 new file mode 100644
-index 0000000..58b6e67
+index 0000000..7513e4a
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.h
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,42 @@
 +#pragma once
 +#include <Arduino.h>
 +#include <helpers/BaseChatMesh.h>   // MAX_TEXT_LEN
 +
-+// Persisted separately from NodePrefs, its own SPIFFS file.
++// Persisted separately from NodePrefs, its own SPIFFS file. sha256_hex is deliberately not a
++// member here -- it's RAM-only (see setSha256Hex()/getSha256Hex()), not persisted with the rest.
 +struct HotspotOtaConfig {
 +  char ssid[32];
 +  char password[64];
-+  char url[147];   // sized to MAX_TEXT_LEN (160) minus "start ota url " (14) plus null terminator --
++  char url[147];   // sized to MAX_TEXT_LEN (160) minus "start ota wan " (14) plus null terminator --
 +                    // the LoRa CLI message budget, not a round number
-+  char sha256_hex[65];   // manual hash; `set ota.sha256 clear` falls back to sidecar-fetch
 +};
 +
 +// Catches MAX_TEXT_LEN drifting out from under url[]'s hand-derived size -- silently truncating
 +// long URLs again -- as a compile error instead.
 +static_assert(sizeof(HotspotOtaConfig::url) == MAX_TEXT_LEN - 14 + 1,
-+              "HotspotOtaConfig.url must track MAX_TEXT_LEN minus the \"start ota url \" prefix");
++              "HotspotOtaConfig.url must track MAX_TEXT_LEN minus the \"start ota wan \" prefix");
 +
 +namespace HotspotOTA {
 +  bool loadConfig(HotspotOtaConfig& cfg);
@@ -680,10 +690,15 @@ index 0000000..58b6e67
 +  void setPower(bool on);   // manual GPIO47 control, independent of run()
 +  bool getPower();
 +
-+  void setScanBypass(bool on);   // RAM-only, one-time -- see `set ota.force`
++  // Manual hash override -- RAM-only, cleared on every boot. `set ota.fw.sha256 clear` (empty
++  // string) falls back to sidecar-fetch. See `resolveExpectedHash()` in HotspotOTA.cpp.
++  void setSha256Hex(const char* hex);
++  const char* getSha256Hex();
 +
-+  // Pre-flight versions of run()'s join/WAN-check steps -- see `start ota join` / `get ota.wan` /
-+  // `start ota leave`. run() skips its own join if already connected via alreadyConnectedTo().
++  void setMarkerBypass(bool on);   // RAM-only, one-time -- see `set ota.fw.marker`
++
++  // Pre-flight versions of run()'s join/WAN-check steps -- see `ota wan join` / `ota wan check` /
++  // `ota wan leave`. run() skips its own join if already connected via alreadyConnectedTo().
 +  bool wifiConnect(char reply[]);
 +  void wifiDisconnect();
 +  bool checkWan(char reply[]);
