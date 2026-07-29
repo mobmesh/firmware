@@ -1,0 +1,67 @@
+name: ota-fw-url-qemu-artifact
+
+# Scratch, one-off workflow: builds heltec_v4_repeater with the ota.fw.url patches applied and
+# pushes just firmware.bin to a scratch branch, since GitHub Actions artifacts aren't reachable
+# from the dev sandbox. Delete once the QEMU boot check is done.
+
+on:
+  push:
+    branches:
+      - ota-fw-url
+
+permissions:
+  contents: write
+
+env:
+  UPSTREAM_REPO: meshcore-dev/MeshCore
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo (patches only)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: pick
+        name: Resolve upstream ref
+        run: |
+          REF=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases" \
+            | jq -r '[.[] | select(.tag_name | startswith("repeater-v"))][0].tag_name')
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout upstream at resolved ref
+        run: |
+          git clone --depth 50 https://github.com/${{ env.UPSTREAM_REPO }}.git upstream-src
+          cd upstream-src
+          git checkout "${{ steps.pick.outputs.ref }}"
+
+      - name: Apply maintained patches in order
+        run: |
+          cd upstream-src
+          for patch in ../patches/*.patch; do
+            git apply --check "$patch" || { echo "::error::$patch does not apply"; exit 1; }
+            git apply "$patch"
+          done
+
+      - name: Set up PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Build (console forced onto UART0, matches qemu-scratch-build.yml precedent)
+        run: |
+          cd upstream-src
+          PLATFORMIO_BUILD_FLAGS="-DARDUINO_USB_CDC_ON_BOOT=0" \
+            pio run -e heltec_v4_repeater
+
+      - name: Push firmware.bin to a scratch branch
+        run: |
+          cp upstream-src/.pio/build/heltec_v4_repeater/firmware.bin firmware.bin
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan ota-fw-url-qemu-output
+          git reset --hard
+          git add -f firmware.bin
+          git commit -m "ota-fw-url-qemu-artifact output ($(date -u +%FT%TZ))"
+          git push -f origin ota-fw-url-qemu-output
