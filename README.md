@@ -67,6 +67,8 @@ These are available on any device running firmware built from these patches, in 
 | `set ota.fw.sha256 <hex>` | Manually specify the expected SHA-256 of the next firmware download. Takes precedence over an automatically-fetched checksum. RAM-only — cleared on every boot. |
 | `set ota.fw.sha256 clear` | Clear a manually-set checksum so an automatically-fetched one can be used again. |
 | `start ota wan <url>` | Join the configured WiFi network, download the firmware at `<url>`, verify it, confirm it's actually a build of this project (refuses otherwise, even if the checksum matches), and flash it. |
+| `set ota.fw.url <url>` | Persist a default firmware URL. Overwrite-only, no `clear`. |
+| `start ota wan update` | Same as `start ota wan <url>`, using the persisted `ota.fw.url` instead of a URL on the command line. Errors with `ota.fw.url not configured` if none is set. Exists to keep remote admin updates short over LoRa — a full firmware URL can be well over 100 characters, this is 21. |
 | `set ota.fw.marker <on\|off>` | Default `on` (marker/authenticity check enforced). One-time, RAM-only `off` bypasses that check above for the next `start ota wan` — never persisted, always back to `on` after a reboot. Never bypasses the sha256 check. Use with care: if the download turns out not to be a build of this project, this node loses remote OTA capability until it's reflashed locally (USB or on-site). |
 | `ota wan join` / `ota wan leave` | Pre-flight: join the configured WiFi network only (no download), or disconnect and drop WAN power. |
 | `ota wan check` | Pre-flight: check WAN reachability once `ota wan join` has joined. |
@@ -82,6 +84,13 @@ start ota wan https://example.com/firmware/heltec_v4_repeater-v1.16.0.bin
 ```
 
 If a file named `<url>.sha256` exists alongside the firmware, it's fetched automatically and used to verify the download — no manual checksum needed. Full parameter and usage details for these commands, in the same format as upstream's own CLI reference, are in [`docs/cli-additions.md`](docs/cli-additions.md). See [`docs/cli_commands.md`](https://github.com/meshcore-dev/MeshCore/blob/main/docs/cli_commands.md) in upstream MeshCore for the complete standard CLI reference.
+
+For remote admin updates over LoRa, where every character sent counts, set `ota.fw.url` once to this project's own published firmware asset and use the short form after that:
+
+```
+set ota.fw.url https://github.com/HeyVern/meshcore-hotspot-ota/raw/refs/heads/main/docs/flasher/heltec_v4/repeater/firmware.bin
+start ota wan update
+```
 
 **`start ota wan` does not reply until it finishes.** Unlike most CLI commands, there is no immediate acknowledgment and no progress update — the device is joining WiFi, downloading, verifying, and flashing before it sends anything back, which can take up to about two minutes. The device will reboot and mount the new firmware image and begin automatic rollback protection testing. 
 

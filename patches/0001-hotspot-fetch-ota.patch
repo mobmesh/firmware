@@ -1,8 +1,8 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index 9accb29..0aa465f 100644
+index 9accb29..73fcecc 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -75,6 +75,112 @@ This document provides an overview of CLI commands that can be sent to MeshCore
+@@ -75,6 +75,141 @@ This document provides an overview of CLI commands that can be sent to MeshCore
  
  ---
  
@@ -24,6 +24,19 @@ index 9accb29..0aa465f 100644
 +however far in a `<url>.sha256` sidecar says to look (a `<hash>:<offset>` sidecar, generated
 +automatically by this project's own release builds, carries the exact position for that specific
 +build). See `set ota.fw.marker` below for the rare case where neither applies.
++
++**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
++
++---
++
++### Start an Over-The-Air (OTA) firmware update using the configured default URL
++**Usage:**
++- `start ota wan update`
++
++**Note:** Identical to `start ota wan <url>`, using the URL persisted via `set ota.fw.url` instead
++of one supplied on the command line. Fails with `ERR: ota.fw.url not configured` if none has been
++set. Exists to keep remote admin updates short over LoRa -- a full firmware URL can be well over 100
++characters, and `start ota wan update` is 21.
 +
 +**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 +
@@ -56,6 +69,22 @@ index 9accb29..0aa465f 100644
 +download and is **not** overridden by a `<url>.sha256` sidecar. `set ota.fw.sha256 clear` removes it
 +so sidecar-fetch takes effect again — do this before pointing `start ota wan` at a different
 +firmware image, or a stale hash will block its sidecar.
++
++**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
++
++---
++
++#### View or change the default URL used by `start ota wan update`
++**Usage:**
++- `get ota.fw.url`
++- `set ota.fw.url <url>`
++
++**Parameters:**
++- `url`: HTTP(S) URL of the firmware `.bin` to download and flash
++
++**Note:** Persisted — unlike `ota.fw.sha256`/`ota.fw.marker`, this names a stable download location
++for this device rather than a one-time override. Overwrite to change it; there is no `clear`.
++Rejects (does not truncate) a URL longer than the field allows.
 +
 +**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
 +
@@ -128,7 +157,7 @@ index cfa33cf..2a827ad 100644
    // Power management interface (boards with power management override these)
    virtual bool isExternalPowered() { return false; }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index b78ad6e..fb42bf5 100644
+index b78ad6e..b4bdbb2 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -5,6 +5,16 @@
@@ -148,10 +177,22 @@ index b78ad6e..fb42bf5 100644
  #ifndef BRIDGE_MAX_BAUD
  #define BRIDGE_MAX_BAUD 115200
  #endif
-@@ -239,6 +249,22 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+@@ -239,6 +249,34 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
        } else {
          strcpy(reply, "ERR: clock cannot go backwards");
        }
++#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
++    } else if (memcmp(command, "start ota wan update", 21) == 0 && (command[21] == 0 || command[21] == ' ')) {
++      // Checked ahead of the generic "start ota wan " prefix below, or "update" would be parsed
++      // as a literal URL. Uses the persisted ota.fw.url instead of one supplied on the command line.
++      HotspotOtaConfig cfg;
++      HotspotOTA::loadConfig(cfg);
++      if (cfg.url[0] == 0) {
++        strcpy(reply, "ERR: ota.fw.url not configured");
++      } else if (!_board->startOTAUpdateFromURL(cfg.url, reply)) {
++        // reply[] already carries the specific error from HotspotOTA::run
++      }
++#endif
 +    } else if (memcmp(command, "start ota wan ", 14) == 0) {
 +      if (!_board->startOTAUpdateFromURL(&command[14], reply)) {
 +        // reply[] already carries the specific error from HotspotOTA::run
@@ -171,7 +212,7 @@ index b78ad6e..fb42bf5 100644
      } else if (memcmp(command, "start ota", 9) == 0) {
        if (!_board->startOTAUpdate(_prefs->node_name, reply)) {
          strcpy(reply, "Error");
-@@ -303,7 +329,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+@@ -303,7 +341,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
        bool s = _callbacks->formatFileSystem();
        sprintf(reply, "File system erase: %s", s ? "OK" : "Err");
      } else if (memcmp(command, "ver", 3) == 0) {
@@ -180,7 +221,7 @@ index b78ad6e..fb42bf5 100644
      } else if (memcmp(command, "board", 5) == 0) {
        sprintf(reply, "%s", _board->getManufacturerName());
      } else if (memcmp(command, "sensor get ", 11) == 0) {
-@@ -536,6 +562,55 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -536,6 +574,68 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
      StrHelper::strncpy(_prefs->guest_password, &config[15], sizeof(_prefs->guest_password));
      savePrefs();
      strcpy(reply, "OK");
@@ -209,6 +250,19 @@ index b78ad6e..fb42bf5 100644
 +      HotspotOTA::setSha256Hex(&config[14]);
 +    }
 +    strcpy(reply, "OK");
++  } else if (memcmp(config, "ota.fw.url ", 11) == 0) {
++    // Unlike ota.fw.sha256/ota.fw.marker, this is persisted -- it names a stable download
++    // location for this device, not a one-time override. Powers `start ota wan update`, which
++    // uses this instead of requiring a full URL to be sent over LoRa for every remote update.
++    HotspotOtaConfig cfg;
++    HotspotOTA::loadConfig(cfg);
++    if (strlen(&config[11]) >= sizeof(cfg.url)) {
++      sprintf(reply, "ERR: URL too long (max %d chars)", (int)sizeof(cfg.url) - 1);
++    } else {
++      StrHelper::strncpy(cfg.url, &config[11], sizeof(cfg.url));
++      HotspotOTA::saveConfig(cfg);
++      strcpy(reply, "OK");
++    }
 +  } else if (memcmp(config, "ota.wan.pwr ", 12) == 0) {
 +    // Manual GPIO47 control, independent of HotspotOTA::run() -- for recovery if state is ever in doubt.
 +    if (memcmp(&config[12], "on", 2) == 0) {
@@ -236,12 +290,16 @@ index b78ad6e..fb42bf5 100644
    } else if (memcmp(config, "prv.key ", 8) == 0) {
      uint8_t prv_key[PRV_KEY_SIZE];
      bool success = mesh::Utils::fromHex(prv_key, PRV_KEY_SIZE, &config[8]);
-@@ -925,6 +1000,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -925,6 +1025,14 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
      sprintf(reply, "> %u mV", _board->getBootVoltage());
  #else
      strcpy(reply, "ERROR: Power management not supported");
 +#endif
 +#if defined(WITH_HOTSPOT_OTA)
++  } else if (memcmp(config, "ota.fw.url", 10) == 0) {
++    HotspotOtaConfig cfg;
++    HotspotOTA::loadConfig(cfg);
++    sprintf(reply, "> %s", cfg.url[0] ? cfg.url : "(not set)");
 +  } else if (memcmp(config, "ota.wan.pwr", 11) == 0) {
 +    sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
  #endif
