@@ -1,4 +1,4 @@
-# Firmware
+# Firmware - by Gulf Coast Mesh - Mobile, AL
 
 Custom firmware for MeshCore running on ESP32 boards.
 
