@@ -6,6 +6,19 @@ This project uses a set of patches that are applied to a fresh copy of the upstr
 
 The MeshCore source code itself is not stored in this repository. Instead, this repo contains the patches, board-specific configuration, and the GitHub Actions workflow that puts everything together and publishes the builds.
 
+## Available Mods
+
+Mods add features or changes to the standard MeshCore firmware. Each mod is maintained as a separate set of patches and can include its own board configuration and documentation.
+
+| Mod           | Description                                                                                                                                                                                                                   | Main Features                                                                                                                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hotspot-ota` | Adds remote firmware updates over WiFi ( or cellular hotspot) and automatic rollback protection. A device can connect to an existing WiFi network, download a firmware image, verify it, and install it without needing to be onsite with the node. | Remote OTA updates, power control of external cell modems, firmware SHA-256 verification, firmware authenticity checks, OTA slot management, automatic rollback / recovery after failed updates, remote updates through MeshCore CLI commands |
+
+The `hotspot-ota` mod is especially useful for MeshCore nodes that are installed in remote or hard-to-reach locations. Updates can be started remotely over the LoRa mesh, while rollback protection helps recover the device if a new firmware version fails during startup.
+
+More information about each mod can be found in its own README under `mods/<name>/`.
+
+
 ## Repository Layout
 
 * `mods/<name>/` contains the different features or modifications. Each mod has its own `patches/*.patch` files, along with a `.meta.yaml` file for each patch. The metadata files define patch dependencies. Each mod also has its own documentation. Currently, `hotspot-ota` is the only mod.
