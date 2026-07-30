@@ -37,7 +37,8 @@ Patches are applied in numeric order within each mod. Every patch also lists any
 
 If a patch no longer applies cleanly to the current upstream version, the build fails and an issue is opened with the name of the affected patch. The system does not try to automatically merge or fix the patch.
 
-## Supported Boards
+## Supported Boards 
+<sub><i>* more boards are on the way - " lookin' at you Grumpy "</sub></i>
 
 | Variant     | Board     | Upstream Tag     | Release Asset                   |
 | ----------- | --------- | ---------------- | ------------------------------- |
