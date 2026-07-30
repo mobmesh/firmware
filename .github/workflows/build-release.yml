@@ -89,7 +89,7 @@ jobs:
           fi
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
           echo "version=${REF#${{ matrix.upstream_tag_prefix }}-}" >> "$GITHUB_OUTPUT"
-          echo "release_tag=${REF}-ota_mod" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${REF}-mobmesh" >> "$GITHUB_OUTPUT"
 
       - id: check
         name: Check if already built
@@ -402,7 +402,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.pick.outputs.release_tag }}
-          name: "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - ota_mod"
+          name: "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - mobmesh"
           body_path: release-notes.md
           make_latest: ${{ matrix.make_latest }}
           files: |
