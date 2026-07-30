@@ -103,10 +103,12 @@ Some mods may add extra options or requirements to the flasher. Check the README
 
 You need an ESP32 board that is already supported by MeshCore and has a matching `variants/<board>/overrides.yaml` file in this repository.
 
-Some mods may also require additional hardware.
+Some mods may also require additional hardware -or- manual configuration overrides due to RAM and storage limitations.
 
-For example, `hotspot-ota` requires an external power switch for its WiFi hotspot. Check the README for the mod you are using for the wiring and hardware requirements.
+For example, `hotspot-ota` requires an external power switch to control an external cellular hotspot. Check the README for the mod you are using for the wiring and hardware requirements.
 
 ## About
 
-Custom firmware for MeshCore.
+Custom firmware for MeshCore by the Gulf Coast Mesh - Mobile, Al group.
+
+[HeyVern](https://github.com/HeyVern) - Lead Firmware Designer
