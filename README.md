@@ -1,52 +1,98 @@
 # Firmware
 
-Custom firmware for [MeshCore](https://github.com/meshcore-dev/MeshCore) on ESP32 boards, built from a maintained set of patches instead of a long-lived fork. Every build pulls a fresh copy of upstream and applies our patches on top, so we stay current with upstream releases automatically rather than slowly drifting out of sync.
+Custom firmware for MeshCore running on ESP32 boards.
 
-There's no MeshCore source checked into this repo. What lives here is the patches (grouped by feature under `mods/`), per-board config overrides, and the GitHub Actions workflow that stitches it all together and publishes the result.
+This project uses a set of patches that are applied to a fresh copy of the upstream MeshCore source instead of maintaining a separate long-term fork. Each build starts with the latest upstream release and applies our changes on top of it. This makes it easier to stay up to date without the project slowly getting out of sync with MeshCore.
 
-## Layout
+The MeshCore source code itself is not stored in this repository. Instead, this repo contains the patches, board-specific configuration, and the GitHub Actions workflow that puts everything together and publishes the builds.
 
-- **`mods/<name>/`** — one folder per feature. Each has its own `patches/*.patch`, a `.meta.yaml` sidecar per patch declaring dependencies, and its own docs. Right now `hotspot-ota` is the only one — see [its README](mods/hotspot-ota/README.md).
-- **`variants/<board>/`** — board config, but only the parts we're adding on top of upstream (GPIO pins, timing constants, occasionally a custom partition scheme). Named to match upstream's own `variants/<board>/` layout. Anything upstream already knows about a board — mcu, flash size, USB IDs, psram — gets read from their `boards/<board>.json` instead of copied here. See [`variants/heltec_v4/README.md`](variants/heltec_v4/README.md).
-- **`scripts/generate-board-config.py`** — takes a board's `overrides.yaml`, upstream's own board facts, and the actual built `partitions.bin`, and turns them into build flags plus `pages/flasher/boards.json`. Nothing gets typed in twice.
-- **`pages/flasher/`** — the browser flasher and its build assets, served via GitHub Pages. This is shared across every board and mod, so it lives at the top level rather than under `docs/` (which is just for documentation, not binaries).
-- **`.github/workflows/build-release.yml`** — builds each board/variant against the latest upstream release and publishes it.
+## Repository Layout
 
-Patches apply in numeric order within a mod, and each one's sidecar lists which other patches it needs — CI checks that before touching anything. If a patch doesn't apply cleanly against the current upstream tag, the build fails and opens an issue naming the patch. No auto-merge attempts.
+* `mods/<name>/` contains the different features or modifications. Each mod has its own `patches/*.patch` files, along with a `.meta.yaml` file for each patch. The metadata files define patch dependencies. Each mod also has its own documentation. Currently, `hotspot-ota` is the only mod.
 
-## Supported boards
+* `variants/<board>/` contains configuration changes that are specific to a board. This includes things like GPIO pins, timing values, and sometimes a custom partition layout. The folder structure follows the same `variants/<board>/` layout used by upstream MeshCore.
 
-| Variant | Board | Upstream tag | Release asset |
-|---|---|---|---|
-| Repeater | Heltec V4 | `repeater-v*` | `heltec_v4_rep_ota-vX.Y.Z.bin` |
+  We don't copy board information that MeshCore already knows about. Things like the MCU, flash size, USB IDs, and PSRAM settings are taken directly from the upstream `boards/<board>.json` file.
+
+* `scripts/generate-board-config.py` builds the final board configuration using the board's `overrides.yaml`, the board information from upstream, and the actual `partitions.bin` created during the build. This keeps us from having to manually enter the same information in multiple places.
+
+* `pages/flasher/` contains the web-based firmware flasher and its build files. The flasher is shared by all boards and mods, so it lives at the top level instead of under `docs/`.
+
+* `.github/workflows/build-release.yml` handles building each board and variant against the latest upstream release and publishing the results.
+
+Patches are applied in numeric order within each mod. Every patch also lists any other patches it depends on. CI checks these dependencies before applying anything.
+
+If a patch no longer applies cleanly to the current upstream version, the build fails and an issue is opened with the name of the affected patch. The system does not try to automatically merge or fix the patch.
+
+## Supported Boards
+
+| Variant     | Board     | Upstream Tag     | Release Asset                   |
+| ----------- | --------- | ---------------- | ------------------------------- |
+| Repeater    | Heltec V4 | `repeater-v*`    | `heltec_v4_rep_ota-vX.Y.Z.bin`  |
 | Room Server | Heltec V4 | `room-server-v*` | `heltec_v4_room_ota-vX.Y.Z.bin` |
 
-Repeater and Room Server track separate upstream tag sequences, so they're built and released independently. Adding a new board is mostly just adding a `variants/<board>/overrides.yaml` and a line in the build matrix — the mod itself doesn't need to change unless the new board needs something the mod doesn't already handle.
+The Repeater and Room Server variants use separate upstream tag sequences, so they are built and released independently.
 
-## How it works
+Adding support for another board should be fairly simple. In most cases, you only need to add a `variants/<board>/overrides.yaml` file and add the board to the build matrix. The mod itself should not need any changes unless the new board requires something that the existing mod does not support.
 
-A scheduled run checks upstream for a new release tag on each variant. When one shows up, the workflow clones upstream at that tag, checks the patches against the board's overrides (this is where config drift would get caught), applies the patches, and builds. If a patch doesn't apply, the build stops there and files an issue naming it.
+## How It Works
 
-Once the build succeeds, `pages/flasher/boards.json` gets regenerated straight from the board's overrides, upstream's own facts, and the actual `partitions.bin` that just got built — nothing here is something we typed in by hand. The `.bin` and a `.sha256` get published as a release, and only after every board/variant has built successfully does a separate job push `pages/` to GitHub Pages. A broken build can't publish anything.
+A scheduled GitHub Actions run checks upstream for new release tags for each variant.
 
-You can also kick off a build manually from the Actions tab, and point it at a specific upstream ref or a single variant if you don't want the full matrix.
+When a new release is found, the workflow:
+
+1. Clones the upstream MeshCore repository at that tag.
+2. Checks the patches against the board configuration.
+3. Applies the patches.
+4. Builds the firmware.
+
+The patch checks are important because they catch configuration changes or other upstream changes that could cause problems. If a patch no longer applies, the build stops and an issue is opened identifying the patch that failed.
+
+After a successful build, `pages/flasher/boards.json` is regenerated using the board overrides, the upstream board information, and the actual `partitions.bin` from the build. This means the flasher configuration is generated from the build itself instead of being maintained separately by hand.
+
+The firmware `.bin` file and its `.sha256` checksum are then published as a GitHub release.
+
+The GitHub Pages flasher is only updated after every board and variant has built successfully. This means a failed build will not result in a broken version being published.
+
+Builds can also be started manually from the GitHub Actions tab. You can choose a specific upstream ref or build only one variant instead of running the entire build matrix.
 
 ## Releases
 
-Releases are named after the variant and the upstream tag they were built from — e.g. "Repeater v1.16.0 - ota_mod" — and each one ships:
+Releases are named using the variant and the upstream tag they were built from.
 
-- `<asset-basename>-vX.Y.Z.bin` — the firmware image
-- `<asset-basename>-vX.Y.Z.bin.sha256` — its checksum
+For example:
 
-The release notes are just upstream's own notes for that tag. Flash the `.bin` the same way you'd flash an official MeshCore release, or use the flasher below.
+`Repeater v1.16.0 - ota_mod`
 
-## Web-based flasher
+Each release includes:
 
-[**Open the flasher**](https://mobmesh.github.io/firmware/flasher/) — flashes a board straight from your browser over USB. Needs Chrome, Edge, or Opera (Web Serial support), nothing else. It always grabs whatever was most recently built for the board/variant you pick.
+* `<asset-basename>-vX.Y.Z.bin` — the firmware image
+* `<asset-basename>-vX.Y.Z.bin.sha256` — the checksum for the firmware image
 
-It's not MeshCore's own flasher, just one built for our releases. Check a mod's own README if it adds anything flasher-specific — `hotspot-ota` adds OTA-slot targeting, for instance.
+The release notes come directly from the upstream MeshCore release for that tag.
+
+You can flash the `.bin` file the same way you would flash an official MeshCore release. You can also use the web-based flasher provided by this project.
+
+## Web-Based Flasher
+
+You can use the [web-based flasher](https://mobmesh.github.io/) to flash a supported board directly from your browser over USB.
+
+The flasher requires Chrome, Edge, or Opera because it uses Web Serial. No additional software is needed.
+
+It automatically uses the most recently built firmware for the board and variant you select.
+
+This is not the official MeshCore flasher. It was built specifically for the firmware releases in this project.
+
+Some mods may add extra options or requirements to the flasher. Check the README for the specific mod if you need more information. For example, `hotspot-ota` adds support for selecting the OTA slot that should be used.
 
 ## Requirements
 
-- An ESP32 board MeshCore already supports, with a `variants/<board>/overrides.yaml` here for whatever this project adds on top.
-- Any hardware a given mod needs — `hotspot-ota` wants an external power switch for its WiFi hotspot, for example. Check that mod's README for wiring details.
+You need an ESP32 board that is already supported by MeshCore and has a matching `variants/<board>/overrides.yaml` file in this repository.
+
+Some mods may also require additional hardware.
+
+For example, `hotspot-ota` requires an external power switch for its WiFi hotspot. Check the README for the mod you are using for the wiring and hardware requirements.
+
+## About
+
+Custom firmware for MeshCore.
