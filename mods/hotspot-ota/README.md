@@ -1,68 +1,144 @@
-# hotspot-ota
+# hotspot-ota - Remote OTA Firmware Updates for MeshCore
 
-Adds a hotspot-based over-the-air update path to MeshCore, and automatic post-update rollback protection.
+Adds a WiFi-based over-the-air update path to MeshCore, along with automatic rollback protection if an update doesn't work correctly.
 
-MeshCore's built-in `start ota` command turns the device into a self-hosted WiFi access point and waits for someone to upload a `.bin` file through a web page in local proximity to the device. This mod adds a second path: the device instead powers on its hotspot's external power rail (if wired), joins an existing WiFi hotspot as a client, confirms internet connectivity, downloads the firmware from a supplied URL, verifies it, and flashes itself — no laptop or phone required at the update site. These are ordinary CLI commands, so they can be triggered remotely over the mesh via LoRa, not just from a directly-connected console. A rollback guard confirms every update actually works before committing to it, automatically reverting to the previous firmware if it doesn't.
+MeshCore already has a built-in `start ota` command. This starts a WiFi access point on the device and lets someone nearby upload a `.bin` firmware file through a web page.
+
+This mod adds another way to update the device. Instead of creating its own WiFi network, the device powers on the external power rail for its hotspot, if one is connected, and joins an existing WiFi network. It checks that the network has internet access, downloads the firmware from a URL, verifies it, and then installs it.
+
+This means you don't need to bring a laptop or phone to the location of the device just to perform an update.
+
+The commands are also regular MeshCore CLI commands, so they can be sent remotely over the LoRa mesh. You don't have to be connected directly to the device.
+
+The mod also adds rollback protection. After an update, the new firmware is tested before it is considered good. If the new firmware fails during startup, the device automatically goes back to the previous working firmware.
 
 ## Patches
 
-| File | Purpose |
-|---|---|
-| `patches/0001_hotspot-fetch-ota.patch` | Adds the hotspot-fetch OTA feature to MeshCore |
-| `patches/0002_ota-rollback-guard.patch` | Adds automatic post-update rollback protection. **Depends on 0001** (declared in `0002.meta.yaml`) and cannot be applied alone |
+| File                                    | Purpose                                            |
+| --------------------------------------- | -------------------------------------------------- |
+| `patches/0001_hotspot-fetch-ota.patch`  | Adds the hotspot-based OTA update feature          |
+| `patches/0002_ota-rollback-guard.patch` | Adds automatic rollback protection after an update |
 
-Board-specific constants these patches need (GPIO pin, WiFi/HTTP timing) are **not** hardcoded in the patches — they're injected as `-D` build flags generated from each board's `variants/<board>/overrides.yaml` at the framework level. See the root [README](../../README.md#repository-layout) for how that works.
+The second patch depends on the first one. This dependency is defined in `0002.meta.yaml`, so the rollback patch cannot be applied on its own.
 
-## CLI commands added
+The patches don't contain board-specific settings such as the GPIO pin used for the power switch or WiFi and HTTP timing values.
 
-These are available on any device running firmware built from these patches, in addition to all standard MeshCore CLI commands.
+Those settings come from each board's `variants/<board>/overrides.yaml` file and are passed into the build as `-D` flags. See the root README for more information about how board configuration works.
 
-| Command | Description |
-|---|---|
-| `set ota.wan.wifi <ssid>,<password>` | Set the WiFi credentials used for future updates. Persists across firmware updates — set once. |
-| `set ota.fw.sha256 <hex>` | Manually specify the expected SHA-256 of the next firmware download. Takes precedence over an automatically-fetched checksum. RAM-only — cleared on every boot. |
-| `set ota.fw.sha256 clear` | Clear a manually-set checksum so an automatically-fetched one can be used again. |
-| `start ota wan <url>` | Join the configured WiFi network, download the firmware at `<url>`, verify it, confirm it's actually a build of this project (refuses otherwise, even if the checksum matches), and flash it. |
-| `set ota.fw.url <url>` | Persist a default firmware URL. Overwrite-only, no `clear`. |
-| `start ota wan update` | Same as `start ota wan <url>`, using the persisted `ota.fw.url` instead of a URL on the command line. Errors with `ota.fw.url not configured` if none is set. Exists to keep remote admin updates short over LoRa — a full firmware URL can be well over 100 characters, this is 21. |
-| `set ota.fw.marker <on\|off>` | Default `on` (marker/authenticity check enforced). One-time, RAM-only `off` bypasses that check above for the next `start ota wan` — never persisted, always back to `on` after a reboot. Never bypasses the sha256 check. Use with care: if the download turns out not to be a build of this project, this node loses remote OTA capability until it's reflashed locally (USB or on-site). |
-| `ota wan join` / `ota wan leave` | Pre-flight: join the configured WiFi network only (no download), or disconnect and drop WAN power. |
-| `ota wan check` | Pre-flight: check WAN reachability once `ota wan join` has joined. |
-| `get ota.wan.pwr` / `set ota.wan.pwr <on\|off>` | Diagnostic/recovery command to read or directly force the WAN power switch, independent of `start ota wan`. |
-| `get ota.slot` | Both OTA slots' version and state, e.g. `Slots: A=v1.16.0-0f11a30 (active, valid) \| B=v? (n/a)`. Version includes the short build commit hash (distinguishes two slots sharing the same version number but from different builds) and is `v?` for a slot that's never actually booted (self-reported into SPIFFS on first boot, since the compiled-in image header doesn't carry it). Active slot's state is `pending`/`valid`/`n/a`; the other's is `valid`/`invalid`/`aborted`/`new`/`n/a`. |
-| `ota slot boot <A\|B>` | Point the bootloader at the other OTA slot and reboot into it immediately, without reflashing. Refuses if that slot is already active or has no valid image. Re-arms rollback probation for that slot even if it was previously `valid` -- expect `get ota.slot` to briefly show `pending` right after. |
+## CLI Commands
 
-Example:
+These commands are available on devices built with these patches. They can be used alongside the standard MeshCore CLI commands.
 
-```
+| Command                                         | Description                                                                                                                                                                                                                                                                   |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `set ota.wan.wifi <ssid>,<password>`            | Saves the WiFi network and password that will be used for future updates. The settings survive firmware updates, so you only need to set them once.                                                                                                                           |
+| `set ota.fw.sha256 <hex>`                       | Sets the expected SHA-256 checksum for the next firmware download. This takes priority over a checksum downloaded automatically. The value is kept in RAM and is cleared after every reboot.                                                                                  |
+| `set ota.fw.sha256 clear`                       | Clears a manually configured checksum so the automatically downloaded checksum can be used again.                                                                                                                                                                             |
+| `start ota wan <url>`                           | Connects to the configured WiFi network, downloads the firmware from `<url>`, verifies it, checks that it is actually a build from this project, and flashes it.                                                                                                              |
+| `set ota.fw.url <url>`                          | Saves a default firmware URL. This setting can only be overwritten and cannot be cleared.                                                                                                                                                                                     |
+| `start ota wan update`                          | Same as `start ota wan <url>`, but uses the saved `ota.fw.url`. If no URL has been configured, the command returns `ota.fw.url not configured`. This shorter command is useful for remote updates over LoRa, where every character matters.                                   |
+| `set ota.fw.marker <on\|off>`                   | Controls the firmware authenticity check. It is `on` by default. Setting it to `off` temporarily disables the check for the next `start ota wan` command. The setting is stored only in RAM and is turned back on after a reboot. The SHA-256 check is still always enforced. |
+| `ota wan join` / `ota wan leave`                | Connects to the configured WiFi network without downloading firmware, or disconnects and turns off the WAN power.                                                                                                                                                             |
+| `ota wan check`                                 | Checks whether the device can reach the internet after joining the WiFi network.                                                                                                                                                                                              |
+| `get ota.wan.pwr` / `set ota.wan.pwr <on\|off>` | Reads or directly controls the WAN power switch. This is mainly useful for diagnostics and recovery.                                                                                                                                                                          |
+| `get ota.slot`                                  | Shows the version and state of both OTA slots. The version includes the short build commit hash, which helps tell apart different builds with the same version number. A slot that has never booted will show `v?`.                                                           |
+| `ota slot boot <A\|B>`                          | Changes the bootloader configuration to use the other OTA slot and reboots into it. It refuses to switch if the selected slot is already active or doesn't contain a valid image. Rollback testing is also started again for the selected slot.                               |
+
+For example:
+
+```text
 set ota.wan.wifi MyHotspot,hunter2
 start ota wan https://example.com/firmware/heltec_v4_repeater-v1.16.0.bin
 ```
 
-If a file named `<url>.sha256` exists alongside the firmware, it's fetched automatically and used to verify the download — no manual checksum needed. Full parameter and usage details for these commands, in the same format as upstream's own CLI reference, are in [`docs/cli-additions.md`](docs/cli-additions.md). See [`docs/cli_commands.md`](https://github.com/meshcore-dev/MeshCore/blob/main/docs/cli_commands.md) in upstream MeshCore for the complete standard CLI reference.
+If a file named `<url>.sha256` exists next to the firmware file, it is downloaded automatically and used to verify the firmware. You don't need to manually set the checksum in that case.
 
-For remote admin updates over LoRa, where every character sent counts, set `ota.fw.url` once to this project's own published firmware asset and use the short form after that:
+For complete details about these commands, see `docs/cli-additions.md`. The standard MeshCore CLI commands are documented in the upstream `docs/cli_commands.md`.
 
-```
+### Short Commands for Remote Updates
+
+When updating a device remotely over LoRa, it's useful to keep the commands as short as possible.
+
+You can save the firmware URL once:
+
+```text
 set ota.fw.url https://github.com/mobmesh/firmware/raw/refs/heads/main/pages/flasher/heltec_v4/repeater/firmware.bin
+```
+
+After that, future updates can use:
+
+```text
 start ota wan update
 ```
 
-**`start ota wan` does not reply until it finishes.** Unlike most CLI commands, there is no immediate acknowledgment and no progress update — the device is joining WiFi, downloading, verifying, and flashing before it sends anything back, which can take up to about two minutes. The device will reboot and mount the new firmware image and begin automatic rollback protection testing.
+This is much shorter than sending the full URL every time.
 
-## Web-based flasher: OTA-slot-aware flows
+### OTA Update Timing
 
-The framework's shared flasher (see root README) offers two flows specific to what this mod's patches make possible:
+The `start ota wan` command does not respond immediately.
 
-- **New device** — for a blank board, or one that's bricked. Fully erases the chip and writes bootloader, partition table, and firmware from scratch — into both OTA slots, so `ota slot boot <A|B>` works right away instead of requiring a separate flash into the other slot first.
-- **Update existing device** — for a board already running MeshCore. Writes firmware into a chosen OTA slot (A or B) without erasing anything else. This is the only way to target a specific slot from outside the device's own CLI; it doesn't change which slot the device boots from — use `ota slot boot <A|B>` on-device for that.
+Unlike most CLI commands, there is no initial acknowledgment or progress message. The device first connects to WiFi, checks the connection, downloads the firmware, verifies it, and flashes it before sending a response.
 
-## Automatic rollback protection
+The whole process can take up to around two minutes.
 
-This is added behavior, not something stock MeshCore does.
+After the update finishes, the device reboots using the new firmware and starts the automatic rollback protection process.
 
-**Upstream MeshCore's default:** if a bad update boots and `radio_init()` fails, stock MeshCore just calls `halt()` — the device sits there, unresponsive, with no automatic path back to the last known-good firmware.
+## Web-Based Flasher
 
-**What this patch changes:** it defers that confirmation instead of letting it happen automatically. A newly-updated image (via either `start ota` or `start ota wan`) is held on probation — not yet confirmed — until it's run stably for about 90 seconds with a working radio. If `radio_init()` fails while still on probation, that's treated as evidence the update itself is bad, and the device immediately rolls back and reboots into the previous working firmware instead of halting. Radio failures unrelated to an update still get a capped number of retry-reboots before permanently halting, rather than looping forever. No additional hardware is required — this relies entirely on ESP-IDF's app-rollback feature, which is already compiled into MeshCore's upstream toolchain.
+The shared web-based flasher in this project supports two OTA-slot-aware flashing options for boards using this mod.
 
-**Why:** MeshCore's default behavior of just halting on a radio initialization failure is a real risk especially for a node that's physically remote and can't be walked over to and re-flashed. Without this patch, any bad firmware update can brick a node, leaving it non-responsive to any radio commands. With this patch, the device can self-recover.
+### New Device
+
+Use this option for a blank board or a board that has been bricked.
+
+It completely erases the chip and installs the bootloader, partition table, and firmware from scratch.
+
+The firmware is written to both OTA slots. This means you can use `ota slot boot <A|B>` immediately without having to flash the second slot separately.
+
+### Update Existing Device
+
+Use this option when the board is already running MeshCore.
+
+It writes the firmware to either OTA slot A or B without erasing anything else on the device.
+
+This is the only way to select a specific OTA slot from outside the device's own CLI.
+
+The flasher does not change which slot the device will boot from. To switch slots from the device itself, use:
+
+```text
+ota slot boot <A|B>
+```
+
+## Automatic Rollback Protection
+
+Automatic rollback protection is added by this mod. It is not part of the standard MeshCore behavior.
+
+Normally, if a bad firmware update boots and `radio_init()` fails, MeshCore calls `halt()`. The device then becomes unresponsive and there is no automatic way to return to the previous firmware.
+
+This mod changes that behavior.
+
+After a firmware update using either `start ota` or `start ota wan`, the new firmware is placed into a probation period. It is not immediately marked as confirmed.
+
+The device needs to run for about 90 seconds with a working radio before the new firmware is considered stable.
+
+If `radio_init()` fails while the new firmware is still on probation, the device assumes the update is bad. It automatically rolls back to the previous firmware and reboots.
+
+This is especially useful for nodes that are installed somewhere remote. If a bad firmware update causes the radio to stop working, you may not be able to reach the device to re-flash it.
+
+With rollback protection enabled, the device can recover on its own instead of remaining stuck on the broken firmware.
+
+Radio failures that are unrelated to a recent update are handled differently. The device will retry the reboot a limited number of times and then halt instead of getting stuck in an endless reboot loop.
+
+No extra hardware is required for rollback protection. It uses the ESP-IDF app rollback feature that is already available in the MeshCore upstream toolchain.
+
+## Why This Exists
+
+Remote MeshCore nodes can be difficult or impossible to access physically.
+
+A normal firmware update can leave a remote node unusable if the new firmware has a problem. If the radio fails during startup, the node may stop responding to commands sent over the mesh.
+
+The hotspot OTA feature makes it possible to download and install firmware remotely using an existing WiFi connection.
+
+The rollback protection adds another layer of safety. If the new firmware doesn't start correctly, the node can automatically return to the last known working firmware.
+
+Together, these features make it much safer to manage MeshCore nodes that are installed in remote or hard-to-reach locations.
