@@ -1,0 +1,196 @@
+diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
+index 0969074..25ce7df 100644
+--- a/examples/simple_repeater/MyMesh.cpp
++++ b/examples/simple_repeater/MyMesh.cpp
+@@ -1,5 +1,6 @@
+ #include "MyMesh.h"
+ #include <algorithm>
++#include <helpers/ArduinoHelpers.h>
+ 
+ /* ------------------------------ Config -------------------------------- */
+ 
+@@ -355,7 +356,7 @@ int MyMesh::handleRequest(ClientInfo *sender, uint32_t sender_timestamp, uint8_t
+ #if MAX_NEIGHBOURS
+         // add next neighbour to results
+         auto neighbour = sorted_neighbours[index + offset];
+-        uint32_t heard_seconds_ago = getRTCClock()->getCurrentTime() - neighbour->heard_timestamp;
++        uint32_t heard_seconds_ago = safeElapsedSecs(getRTCClock()->getCurrentTime(), neighbour->heard_timestamp);
+         memcpy(&results_buffer[results_offset], neighbour->id.pub_key, pubkey_prefix_length); results_offset += pubkey_prefix_length;
+         memcpy(&results_buffer[results_offset], &heard_seconds_ago, 4); results_offset += 4;
+         memcpy(&results_buffer[results_offset], &neighbour->snr, 1); results_offset += 1;
+@@ -1096,7 +1097,7 @@ void MyMesh::formatNeighborsReply(char *reply) {
+     mesh::Utils::toHex(hex, neighbour->id.pub_key, 4);
+ 
+     // add next neighbour
+-    uint32_t secs_ago = getRTCClock()->getCurrentTime() - neighbour->heard_timestamp;
++    uint32_t secs_ago = safeElapsedSecs(getRTCClock()->getCurrentTime(), neighbour->heard_timestamp);
+     sprintf(dp, "%s:%d:%d", hex, secs_ago, neighbour->snr);
+     while (*dp)
+       dp++; // find end of string
+diff --git a/examples/simple_repeater/UITask.cpp b/examples/simple_repeater/UITask.cpp
+index 6a85143..a16e797 100644
+--- a/examples/simple_repeater/UITask.cpp
++++ b/examples/simple_repeater/UITask.cpp
+@@ -1,6 +1,7 @@
+ #include "UITask.h"
+ #include <Arduino.h>
+ #include <helpers/CommonCLI.h>
++#include <helpers/ArduinoHelpers.h>
+ 
+ #ifndef USER_BTN_PRESSED
+ #define USER_BTN_PRESSED LOW
+@@ -46,7 +47,7 @@ void UITask::begin(NodePrefs* node_prefs, const char* build_date, const char* fi
+ 
+ void UITask::renderCurrScreen() {
+   char tmp[80];
+-  if (millis() < BOOT_SCREEN_MILLIS) { // boot screen
++  if (!millis_passed(BOOT_SCREEN_MILLIS)) { // boot screen
+     // meshcore logo
+     _display->setColor(DisplayDriver::BLUE);
+     int logoWidth = 128;
+@@ -94,7 +95,7 @@ void UITask::renderCurrScreen() {
+ 
+ void UITask::loop() {
+ #ifdef PIN_USER_BTN
+-  if (millis() >= _next_read) {
++  if (millis_passed(_next_read)) {
+     int btnState = digitalRead(PIN_USER_BTN);
+     if (btnState != _prevBtnState) {
+       if (btnState == USER_BTN_PRESSED) {  // pressed?
+@@ -112,14 +113,14 @@ void UITask::loop() {
+ #endif
+ 
+   if (_display->isOn()) {
+-    if (millis() >= _next_refresh) {
++    if (millis_passed(_next_refresh)) {
+       _display->startFrame();
+       renderCurrScreen();
+       _display->endFrame();
+ 
+       _next_refresh = millis() + 1000;   // refresh every second
+     }
+-    if (millis() > _auto_off) {
++    if (millis_passed(_auto_off)) {
+       _display->turnOff();
+     }
+   }
+diff --git a/examples/simple_room_server/UITask.cpp b/examples/simple_room_server/UITask.cpp
+index 640a1d2..054dec1 100644
+--- a/examples/simple_room_server/UITask.cpp
++++ b/examples/simple_room_server/UITask.cpp
+@@ -1,6 +1,7 @@
+ #include "UITask.h"
+ #include <Arduino.h>
+ #include <helpers/CommonCLI.h>
++#include <helpers/ArduinoHelpers.h>
+ 
+ #ifndef USER_BTN_PRESSED
+ #define USER_BTN_PRESSED LOW
+@@ -46,7 +47,7 @@ void UITask::begin(NodePrefs* node_prefs, const char* build_date, const char* fi
+ 
+ void UITask::renderCurrScreen() {
+   char tmp[80];
+-  if (millis() < BOOT_SCREEN_MILLIS) { // boot screen
++  if (!millis_passed(BOOT_SCREEN_MILLIS)) { // boot screen
+     // meshcore logo
+     _display->setColor(DisplayDriver::BLUE);
+     int logoWidth = 128;
+@@ -94,7 +95,7 @@ void UITask::renderCurrScreen() {
+ 
+ void UITask::loop() {
+ #ifdef PIN_USER_BTN
+-  if (millis() >= _next_read) {
++  if (millis_passed(_next_read)) {
+     int btnState = digitalRead(PIN_USER_BTN);
+     if (btnState != _prevBtnState) {
+       if (btnState == USER_BTN_PRESSED) {  // pressed?
+@@ -112,14 +113,14 @@ void UITask::loop() {
+ #endif
+ 
+   if (_display->isOn()) {
+-    if (millis() >= _next_refresh) {
++    if (millis_passed(_next_refresh)) {
+       _display->startFrame();
+       renderCurrScreen();
+       _display->endFrame();
+ 
+       _next_refresh = millis() + 1000;   // refresh every second
+     }
+-    if (millis() > _auto_off) {
++    if (millis_passed(_auto_off)) {
+       _display->turnOff();
+     }
+   }
+diff --git a/src/helpers/ArduinoHelpers.h b/src/helpers/ArduinoHelpers.h
+index 97596da..2cf8159 100644
+--- a/src/helpers/ArduinoHelpers.h
++++ b/src/helpers/ArduinoHelpers.h
+@@ -24,6 +24,28 @@ public:
+   unsigned long getMillis() override { return millis(); }
+ };
+ 
++/**
++ * \brief  Wrap-safe millis deadline check, handling the 49-day millis() overflow.
++ * \param  target  The deadline timestamp obtained from millis() + delay.
++ * \returns true when the deadline has passed.
++ * \note   Use this instead of \c millis()>=target which fails near the 32-bit wrap.
++ *         Works via signed subtraction (2's complement).
++ */
++inline bool millis_passed(unsigned long target) {
++  return (long)(millis() - target) > 0;
++}
++
++// Safe elapsed time calculation that handles clock corrections (when RTC is set backwards,
++// e.g. after a reboot resets VolatileRTCClock to its fallback epoch while persisted
++// timestamps still reflect real prior time).
++// Returns 0 if recorded_timestamp is in the "future" relative to current_time.
++inline uint32_t safeElapsedSecs(uint32_t current_time, uint32_t recorded_timestamp) {
++  if (recorded_timestamp > current_time) {
++    return 0;  // Clock was corrected backwards; treat as "just now"
++  }
++  return current_time - recorded_timestamp;
++}
++
+ class StdRNG : public mesh::RNG {
+ public:
+   void begin(long seed) { randomSeed(seed); }
+diff --git a/src/helpers/sensors/EnvironmentSensorManager.cpp b/src/helpers/sensors/EnvironmentSensorManager.cpp
+index 73842d9..ed81e39 100644
+--- a/src/helpers/sensors/EnvironmentSensorManager.cpp
++++ b/src/helpers/sensors/EnvironmentSensorManager.cpp
+@@ -1,4 +1,5 @@
+ #include "EnvironmentSensorManager.h"
++#include <helpers/ArduinoHelpers.h>
+ 
+ #include <Wire.h>
+ 
+@@ -893,7 +894,7 @@ void EnvironmentSensorManager::loop() {
+   if (gps_active) {
+     _location->loop();
+   }
+-  if (millis() > next_gps_update) {
++  if (millis_passed(next_gps_update)) {
+ 
+     if(gps_active){
+     #ifdef RAK_WISBLOCK_GPS
+diff --git a/src/helpers/sensors/MicroNMEALocationProvider.h b/src/helpers/sensors/MicroNMEALocationProvider.h
+index eec466d..c8f5b12 100644
+--- a/src/helpers/sensors/MicroNMEALocationProvider.h
++++ b/src/helpers/sensors/MicroNMEALocationProvider.h
+@@ -4,6 +4,7 @@
+ #include <MicroNMEA.h>
+ #include <RTClib.h>
+ #include <helpers/RefCountedDigitalPin.h>
++#include <helpers/ArduinoHelpers.h>
+ 
+ #ifndef GPS_EN
+     #ifdef PIN_GPS_EN
+@@ -143,7 +144,7 @@ public :
+ 
+         if (!isValid()) time_valid = 0;
+ 
+-        if (millis() > next_check) {
++        if (millis_passed(next_check)) {
+             next_check = millis() + 1000;
+             // Re-enable time sync periodically when GPS has valid fix
+             if (!_time_sync_needed && _clock != NULL && (millis() - _last_time_sync) > TIME_SYNC_INTERVAL) {

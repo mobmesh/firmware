@@ -1,0 +1,2130 @@
+<!doctype html>
+<html lang="en" class="config-page">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="Repeater configurator: naming, region scopes, settings, and USB deploy for GulfCoastMesh MeshCore repeaters."
+    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="../shared/style.css" />
+    <link rel="stylesheet" href="configurator.css" />
+    <title>Repeater Configurator</title>
+  </head>
+  <body class="config-body">
+    <div class="page-wrap">
+      <div class="config-header">
+        <div class="config-header-top">
+          <div class="config-header-brand">
+            <span class="badge-pill">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+              </svg>
+              REPEATER SETUP
+            </span>
+            <h1>Repeater Configurator</h1>
+          </div>
+          <a
+            class="github-link config-header-github"
+            href="https://github.com/mobmesh/firmware"
+            aria-label="View this project on GitHub"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="18"
+              height="18"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                d="M10.226 17.284c-2.965-.36-5.054-2.493-5.054-5.256 0-1.123.404-2.336 1.078-3.144-.292-.741-.247-2.314.09-2.965.898-.112 2.111.36 2.83 1.01.853-.269 1.752-.404 2.853-.404 1.1 0 1.999.135 2.807.382.696-.629 1.932-1.1 2.83-.988.315.606.36 2.179.067 2.942.72.854 1.101 2 1.101 3.167 0 2.763-2.089 4.852-5.098 5.234.763.494 1.28 1.572 1.28 2.807v2.336c0 .674.561 1.056 1.235.786 4.066-1.55 7.255-5.615 7.255-10.646C23.5 6.188 18.334 1 11.978 1 5.62 1 .5 6.188.5 12.545c0 4.986 3.167 9.12 7.435 10.669.606.225 1.19-.18 1.19-.786V20.63a2.9 2.9 0 0 1-1.078.224c-1.483 0-2.359-.808-2.987-2.313-.247-.607-.517-.966-1.034-1.033-.27-.023-.359-.135-.359-.27 0-.27.45-.471.898-.471.652 0 1.213.404 1.797 1.235.45.651.921.943 1.483.943.561 0 .92-.202 1.437-.719.382-.381.674-.718.944-.943"
+              ></path>
+            </svg>
+            <span>mobmesh/firmware</span>
+          </a>
+        </div>
+        <div class="config-header-serial" id="config-header-serial">
+          <p
+            id="serial-unsupported"
+            class="serial-unsupported-note config-header-serial-unsupported"
+            hidden
+          >
+            Web Serial is not available in this browser.
+          </p>
+          <div class="config-header-serial-toolbar">
+            <div
+              class="config-action-group config-action-group--connection"
+              role="group"
+              aria-label="Device connection"
+            >
+            <button
+              type="button"
+              class="copy-btn serial-usb-toggle serial-usb-toggle--connect"
+              id="serial-usb-btn"
+              data-action="connect"
+              title="Chrome or Edge on HTTPS or localhost. Reconnects to an already-paired repeater at 115200 baud, or opens the Web Serial picker the first time. Shift-click to pick a different device."
+              aria-label="Connect USB"
+            >
+              <svg
+                class="serial-btn-icon serial-btn-icon--connect"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  d="M15 7v4h1v2h-3V7h2m-4 0v6H8v-2h1V7h2m5-4H8c-1.1 0-2 .9-2 2v2H4v6h2v6c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"
+                />
+              </svg>
+              <svg
+                class="serial-btn-icon serial-btn-icon--disconnect"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+                hidden
+              >
+                <path
+                  d="M15.5 7v4h1v2h-3.17l2 2H17c.55 0 1-.45 1-1V5c0-1.1-.9-2-2-2h-3.17l2 2H15.5zM2.81 2.81L1.39 4.22 6.17 9H4v2h2v6c0 1.1.9 2 2 2h6.17l3.61 3.61 1.41-1.41L2.81 2.81zM8.17 11l2 2H8v-2h.17zm1.66 6l2-2H13.5v2H9.83z"
+                />
+              </svg>
+              <span class="serial-usb-btn-label">Connect USB</span>
+            </button>
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="serial-read-btn"
+              disabled
+              title="Pull name, radio, adverts, regions, and other prefs from the device into this form. Admin password cannot be read back."
+            >
+              <svg
+                class="serial-btn-icon"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z" />
+              </svg>
+              <span>Read from repeater</span>
+            </button>
+            <span
+              class="serial-status"
+              id="serial-status"
+              data-state="disconnected"
+              >Disconnected</span
+            >
+            </div>
+            <div
+              class="config-action-group config-action-group--deploy"
+              role="group"
+              aria-label="Deploy to device"
+            >
+              <button
+                type="button"
+                class="copy-btn serial-btn-apply"
+                id="serial-apply-btn"
+                disabled
+                title="Write the generated CLI script to the device over USB. Always includes MeshCore firmware-default lines where needed so the node matches the form."
+              >
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z" /></svg>
+                <span>Apply configuration</span>
+              </button>
+              <button
+                type="button"
+                class="copy-btn serial-btn-secondary"
+                id="serial-advert-zerohop-btn"
+                disabled
+                title="Advertise once to local RF neighbours only — not rebroadcast (CLI: advert.zerohop)"
+              >
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7.1 6.9 5.7 5.5A9 9 0 0 0 3 12a9 9 0 0 0 2.7 6.5l1.4-1.4A7 7 0 0 1 5 12c0-1.9.8-3.7 2.1-5.1zm9.8 0A7 7 0 0 1 19 12a7 7 0 0 1-2.1 5.1l1.4 1.4A9 9 0 0 0 21 12a9 9 0 0 0-2.7-6.5l-1.4 1.4z" /></svg>
+                <span>Zero-hop advert</span>
+              </button>
+              <button
+                type="button"
+                class="copy-btn serial-btn-secondary"
+                id="serial-advert-flood-btn"
+                disabled
+                title="Immediately flood-advertise this node once (CLI: advert) — name, key, and position go out and get rebroadcast within hop limits"
+              >
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8.5 8.5 7.1 7.1A7 7 0 0 0 5 12c0 1.9.8 3.7 2.1 5l1.4-1.4A5 5 0 0 1 7 12c0-1.4.6-2.6 1.5-3.5zm7 0A5 5 0 0 1 17 12c0 1.4-.6 2.6-1.5 3.5l1.4 1.4A7 7 0 0 0 19 12a7 7 0 0 0-2.1-4.9l-1.4 1.4zM5.6 5.6 4.2 4.2A11 11 0 0 0 1 12c0 3 1.2 5.8 3.2 7.8l1.4-1.4A9 9 0 0 1 3 12c0-2.5 1-4.7 2.6-6.4zm12.8 0A9 9 0 0 1 21 12a9 9 0 0 1-2.6 6.4l1.4 1.4A11 11 0 0 0 23 12a11 11 0 0 0-3.2-7.8l-1.4 1.4z" /></svg>
+                <span>Flood advert</span>
+              </button>
+            </div>
+            <div
+              class="config-action-group config-action-group--form"
+              role="group"
+              aria-label="Form helpers"
+            >
+              <button
+                type="button"
+                class="copy-btn serial-btn-secondary"
+                id="recommended-settings-btn"
+                title="Fill radio + flood fields with the GulfCoastMesh baseline (form only — nothing is written until you Apply)"
+              >
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.5 5.6 10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7l2.5-1.4zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14l-2.5 1.4zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5L22 2zm-7.63 5.29a1 1 0 0 0-1.41 0L1.29 18.96a1 1 0 0 0 0 1.41l2.34 2.34a1 1 0 0 0 1.41 0L16.7 11.05a1 1 0 0 0 0-1.41l-2.33-2.35zm-1.03 5.49-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z" /></svg>
+                <span>Apply recommended settings</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <p class="config-header-desc">
+          Configure your repeater, then apply over USB or copy the command script.
+        </p>
+      </div>
+
+      <main class="config-main" id="config-main">
+        <section
+          class="config-card config-general-card"
+          id="general-card"
+          aria-labelledby="configuration-heading"
+        >
+          <div class="config-section-head">
+            <h2 id="configuration-heading" class="config-section-title">
+              Configuration
+            </h2>
+          </div>
+
+          <div class="config-identity-block" id="config-identity-block">
+            <h3
+              class="config-subsection-title"
+              title="Set where the repeater is and how its advertised name is built (set lat/lon/name, gps advert)"
+            >
+              Location &amp; name
+            </h3>
+            <div class="config-identity-search config-header-search">
+              <div class="search-wrap">
+                <span class="search-icon" aria-hidden="true">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  class="search-input"
+                  id="city-search"
+                  placeholder="Loading locations…"
+                  aria-label="Search locations and region codes"
+                  title="Search Gulf Coast places and region codes to set location, naming prefix, and region scopes"
+                  autocomplete="off"
+                />
+                <div
+                  class="search-dropdown"
+                  id="city-dropdown"
+                  style="display: none"
+                ></div>
+              </div>
+            </div>
+            <div class="config-position-block">
+              <div class="config-position-row">
+                <label
+                  class="config-form-field config-form-field--position"
+                  for="setting-lat"
+                >
+                  <span
+                    title="Where this repeater sits (decimal degrees). Clients and maps use this when Advert location is Prefs (CLI: set lat)."
+                    >Latitude</span
+                  >
+                  <input
+                    id="setting-lat"
+                    type="text"
+                    inputmode="decimal"
+                    placeholder="30.6954"
+                    autocomplete="off"
+                  />
+                </label>
+                <label
+                  class="config-form-field config-form-field--position"
+                  for="setting-lon"
+                >
+                  <span
+                    title="East/west position (decimal degrees). Paired with latitude in Prefs adverts (CLI: set lon)."
+                    >Longitude</span
+                  >
+                  <input
+                    id="setting-lon"
+                    type="text"
+                    inputmode="decimal"
+                    placeholder="-88.0399"
+                    autocomplete="off"
+                  />
+                </label>
+                <div class="config-position-actions">
+                  <button
+                    type="button"
+                    class="copy-btn serial-btn-secondary"
+                    id="position-pick-map-btn"
+                    title="Click the map to set latitude and longitude for this repeater"
+                  >
+                    Pick on map
+                  </button>
+                  <button
+                    type="button"
+                    class="copy-btn serial-btn-secondary"
+                    id="position-clear-btn"
+                    title="Clear stored lat/lon (they will not be written until you Apply)"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <label
+                  class="config-form-field config-form-field--position config-form-field--advert-loc"
+                  for="setting-advert-loc"
+                >
+                  <span
+                    title="What position goes into adverts (CLI: gps advert). None = hide location; Prefs = use lat/lon above; Share = live GPS if the board has it."
+                    >Advert location</span
+                  >
+                  <select id="setting-advert-loc">
+                    <option
+                      value="none"
+                      title="Do not include any location in adverts"
+                    >
+                      None
+                    </option>
+                    <option
+                      value="prefs"
+                      selected
+                      title="Advertise the stored lat/lon from this form"
+                    >
+                      Prefs (stored lat/lon)
+                    </option>
+                    <option
+                      value="share"
+                      title="Advertise live GPS coordinates (needs GPS hardware)"
+                    >
+                      Share (live GPS)
+                    </option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="config-identity-fields">
+              <div class="config-naming-fields">
+                <div class="config-form-grid config-form-grid--naming-row">
+                  <label
+                    class="config-form-field"
+                    for="name-location-mode"
+                    id="name-location-mode-wrap"
+                  >
+                    <span
+                      title="Local naming helper: how much place text we put before your node name. The full string becomes set name — not a separate CLI setting."
+                      >Prefix format</span
+                    >
+                    <select id="name-location-mode">
+                      <option
+                        value="city"
+                        title="Prefix like GC-MOB- …"
+                      >
+                        Region &amp; city
+                      </option>
+                      <option
+                        value="state"
+                        title="Prefix like GC-AL- …"
+                      >
+                        Region &amp; state
+                      </option>
+                      <option value="country" title="Prefix like GC- …">
+                        Region only
+                      </option>
+                      <option
+                        value="none"
+                        title="No auto place prefix — name is only what you type"
+                      >
+                        No predefined prefix
+                      </option>
+                    </select>
+                  </label>
+                  <label class="config-form-field" for="name-prefix-preview">
+                    <span
+                      title="Auto-built from location + prefix format. Combined with Node name into the advertised name (set name)."
+                      >Prefix</span
+                    >
+                    <input id="name-prefix-preview" type="text" />
+                  </label>
+                  <label class="config-form-field" for="name-suffix">
+                    <span
+                      title="Your unique name after the prefix. Full advert name is Prefix + this (+ optional emoji). With location set, MeshCore caps names around 24 bytes; otherwise ~32 (CLI: set name)."
+                      >Node name</span
+                    >
+                    <input
+                      id="name-suffix"
+                      type="text"
+                      placeholder="Tower-01"
+                      autocomplete="off"
+                    />
+                  </label>
+                  <label class="config-form-field" for="name-power-emoji">
+                    <span
+                      title="Naming convention: optional emoji hint (solar / mains / battery / observer) appended to the advertised name — not a separate MeshCore CLI setting."
+                      >Node type</span
+                    >
+                    <select id="name-power-emoji">
+                      <option value="" title="No power/type emoji in the name">
+                        Do not include
+                      </option>
+                      <option value="🌞" title="Solar-powered site">
+                        🌞 Solar
+                      </option>
+                      <option value="⚡" title="Mains-powered site">
+                        ⚡ Mains
+                      </option>
+                      <option value="🔋" title="Battery-powered site">
+                        🔋 Battery
+                      </option>
+                      <option
+                        value="👀"
+                        title="Observer / listen-only style node"
+                      >
+                        👀 Observer
+                      </option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <div class="config-naming-preview">
+                <p class="result-muted-note">Generated name</p>
+                <p id="name-preview" class="config-naming-preview-value">—</p>
+                <p id="name-preview-meta" class="config-naming-preview-meta"></p>
+                <p
+                  id="name-preview-note"
+                  class="result-muted-note config-naming-note"
+                  hidden
+                ></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="config-settings-groups" id="settings-tier-general">
+            <div class="config-subsection">
+              <h3
+                class="config-subsection-title"
+                title="Admin and guest passwords for remote access (password / set guest.password)"
+              >
+                Access
+              </h3>
+              <div class="config-form-grid config-form-grid--settings-system">
+                <label class="config-form-field" for="setting-admin-password">
+                  <span
+                    title="Who can administer this node over the mesh (CLI: password …). Default is “password”. Cannot be read back from the device — companions that know it get admin ACL access."
+                    >Admin password</span
+                  >
+                  <input
+                    id="setting-admin-password"
+                    type="text"
+                    placeholder="password"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="config-form-field" for="setting-guest-password">
+                  <span
+                    title="Guest access for telemetry / room join without full admin (CLI: set guest.password). Leave empty for open guest access."
+                    >Guest password</span
+                  >
+                  <input
+                    id="setting-guest-password"
+                    type="text"
+                    placeholder="Optional"
+                    autocomplete="off"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div class="config-subsection">
+              <div class="config-subsection-head">
+                <h3
+                  class="config-subsection-title"
+                  title="LoRa frequency plan, duty cycle, and TX power (set radio / set tx / set dutycycle)"
+                >
+                  Radio settings
+                </h3>
+                <button
+                  type="button"
+                  class="copy-btn serial-btn-secondary recommended-settings-btn-compact"
+                  id="recommended-settings-btn-2"
+                  title="Fill radio + flood fields with the GulfCoastMesh baseline (form only — nothing is written until you Apply)"
+                >
+                  <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.5 5.6 10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7l2.5-1.4zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14l-2.5 1.4zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5L22 2zm-7.63 5.29a1 1 0 0 0-1.41 0L1.29 18.96a1 1 0 0 0 0 1.41l2.34 2.34a1 1 0 0 0 1.41 0L16.7 11.05a1 1 0 0 0 0-1.41l-2.33-2.35zm-1.03 5.49-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z" /></svg>
+                  <span>Recommended</span>
+                </button>
+              </div>
+              <div class="config-form-grid">
+                <label
+                  class="config-form-field config-form-field--full"
+                  for="setting-radio-preset"
+                >
+                  <span
+                    title="Region-tuned LoRa freq / SF / BW / CR in one pick (CLI: set radio). Needs a reboot to take effect. Choose Custom to type values yourself."
+                    >Radio preset</span
+                  >
+                  <select id="setting-radio-preset"></select>
+                </label>
+                <label class="config-form-field" for="setting-dutycycle">
+                  <span
+                    title="How much airtime this node may use after each TX (CLI: set dutycycle, FW 1.15+). 10% matches typical EU 868 rules; 50% is firmware default; 100% = no limit; 1% is strictest."
+                    >Duty cycle (%)</span
+                  >
+                  <select id="setting-dutycycle">
+                    <option
+                      value="1"
+                      title="~1% airtime — strictest common EU-style limit"
+                    >
+                      1
+                    </option>
+                    <option
+                      value="10"
+                      title="~10% airtime — common EU 868 recommendation"
+                    >
+                      10
+                    </option>
+                    <option
+                      value="50"
+                      selected
+                      title="~50% airtime — MeshCore firmware default; US 915 ISM has no duty-cycle limit"
+                    >
+                      50
+                    </option>
+                    <option
+                      value="100"
+                      title="No duty-cycle limit (check local regulations)"
+                    >
+                      100
+                    </option>
+                  </select>
+                </label>
+              </div>
+              <div
+                id="setting-radio-custom-wrap"
+                class="setting-radio-custom"
+                hidden
+              >
+                <div class="config-form-grid config-form-grid--radio-custom">
+                  <label class="config-form-field" for="setting-radio-freq">
+                    <span
+                      title="LoRa centre frequency in MHz (part of set radio / set freq). Must be legal for your region. Reboot required after change."
+                      >Freq (MHz)</span
+                    >
+                    <input
+                      id="setting-radio-freq"
+                      type="number"
+                      step="0.001"
+                      min="150"
+                      max="2500"
+                      placeholder="869.618"
+                    />
+                  </label>
+                  <label class="config-form-field" for="setting-radio-sf">
+                    <span
+                      title="Spreading factor 5–12. Higher SF = longer range and more airtime; lower SF = faster, shorter packets."
+                      >SF</span
+                    >
+                    <input
+                      id="setting-radio-sf"
+                      type="number"
+                      step="1"
+                      min="5"
+                      max="12"
+                      placeholder="8"
+                    />
+                  </label>
+                  <label class="config-form-field" for="setting-radio-bw">
+                    <span
+                      title="Bandwidth in kHz (7.8–500). Narrower often squeezes between ISM interference; wider is faster. Part of set radio."
+                      >BW (kHz)</span
+                    >
+                    <input
+                      id="setting-radio-bw"
+                      type="number"
+                      step="0.001"
+                      min="7"
+                      max="500"
+                      placeholder="62.5"
+                    />
+                  </label>
+                  <label class="config-form-field" for="setting-radio-cr">
+                    <span
+                      title="Coding rate 5–8 (forward error correction). Higher CR = more redundancy and longer airtime if the channel is noisy."
+                      >CR</span
+                    >
+                    <input
+                      id="setting-radio-cr"
+                      type="number"
+                      step="1"
+                      min="5"
+                      max="8"
+                      placeholder="8"
+                    />
+                  </label>
+                  <label class="config-form-field" for="setting-radio-txpower">
+                    <span
+                      title="LoRa chip TX power in dBm (1–22, CLI: set tx). Some boards add a PA on top — check the board manual. Too high can break local rules."
+                      >TX power (dBm)</span
+                    >
+                    <input
+                      id="setting-radio-txpower"
+                      type="number"
+                      step="1"
+                      min="1"
+                      max="22"
+                      placeholder="22"
+                    />
+                  </label>
+                </div>
+                <p
+                  id="setting-radio-error"
+                  class="setting-radio-error"
+                  role="alert"
+                  hidden
+                ></p>
+              </div>
+            </div>
+
+            <div class="config-subsection">
+              <h3
+                class="config-subsection-title"
+                title="How often and how far this node announces itself, plus flood hop caps"
+              >
+                Advertising
+              </h3>
+              <div class="config-form-grid config-form-grid--settings-adverts">
+                <label
+                  class="config-form-field"
+                  for="setting-flood-advert-interval"
+                >
+                  <span
+                    title="How often this repeater floods its advert across the mesh (hours, 3–168). Flood = neighbours rebroadcast it. GulfCoastMesh uses 23 (CLI: set flood.advert.interval)."
+                    >Flood advert interval (h)</span
+                  >
+                  <input
+                    id="setting-flood-advert-interval"
+                    type="number"
+                    min="3"
+                    max="168"
+                    step="1"
+                    value="23"
+                  />
+                </label>
+                <label class="config-form-field" for="setting-advert-interval">
+                  <span
+                    title="Local-only (zero-hop) advert timer in minutes. Only RF neighbours hear it — not rebroadcast. Rounded down to even minutes; 0 = disabled (CLI: set advert.interval)."
+                    >Zero-hop advert interval (min)</span
+                  >
+                  <input
+                    id="setting-advert-interval"
+                    type="number"
+                    min="0"
+                    max="240"
+                    step="2"
+                    value="240"
+                  />
+                </label>
+              </div>
+              <div
+                class="config-form-grid config-form-grid--settings-flood-limits"
+              >
+                <label class="config-form-field" for="setting-flood-max">
+                  <span
+                    title="Hard cap on how many hops any flood packet may travel through this mesh path (0–64, default 64). Firmware absolute max is 64 (CLI: set flood.max)."
+                    >Flood max hops (all)</span
+                  >
+                  <input
+                    id="setting-flood-max"
+                    type="number"
+                    min="0"
+                    max="64"
+                    step="1"
+                    value="64"
+                  />
+                </label>
+                <label
+                  class="config-form-field"
+                  for="setting-flood-max-unscoped"
+                >
+                  <span
+                    title="Hop cap for floods with no region tag. Lower (e.g. 3) lets local unscoped traffic work without denying *, while stopping distant noise from flooding your area (CLI: set flood.max.unscoped)."
+                    >Flood max unscoped hops</span
+                  >
+                  <input
+                    id="setting-flood-max-unscoped"
+                    type="number"
+                    min="0"
+                    max="64"
+                    step="1"
+                    value="12"
+                  />
+                </label>
+                <label
+                  class="config-form-field"
+                  for="setting-flood-max-advert"
+                >
+                  <span
+                    title="Hop cap for advert floods only — keeps node-info floods from spanning the whole continent (default often 8; CLI: set flood.max.advert)."
+                    >Flood max advert hops</span
+                  >
+                  <input
+                    id="setting-flood-max-advert"
+                    type="number"
+                    min="0"
+                    max="64"
+                    step="1"
+                    value="8"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div class="config-subsection">
+              <h3
+                class="config-subsection-title"
+                title="Optional contact text clients can read (set owner.info)"
+              >
+                Owner info
+              </h3>
+              <div class="config-form-grid">
+                <label
+                  class="config-form-field config-form-field--full"
+                  for="setting-owner-info"
+                >
+                  <span
+                    title="Free-text contact or notes clients can read (CLI: set owner.info, FW 1.12+). In CLI, | becomes a newline."
+                    >Contact or notes</span
+                  >
+                  <input
+                    id="setting-owner-info"
+                    type="text"
+                    placeholder="Contact or notes"
+                    autocomplete="off"
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <details class="config-settings-tier" id="settings-tier-advanced">
+            <summary
+              class="config-settings-tier-summary"
+              title="Forwarding, path-hash size for this node’s adverts, loop detection, TX/RX timing, and radio diagnostics"
+            >
+              Advanced settings
+            </summary>
+            <div class="config-form-grid config-form-grid--settings-rest">
+              <label class="config-form-field" for="setting-repeat">
+                <span
+                  title="On = this node forwards (repeats) packets. Off = listen/observer style — it will not rebroadcast flood or routed traffic (CLI: set repeat)."
+                  >Repeat mode</span
+                >
+                <select id="setting-repeat">
+                  <option value="on" selected title="Forward packets as a repeater">
+                    on
+                  </option>
+                  <option
+                    value="off"
+                    title="Do not forward — useful for observers"
+                  >
+                    off
+                  </option>
+                </select>
+              </label>
+              <label class="config-form-field" for="setting-loop-detect">
+                <span
+                  title="Drops flood packets that already contain this repeater’s ID too often — stops packet storms from bad/forked firmware (CLI: set loop.detect, FW 1.14+)."
+                  >Loop detection</span
+                >
+                <select id="setting-loop-detect">
+                  <option value="off" title="No loop checks">off</option>
+                  <option
+                    value="minimal"
+                    selected
+                    title="Drop if own ID appears often (thresholds depend on path-hash size)"
+                  >
+                    minimal
+                  </option>
+                  <option
+                    value="moderate"
+                    title="Stricter than minimal — drop sooner when own ID is in the path"
+                  >
+                    moderate
+                  </option>
+                  <option
+                    value="strict"
+                    title="Drop if own ID appears even once in the path"
+                  >
+                    strict
+                  </option>
+                </select>
+              </label>
+              <label class="config-form-field" for="setting-path-hash-mode">
+                <span
+                  title="Path-ID size used only in this repeater’s own adverts — not what it forwards. 0 = 1-byte / up to 64 hops; 1 = 2-byte / 32; 2 = 3-byte / 21. Pre-1.14 nodes drop multi-byte (CLI: set path.hash.mode)."
+                  >Path hash mode</span
+                >
+                <select id="setting-path-hash-mode">
+                  <option
+                    value="0"
+                    title="1-byte path IDs — widest hop budget (64), more ID collisions"
+                  >
+                    0 — 1-byte (64 hops)
+                  </option>
+                  <option
+                    value="1"
+                    selected
+                    title="2-byte path IDs — fewer collisions, max ~32 flood hops"
+                  >
+                    1 — 2-byte (32 hops)
+                  </option>
+                  <option
+                    value="2"
+                    title="3-byte path IDs — rare collisions, max ~21 flood hops"
+                  >
+                    2 — 3-byte (21 hops)
+                  </option>
+                </select>
+              </label>
+            </div>
+            <div class="config-form-grid config-form-grid--settings-timing">
+              <label class="config-form-field" for="setting-txdelay">
+                <span
+                  title="Scales the random wait before re-flooding so nearby repeaters don’t all TX at once. Higher = fewer collisions, more latency. 0 = no delay window (CLI: set txdelay)."
+                  >Tx delay (flood)</span
+                >
+                <input
+                  id="setting-txdelay"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value="0.5"
+                />
+              </label>
+              <label class="config-form-field" for="setting-direct-txdelay">
+                <span
+                  title="Same collision-avoidance window as Tx delay, but for direct (routed) traffic. Default is lower because fewer nodes compete (CLI: set direct.txdelay)."
+                  >Direct tx delay</span
+                >
+                <input
+                  id="setting-direct-txdelay"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value="0.2"
+                />
+              </label>
+              <label class="config-form-field" for="setting-rxdelay">
+                <span
+                  title="Experimental: weak-signal receivers wait before processing a flood; strong-signal ones go first so duplicates get suppressed (CLI: set rxdelay)."
+                  >Rx delay base</span
+                >
+                <input
+                  id="setting-rxdelay"
+                  type="number"
+                  min="0"
+                  max="20"
+                  step="0.1"
+                  value="0"
+                />
+              </label>
+            </div>
+            <div class="config-form-grid config-form-grid--settings-expert">
+              <label class="config-form-field" for="setting-radio-rxgain">
+                <span
+                  title="Boosted receive gain on SX126x / LR1110 radios. Usually leave on for better sensitivity (CLI: set radio.rxgain)."
+                  >Radio RX gain</span
+                >
+                <select id="setting-radio-rxgain">
+                  <option
+                    value="on"
+                    selected
+                    title="Boosted RX gain enabled (typical default)"
+                  >
+                    on (boosted)
+                  </option>
+                  <option value="off" title="Disable boosted RX gain">
+                    off
+                  </option>
+                </select>
+              </label>
+              <label class="config-form-field" for="setting-int-thresh">
+                <span
+                  title="Local RF interference gate used by the radio stack. 0 disables the check (CLI: set int.thresh)."
+                  >Interference threshold</span
+                >
+                <input
+                  id="setting-int-thresh"
+                  type="number"
+                  min="0"
+                  max="255"
+                  step="1"
+                  value="0"
+                />
+              </label>
+              <label class="config-form-field" for="setting-agc-reset">
+                <span
+                  title="Periodically reset SX1262 AGC to fight “deafness” near strong interferers. Seconds, rounded down to a multiple of 4 — try 4. 0 = off (CLI: set agc.reset.interval)."
+                  >AGC reset interval (s)</span
+                >
+                <input
+                  id="setting-agc-reset"
+                  type="number"
+                  min="0"
+                  max="255"
+                  step="4"
+                  value="4"
+                />
+              </label>
+              <label class="config-form-field" for="setting-multi-acks">
+                <span
+                  title="Extra multi-ACK behaviour for some traffic patterns. Leave off unless you know you need it (CLI: set multi.acks)."
+                  >Multi-acks</span
+                >
+                <select id="setting-multi-acks">
+                  <option value="0" title="Multi-acks disabled">off</option>
+                  <option value="1" selected title="Multi-acks enabled">
+                    on
+                  </option>
+                </select>
+              </label>
+            </div>
+          </details>
+        </section>
+
+        <section
+          class="config-card policy-section visible"
+          id="policy-card"
+          aria-labelledby="regions-heading"
+          aria-live="polite"
+        >
+          <div class="policy-card-head">
+            <h2
+              id="regions-heading"
+              class="config-section-title"
+              title="Which region transport codes this repeater will flood (region allowf / denyf / home)"
+            >
+              Region scopes
+            </h2>
+            <div
+              class="policy-global-actions policy-card-head-actions"
+              id="policy-head-actions"
+              role="group"
+              aria-label="Apply to all policy scopes below"
+              hidden
+            >
+              <button
+                type="button"
+                class="policy-global-btn"
+                data-global-bulk="defaults"
+                title="Reset every scope row to the configurator defaults (home Allow, neighbours cleared as designed)"
+              >
+                Defaults
+              </button>
+              <button
+                type="button"
+                class="policy-global-btn policy-global-btn--clear"
+                data-global-bulk="clear"
+                title="Clear Allow and Deny on every region row in all scopes"
+              >
+                Clear all
+              </button>
+              <button
+                type="button"
+                class="policy-global-btn"
+                data-global-bulk="allow"
+                title="Allow flood for every listed region (region allowf …)"
+              >
+                Allow all
+              </button>
+              <button
+                type="button"
+                class="policy-global-btn"
+                data-global-bulk="deny"
+                title="Deny flood for every listed region (region denyf …)"
+              >
+                Deny all
+              </button>
+            </div>
+          </div>
+          <p
+            id="policy-scope-empty"
+            class="result-muted-note policy-scope-empty policy-location-prompt"
+          >
+            Choose a location above to configure region scopes.
+          </p>
+          <div id="policy-regions-body" hidden>
+            <p
+              class="config-card-desc"
+              title="Each Allow/Deny maps to region allowf / region denyf. Untagged traffic uses the * wildcard. Changes are written when you Apply."
+            >
+              Allow or deny flood per scope.
+            </p>
+            <div
+              id="policy-grids-container"
+              class="policy-grids-container"
+            ></div>
+            <details class="policy-codes-details" id="policy-codes-details">
+              <summary class="policy-codes-summary" id="result-card-heading">
+                Codes for this selection
+              </summary>
+              <div
+                class="policy-codes-block result-section"
+                id="result-card"
+              >
+                <div class="result-found-stack" id="result-grid"></div>
+              </div>
+            </details>
+            <div class="policy-masters policy-region-footer">
+              <p class="policy-region-footer-title">Region CLI options</p>
+              <label
+                class="policy-master"
+                title="Allow flood for packets with no region transport code (CLI: region allowf *). Turn off only if neighbours agree; keep enough Allow rows or untagged packets may drop."
+              >
+                <input type="checkbox" id="policy-untagged-flood" checked />
+                <span>Allow flooding untagged traffic (<code>*</code>)</span>
+              </label>
+              <div
+                class="policy-home-override-wrap"
+                role="group"
+                aria-label="Home region override"
+              >
+                <label
+                  class="policy-home-override-label"
+                  for="policy-home-override"
+                  title="Would force region home to a chosen code instead of the smallest Allow in the home table. Not wired as an active firmware feature in current builds — left for future use."
+                >
+                  <input
+                    type="checkbox"
+                    class="policy-home-override"
+                    id="policy-home-override"
+                  />
+                  <span>Home override</span>
+                  <span class="policy-home-override-inactive-note"
+                    >Not an active function in the current firmware</span
+                  >
+                </label>
+                <p
+                  class="policy-home-override-hint"
+                  title="By default Apply writes region home to the smallest scope with Allow checked in the home table (or *). Override would pick another code."
+                >
+                  Override automatic <code>region home</code> (smallest allowed
+                  home scope).
+                </p>
+                <label
+                  class="policy-home-override-select-label"
+                  for="policy-home-override-select"
+                  title="Target region code for region home when Home override is on"
+                  >Target for region home</label
+                >
+                <select
+                  id="policy-home-override-select"
+                  class="policy-home-override-select"
+                  disabled
+                  aria-label="Override region home code"
+                >
+                  <option value="">Default</option>
+                </select>
+              </div>
+              <div
+                class="policy-default-scope-wrap"
+                role="group"
+                aria-label="Default flood scope"
+              >
+                <label
+                  class="policy-default-scope-label"
+                  for="policy-default-scope-select"
+                  title="Tags this node's own flood adverts with a region transport code (CLI: region default). With flood.max.advert above flood.max.unscoped, scoped adverts get more hop budget than untagged noise."
+                >
+                  Default flood scope
+                </label>
+                <p
+                  class="policy-default-scope-hint"
+                  title="Apply writes region default only when you pick a scope here. Automatic keeps the value already on the device."
+                >
+                  <code>region default</code> decides which hop budget this
+                  node's own flood adverts get. Automatic keeps whatever the
+                  device already has and writes nothing new — pick a scope here
+                  only if you mean to change it.
+                </p>
+                <select
+                  id="policy-default-scope-select"
+                  class="policy-default-scope-select"
+                  aria-label="Default flood scope region"
+                >
+                  <option value="">Automatic (none)</option>
+                  <option value="__none__">None (&lt;null&gt;)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          class="config-card config-mod-card"
+          id="mod-card"
+          aria-labelledby="mod-heading"
+          hidden
+        >
+          <div class="config-section-head">
+            <h2 id="mod-heading" class="config-section-title">Hotspot OTA</h2>
+            <span class="serial-status" id="mod-status" data-state="connected"
+              >Modded firmware</span
+            >
+          </div>
+          <p class="config-card-desc">
+            Extra commands this build adds on top of stock MeshCore. Only shown
+            when the connected repeater answers to them.
+          </p>
+
+          <dl class="device-info-grid">
+            <div class="device-info-item device-info-item--wide">
+              <dt title="Active OTA slot and rollback state (CLI: get ota.slot)">
+                OTA slots
+              </dt>
+              <dd id="mod-info-slot" class="device-info-mono">—</dd>
+            </div>
+          </dl>
+
+          <h3
+            class="config-subsection-title"
+            title="Where start ota wan update pulls firmware from (CLI: get/set ota.fw.url)"
+          >
+            Update source
+          </h3>
+          <div class="config-form-grid">
+            <label
+              class="config-form-field config-form-field--full"
+              for="setting-ota-fw-url"
+            >
+              <span
+                title="HTTPS URL of the firmware .bin used by start ota wan update. Persisted on the device (CLI: set ota.fw.url)."
+                >Firmware URL</span
+              >
+              <input
+                id="setting-ota-fw-url"
+                type="text"
+                placeholder="https://…/firmware.bin"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
+          </div>
+
+          <h3
+            class="config-subsection-title"
+            title="WiFi network joined for OTA downloads (CLI: set ota.wan.wifi ssid,password)"
+          >
+            Hotspot credentials
+          </h3>
+          <div class="config-form-grid">
+            <label class="config-form-field" for="setting-ota-wifi-ssid">
+              <span
+                title="WiFi network name the repeater joins for an OTA download. Persisted separately from node prefs."
+                >WiFi SSID</span
+              >
+              <input
+                id="setting-ota-wifi-ssid"
+                type="text"
+                placeholder="Leave blank to keep current"
+                autocomplete="off"
+              />
+            </label>
+            <label class="config-form-field" for="setting-ota-wifi-pass">
+              <span
+                title="WiFi password. Cannot be read back from the device, the same as the admin password."
+                >WiFi password</span
+              >
+              <input
+                id="setting-ota-wifi-pass"
+                type="text"
+                placeholder="Leave blank to keep current"
+                autocomplete="off"
+              />
+            </label>
+          </div>
+          <p class="result-muted-note">
+            Both fields are write-only. Filling them adds
+            <code>set ota.wan.wifi</code> to the command script; leaving them
+            blank keeps whatever the device already has.
+          </p>
+
+          <h3
+            class="config-subsection-title"
+            title="Pre-flight checks and the update trigger (CLI: ota wan join / check / leave, start ota wan update)"
+          >
+            WAN actions
+          </h3>
+          <div class="device-tools-toolbar">
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="mod-wan-join-btn"
+              disabled
+              title="Join the configured WiFi network only — one quick attempt, no download (CLI: ota wan join)"
+            >
+              Join WiFi
+            </button>
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="mod-wan-check-btn"
+              disabled
+              title="Check WAN reachability without rejoining (CLI: ota wan check)"
+            >
+              Check WAN
+            </button>
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="mod-wan-leave-btn"
+              disabled
+              title="Disconnect and drop WAN power for a clean retry (CLI: ota wan leave)"
+            >
+              Leave WiFi
+            </button>
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="mod-wan-pwr-btn"
+              disabled
+              title="Toggle the GPIO47 WAN power switch directly (CLI: set ota.wan.pwr on|off)"
+            >
+              WAN power: —
+            </button>
+          </div>
+        </section>
+
+        <section
+          class="config-card result-section visible"
+          id="commands-card"
+          aria-labelledby="deploy-heading"
+        >
+          <h2
+            id="deploy-heading"
+            class="config-section-title"
+            title="Session log, interactive MeshCore CLI console, and the command script that Apply will send"
+          >
+            Deploy
+          </h2>
+          <p class="config-card-desc">
+            Apply configuration and adverts from the top toolbar. Here you can
+            review the session log, use the interactive console, and copy the
+            command script.
+          </p>
+
+          <div class="serial-apply-panel" id="serial-apply-panel">
+            <div class="serial-log-toolbar">
+              <p class="deploy-toolbar-label serial-log-toolbar-label">
+                Session log
+              </p>
+              <label
+                class="serial-show-command-log"
+                title="Show each CLI command and reply during USB read"
+              >
+                <input type="checkbox" id="serial-show-command-log" />
+                <span>Show command log</span>
+              </label>
+            </div>
+            <div class="serial-terminal" id="serial-terminal">
+              <pre
+                class="serial-apply-log"
+                id="serial-apply-log"
+                aria-live="polite"
+              ></pre>
+              <form
+                class="serial-console-form serial-terminal-input-row"
+                id="serial-console-form"
+              >
+                <label class="visually-hidden" for="serial-console-input"
+                  >Interactive console command</label
+                >
+                <span class="serial-terminal-prompt" aria-hidden="true"
+                  >&gt;</span
+                >
+                <input
+                  type="text"
+                  id="serial-console-input"
+                  class="serial-console-input"
+                  placeholder="type a command…  (e.g. get name)"
+                  list="serial-command-db"
+                  disabled
+                  autocomplete="off"
+                  spellcheck="false"
+                  maxlength="151"
+                  title="One command per line (max 151 chars). Up/Down recalls history. Start typing for suggestions. region load not supported."
+                />
+                <button
+                  type="submit"
+                  class="copy-btn serial-btn-secondary serial-console-btn"
+                  id="serial-console-send-btn"
+                  disabled
+                  title="Send line to device"
+                >
+                  <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 7v4H5.83l3.58-3.59L8 6l-6 6 6 6 1.41-1.41L5.83 13H21V7z" /></svg>
+                  <span>Send</span>
+                </button>
+                <button
+                  type="button"
+                  class="copy-btn serial-btn-secondary serial-console-btn"
+                  id="serial-console-clear-btn"
+                  disabled
+                  title="Clear session log"
+                >
+                  <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.14 3a2 2 0 0 1 1.41.59l4.86 4.86a2 2 0 0 1 0 2.83L11.83 20H20v2H7.83l-5.24-5.24a2 2 0 0 1 0-2.83L13.73 3.59A2 2 0 0 1 15.14 3zM9 18.17 4.41 13.6 8 10l4.59 4.59L9 18.17z" /></svg>
+                  <span>Clear</span>
+                </button>
+              </form>
+            </div>
+            <datalist id="serial-command-db">
+              <option value="get name">Get advertisement name</option>
+              <option value="get radio">Get radio (freq,bw,sf,cr)</option>
+              <option value="get tx">Get TX power (dBm)</option>
+              <option value="get freq">Get frequency (MHz)</option>
+              <option value="get repeat">Get repeat mode</option>
+              <option value="get owner.info">Get owner info</option>
+              <option value="get guest.password">Get guest password</option>
+              <option value="get dutycycle">Get duty cycle (%)</option>
+              <option value="get advert.interval">
+                Get zero-hop advert interval (min)
+              </option>
+              <option value="get flood.advert.interval">
+                Get flood advert interval (h)
+              </option>
+              <option value="get flood.max">Get flood max hops</option>
+              <option value="get flood.max.unscoped">
+                Get flood max unscoped hops
+              </option>
+              <option value="get flood.max.advert">
+                Get flood max advert hops
+              </option>
+              <option value="get path.hash.mode">Get path hash mode</option>
+              <option value="get loop.detect">Get loop detection</option>
+              <option value="get txdelay">Get flood TX delay factor</option>
+              <option value="get direct.txdelay">
+                Get direct TX delay factor
+              </option>
+              <option value="get rxdelay">Get RX delay base</option>
+              <option value="get radio.rxgain">Get boosted RX gain</option>
+              <option value="get int.thresh">
+                Get interference threshold
+              </option>
+              <option value="get agc.reset.interval">
+                Get AGC reset interval (s)
+              </option>
+              <option value="get multi.acks">Get multi-acks</option>
+              <option value="get lat">Get latitude</option>
+              <option value="get lon">Get longitude</option>
+              <option value="get public.key">Get public key</option>
+              <option value="get role">Get device role</option>
+              <option value="get prv.key">Get private key (serial only)</option>
+              <option value="set name ">Set advertisement name</option>
+              <option value="set radio ">Set radio: freq,bw,sf,cr</option>
+              <option value="set tx ">Set TX power (dBm)</option>
+              <option value="set freq ">Set frequency (MHz)</option>
+              <option value="set repeat ">Set repeat mode (on|off)</option>
+              <option value="set owner.info ">Set owner info</option>
+              <option value="set guest.password ">Set guest password</option>
+              <option value="set dutycycle ">Set duty cycle (%)</option>
+              <option value="set advert.interval ">
+                Set zero-hop advert interval (min)
+              </option>
+              <option value="set flood.advert.interval ">
+                Set flood advert interval (h)
+              </option>
+              <option value="set flood.max ">Set flood max hops</option>
+              <option value="set flood.max.unscoped ">
+                Set flood max unscoped hops
+              </option>
+              <option value="set flood.max.advert ">
+                Set flood max advert hops
+              </option>
+              <option value="set path.hash.mode ">
+                Set path hash mode (0-2)
+              </option>
+              <option value="set loop.detect ">
+                Set loop detection (off|minimal|moderate|strict)
+              </option>
+              <option value="set txdelay ">Set flood TX delay factor</option>
+              <option value="set direct.txdelay ">
+                Set direct TX delay factor
+              </option>
+              <option value="set rxdelay ">Set RX delay base</option>
+              <option value="set radio.rxgain ">
+                Set boosted RX gain (on|off)
+              </option>
+              <option value="set int.thresh ">
+                Set interference threshold
+              </option>
+              <option value="set agc.reset.interval ">
+                Set AGC reset interval (s)
+              </option>
+              <option value="set multi.acks ">Set multi-acks (0|1)</option>
+              <option value="set lat ">Set latitude</option>
+              <option value="set lon ">Set longitude</option>
+              <option value="set prv.key ">Set private key (hex)</option>
+              <option value="advert">Send flood advert</option>
+              <option value="advert.zerohop">Send zero-hop advert</option>
+              <option value="reboot">Reboot device</option>
+              <option value="clock">Show device time</option>
+              <option value="clock sync">Sync device clock</option>
+              <option value="time ">Set device time (epoch seconds)</option>
+              <option value="ver">Show firmware version</option>
+              <option value="erase">Factory reset (erase all)</option>
+              <option value="start ota">Start OTA firmware update</option>
+              <option value="password ">Set admin password</option>
+              <option value="gps advert">Advert location mode</option>
+              <option value="region home">Show region home</option>
+              <option value="region list allowed">List allowed regions</option>
+              <option value="region list denied">List denied regions</option>
+              <option value="neighbors">Show neighbors</option>
+              <option value="log">Output log</option>
+              <option value="log start">Start packet logging</option>
+              <option value="log stop">Stop packet logging</option>
+              <option value="log erase">Erase packet logs</option>
+              <option value="poweroff">Power off device</option>
+              <option value="shutdown">Shut down device</option>
+              <option value="clkreboot">Reset clock and reboot</option>
+              <option value="board">Show hardware name</option>
+              <option value="neighbor.remove ">
+                Remove neighbor by pubkey prefix
+              </option>
+              <option value="discover.neighbors">
+                Discover zero-hop neighbors
+              </option>
+              <option value="clear stats">Clear statistics</option>
+              <option value="stats-core">
+                System stats (battery, uptime, queue)
+              </option>
+              <option value="stats-radio">
+                Radio stats (noise, RSSI/SNR, airtime)
+              </option>
+              <option value="stats-packets">
+                Packet counters (received, sent)
+              </option>
+              <option value="tempradio ">
+                Temporary radio params: freq,bw,sf,cr,mins
+              </option>
+              <option value="get adc.multiplier">Get battery ADC multiplier</option>
+              <option value="set adc.multiplier ">Set battery ADC multiplier</option>
+              <option value="get af">Get airtime factor (deprecated)</option>
+              <option value="set af ">Set airtime factor (deprecated)</option>
+              <option value="powersaving">Show power-saving flag</option>
+              <option value="powersaving on">Enable power saving</option>
+              <option value="powersaving off">Disable power saving</option>
+              <option value="setperm ">
+                Set companion permissions: pubkey 0-3
+              </option>
+              <option value="get acl">View ACL</option>
+              <option value="get allow.read.only">
+                Get room read-only flag
+              </option>
+              <option value="set allow.read.only ">
+                Set room read-only flag (on|off)
+              </option>
+              <option value="region">Dump all regions</option>
+              <option value="region load">Bulk-load regions (interactive)</option>
+              <option value="region save">Save region changes</option>
+              <option value="region allowf ">Allow (flood) a region</option>
+              <option value="region denyf ">Block a region</option>
+              <option value="region get ">Show region info</option>
+              <option value="region default">Show default scope region</option>
+              <option value="region default ">Set default scope region</option>
+              <option value="region put ">Create region: name [parent]</option>
+              <option value="region def ">Define region hierarchy (tokens)</option>
+              <option value="region remove ">Remove a region</option>
+              <option value="region list">List regions: allowed|denied</option>
+              <option value="gps">Show GPS state</option>
+              <option value="gps on">Enable GPS</option>
+              <option value="gps off">Disable GPS</option>
+              <option value="gps sync">Sync clock with GPS</option>
+              <option value="gps setloc">Set location from GPS</option>
+              <option value="sensor list">List sensors</option>
+              <option value="sensor get ">Get a sensor value</option>
+              <option value="sensor set ">Set a sensor value</option>
+              <option value="get bridge.type">Show bridge type</option>
+              <option value="get bridge.enabled">Get bridge enabled</option>
+              <option value="set bridge.enabled ">Set bridge enabled (on|off)</option>
+              <option value="get bridge.delay">Get bridge delay (ms)</option>
+              <option value="set bridge.delay ">Set bridge delay (ms)</option>
+              <option value="get bridge.source">Get bridge source</option>
+              <option value="set bridge.source ">Set bridge source (logRx|logTx)</option>
+              <option value="get bridge.baud">Get bridge baud (RS-232)</option>
+              <option value="set bridge.baud ">Set bridge baud (RS-232)</option>
+              <option value="get bridge.channel">Get bridge channel (ESPNow)</option>
+              <option value="set bridge.channel ">Set bridge channel (ESPNow)</option>
+              <option value="get bridge.secret">Get ESP-Now secret</option>
+              <option value="set bridge.secret ">Set ESP-Now secret</option>
+              <option value="get bootloader.ver">Bootloader version (nRF52)</option>
+              <option value="get pwrmgt.support">Power management support</option>
+              <option value="get pwrmgt.source">Current power source</option>
+              <option value="get pwrmgt.bootreason">Boot/reset reason</option>
+              <option value="get pwrmgt.bootmv">Boot voltage</option>
+            </datalist>
+          </div>
+
+          <details class="cli-preview-details" id="cli-preview-panel">
+            <summary class="cli-preview-summary">
+              <span class="cli-preview-summary-label">Command preview</span>
+              <span class="cli-preview-summary-hint cli-preview-hint-closed"
+                >Show CLI script</span
+              >
+              <span class="cli-preview-summary-hint cli-preview-hint-open"
+                >Hide</span
+              >
+            </summary>
+            <label
+              class="config-cli-show-defaults"
+              title="Forces every firmware-default value into the preview and USB Apply. Without a read, defaults are always included since the repeater's current values are unknown; after a read, only what differs is sent unless this is checked."
+            >
+              <input type="checkbox" id="cli-show-defaults" />
+              <span>Include firmware defaults</span>
+            </label>
+            <pre class="commands-block" id="commands-block"></pre>
+          </details>
+          <div class="cli-preview-actions">
+            <button
+              type="button"
+              class="copy-btn serial-btn-apply"
+              id="serial-apply-btn-2"
+              disabled
+              title="Write the generated CLI script to the device over USB. Always includes MeshCore firmware-default lines where needed so the node matches the form."
+            >
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z" /></svg>
+              <span>Apply configuration</span>
+            </button>
+            <button
+              type="button"
+              class="copy-btn"
+              id="copy-btn"
+              title="Copy the generated CLI script to paste into a serial console yourself (one line at a time if needed)"
+            >
+              Copy command script
+            </button>
+          </div>
+          <p
+            class="cli-firmware-note"
+            title="Region hierarchy uses MeshCore region def (introduced in 1.16.0). Named regions from region def are flood-allowed; only * and Deny rows need allowf/denyf."
+          >
+            Requires MeshCore firmware
+            <strong>v1.16.0</strong> or newer on the repeater.
+            Named regions from <code>region def</code> are flood-allowed by
+            default.
+          </p>
+        </section>
+
+        <section
+          class="config-card device-tools-section"
+          id="device-tools-card"
+          aria-labelledby="device-tools-heading"
+        >
+          <h2
+            id="device-tools-heading"
+            class="config-section-title"
+            title="Live device readouts, identity keys, JSON backup, reboot / OTA / factory reset"
+          >
+            Device tools
+          </h2>
+          <p class="config-card-desc">
+            Live device info, identity, config backup, and maintenance actions.
+            Requires a USB connection.
+          </p>
+
+          <h3
+            class="config-subsection-title"
+            title="Firmware version, role, clock, and public key read from the connected device"
+          >
+            Device info
+          </h3>
+          <dl class="device-info-grid">
+            <div class="device-info-item">
+              <dt
+                title="Firmware version string from the device (CLI: ver)"
+              >
+                Version
+              </dt>
+              <dd id="device-info-version">—</dd>
+            </div>
+            <div class="device-info-item">
+              <dt
+                title="Configured role — repeater, room server, companion, sensor, etc. (CLI: get role)"
+              >
+                Role
+              </dt>
+              <dd id="device-info-role">—</dd>
+            </div>
+            <div class="device-info-item">
+              <dt title="Device clock in UTC (CLI: clock). Use Sync clock to set it.">
+                Clock
+              </dt>
+              <dd id="device-info-clock">—</dd>
+            </div>
+            <div class="device-info-item device-info-item--wide">
+              <dt
+                title="Ed25519 public key identity for this node — how others address and path through it (CLI: get public.key)"
+              >
+                Public key
+              </dt>
+              <dd id="device-info-pubkey" class="device-info-mono">—</dd>
+            </div>
+          </dl>
+          <div class="device-tools-toolbar">
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="device-sync-clock-btn"
+              disabled
+              title="Set the device clock from this computer’s current time (CLI: clock sync)"
+            >
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z" /></svg>
+              <span>Sync clock</span>
+            </button>
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="device-copy-pubkey-btn"
+              title="Copy the public key hex to the clipboard"
+            >
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z" /></svg>
+              <span>Copy public key</span>
+            </button>
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="serial-advert-zerohop-btn-2"
+              disabled
+              title="Advertise once to local RF neighbours only — not rebroadcast (CLI: advert.zerohop)"
+            >
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7.1 6.9 5.7 5.5A9 9 0 0 0 3 12a9 9 0 0 0 2.7 6.5l1.4-1.4A7 7 0 0 1 5 12c0-1.9.8-3.7 2.1-5.1zm9.8 0A7 7 0 0 1 19 12a7 7 0 0 1-2.1 5.1l1.4 1.4A9 9 0 0 0 21 12a9 9 0 0 0-2.7-6.5l-1.4 1.4z" /></svg>
+              <span>Zero-hop advert</span>
+            </button>
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="serial-advert-flood-btn-2"
+              disabled
+              title="Immediately flood-advertise this node once (CLI: advert) — name, key, and position go out and get rebroadcast within hop limits"
+            >
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8.5 8.5 7.1 7.1A7 7 0 0 0 5 12c0 1.9.8 3.7 2.1 5l1.4-1.4A5 5 0 0 1 7 12c0-1.4.6-2.6 1.5-3.5zm7 0A5 5 0 0 1 17 12c0 1.4-.6 2.6-1.5 3.5l1.4 1.4A7 7 0 0 0 19 12a7 7 0 0 0-2.1-4.9l-1.4 1.4zM5.6 5.6 4.2 4.2A11 11 0 0 0 1 12c0 3 1.2 5.8 3.2 7.8l1.4-1.4A9 9 0 0 1 3 12c0-2.5 1-4.7 2.6-6.4zm12.8 0A9 9 0 0 1 21 12a9 9 0 0 1-2.6 6.4l1.4 1.4A11 11 0 0 0 23 12a11 11 0 0 0-3.2-7.8l-1.4 1.4z" /></svg>
+              <span>Flood advert</span>
+            </button>
+          </div>
+
+          <h3
+            class="config-subsection-title"
+            title="Private key identity — get/set prv.key over serial; vanity gen finds a public-key prefix you like"
+          >
+            Identity
+          </h3>
+          <div class="device-identity-row">
+            <label class="config-form-field config-form-field--full" for="device-prvkey">
+              <span
+                title="Private key that owns this node’s identity (CLI: get/set prv.key, serial only). Keep secret — anyone with it can impersonate the node. Changing it needs a reboot."
+                >Private key (keep secret)</span
+              >
+              <input
+                id="device-prvkey"
+                type="password"
+                readonly
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="Read from device to reveal"
+              />
+            </label>
+            <div class="device-identity-actions">
+              <button
+                type="button"
+                class="copy-btn serial-btn-secondary"
+                id="device-prvkey-reveal-btn"
+                title="Show / hide the private key"
+              >
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" /></svg>
+                <span>Reveal</span>
+              </button>
+              <button
+                type="button"
+                class="copy-btn serial-btn-secondary"
+                id="device-prvkey-copy-btn"
+                title="Copy the private key"
+              >
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11v14z" /></svg>
+                <span>Copy</span>
+              </button>
+              <button
+                type="button"
+                class="copy-btn serial-btn-secondary"
+                id="device-vanity-btn"
+                title="Brute-force a new keypair whose public key starts with a chosen hex prefix — helps avoid first-byte collisions with nearby repeaters. Written with set prv.key; reboot required."
+              >
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7.5 5.6 10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7l2.5-1.4zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14l-2.5 1.4zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5L22 2zm-7.63 5.29a1 1 0 0 0-1.41 0L1.29 18.96a1 1 0 0 0 0 1.41l2.34 2.34a1 1 0 0 0 1.41 0L16.7 11.05a1 1 0 0 0 0-1.41l-2.33-2.35zm-1.03 5.49-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z" /></svg>
+                <span>Generate vanity key…</span>
+              </button>
+            </div>
+          </div>
+
+          <h3
+            class="config-subsection-title"
+            title="Save or reload this form as JSON — form only until you Apply to the device"
+          >
+            Configuration backup
+          </h3>
+          <div class="device-tools-toolbar">
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="config-export-btn"
+              title="Download the current form (settings + regions) as JSON for backup or sharing — does not include the private key unless already loaded"
+            >
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z" /></svg>
+              <span>Export JSON</span>
+            </button>
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="config-import-btn"
+              title="Load a previously exported JSON into this form. Nothing is written to the device until you Apply."
+            >
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z" /></svg>
+              <span>Import JSON</span>
+            </button>
+            <input
+              type="file"
+              id="config-import-file"
+              accept="application/json,.json"
+              hidden
+            />
+          </div>
+
+          <h3
+            class="config-subsection-title device-danger-title"
+            title="Reboot, start OTA update mode, or factory-erase the device (destructive)"
+          >
+            Maintenance
+          </h3>
+          <div class="device-tools-toolbar device-danger-zone">
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="device-reboot-btn"
+              disabled
+              title="Soft-reboot the device now (CLI: reboot). Needed after radio or private-key changes."
+            >
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" /></svg>
+              <span>Reboot</span>
+            </button>
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="device-ota-btn"
+              disabled
+              title="Enter OTA firmware-update mode so a flasher on this machine can push new firmware over the local link (CLI: start ota)"
+            >
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.99 5.99 0 0 0 0 14c0 3.31 2.69 6 6 6h13a5 5 0 0 0 .35-9.96zM14 13v4h-4v-4H7l5-5 5 5h-3z" /></svg>
+              <span>Start Local OTA</span>
+            </button>
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              id="device-wan-ota-btn"
+              disabled
+              hidden
+              title="Download the firmware at the URL in Hotspot OTA over WiFi and flash it, then reboot (CLI: start ota wan update)"
+            >
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.99 5.99 0 0 0 0 14c0 3.31 2.69 6 6 6h13a5 5 0 0 0 .35-9.96zM17 13l-5 5-5-5h3V9h4v4h3z" /></svg>
+              <span>Start WAN OTA</span>
+            </button>
+            <button
+              type="button"
+              class="copy-btn serial-btn-danger"
+              id="device-factory-reset-btn"
+              disabled
+              title="Wipe identity and all prefs on the device (CLI: erase). Destructive and serial-only — you will need to reconfigure from scratch."
+            >
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8.27 3 3 8.27v7.46L8.27 21h7.46L21 15.73V8.27L15.73 3H8.27zM13 17h-2v-2h2v2zm0-4h-2V7h2v6z" /></svg>
+              <span>Factory reset</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="config-card config-map-card" aria-labelledby="map-heading">
+          <div class="config-section-head">
+            <h2 id="map-heading" class="config-section-title">Region map</h2>
+            <a
+              class="copy-btn serial-btn-secondary"
+              href="../region-map/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Open full map</a
+            >
+          </div>
+          <p class="config-card-desc">
+            Where the <code>gc</code> scopes sit on the coast. Picking a
+            location above moves the map with it.
+          </p>
+          <div class="config-map-embed">
+            <iframe
+              id="region-map-frame"
+              src="../region-map/?embed=1&amp;panel=1"
+              title="Region map"
+              class="config-map-iframe"
+              loading="lazy"
+            ></iframe>
+          </div>
+        </section>
+
+        <footer class="config-footer page-footer">
+          <p>
+            Configuration is written to the repeater only when Apply runs.
+            Nothing leaves this browser.
+          </p>
+        </footer>
+      </main>
+    </div>
+
+    <div
+      id="recommended-settings-modal"
+      class="config-confirm-modal"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="recommended-settings-modal-title"
+    >
+      <div
+        class="config-confirm-modal-backdrop"
+        data-recommended-settings-dismiss
+      ></div>
+      <div class="config-confirm-modal-panel">
+        <div class="config-confirm-modal-header">
+          <h2
+            id="recommended-settings-modal-title"
+            class="config-confirm-modal-title"
+          >
+            Apply recommended settings?
+          </h2>
+          <button
+            type="button"
+            class="config-confirm-modal-close"
+            id="recommended-settings-close-btn"
+            aria-label="Close"
+            data-recommended-settings-dismiss
+          >
+            ×
+          </button>
+        </div>
+        <p class="config-confirm-modal-hint">
+          This updates the form fields below. It does not write to the repeater
+          until you use Apply configuration.
+        </p>
+        <ul class="config-confirm-modal-list" id="recommended-settings-list">
+          <li>
+            <span>Radio preset</span>
+            <strong>USA/Canada (Recommended)</strong>
+          </li>
+          <li>
+            <span>Duty cycle</span>
+            <strong>10%</strong>
+          </li>
+          <li>
+            <span>Flood advert interval</span>
+            <strong>47 h</strong>
+          </li>
+          <li>
+            <span>Zero-hop advert interval</span>
+            <strong>0 min (disabled)</strong>
+          </li>
+          <li>
+            <span>Flood max hops (all)</span>
+            <strong>64</strong>
+          </li>
+          <li>
+            <span>Path hash mode</span>
+            <strong>2-byte (32 hops)</strong>
+          </li>
+          <li>
+            <span>Loop detection</span>
+            <strong>minimal</strong>
+          </li>
+        </ul>
+        <fieldset class="recommended-flood-allowance">
+          <legend class="recommended-flood-allowance-legend">
+            Flood hop allowance
+            <span class="recommended-flood-allowance-hint"
+              >(unscoped / advert)</span
+            >
+          </legend>
+          <div
+            class="recommended-flood-allowance-options"
+            role="radiogroup"
+            aria-label="Flood hop allowance"
+          >
+            <label class="recommended-flood-option">
+              <input
+                type="radio"
+                name="recommended-flood-allowance"
+                value="minimal"
+              />
+              <span class="recommended-flood-option-title">Minimal</span>
+              <span class="recommended-flood-option-meta">4 / 6</span>
+            </label>
+            <label class="recommended-flood-option">
+              <input
+                type="radio"
+                name="recommended-flood-allowance"
+                value="average"
+                checked
+              />
+              <span class="recommended-flood-option-title">Average</span>
+              <span class="recommended-flood-option-meta">8 / 12</span>
+            </label>
+            <label class="recommended-flood-option">
+              <input
+                type="radio"
+                name="recommended-flood-allowance"
+                value="extended"
+              />
+              <span class="recommended-flood-option-title">Extended</span>
+              <span class="recommended-flood-option-meta">16 / 24</span>
+            </label>
+            <label class="recommended-flood-option">
+              <input
+                type="radio"
+                name="recommended-flood-allowance"
+                value="full"
+              />
+              <span class="recommended-flood-option-title">Full</span>
+              <span class="recommended-flood-option-meta">64 / 64</span>
+            </label>
+          </div>
+        </fieldset>
+        <div class="config-confirm-modal-actions">
+          <button
+            type="button"
+            class="copy-btn serial-btn-secondary"
+            data-recommended-settings-dismiss
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="copy-btn serial-btn-apply"
+            id="recommended-settings-confirm-btn"
+          >
+            Apply to form
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="serial-read-confirm-modal"
+      class="config-confirm-modal"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="serial-read-confirm-modal-title"
+    >
+      <div
+        class="config-confirm-modal-backdrop"
+        data-serial-read-confirm-dismiss
+      ></div>
+      <div class="config-confirm-modal-panel">
+        <div class="config-confirm-modal-header">
+          <h2
+            id="serial-read-confirm-modal-title"
+            class="config-confirm-modal-title"
+          >
+            Read settings from repeater?
+          </h2>
+          <button
+            type="button"
+            class="config-confirm-modal-close"
+            aria-label="Close"
+            data-serial-read-confirm-dismiss
+          >
+            ×
+          </button>
+        </div>
+        <p class="config-confirm-modal-hint" id="serial-read-confirm-hint">
+          This overwrites the form with values from the connected device. Admin
+          password cannot be read from the device.
+        </p>
+        <div class="config-confirm-modal-actions">
+          <button
+            type="button"
+            class="copy-btn serial-btn-secondary"
+            data-serial-read-confirm-dismiss
+          >
+            Skip
+          </button>
+          <button
+            type="button"
+            class="copy-btn serial-btn-apply"
+            id="serial-read-confirm-btn"
+          >
+            Read and overwrite form
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="location-coords-modal"
+      class="config-confirm-modal"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="location-coords-modal-title"
+    >
+      <div
+        class="config-confirm-modal-backdrop"
+        data-location-coords-dismiss
+      ></div>
+      <div class="config-confirm-modal-panel">
+        <div class="config-confirm-modal-header">
+          <h2
+            id="location-coords-modal-title"
+            class="config-confirm-modal-title"
+          >
+            Keep existing coordinates?
+          </h2>
+          <button
+            type="button"
+            class="config-confirm-modal-close"
+            aria-label="Close"
+            data-location-coords-dismiss
+          >
+            ×
+          </button>
+        </div>
+        <p class="config-confirm-modal-hint">
+          You already have coordinates set. Choose whether to keep them or use
+          the default center for the new location.
+        </p>
+        <ul class="config-confirm-modal-list">
+          <li>
+            <span>Current coordinates</span>
+            <strong id="location-coords-current">—</strong>
+          </li>
+          <li>
+            <span id="location-coords-default-label">Default center</span>
+            <strong id="location-coords-default">—</strong>
+          </li>
+        </ul>
+        <div class="config-confirm-modal-actions config-confirm-modal-actions--stack">
+          <button
+            type="button"
+            class="copy-btn serial-btn-apply"
+            id="location-coords-keep-btn"
+          >
+            Keep current coordinates
+          </button>
+          <button
+            type="button"
+            class="copy-btn serial-btn-secondary"
+            id="location-coords-use-default-btn"
+          >
+            Use default center
+          </button>
+          <button
+            type="button"
+            class="copy-btn serial-btn-secondary"
+            data-location-coords-dismiss
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="position-map-modal"
+      class="position-map-modal"
+      hidden
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="position-map-modal-title"
+    >
+      <div class="position-map-modal-backdrop" data-position-map-dismiss></div>
+      <div class="position-map-modal-panel">
+        <div class="position-map-modal-header">
+          <h2 id="position-map-modal-title" class="position-map-modal-title">
+            Pick repeater location
+          </h2>
+          <button
+            type="button"
+            class="position-map-modal-close"
+            id="position-map-close-btn"
+            aria-label="Close"
+            data-position-map-dismiss
+          >
+            ×
+          </button>
+        </div>
+        <p class="position-map-modal-hint">
+          Click the map or drag the marker to indicate your repeater position.
+          For optimal privacy, do not pin the exact location, instead choose a
+          nearby random location or landmark.
+        </p>
+        <div id="position-map-container" class="position-map-container"></div>
+        <div class="position-map-modal-footer">
+          <span id="position-map-pick-preview" class="position-map-pick-preview"
+            >—</span
+          >
+          <div class="position-map-modal-actions">
+            <button
+              type="button"
+              class="copy-btn serial-btn-secondary"
+              data-position-map-dismiss
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="copy-btn serial-btn-apply"
+              id="position-map-use-btn"
+            >
+              Use position
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="vendor/leaflet/leaflet.js"></script>
+    <script src="vendor/tweetnacl/nacl.min.js"></script>
+    <script src="../shared/gc-regions.js"></script>
+    <script src="./src/repeater-serial.js"></script>
+    <script src="./src/configurator/dom.js"></script>
+    <script src="./src/configurator/serial-ui.js"></script>
+    <script src="./src/configurator/location.js"></script>
+    <script src="./src/configurator/naming.js"></script>
+    <script src="./src/configurator/settings.js"></script>
+    <script src="./src/configurator/policy.js"></script>
+    <script src="./src/configurator/cli.js"></script>
+    <script src="./src/configurator/position.js"></script>
+    <script src="./src/configurator.js"></script>
+  </body>
+</html>

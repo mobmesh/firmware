@@ -1,0 +1,71 @@
+# Single source of truth for what gets built and released.
+#
+# Each entry is one (board, role) combination this project ships. `mods`
+# lists which mods/<name>/ this target includes -- every target lists every
+# mod it wants explicitly, nothing is applied by default. Board hardware
+# facts (pins, timeouts, partitions, flasher notes) live in
+# variants/<board>/overrides.yaml, not here; this file only decides what
+# combinations exist and which features go into each one.
+#
+# asset_basename is not listed here -- it's computed by
+# `scripts/generate-board-config.py resolve-targets` from
+# <board>_<asset_role_abbrev>_<mods' suffixes, in the order listed below,
+# from each mod's mods/<name>/mod.yaml>.
+#
+# vendor_flasher_assets: exactly one target per BOARD should be true. It controls
+# whether this target's build vendors that board's bootloader.bin/partitions.bin/
+# boot_app0.bin into pages/flasher/<board>/ for the web flasher's "New device" (full
+# erase) flow. These files are NOT shared/generic across boards or roles -- each
+# board's partition table (see variants/<board>/overrides.yaml's partitions_override)
+# is different, so they're always sourced fresh from THIS target's own build output,
+# never copied from another board or reused across runs. Distinct from sync_docs,
+# which governs global project docs (CLI docs, commands.json) and should stay set on
+# exactly one target repo-wide, not one per board.
+targets:
+  - board: heltec_v4
+    role: repeater
+    build_env: heltec_v4_repeater
+    upstream_tag_prefix: repeater
+    release_title: Repeater
+    asset_role_abbrev: rep
+    sync_docs: true
+    vendor_flasher_assets: true
+    # All targets sharing upstream_tag_prefix "repeater" publish to the same release,
+    # so they must agree on make_latest/release_title -- resolve-targets enforces this.
+    make_latest: true
+    mods: [hotspot-ota, timing-safety]
+
+  - board: heltec_v4
+    role: room_server
+    build_env: heltec_v4_room_server
+    upstream_tag_prefix: room-server
+    release_title: Room
+    asset_role_abbrev: room
+    sync_docs: false
+    vendor_flasher_assets: false
+    make_latest: false
+    mods: [hotspot-ota, timing-safety]
+
+  - board: xiao_c3
+    role: repeater
+    build_env: Xiao_C3_repeater
+    upstream_tag_prefix: repeater
+    release_title: Repeater
+    asset_role_abbrev: rep
+    sync_docs: false
+    vendor_flasher_assets: true
+    # Must match heltec_v4's repeater entry -- both publish to the same shared release
+    # (same upstream_tag_prefix), and make_latest is a release-level flag, not per-asset.
+    make_latest: true
+    mods: [hotspot-ota, timing-safety]
+
+  - board: xiao_c3
+    role: room_server
+    build_env: Xiao_C3_room_server
+    upstream_tag_prefix: room-server
+    release_title: Room
+    asset_role_abbrev: room
+    sync_docs: false
+    vendor_flasher_assets: false
+    make_latest: false
+    mods: [hotspot-ota, timing-safety]

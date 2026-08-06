@@ -1,0 +1,56 @@
+# Override-only board config for heltec_v4.
+#
+# This is NOT a copy of upstream MeshCore's boards/heltec_v4.json or
+# variants/heltec_v4/platformio.ini -- it holds ONLY the facts specific to
+# features THIS project adds on top of upstream (see mods/*/patches/). Every
+# other board fact (mcu, flash size, USB hwids, psram, default partition
+# scheme) is read directly from upstream at generation time by
+# scripts/generate-board-config.py -- never duplicated here.
+#
+# The path variants/heltec_v4/ mirrors upstream's own variants/<name>/ naming
+# by design, so the mapping from "which upstream variant does this override"
+# is the directory path itself, not a hand-written reference field.
+
+# Build flags injected into this board's variant platformio.ini envs,
+# following upstream's own -D PIN_XXX=nn idiom (see e.g. PIN_GPS_RX,
+# PIN_VEXT_EN in upstream's variants/heltec_v4/platformio.ini). Consumed by
+# mods/hotspot-ota's HotspotOTA.cpp as plain macros -- no separate header.
+#
+# PIN_HOTSPOT_PWR: confirmed clean on Heltec V4.3.1 (GPIO48 = fallback).
+# OTA_WIFI_JOIN_*: hotspot WiFi can take up to ~60s to appear after
+#   PIN_HOTSPOT_PWR is asserted (cellular modem boot). 6 attempts x 15s +
+#   5x5s between = ~115s worst case, comfortably past that.
+# OTA_DIAG_WIFI_JOIN_ATTEMPTS: `ota wan join` uses this instead of the full
+#   patient budget above -- 1 attempt (~15s) so it can't block the CLI.
+# OTA_WAN_CHECK_*: advisory WAN check -- cellular modems often show L2 link
+#   up before the data session negotiates.
+build_flags:
+  PIN_HOTSPOT_PWR: 47
+  OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS: 15000
+  OTA_WIFI_JOIN_RETRY_DELAY_MS: 5000
+  OTA_WIFI_JOIN_MAX_ATTEMPTS: 6
+  OTA_HTTP_TIMEOUT_MS: 20000
+  OTA_DIAG_WIFI_JOIN_ATTEMPTS: 1
+  OTA_WAN_CHECK_ATTEMPTS: 3
+  OTA_WAN_CHECK_RETRY_DELAY_MS: 10000
+
+# Optional: only set when a board's default partition scheme (from upstream's
+# boards/<name>.json) doesn't leave enough OTA slot room for this project's
+# added features. Not needed for heltec_v4 today. When set to a filename (e.g.
+# "custom_partitions.csv"), `scripts/generate-board-config.py flags` emits a
+# `board_build.partitions = <name>.csv` build-flag line for that board's
+# patch -- but vendoring the actual CSV file into the upstream tree is done
+# by that same patch's own diff (as a new file, exactly like HotspotOTA.cpp
+# is added today), not by this script. This never touches upstream's own
+# board JSON.
+partitions_override: null
+
+# Facts needed by the web flasher that aren't derivable from upstream (mcu,
+# flash size, etc. -- those come from upstream's boards/heltec_v4.json) or
+# from the built partitions.bin (offsets -- see scripts/generate-board-config.py).
+# This is the only other hand-maintained source for pages/flasher/boards.json.
+flasher:
+  label: "Heltec V4"
+  connect_note: "Put the board into flash mode first (hold PGM, tap RST, then release PGM), then connect over USB."
+  post_flash_note: "Press RST once to put the board back into normal operation."
+

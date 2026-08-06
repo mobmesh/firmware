@@ -1,0 +1,7 @@
+{
+  "_comment": "Maps each option in the page's location picker (index.html's #location-menu data-value) to the URL of that group's device settings definition. A definition is a JSON object with a \"commands\" array of CLI strings, sent to the device over serial after a flash. Entries pointing off-site need CORS headers allowing this origin. A key with no entry here, or a URL that can't be fetched, simply means no settings are applied.",
+  "mobile": "./member-config-mobile.json",
+  "louisiana": "",
+  "florida": "",
+  "_community": "MeshCore Community applies nothing. It has no entry below on purpose, which loadMemberCommands() reads as an empty command list, so the flash finishes without touching the device's settings."
+}

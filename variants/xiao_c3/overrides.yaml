@@ -1,0 +1,41 @@
+# Override-only board config for xiao_c3.
+#
+# This is NOT a copy of upstream MeshCore's boards/xiao_c3.json or
+# variants/xiao_c3/platformio.ini -- it holds ONLY the facts specific to
+# features THIS project adds on top of upstream (see mods/*/patches/). Every
+# other board fact (mcu, flash size, USB hwids, psram, default partition
+# scheme) is read directly from upstream at generation time by
+# scripts/generate-board-config.py -- never duplicated here.
+
+# Build flags injected into this board's variant platformio.ini envs at
+# build time (see scripts/generate-board-config.py inject-env). Which mods
+# get injected for this board is decided in build-targets.yaml, not here.
+#
+# PIN_HOTSPOT_PWR: PLACEHOLDER, not yet confirmed on real Xiao C3 hardware --
+#   carried over from heltec_v4 as a starting value only. Do not treat this
+#   as validated for this board's actual pinout; replace once the real
+#   hotspot power-switch GPIO is confirmed.
+# OTA_WIFI_JOIN_*/OTA_HTTP_TIMEOUT_MS/OTA_WAN_CHECK_*: carried over from
+#   heltec_v4 as sensible starting defaults, not yet tuned for this board.
+build_flags:
+  PIN_HOTSPOT_PWR: 47
+  OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS: 15000
+  OTA_WIFI_JOIN_RETRY_DELAY_MS: 5000
+  OTA_WIFI_JOIN_MAX_ATTEMPTS: 6
+  OTA_HTTP_TIMEOUT_MS: 20000
+  OTA_DIAG_WIFI_JOIN_ATTEMPTS: 1
+  OTA_WAN_CHECK_ATTEMPTS: 3
+  OTA_WAN_CHECK_RETRY_DELAY_MS: 10000
+
+# Xiao C3's stock 4MB partition scheme doesn't leave enough OTA app-slot room
+# for hotspot-ota's added code. This custom table shrinks spiffs/coredump to
+# grow both OTA app slots to 0x1D0000 bytes each -- sums to exactly 0x400000
+# (4MB): 0x9000 (bootloader+table region) + 0x5000 (nvs) + 0x2000 (otadata)
+# + 0x1D0000*2 (app0/app1) + 0x40000 (spiffs) + 0x10000 (coredump).
+partitions_override: partitions_xiao_c3.csv
+
+# Facts needed by the web flasher that aren't derivable from upstream.
+flasher:
+  label: "Xiao ESP32-C3"
+  connect_note: "Put the board into flash mode first (hold BOOT, tap RESET, then release BOOT), then connect over USB."
+  post_flash_note: "Press RESET once to put the board back into normal operation."

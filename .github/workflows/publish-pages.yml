@@ -1,0 +1,37 @@
+name: publish-pages
+
+# Standalone manual trigger to redeploy pages/ to GitHub Pages without rebuilding firmware.
+# Requires repo Settings -> Pages -> Source to be set to "GitHub Actions".
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  publish-pages:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Write build stamp for stale-page detection
+        run: |
+          echo "{\"sha\": \"$(git rev-parse HEAD)\"}" > pages/flasher/build-stamp.json
+
+      - name: Upload pages/ as the Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: pages
+
+      - id: deployment
+        name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v5

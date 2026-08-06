@@ -1,0 +1,5 @@
+{
+  "heltec_v4": { "label": "Heltec Lora 32 R3 v4.3.x", "board": "heltec_v4", "icon": "icons/heltec_v4.png", "icon2": "icons/heltec_v4_rst.png" },
+  "xiao_c3": { "label": "Seeed Studio Xiao ESP32-C3", "board": "xiao_c3", "icon": "icons/xiao_c3.png", "icon2": "icons/xiao_c3_rst.png" },
+  "grumpy_board": { "label": "The Grumpy Board v1", "board": "xiao_c3", "icon": "icons/grumpy_board.png", "icon2": "icons/grumpy_board_rst.png" }
+}

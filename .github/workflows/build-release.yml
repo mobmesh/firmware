@@ -1,0 +1,567 @@
+name: sync-build-release
+
+permissions:
+  contents: write
+  issues: write
+  pages: write
+  id-token: write
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # daily poll for new upstream tags across all variants
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: 'Upstream tag/branch to build against (blank = auto-detect latest tag per variant). Applies to whichever variant(s) this run builds.'
+        required: false
+        default: ''
+      variant:
+        description: 'Limit this run to a single variant id, e.g. repeater or room_server (blank = build all variants)'
+        required: false
+        default: ''
+      force_rebuild:
+        description: 'Rebuild and republish even if a release already exists for the resolved tag (manual runs only -- the scheduled poll always respects the existing-release check)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  UPSTREAM_REPO: meshcore-dev/MeshCore
+
+jobs:
+  compute-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+
+      - name: Resolve build-targets.yaml into the CI build matrix
+        id: resolve
+        run: |
+          pip install --quiet pyyaml
+          echo "matrix=$(python3 scripts/generate-board-config.py resolve-targets)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: compute-matrix
+    # Boards sharing a role (matrix.upstream_tag_prefix) publish to the same release tag --
+    # queue them rather than let parallel matrix jobs race to create/update that release.
+    # Different roles still build in parallel; only same-role jobs across boards serialize.
+    concurrency:
+      group: release-${{ github.workflow }}-${{ matrix.upstream_tag_prefix }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.compute-matrix.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo (patches only)
+        uses: actions/checkout@v7
+
+      - id: filter
+        name: Check whether this variant is in scope for this run
+        run: |
+          if [ -n "${{ github.event.inputs.variant }}" ] && [ "${{ github.event.inputs.variant }}" != "${{ matrix.id }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify variants/<board>/overrides.yaml exists for this board
+        if: steps.filter.outputs.skip == 'false'
+        run: |
+          test -f "variants/${{ matrix.board_id }}/overrides.yaml" || {
+            echo "::error::variants/${{ matrix.board_id }}/overrides.yaml not found. Add one (see scripts/generate-board-config.py) before this board can build -- pages/flasher/boards.json is regenerated from it every run, not hand-maintained."
+            exit 1
+          }
+
+      - id: pick
+        name: Resolve upstream ref for ${{ matrix.id }}
+        if: steps.filter.outputs.skip == 'false'
+        run: |
+          if [ -n "${{ github.event.inputs.upstream_ref }}" ]; then
+            REF="${{ github.event.inputs.upstream_ref }}"
+          else
+            REF=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases" \
+              | jq -r '[.[] | select(.tag_name | startswith("${{ matrix.upstream_tag_prefix }}-v"))][0].tag_name')
+          fi
+          if [ -z "$REF" ] || [ "$REF" = "null" ]; then
+            echo "::error::No upstream ${{ matrix.upstream_tag_prefix }}-v* release found."
+            exit 1
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "version=${REF#${{ matrix.upstream_tag_prefix }}-}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${REF}-mobmesh" >> "$GITHUB_OUTPUT"
+
+      - id: check
+        name: Check if this board's asset already exists in the shared release
+        if: steps.filter.outputs.skip == 'false'
+        run: |
+          if [ "${{ github.event.inputs.force_rebuild }}" = "true" ]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Boards sharing a role publish to the same release tag -- release existence alone
+          # doesn't mean THIS board's asset is in it, so check the assets list, not just the tag.
+          ASSET_NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}.bin"
+          STATUS=$(curl -s -o /tmp/release.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.pick.outputs.release_tag }}")
+          if [ "$STATUS" = "200" ] && jq -e --arg name "$ASSET_NAME" '.assets[]? | select(.name == $name)' /tmp/release.json > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch upstream release notes
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          BODY=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases/tags/${{ steps.pick.outputs.ref }}" \
+            | jq -r '.body // ""')
+          {
+            echo "Built from [\`${{ steps.pick.outputs.ref }}\`](https://github.com/${{ env.UPSTREAM_REPO }}/releases/tag/${{ steps.pick.outputs.ref }}) of upstream MeshCore."
+            echo ""
+            echo "## Upstream release notes"
+            echo ""
+            if [ -n "$BODY" ]; then
+              echo "$BODY"
+            else
+              echo "_Upstream published no release notes for this tag._"
+            fi
+          } > release-notes.md
+
+      - name: Checkout upstream at resolved ref
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          git clone --depth 50 https://github.com/${{ env.UPSTREAM_REPO }}.git upstream-src
+          cd upstream-src
+          git checkout "${{ steps.pick.outputs.ref }}"
+
+      - name: Verify each patch's sidecar dependencies are satisfied, in order
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          applied=""
+          IFS=',' read -ra MODS <<< "${{ join(matrix.mods, ',') }}"
+          for mod in "${MODS[@]}"; do
+            for patch in "mods/$mod/patches"/*.patch; do
+              id=$(basename "$patch" | cut -d'_' -f1)
+              qualified_id="$mod/$id"
+              sidecar="mods/$mod/patches/${id}.meta.yaml"
+              test -f "$sidecar" || { echo "::error::$patch has no sidecar ($sidecar)."; exit 1; }
+              requires=$(python3 -c "import yaml,sys; print(' '.join(yaml.safe_load(open(sys.argv[1])).get('requires') or []))" "$sidecar")
+              for req in $requires; do
+                case " $applied " in
+                  *" $req "*) ;;
+                  *) echo "::error::$patch ($sidecar) requires '$req', which has not been applied yet. Check patch ordering (mods: ${{ join(matrix.mods, ', ') }})."; exit 1 ;;
+                esac
+              done
+              applied="$applied $qualified_id"
+            done
+          done
+          echo "Sidecar dependency order OK: applied order was:$applied"
+
+      - name: Apply maintained patches in order (fail loudly on drift, do not attempt auto-merge)
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          cd upstream-src
+          IFS=',' read -ra MODS <<< "${{ join(matrix.mods, ',') }}"
+          for mod in "${MODS[@]}"; do
+            for patch in "../mods/$mod/patches"/*.patch; do
+              git apply --check "$patch" || {
+                echo "::error::$patch no longer applies cleanly against ${{ steps.pick.outputs.ref }}. Manual rebase required."
+                exit 1
+              }
+              git apply "$patch"
+            done
+          done
+
+      - name: Inject this target's mod + board build flags into platformio.ini
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          pip install --quiet pyyaml
+          python3 scripts/generate-board-config.py inject-env \
+            --board ${{ matrix.board_id }} \
+            --env ${{ matrix.build_env }} \
+            --platformio-ini "upstream-src/variants/${{ matrix.board_id }}/platformio.ini" \
+            --mods "${{ join(matrix.mods, ',') }}"
+          cd upstream-src
+          DIFF=$(git diff -- "variants/${{ matrix.board_id }}/platformio.ini")
+          if [ -z "$DIFF" ]; then
+            echo "::error::inject-env ran but produced no change to variants/${{ matrix.board_id }}/platformio.ini -- nothing was actually injected."
+            exit 1
+          fi
+          echo "$DIFF"
+
+      - name: Set up PlatformIO
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          pip install --upgrade platformio
+
+      - name: Build
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          cd upstream-src
+          OTA_MOD_SHA="$(git -C .. rev-parse --short HEAD)"
+          OTA_MOD_DATE="$(date -u +"%-d %b %Y") - $OTA_MOD_SHA"
+          PLATFORMIO_BUILD_FLAGS="-D 'OTA_MOD_BUILD_DATE=\"$OTA_MOD_DATE\"' -D 'OTA_MOD_SHORT_SHA=\"$OTA_MOD_SHA\"'" \
+            pio run -e ${{ matrix.build_env }}
+
+      - id: rollback_check
+        name: Verify RollbackGuard's core hook still exists and is called (catches silent drift before it ships)
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
+          HITS=$([ -n "$FRAMEWORK_DIR" ] && grep -ro "verifyRollbackLater" "$FRAMEWORK_DIR" | wc -l || echo 0)
+          echo "verifyRollbackLater occurrences in installed core: $HITS"
+          # Expect >=2: one for the weak prototype, one for the actual call site inside initArduino().
+          # A count of 1 means it's declared but no longer referenced anywhere -- our override would
+          # link fine and simply never run, which link success alone would not catch.
+          if [ -z "$FRAMEWORK_DIR" ] || [ "$HITS" -lt 2 ]; then
+            echo "::error::verifyRollbackLater() found $HITS time(s) in the installed Arduino-ESP32 core ($FRAMEWORK_DIR), expected >=2 (declaration + call site)."
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+      - name: Notify on rollback-guard hook drift
+        if: failure() && steps.rollback_check.outputs.failed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[${{ matrix.board_id }}/${{ matrix.id }}] verifyRollbackLater() no longer found/called in the Arduino-ESP32 core`,
+              body: [
+                `The \`${{ matrix.board_id }}/${{ matrix.id }}\` build failed because the installed Arduino-ESP32 core no longer declares and calls \`verifyRollbackLater()\` (see \`src/helpers/esp32/RollbackGuard.cpp\`). This usually means a core version bump changed how OTA rollback confirmation works, and \`RollbackGuard\`'s override may have silently stopped taking effect.`,
+                ``,
+                `**To fix:**`,
+                `1. Check the installed core's \`cores/esp32/esp32-hal-misc.c\` (or wherever \`initArduino()\` now lives) for how it confirms/defers OTA rollback.`,
+                `2. Update \`verifyRollbackLater()\` in \`RollbackGuard.cpp\` to match the new mechanism, if an equivalent hook still exists.`,
+                `3. If the core dropped app-rollback confirmation control entirely, this feature needs a bigger rework -- see "Automatic rollback protection" in README.md.`,
+                ``,
+                `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              ].join('\n')
+            });
+
+      - name: Sync mods/hotspot-ota/docs/cli-additions.md from the patches' actual effect
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.sync_docs
+        run: |
+          cd upstream-src
+          {
+            echo "<!-- AUTO-GENERATED by .github/workflows/build-release.yml -- do not edit directly."
+            echo "     Source: mods/hotspot-ota/patches/*.patch (applied in order) against ${{ steps.pick.outputs.ref }}."
+            echo "     To change this content, edit the relevant patch and let the next build regenerate this file. -->"
+            echo ""
+            echo "# CLI commands added by these patches"
+            echo ""
+            echo "This is the exact documentation \`mods/hotspot-ota/patches/*.patch\` adds to MeshCore's own"
+            echo "\`docs/cli_commands.md\`, extracted from the last successful build against"
+            echo "\`${{ steps.pick.outputs.ref }}\`."
+            echo ""
+            echo "---"
+            git diff HEAD -- docs/cli_commands.md | grep '^+' | grep -v '^+++' | sed 's/^+//'
+          } > ../mods/hotspot-ota/docs/cli-additions.md
+
+      - name: Commit cli-additions.md if changed
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.sync_docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4 5; do
+            git add mods/hotspot-ota/docs/cli-additions.md
+            git diff --staged --quiet && break
+            git commit -m "docs: sync cli-additions.md with ${{ steps.pick.outputs.ref }}"
+            git push && break
+            if [ "$i" -eq 5 ]; then
+              echo "::error::failed to push cli-additions.md after 5 attempts"
+              exit 1
+            fi
+            # Regenerate against the latest remote state rather than rebasing a conflicting
+            # diff -- this file is fully rewritten each run, so a textual rebase conflicts easily.
+            git reset --hard HEAD~1
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+            cd upstream-src
+            {
+              echo "<!-- AUTO-GENERATED by .github/workflows/build-release.yml -- do not edit directly."
+              echo "     Source: mods/hotspot-ota/patches/*.patch (applied in order) against ${{ steps.pick.outputs.ref }}."
+              echo "     To change this content, edit the relevant patch and let the next build regenerate this file. -->"
+              echo ""
+              echo "# CLI commands added by these patches"
+              echo ""
+              echo "This is the exact documentation \`mods/hotspot-ota/patches/*.patch\` adds to MeshCore's own"
+              echo "\`docs/cli_commands.md\`, extracted from the last successful build against"
+              echo "\`${{ steps.pick.outputs.ref }}\`."
+              echo ""
+              echo "---"
+              git diff HEAD -- docs/cli_commands.md | grep '^+' | grep -v '^+++' | sed 's/^+//'
+            } > ../mods/hotspot-ota/docs/cli-additions.md
+            cd ..
+          done
+
+      - name: Update pages/flasher's bootloader.bin/partitions.bin/boot_app0.bin for the web flasher
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.vendor_flasher_assets
+        run: |
+          BOOT="upstream-src/.pio/build/${{ matrix.build_env }}/bootloader.bin"
+          PART="upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin"
+          # boot_app0.bin is NOT a per-build .pio/build/ artifact -- it's a static file shipped
+          # inside the Arduino-ESP32 framework package itself (same file regardless of board or
+          # partition table), so it has to be located in the installed package, not the build dir.
+          FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
+          APP0=$(find "$FRAMEWORK_DIR" -name 'boot_app0.bin' | head -1)
+          test -f "$BOOT"
+          test -f "$PART"
+          test -n "$APP0" && test -f "$APP0"
+          DEST="pages/flasher/${{ matrix.board_id }}"
+          mkdir -p "$DEST"
+          cp "$BOOT" "$DEST/bootloader.bin"
+          cp "$PART" "$DEST/partitions.bin"
+          cp "$APP0" "$DEST/boot_app0.bin"
+
+      - name: Commit vendored flasher assets if changed
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.vendor_flasher_assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4 5; do
+            git add "pages/flasher/${{ matrix.board_id }}/bootloader.bin" "pages/flasher/${{ matrix.board_id }}/partitions.bin" "pages/flasher/${{ matrix.board_id }}/boot_app0.bin"
+            git diff --staged --quiet && break
+            git commit -m "docs: sync ${{ matrix.board_id }} flasher assets with ${{ steps.pick.outputs.ref }}"
+            git push && break
+            if [ "$i" -eq 5 ]; then
+              echo "::error::failed to push ${{ matrix.board_id }} flasher assets after 5 attempts"
+              exit 1
+            fi
+            git reset --hard HEAD~1
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+            # These are per-board build output (this board's own partition table), not shared
+            # or generic -- re-copy from THIS run's own .pio/build/, never another board's.
+            # (boot_app0.bin is the one exception -- it's generic framework-package content,
+            # not per-board, but still re-copied fresh each retry for consistency.)
+            FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
+            cp "upstream-src/.pio/build/${{ matrix.build_env }}/bootloader.bin" "pages/flasher/${{ matrix.board_id }}/bootloader.bin"
+            cp "upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin" "pages/flasher/${{ matrix.board_id }}/partitions.bin"
+            cp "$(find "$FRAMEWORK_DIR" -name 'boot_app0.bin' | head -1)" "pages/flasher/${{ matrix.board_id }}/boot_app0.bin"
+          done
+
+      - name: Sync upstream CLI documentation and regenerate commands.json
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.sync_docs
+        run: |
+          cp upstream-src/docs/cli_commands.md mods/hotspot-ota/docs/cli_commands.md
+          python3 scripts/generate-commands-json.py
+
+      - name: Commit generated commands.json if changed
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.sync_docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4 5; do
+            git add mods/hotspot-ota/docs/cli_commands.md pages/flasher/commands.json
+            git diff --staged --quiet && break
+            git commit -m "docs: sync cli_commands.md with upstream and regenerate commands.json for serial console"
+            git push && break
+            if [ "$i" -eq 5 ]; then
+              echo "::error::failed to push commands.json after 5 attempts"
+              exit 1
+            fi
+            git reset --hard HEAD~1
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+            cp upstream-src/docs/cli_commands.md mods/hotspot-ota/docs/cli_commands.md
+            python3 scripts/generate-commands-json.py
+          done
+
+      - name: Locate app-only .bin (not the merged/full-flash image)
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        id: artifact
+        run: |
+          cd upstream-src
+          BIN=".pio/build/${{ matrix.build_env }}/firmware.bin"
+          test -f "$BIN"
+          NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}.bin"
+          cp "$BIN" "../$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Locate bootloader.bin and partitions.bin (needed for the partition-layout drift check below)
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        id: flash_parts
+        run: |
+          cd upstream-src
+          BOOT=".pio/build/${{ matrix.build_env }}/bootloader.bin"
+          PART=".pio/build/${{ matrix.build_env }}/partitions.bin"
+          test -f "$BOOT"
+          test -f "$PART"
+          BOOT_NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}-bootloader.bin"
+          PART_NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}-partitions.bin"
+          cp "$BOOT" "../$BOOT_NAME"
+          cp "$PART" "../$PART_NAME"
+          echo "bootloader_name=$BOOT_NAME" >> "$GITHUB_OUTPUT"
+          echo "partitions_name=$PART_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Regenerate pages/flasher/boards.json from overrides.yaml + upstream + this build's real partitions.bin
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          pip install --quiet pyyaml
+          python3 scripts/generate-board-config.py boards-json \
+            --board ${{ matrix.board_id }} \
+            --upstream-dir upstream-src \
+            --partitions-bin "upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin" \
+            --variant-id ${{ matrix.id }} \
+            --variant-label "${{ matrix.release_title }}" \
+            --asset-basename ${{ matrix.asset_basename }} \
+            --firmware-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" \
+            --firmware-sha-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin.sha256" \
+            --output pages/flasher/boards.json
+
+      - name: Verify firmware.bin fits within its OTA app partition
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          MAX_HEX=$(jq -r '.["${{ matrix.board_id }}"].offsets.appMaxSize' pages/flasher/boards.json)
+          MAX=$((MAX_HEX))
+          SIZE=$(stat -c%s "${{ steps.artifact.outputs.name }}")
+          echo "firmware.bin size: $SIZE bytes; app partition max: $MAX bytes"
+          if [ "$SIZE" -gt "$MAX" ]; then
+            echo "::error::firmware.bin ($SIZE bytes) exceeds the ${{ matrix.board_id }} app partition size ($MAX bytes, from pages/flasher/boards.json). Flashing this into an OTA slot would overrun into the next partition."
+            exit 1
+          fi
+
+      - id: marker_check
+        name: Verify the OTA authenticity marker lands within HotspotOTA's early-abort scan window
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          WINDOW=65536   # must match OTA_MOD_MARKER_SCAN_WINDOW in src/helpers/esp32/HotspotOTA.cpp
+          OFFSET=$(grep -aob 'H0TSP0T' "${{ steps.artifact.outputs.name }}" | head -1 | cut -d: -f1)
+          if [ -z "$OFFSET" ]; then
+            echo "::error::H0TSP0T marker not found anywhere in ${{ steps.artifact.outputs.name }} -- HotspotOTA.cpp's OTA_MOD_MARKER constant may have been removed or renamed."
+            exit 1
+          fi
+          echo "H0TSP0T marker found at byte offset $OFFSET (scan window: first $WINDOW bytes)"
+          if [ "$OFFSET" -ge "$WINDOW" ]; then
+            echo "::error::H0TSP0T marker found at byte offset $OFFSET, past HotspotOTA.cpp's $WINDOW-byte early-abort scan window. A legitimate build of this project would fail its own 'start ota url' authenticity check. Either whatever pushed the marker later needs addressing, or OTA_MOD_MARKER_SCAN_WINDOW in HotspotOTA.cpp needs widening to match."
+            exit 1
+          fi
+          echo "offset=$OFFSET" >> "$GITHUB_OUTPUT"
+
+      # Note: there is no longer a separate "does partitions.bin match boards.json" drift check
+      # here -- boards.json is now generated FROM this exact partitions.bin a few steps above
+      # (scripts/generate-board-config.py boards-json), so that comparison would be a tautology.
+      # The equivalent safety net (failing loudly if the expected otadata/ota_0/ota_1 partitions
+      # aren't present) now lives inside generate-board-config.py's own partition-table parser.
+
+      - name: Generate SHA-256 sidecar
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          HASH=$(sha256sum "${{ steps.artifact.outputs.name }}" | awk '{print $1}')
+          echo "$HASH:${{ steps.marker_check.outputs.offset }}" > "${{ steps.artifact.outputs.name }}.sha256"
+
+      - name: Vendor firmware.bin for the web flasher (GitHub Release assets have no CORS headers, so the page's fetch() can't read them cross-origin)
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          DEST="pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}"
+          mkdir -p "$DEST"
+          cp "${{ steps.artifact.outputs.name }}" "$DEST/firmware.bin"
+          cp "${{ steps.artifact.outputs.name }}.sha256" "$DEST/firmware.bin.sha256"
+
+      - name: Commit vendored firmware.bin and this variant's boards.json entry if changed
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4 5; do
+            git add "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin.sha256" pages/flasher/boards.json
+            git diff --staged --quiet && break
+            git commit -m "docs: vendor ${{ matrix.board_id }}/${{ matrix.id }} firmware.bin (${{ steps.pick.outputs.version }}) and refresh boards.json for the web flasher"
+            git push && break
+            if [ "$i" -eq 5 ]; then
+              echo "::error::failed to push ${{ matrix.board_id }}/${{ matrix.id }} firmware.bin/boards.json after 5 attempts"
+              exit 1
+            fi
+            # boards.json is fully re-serialized on every run (json.dumps of the whole file),
+            # so two concurrent boards/roles regenerating it will conflict on a textual rebase
+            # even when their actual changes don't overlap. Discard our commit and regenerate
+            # fresh against the latest remote tip instead -- this is idempotent and always
+            # converges, since boards-json only ever touches this target's own board/variant
+            # entry and preserves everything else already in the file.
+            git reset --hard HEAD~1
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+            python3 scripts/generate-board-config.py boards-json \
+              --board ${{ matrix.board_id }} \
+              --upstream-dir upstream-src \
+              --partitions-bin "upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin" \
+              --variant-id ${{ matrix.id }} \
+              --variant-label "${{ matrix.release_title }}" \
+              --asset-basename ${{ matrix.asset_basename }} \
+              --firmware-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" \
+              --firmware-sha-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin.sha256" \
+              --output pages/flasher/boards.json
+            mkdir -p "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}"
+            cp "${{ steps.artifact.outputs.name }}" "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin"
+            cp "${{ steps.artifact.outputs.name }}.sha256" "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin.sha256"
+          done
+
+      - name: Publish release with .bin + .sha256 sidecar
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.pick.outputs.release_tag }}
+          name: "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - mobmesh"
+          body_path: release-notes.md
+          make_latest: ${{ matrix.make_latest }}
+          files: |
+            ${{ steps.artifact.outputs.name }}
+            ${{ steps.artifact.outputs.name }}.sha256
+
+      - name: Notify on patch/build failure
+        if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && steps.rollback_check.outputs.failed != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[${{ matrix.board_id }}/${{ matrix.id }}] Patch or build failed against ${{ steps.pick.outputs.ref }}`,
+              body: `sync-build-release (${{ matrix.board_id }}/${{ matrix.id }}) failed for upstream ref \`${{ steps.pick.outputs.ref }}\`. Check the workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
+
+  # Runs only after every matrix combination above has succeeded (GitHub Actions' default
+  # `needs:` behavior for a matrix job) -- so a red build can never publish, closing the gap
+  # classic branch/docs-folder Pages deployment had (it auto-published on any push touching the
+  # folder, independent of whether checks passed). Requires repo Settings -> Pages -> Source to
+  # be set to "GitHub Actions" (one-time manual step) instead of "Deploy from a branch".
+  publish-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+
+      - name: Pull latest commits (the build job(s) above may have just pushed vendored assets)
+        run: git pull --ff-only origin "${{ github.ref_name }}"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Write build stamp for stale-page detection
+        run: |
+          echo "{\"sha\": \"$(git rev-parse HEAD)\"}" > pages/flasher/build-stamp.json
+
+      - name: Upload pages/ as the Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: pages
+
+      - id: deployment
+        name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v5

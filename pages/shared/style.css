@@ -1,0 +1,784 @@
+/* style.css
+   Resembling the gulfcoastmesh.org theme for cohesiveness. */
+
+:root {
+  --bg-0: #03080f;
+  --bg-1: #061320;
+  --bg-elevated: #0e1f33;
+  --bg-elevated-glass: rgba(14, 31, 51, 0.6);
+  --fg: #e8f0f8;
+  --fg-muted: #9eb5ce;
+  --line: #223a58;
+  --accent: #2dd1bd;
+  --accent-strong: #11b6a4;
+  --accent-soft: rgba(45, 209, 189, 0.14);
+  --accent-warm: #f9a228;
+  --accent-warm-strong: #f3820f;
+  --accent-warm-soft: rgba(249, 162, 40, 0.14);
+  --danger: #e8637a;
+  --radius: 1.25rem;
+  --radius-sm: 0.75rem;
+  --radius-full: 999px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--fg);
+  min-height: 100vh;
+  background-color: var(--bg-0);
+  background-image:
+    radial-gradient(circle at 88% 92%, rgba(249, 162, 40, 0.06), transparent 28%),
+    radial-gradient(circle at 90% 8%, rgba(232, 99, 122, 0.08), transparent 25%),
+    linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 45%, var(--bg-0) 100%),
+    radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: auto, auto, auto, 26px 26px;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+
+.wrap {
+  width: clamp(320px, 90%, 640px);
+  margin: 0 auto;
+  padding: 6.5rem 1.25rem 4rem;
+  position: relative;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.35rem 0.9rem;
+  margin-bottom: 0.9rem;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  border: 1px solid rgba(45, 209, 189, 0.35);
+  color: var(--accent);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.page-header h1 {
+  font-size: 1.7rem;
+  margin: 0 0 0.4rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* Stays on one line and overflows .wrap evenly, centred by the header's
+   text-align rather than by any width of its own. */
+.page-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  gap: 0.35em;
+}
+
+/* Too narrow to overflow into -- wrap rather than force a sideways scroll. */
+@media (max-width: 560px) {
+  .page-title {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+}
+
+.location-select-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.location-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-size: 1.7rem;
+  font-weight: 800;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  background: linear-gradient(120deg, var(--accent) 0%, var(--accent-strong) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.location-caret {
+  color: var(--fg-muted);
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+  -webkit-text-fill-color: initial;
+}
+
+.location-select[aria-expanded="true"] .location-caret {
+  transform: rotate(180deg);
+}
+
+.location-select:hover .location-caret,
+.location-select:focus-visible .location-caret {
+  color: var(--accent);
+}
+
+.location-select:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.location-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 20;
+  min-width: 100%;
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem;
+  background: var(--bg-elevated-glass);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.7);
+  font-size: 0.95rem;
+  font-weight: 400;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.location-menu li {
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--fg-muted);
+}
+
+.location-menu li:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--fg);
+}
+
+.location-menu li[aria-selected="true"] {
+  color: var(--accent);
+}
+
+.subtitle {
+  color: var(--fg-muted);
+  margin: 0;
+}
+
+.card {
+  position: relative;
+  background: var(--bg-elevated-glass);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
+    0 40px 100px -36px rgba(0, 0, 0, 0.75);
+  padding: 2rem;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
+/* Wizard step progress bar -- NOT decorative. Width reflects how far along
+   the actual flow the user is (see the --step-progress custom property set
+   by the small observer script in index.html, which watches #wizard's
+   .step-title text against flasher.js's real step sequence). Defaults to
+   the first step's width if that script hasn't run yet. */
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  height: 3px;
+  width: var(--step-progress, 8%);
+  background-image:
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent),
+    linear-gradient(90deg, color-mix(in srgb, var(--accent-warm) 60%, white), var(--accent-warm), var(--accent-warm), var(--accent-warm-strong));
+  background-size: 50% 100%, 100% 100%;
+  background-repeat: no-repeat, no-repeat;
+  background-position: -50% 0, 0 0;
+  opacity: 0.3;
+  transition: width 0.35s ease;
+  animation: bar-shimmer 8s linear infinite;
+}
+
+/* Static 1px top edge accent -- teal at center, fading to the card's normal
+   border color at each end. Sits under the progress bar (::before, z-index
+   1) wherever the two overlap. */
+.card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line), var(--accent), var(--line));
+}
+
+/* Idle shimmer -- a highlight streak travels across the (otherwise static)
+   fill, so the bar reads as "alive" even while width isn't changing. Back to
+   linear/wrap (not alternate), but the wrap is held off: travels for the
+   first 4s, then sits at the end position for the next 4s before jumping
+   back to the start on the next loop. */
+@keyframes bar-shimmer {
+  0%   { background-position: -50% 0, 0 0; }
+  50%  { background-position: 150% 0, 0 0; }
+  100% { background-position: 150% 0, 0 0; }
+}
+
+.step-focus {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.step-focus > .status-text {
+  margin-top: 10px;
+}
+
+.step-title {
+  margin: 0 0 0.3rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.flashing-icon {
+  display: block;
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+  margin: 1rem auto;
+  animation: float 4s ease-in-out infinite;
+}
+
+.done-icon-stack {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 1rem auto;
+}
+
+.done-icon-stack .flashing-icon {
+  margin: 0;
+  animation: none;
+}
+
+.done-icon-checkmark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+}
+
+.step-desc {
+  color: var(--fg-muted);
+  margin: 0 0 2.25rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.tiles {
+  display: grid;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.tile {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  padding: 0.9rem 1.1rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+.tile:hover {
+  border-color: var(--accent);
+  transform: translateY(-3px);
+  box-shadow: 0 30px 80px -30px rgba(45, 209, 189, 0.45);
+}
+
+.tile:active {
+  transform: translateY(0);
+}
+
+.tile strong {
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+.tile small {
+  color: var(--fg-muted);
+}
+
+.tile-warning {
+  color: color-mix(in srgb, var(--danger) 45%, var(--fg-muted));
+}
+
+.tile-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.tile-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.board-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.board-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.85rem;
+  width: 150px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  padding: 1.5rem 0.75rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+.board-tile:hover {
+  border-color: var(--accent);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 30px 80px -30px rgba(45, 209, 189, 0.45);
+}
+
+.board-tile:hover .board-tile-icon {
+  transform: translateY(-6px);
+}
+
+.board-tile:active {
+  transform: translateY(-1px) scale(1.01);
+}
+
+.board-tile-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(45, 209, 189, 0.16), rgba(249, 162, 40, 0.12));
+  border: 1px solid var(--line);
+  object-fit: contain;
+  transition: transform 0.4s ease;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.board-tile strong {
+  display: block;
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+.actions-footer {
+  justify-content: flex-start;
+  margin-top: auto;
+}
+
+/* Harvested: fully rounded ("pill") buttons instead of soft-rounded rects. */
+button.btn {
+  font: inherit;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 0.7rem 1.5rem 0.9rem;
+  cursor: pointer;
+  font-weight: 700;
+  transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+/* Glossy sheen, lit from the upper-left -- a background layer, not a
+   pseudo-element, so it never sits in the paint order above the button's
+   own text (an absolutely-positioned ::before does, regardless of DOM
+   order, since it's a positioned box; a background layer can't). */
+.btn-primary {
+  background-image:
+    radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02) 40%, transparent 62%),
+    linear-gradient(120deg, var(--accent) 0%, var(--accent-strong) 45%, color-mix(in srgb, var(--accent-strong) 70%, black) 110%);
+  color: #04120f;
+  box-shadow: 0 10px 26px -10px rgba(17, 182, 164, 0.35);
+  transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 32px -10px rgba(17, 182, 164, 0.5);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--fg-muted);
+  border: 1px solid var(--line);
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
+.btn-warning {
+  color: rgb(230, 180, 60);
+  border-color: rgba(230, 180, 60, 0.35);
+}
+
+.btn-warning:hover {
+  border-color: rgb(230, 180, 60);
+}
+
+#back {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+
+#back:hover {
+  opacity: 1;
+}
+
+/* Halves the stacked gap where a description sits directly above the bar */
+.step-desc:has(+ .progress-track) {
+  margin-bottom: 0.75rem;
+}
+
+.progress-track {
+  height: 0.6rem;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  margin: 1.25rem 0 0.75rem;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+  width: 0%;
+  transition: width 0.2s ease;
+}
+
+.status-text {
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+  min-height: 1.2em;
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.step-log {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+
+.step-log li {
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.step-log li:last-child {
+  border-bottom: none;
+  color: var(--fg);
+}
+
+.error-box {
+  background: rgba(232, 99, 122, 0.08);
+  border: 1px solid rgba(232, 99, 122, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem 1.1rem;
+  color: var(--fg);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.success-box {
+  background: rgba(45, 209, 189, 0.08);
+  border: 1px solid rgba(45, 209, 189, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem 1.1rem;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.warning-box {
+  background: rgba(230, 180, 60, 0.08);
+  border: 1px solid rgba(230, 180, 60, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem 1.1rem;
+  color: var(--fg);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.page-footer {
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: 0.8rem;
+  margin-top: 2rem;
+  line-height: 1.5;
+  opacity: 0.25;
+}
+
+.build-info {
+  margin-top: 0.6rem;
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
+.build-info.stale {
+  color: var(--danger);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.page-footer a {
+  color: var(--accent);
+}
+
+select.field,
+input.field {
+  width: 100%;
+  font: inherit;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+select.field:focus,
+input.field:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.btn-primary-warm {
+  background: linear-gradient(120deg, #fdd98c 0%, var(--accent-warm) 45%, var(--accent-warm-strong) 110%);
+  color: #2a1400;
+  box-shadow: 0 14px 40px -8px rgba(249, 162, 40, 0.55);
+}
+
+.btn-primary-warm:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.github-link {
+  position: fixed;
+  top: 1.25rem;
+  left: 1.25rem;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border-radius: var(--radius-full);
+  padding: 0.6rem 1.15rem;
+  color: var(--fg);
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.05);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--line);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.github-link:hover {
+  border-color: var(--accent);
+  box-shadow: 0 14px 40px -8px rgba(45, 209, 189, 0.5);
+  transform: translateY(-1px);
+}
+
+.console-toggle {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 20;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 0.6rem 1.15rem;
+  cursor: pointer;
+  background: linear-gradient(120deg, #fdd98c 0%, var(--accent-warm) 45%, var(--accent-warm-strong) 110%);
+  color: #2a1400;
+  box-shadow: 0 10px 30px -10px rgba(249, 162, 40, 0.45);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.console-toggle:hover {
+  box-shadow: 0 14px 40px -8px rgba(249, 162, 40, 0.55);
+  transform: translateY(-1px);
+}
+
+.console-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(2, 5, 10, 0.75);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.console-backdrop.hidden {
+  display: none;
+}
+
+.console-modal {
+  width: 100%;
+  max-width: 900px;
+  background: var(--bg-elevated-glass);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
+    0 36px 90px -36px rgba(0, 0, 0, 0.8);
+  padding: 1.5rem;
+}
+
+.console-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.console-modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.console-output {
+  height: 220px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 1rem 0;
+  color: var(--fg);
+}
+
+.console-modal .actions {
+  margin-top: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.console-form {
+  margin: 0;
+}
+
+.console-form input.field {
+  margin-bottom: 0;
+}
+
+.console-reference {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.console-reference span {
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card::before {
+    transition: none !important;
+  }
+  .flashing-icon {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,5 @@
+# Mod-level facts, distinct from the per-patch sidecars (0001.meta.yaml,
+# 0002.meta.yaml) which declare per-patch env contributions. This file holds
+# facts about the mod as a whole.
+name: hotspot-ota
+suffix: ota
