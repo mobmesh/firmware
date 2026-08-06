@@ -4,7 +4,7 @@
 
 ### Fewer trips and no climbing.
 
-⚡️ **[Flash a device now](https://mobmesh.github.io/firmware/flasher)** &nbsp;•&nbsp; [What you get](#the-short-version) &nbsp;•&nbsp; [How it works](#still-reading-good) &nbsp;•&nbsp; [Mods](#current-mods-applied)
+⚡️ **[Flash a device now](https://tools.mobmesh.org/flasher)** &nbsp;•&nbsp; [What you get](#the-short-version) &nbsp;•&nbsp; [How it works](#still-reading-good) &nbsp;•&nbsp; [Mods](#current-mods-applied)
 
 </div>
 
@@ -39,7 +39,7 @@ Frequency, bandwidth, spreading factor, coding rate, advert intervals, region ma
 | Clock after reboot | Placeholder date | Set from NTP on any OTA join |
 
 > [!TIP]
-> If that's all you needed, the ⚡️ **[web-based flasher](https://mobmesh.github.io/firmware/flasher)** is right there and the rest of this page is optional.
+> If that's all you needed, the ⚡️ **[web-based flasher](https://tools.mobmesh.org/flasher)** is right there and the rest of this page is optional.
 
 ---
 

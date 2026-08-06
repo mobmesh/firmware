@@ -73,6 +73,14 @@ When updating a device remotely over LoRa, it's useful to keep the commands as s
 You can save the firmware URL once:
 
 ```text
+set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin
+```
+
+That address serves the same file as the copy on GitHub, but it is shorter to type
+and it does not redirect on the way. If a device has trouble fetching it, the
+GitHub address still works:
+
+```text
 set ota.fw.url https://github.com/mobmesh/firmware/raw/refs/heads/main/pages/flasher/heltec_v4/repeater/firmware.bin
 ```
 
@@ -94,7 +102,7 @@ The whole process can take up to around two minutes.
 
 After the update finishes, the device reboots using the new firmware and starts the automatic rollback protection process.
 
-## [Web-Based Flasher](https://mobmesh.github.io/firmware/flasher)
+## [Web-Based Flasher](https://tools.mobmesh.org/flasher)
 
 Some boards need a repartitioned flash layout to make room for this mod's expanded feature set. The flasher will let the user know if this is the case.
 

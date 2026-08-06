@@ -23,7 +23,7 @@ More information about each mod can be found in its own README under `mods/<name
 
 ## Web-Based Flasher
 
-You can use the ⚡️[web-based flasher](https://mobmesh.github.io/firmware/flasher) to flash a supported devices directly from your browser over USB.
+You can use the ⚡️[web-based flasher](https://tools.mobmesh.org/flasher) to flash a supported devices directly from your browser over USB.
 
 The flasher requires Chrome, Edge, or Opera because it uses Web Serial. No additional software is needed.
 
