@@ -233,6 +233,7 @@ def cmd_boards_json(args):
     board_entry["variants"][args.variant_id] = {
         "label": args.variant_label,
         "assetBasename": args.asset_basename,
+        "version": args.version,
         "firmwareFile": args.firmware_file,
         "firmwareShaFile": args.firmware_sha_file,
     }
@@ -242,6 +243,7 @@ def cmd_boards_json(args):
 
     all_boards[args.board] = board_entry
     all_boards["_generated"] = GENERATED_NOTICE
+    all_boards["_version"] = args.version
     output_path.write_text(json.dumps(all_boards, indent=2) + "\n")
     print(f"OK: updated '{args.board}' ({args.variant_id}) in {output_path}")
 
@@ -446,6 +448,7 @@ def main():
     p_bj.add_argument("--variant-id", required=True)
     p_bj.add_argument("--variant-label", required=True)
     p_bj.add_argument("--asset-basename", required=True)
+    p_bj.add_argument("--version", required=True)
     p_bj.add_argument("--firmware-file", required=True)
     p_bj.add_argument("--firmware-sha-file", required=True)
     p_bj.add_argument("--output", required=True)

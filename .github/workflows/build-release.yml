@@ -413,6 +413,7 @@ jobs:
             --variant-id ${{ matrix.id }} \
             --variant-label "${{ matrix.release_title }}" \
             --asset-basename ${{ matrix.asset_basename }} \
+            --version "${{ steps.pick.outputs.version }}" \
             --firmware-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" \
             --firmware-sha-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin.sha256" \
             --output pages/flasher/boards.json
@@ -496,6 +497,7 @@ jobs:
               --variant-id ${{ matrix.id }} \
               --variant-label "${{ matrix.release_title }}" \
               --asset-basename ${{ matrix.asset_basename }} \
+              --version "${{ steps.pick.outputs.version }}" \
               --firmware-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" \
               --firmware-sha-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin.sha256" \
               --output pages/flasher/boards.json

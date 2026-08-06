@@ -321,7 +321,6 @@ body {
   display: block;
   width: 100%;
   text-align: left;
-  text-decoration: none;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
