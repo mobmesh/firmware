@@ -5,6 +5,8 @@ Run: python3 scripts/tests/test_generate_board_config.py
 """
 import argparse
 import importlib.util
+import json
+import struct
 import tempfile
 import unittest
 from pathlib import Path
@@ -166,6 +168,90 @@ class InjectEnvTestCase(unittest.TestCase):
 
         with self.assertRaises(SystemExit):
             self._run(ini_path, mods="mod-a,mod-b")
+
+
+class BoardsJsonTestCase(unittest.TestCase):
+    """cmd_boards_json: the per-variant postFlashCommands passthrough."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo_root = Path(self.tmp.name)
+        self._orig_repo_root = gbc.REPO_ROOT
+        gbc.REPO_ROOT = self.repo_root
+        self.addCleanup(self._restore)
+        self.addCleanup(self.tmp.cleanup)
+
+    def _restore(self):
+        gbc.REPO_ROOT = self._orig_repo_root
+
+    def _partitions_bin(self) -> Path:
+        """Minimal dual-OTA table: otadata + ota_0 + ota_1, then a stop byte."""
+        entries = [
+            (gbc.PARTITION_TYPE_DATA, gbc.DATA_SUBTYPE_OTA, 0xE000, 0x2000),
+            (gbc.PARTITION_TYPE_APP, gbc.APP_SUBTYPE_OTA_0, 0x10000, 0x640000),
+            (gbc.PARTITION_TYPE_APP, gbc.APP_SUBTYPE_OTA_1, 0x650000, 0x640000),
+        ]
+        blob = b""
+        for ptype, subtype, offset, size in entries:
+            blob += gbc.PARTITION_MAGIC + bytes([ptype, subtype])
+            blob += struct.pack("<II", offset, size)
+            blob += b"\x00" * (gbc.PARTITION_ENTRY_SIZE - 12)
+        blob += b"\xff" * gbc.PARTITION_ENTRY_SIZE
+        path = self.repo_root / "partitions.bin"
+        path.write_bytes(blob)
+        return path
+
+    def _run(self, overrides_yaml: str, variant_id: str) -> dict:
+        (self.repo_root / "variants" / "heltec_v4").mkdir(parents=True, exist_ok=True)
+        (self.repo_root / "variants" / "heltec_v4" / "overrides.yaml").write_text(overrides_yaml)
+
+        upstream = self.repo_root / "upstream" / "boards"
+        upstream.mkdir(parents=True, exist_ok=True)
+        (upstream / "heltec_v4.json").write_text('{"build": {"mcu": "esp32s3"}}')
+
+        out = self.repo_root / "boards.json"
+        gbc.cmd_boards_json(argparse.Namespace(
+            board="heltec_v4",
+            upstream_dir=str(self.repo_root / "upstream"),
+            partitions_bin=str(self._partitions_bin()),
+            variant_id=variant_id,
+            variant_label="Repeater",
+            asset_basename="heltec_v4_rep_ota_ts",
+            version="1.16.0",
+            firmware_file="heltec_v4/repeater/firmware.bin",
+            firmware_sha_file="heltec_v4/repeater/firmware.bin.sha256",
+            output=str(out),
+        ))
+        return json.loads(out.read_text())["heltec_v4"]["variants"][variant_id]
+
+    FLASHER_BASE = (
+        "build_flags: {}\npartitions_override: null\n"
+        "flasher:\n  label: \"Heltec V4\"\n  connect_note: \"c\"\n  post_flash_note: \"p\"\n"
+    )
+
+    def test_post_flash_commands_reach_the_variant(self):
+        variant = self._run(
+            self.FLASHER_BASE
+            + "  post_flash_commands:\n    repeater:\n      - \"set ota.fw.url https://x/f.bin\"\n",
+            "repeater",
+        )
+        self.assertEqual(
+            variant["postFlashCommands"],
+            ["set ota.fw.url https://x/f.bin"],
+        )
+
+    def test_variant_without_commands_omits_the_key(self):
+        # flasher.js reads a missing key as an empty list, so don't emit noise.
+        variant = self._run(
+            self.FLASHER_BASE
+            + "  post_flash_commands:\n    repeater:\n      - \"set a b\"\n",
+            "room_server",
+        )
+        self.assertNotIn("postFlashCommands", variant)
+
+    def test_absent_post_flash_commands_block_is_fine(self):
+        variant = self._run(self.FLASHER_BASE, "repeater")
+        self.assertNotIn("postFlashCommands", variant)
 
 
 if __name__ == "__main__":

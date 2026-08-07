@@ -54,3 +54,16 @@ flasher:
   connect_note: "Put the board into flash mode first (hold PGM, tap RST, then release PGM), then connect over USB."
   post_flash_note: "Press RST once to put the board back into normal operation."
 
+  # CLI settings sent over serial after a flash, keyed by variant id. These run
+  # before the location settings from member-config-*.json, so a region can
+  # override a board default rather than the other way round. A variant with no
+  # entry here simply gets none. Don't put `reboot` in the list -- the flasher
+  # sends it raw after the whole chain (routing it through sendCommand would
+  # block waiting on a reply the device never sends).
+  #
+  # ota.fw.url is where `ota wan` pulls an update from, so it must point at
+  # this exact board+variant's image, not a generic path.
+  post_flash_commands:
+    repeater:
+      - "set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin"
+

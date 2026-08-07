@@ -230,13 +230,24 @@ def cmd_boards_json(args):
     existing_variants = existing.get("variants", {})
 
     board_entry["variants"] = existing_variants
-    board_entry["variants"][args.variant_id] = {
+    variant_entry = {
         "label": args.variant_label,
         "assetBasename": args.asset_basename,
         "version": args.version,
         "firmwareFile": args.firmware_file,
         "firmwareShaFile": args.firmware_sha_file,
     }
+
+    # Optional per-variant CLI settings from overrides.yaml's
+    # flasher.post_flash_commands. The flasher prepends these to the location
+    # commands from member-config-*.json (see flasher.js), so a region can
+    # override a board default. Omitted entirely when a variant has none, which
+    # flasher.js reads as an empty list.
+    post_flash = (overrides["flasher"].get("post_flash_commands") or {}).get(args.variant_id)
+    if post_flash:
+        variant_entry["postFlashCommands"] = list(post_flash)
+
+    board_entry["variants"][args.variant_id] = variant_entry
     board_entry["bootApp0"] = existing.get("bootApp0", f"{args.board}/boot_app0.bin")
     board_entry["bootloaderFile"] = existing.get("bootloaderFile", f"{args.board}/bootloader.bin")
     board_entry["partitionsFile"] = existing.get("partitionsFile", f"{args.board}/partitions.bin")
