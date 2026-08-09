@@ -51,6 +51,7 @@
       "repeater": {
         "label": "Repeater",
         "assetBasename": "xiao_c3_rep_ota_ts",
+        "version": "v1.17.0",
         "firmwareFile": "xiao_c3/repeater/firmware.bin",
         "firmwareShaFile": "xiao_c3/repeater/firmware.bin.sha256"
       },
@@ -64,5 +65,6 @@
     "bootApp0": "xiao_c3/boot_app0.bin",
     "bootloaderFile": "xiao_c3/bootloader.bin",
     "partitionsFile": "xiao_c3/partitions.bin"
-  }
+  },
+  "_version": "v1.17.0"
 }
