@@ -1,8 +1,8 @@
 diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index 9accb29..73fcecc 100644
+index b618ae2..27ab9b8 100644
 --- a/docs/cli_commands.md
 +++ b/docs/cli_commands.md
-@@ -75,6 +75,141 @@ This document provides an overview of CLI commands that can be sent to MeshCore
+@@ -89,6 +89,141 @@ This document provides an overview of CLI commands that can be sent to MeshCore
  
  ---
  
@@ -145,19 +145,19 @@ index 9accb29..73fcecc 100644
  **Usage:**
  - `erase`
 diff --git a/src/MeshCore.h b/src/MeshCore.h
-index cfa33cf..2a827ad 100644
+index 89e60b1..5f9ec85 100644
 --- a/src/MeshCore.h
 +++ b/src/MeshCore.h
-@@ -64,6 +64,7 @@ public:
-   virtual uint8_t getStartupReason() const = 0;
-   virtual bool getBootloaderVersion(char* version, size_t max_len) { return false; }
-   virtual bool startOTAUpdate(const char* id, char reply[]) { return false; }   // not supported
+@@ -67,6 +67,7 @@ public:
+   virtual bool setLoRaFemLnaEnabled(bool enable) { return false; }
+   virtual bool canControlLoRaFemLna() const { return false; }
+   virtual bool isLoRaFemLnaEnabled() const { return false; }
 +  virtual bool startOTAUpdateFromURL(const char* url, char reply[]) { return false; }   // not supported
  
    // Power management interface (boards with power management override these)
    virtual bool isExternalPowered() { return false; }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index b78ad6e..b4bdbb2 100644
+index 07181e1..29addbb 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -5,6 +5,16 @@
@@ -177,7 +177,7 @@ index b78ad6e..b4bdbb2 100644
  #ifndef BRIDGE_MAX_BAUD
  #define BRIDGE_MAX_BAUD 115200
  #endif
-@@ -239,6 +249,34 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+@@ -205,6 +215,34 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
        } else {
          strcpy(reply, "ERR: clock cannot go backwards");
        }
@@ -212,7 +212,7 @@ index b78ad6e..b4bdbb2 100644
      } else if (memcmp(command, "start ota", 9) == 0) {
        if (!_board->startOTAUpdate(_prefs->node_name, reply)) {
          strcpy(reply, "Error");
-@@ -303,7 +341,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+@@ -269,7 +307,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
        bool s = _callbacks->formatFileSystem();
        sprintf(reply, "File system erase: %s", s ? "OK" : "Err");
      } else if (memcmp(command, "ver", 3) == 0) {
@@ -221,7 +221,7 @@ index b78ad6e..b4bdbb2 100644
      } else if (memcmp(command, "board", 5) == 0) {
        sprintf(reply, "%s", _board->getManufacturerName());
      } else if (memcmp(command, "sensor get ", 11) == 0) {
-@@ -536,6 +574,68 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -506,6 +544,68 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
      StrHelper::strncpy(_prefs->guest_password, &config[15], sizeof(_prefs->guest_password));
      savePrefs();
      strcpy(reply, "OK");
@@ -290,11 +290,10 @@ index b78ad6e..b4bdbb2 100644
    } else if (memcmp(config, "prv.key ", 8) == 0) {
      uint8_t prv_key[PRV_KEY_SIZE];
      bool success = mesh::Utils::fromHex(prv_key, PRV_KEY_SIZE, &config[8]);
-@@ -925,6 +1025,14 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
-     sprintf(reply, "> %u mV", _board->getBootVoltage());
- #else
-     strcpy(reply, "ERROR: Power management not supported");
-+#endif
+@@ -952,6 +1052,14 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+     if (tmp == reply) {
+       sprintf(reply, "No extra SF configured");
+     }
 +#if defined(WITH_HOTSPOT_OTA)
 +  } else if (memcmp(config, "ota.fw.url", 10) == 0) {
 +    HotspotOtaConfig cfg;
@@ -302,14 +301,15 @@ index b78ad6e..b4bdbb2 100644
 +    sprintf(reply, "> %s", cfg.url[0] ? cfg.url : "(not set)");
 +  } else if (memcmp(config, "ota.wan.pwr", 11) == 0) {
 +    sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
- #endif
++#endif
    } else {
      sprintf(reply, "??: %s", config);
+   }
 diff --git a/src/helpers/ESP32Board.cpp b/src/helpers/ESP32Board.cpp
-index e0ca1d0..92362ea 100644
+index a55abb2..13b61fa 100644
 --- a/src/helpers/ESP32Board.cpp
 +++ b/src/helpers/ESP32Board.cpp
-@@ -38,10 +38,38 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
+@@ -39,10 +39,38 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
    return true;
  }
  
@@ -347,12 +347,12 @@ index e0ca1d0..92362ea 100644
 +}
  #endif
  
- #endif
+ void ESP32Board::powerOff() {
 diff --git a/src/helpers/ESP32Board.h b/src/helpers/ESP32Board.h
-index a4cbf2a..8b9198f 100644
+index d7eb5fe..e88a785 100644
 --- a/src/helpers/ESP32Board.h
 +++ b/src/helpers/ESP32Board.h
-@@ -151,6 +151,7 @@ public:
+@@ -155,6 +155,7 @@ public:
    }
  
    bool startOTAUpdate(const char* id, char reply[]) override;
@@ -362,7 +362,7 @@ index a4cbf2a..8b9198f 100644
      inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..68e548c
+index 0000000..5dc4807
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
 @@ -0,0 +1,362 @@
