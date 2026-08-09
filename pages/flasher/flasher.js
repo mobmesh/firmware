@@ -7,9 +7,11 @@ const CLI_BAUD_RATE = 115200;
 const BOOTLOADER_POLL_INTERVAL_MS = 500;
 const BOOTLOADER_POLL_ATTEMPTS = 40; // ~20s -- re-enumeration after the reboot gesture has been observed taking several seconds
 
-// ROM bootloader PID (0x1001), distinct from CLI/app mode (0x2). Confirms
-// bootloader mode before the esptool handoff, and is the sole input to the
-// erase-vs-preserve decision in renderBoard().
+// ROM bootloader PID (0x1001). No longer distinct from app mode: upstream
+// v1.17.0 moved heltec_v4 to ARDUINO_USB_MODE=1, and xiao_c3 never had the
+// TinyUSB 0x2 mode at all, so a running node enumerates identically.
+// Used only to pick the reset path; erase-vs-preserve is decided in runFlash()
+// from the chip's own partition table and filesystem.
 const BOARD_BOOTLOADER_USB_IDS = {
   heltec_v4: { usbVendorId: ESPRESSIF_VENDOR_ID, usbProductId: 0x1001 },
   xiao_c3: { usbVendorId: ESPRESSIF_VENDOR_ID, usbProductId: 0x1001 },
@@ -112,9 +114,11 @@ function findFilesystemPartition(partitions) {
 }
 
 // Only the first two appear in every release back to v1.0.0c. The rest arrived
-// later (/com_prefs v1.4.1, /s_contacts v1.9.0, /regions2 v1.10.0), so dropping
-// them would stop recognising older devices.
-const MESHCORE_FILES = ["/identity/_main.id", "/node_prefs", "/com_prefs", "/regions2", "/s_contacts"];
+// later (/com_prefs v1.4.1, /s_contacts v1.9.0, /regions2 v1.10.0, /prefs.json
+// v1.17.0), so dropping them would stop recognising older devices.
+// A v1.17 device flashed fresh may carry only /identity/_main.id and
+// /prefs.json -- an upgraded one still has the legacy files too.
+const MESHCORE_FILES = ["/identity/_main.id", "/node_prefs", "/com_prefs", "/prefs.json", "/regions2", "/s_contacts"];
 
 // An empty or unreadable filesystem answers no, which is correct either way
 function looksLikeMeshCore(files) {
@@ -431,15 +435,13 @@ function renderBoard() {
       state.boardId = el.dataset.board;
       state.boardIcon = el.dataset.iconSrc || null;
       state.boardIcon2 = el.dataset.icon2Src || null;
-      // Mode from how the device enumerated: 0x1001 erases, 0x2 preserves
+      // Reset path only -- says nothing about what is already on the chip.
       state.alreadyInFlashMode = Boolean(earlyPort && matchesBootloaderUsbId(earlyPort));
-      state.mode = state.alreadyInFlashMode ? "new" : "update";
-      // Logged because this one check decides whether the chip gets erased
       const info = earlyPort ? earlyPort.getInfo() : {};
       const asHex = (v) => (typeof v === "number" ? `0x${v.toString(16)}` : "unknown");
       console.info(
         `[flash] Device enumerated as VID ${asHex(info.usbVendorId)} PID ${asHex(info.usbProductId)} -- ` +
-          `${state.alreadyInFlashMode ? "bootloader mode, full erase" : "CLI mode, no erase"} (${state.mode})`
+          `${state.alreadyInFlashMode ? "skipping the reboot gesture" : "will send the reboot gesture"}`
       );
       renderVariant();
     });
@@ -809,11 +811,11 @@ async function runFlash(onProgress, onStatus, onTitle) {
     console.warn(`[flash] Not a MeshCore device (${seen}), existing data will not be kept`);
   }
 
-  // An update keeps the device's table, which only works while it still
-  // matches. A changed layout writes the whole thing instead.
+  // Reusing the device's own table only works while it still matches ours. A
+  // changed layout writes the whole thing instead -- the data still survives,
+  // rebuilt for the new partition size by the restore step below.
   const newPartitions = parsePartitionTable(partitions);
   const layoutChanged =
-    state.mode !== "new" &&
     Array.isArray(spiffsBackup.partitions) &&
     !partitionTablesMatch(spiffsBackup.partitions, newPartitions);
   if (layoutChanged) {
@@ -826,7 +828,22 @@ async function runFlash(onProgress, onStatus, onTitle) {
     console.info("[flash] Writing the full layout, since nothing on this device is being preserved");
   }
 
-  if (state.mode === "new" || layoutChanged || foreignInstall) {
+  // How much to write, decided from the chip and never from how it enumerated
+  // -- on >=1.17 a running node and the ROM bootloader share a VID:PID, so
+  // deriving this from the port erased live devices. Skip the layout only on
+  // positive evidence: a MeshCore filesystem we could read, on a table still
+  // matching ours. This is not the same question as whether the user's data
+  // survives -- that is the restore step below, which runs off the backup
+  // regardless of what gets written here.
+  const appSlotsOnly = spiffsBackup.status === "ok" && isMeshCore && !layoutChanged;
+  // Drives the closing screen's wording, and is the honest record of what ran
+  state.mode = appSlotsOnly ? "update" : "new";
+  console.info(
+    `[flash] ${appSlotsOnly ? "Writing app slots only" : "Writing the full layout with a full erase"} ` +
+      `(filesystem ${spiffsBackup.status}, meshcore ${isMeshCore}, layout ${layoutChanged ? "changed" : "unchanged"})`
+  );
+
+  if (!appSlotsOnly) {
     const bootloader = await step(onStatus, "Loading bootloader", () => loadLocalBinary(board.bootloaderFile));
     const bootApp0 = await step(onStatus, "Preparing boot selector", () => loadLocalBinary(board.bootApp0));
 
