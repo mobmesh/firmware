@@ -39,6 +39,22 @@ board = heltec_v4
 build_src_filter = foo
 """
 
+# Mirrors the real upstream variant: commented-out flags sit at column 0 between
+# the last real flag and the next key.
+COMMENTED_FLAGS_INI = """[env:heltec_v4_repeater]
+board = heltec_v4
+build_flags =
+  ${heltec_v4_oled.build_flags}
+  -D DISPLAY_CLASS=SSD1306Display
+  -D MAX_NEIGHBOURS=50
+;  -D MESH_PACKET_LOGGING=1
+;  -D MESH_DEBUG=1
+build_src_filter = ${heltec_v4_oled.build_src_filter}
+  +<helpers/ui/SSD1306Display.cpp>
+lib_deps =
+  foo
+"""
+
 
 class InjectEnvTestCase(unittest.TestCase):
     def setUp(self):
@@ -65,9 +81,11 @@ class InjectEnvTestCase(unittest.TestCase):
     def _make_overrides(self, board: str, content: str):
         self._write(f"variants/{board}/overrides.yaml", content)
 
-    def _run(self, ini_path: Path, board="heltec_v4", env="heltec_v4_repeater", mods="hotspot-ota"):
+    def _run(self, ini_path: Path, board="heltec_v4", env="heltec_v4_repeater", mods="hotspot-ota",
+             append_flags=""):
         args = argparse.Namespace(
             board=board, env=env, platformio_ini=str(ini_path), mods=mods,
+            append_flags=append_flags,
         )
         gbc.cmd_inject_env(args)
 
@@ -94,6 +112,92 @@ class InjectEnvTestCase(unittest.TestCase):
         # untouched env must not pick up the other env's injected flags
         room_section = result.split("[env:heltec_v4_room_server]")[1]
         self.assertNotIn("WITH_HOTSPOT_OTA", room_section)
+
+    def _minimal_mod_and_overrides(self):
+        self._make_mod("hotspot-ota", {"0001": "id: \"0001\"\ntitle: x\nrequires: []\n"})
+        self._make_overrides("heltec_v4", "build_flags: {}\npartitions_override: null\n")
+
+    def _flag_order(self, section: str, *needles):
+        return [section.index(n) for n in needles]
+
+    def test_appended_flag_lands_after_upstreams_own(self):
+        # The whole point of appending: a later -U beats the env's earlier -D.
+        # Prepended, it would be silently re-defined and the override would do nothing.
+        self._minimal_mod_and_overrides()
+        ini_path = self._write("platformio.ini", COMMENTED_FLAGS_INI)
+
+        self._run(ini_path, append_flags="-UDISPLAY_CLASS")
+
+        section = ini_path.read_text()
+        define_at, undef_at = self._flag_order(
+            section, "-D DISPLAY_CLASS=SSD1306Display", "-UDISPLAY_CLASS"
+        )
+        self.assertLess(define_at, undef_at)
+
+    def test_commented_flags_do_not_truncate_the_block(self):
+        # ";  -D ..." lines sit at column 0, so a naive "stop at the first
+        # unindented line" would insert before the last real flag.
+        self._minimal_mod_and_overrides()
+        ini_path = self._write("platformio.ini", COMMENTED_FLAGS_INI)
+
+        self._run(ini_path, append_flags="-UDISPLAY_CLASS")
+
+        section = ini_path.read_text()
+        last_real_at, undef_at, next_key_at = self._flag_order(
+            section, "-D MAX_NEIGHBOURS=50", "-UDISPLAY_CLASS", "build_src_filter"
+        )
+        self.assertLess(last_real_at, undef_at)
+        self.assertLess(undef_at, next_key_at)
+
+    def test_real_flag_after_a_comment_still_counts_as_the_block_end(self):
+        # The case that makes comment-skipping load-bearing: stopping at the first
+        # comment would insert before -D DISPLAY_CLASS, so the -U would not win.
+        self._minimal_mod_and_overrides()
+        ini_path = self._write("platformio.ini", COMMENTED_FLAGS_INI.replace(
+            ";  -D MESH_DEBUG=1\n",
+            ";  -D MESH_DEBUG=1\n  -D DISPLAY_CLASS=SSD1306Display\n",
+        ))
+
+        self._run(ini_path, append_flags="-UDISPLAY_CLASS")
+
+        section = ini_path.read_text()
+        last_define_at = section.rindex("-D DISPLAY_CLASS=SSD1306Display")
+        self.assertLess(last_define_at, section.index("-UDISPLAY_CLASS"))
+
+    def test_multiple_appended_flags_keep_their_order(self):
+        self._minimal_mod_and_overrides()
+        ini_path = self._write("platformio.ini", COMMENTED_FLAGS_INI)
+
+        self._run(ini_path, append_flags="-UDISPLAY_CLASS,-UFOO")
+
+        section = ini_path.read_text()
+        first_at, second_at = self._flag_order(section, "-UDISPLAY_CLASS", "-UFOO")
+        self.assertLess(first_at, second_at)
+
+    def test_no_append_flags_leaves_the_block_alone(self):
+        self._minimal_mod_and_overrides()
+        ini_path = self._write("platformio.ini", COMMENTED_FLAGS_INI)
+
+        self._run(ini_path, append_flags="")
+
+        self.assertNotIn("-U", ini_path.read_text())
+
+    def test_board_level_append_from_overrides_yaml(self):
+        # Same mechanism, declared per-board instead of per-target.
+        self._make_mod("hotspot-ota", {"0001": "id: \"0001\"\ntitle: x\nrequires: []\n"})
+        self._make_overrides("heltec_v4", (
+            "build_flags: {}\nbuild_flags_append: [\"-UDISPLAY_CLASS\"]\n"
+            "partitions_override: null\n"
+        ))
+        ini_path = self._write("platformio.ini", COMMENTED_FLAGS_INI)
+
+        self._run(ini_path)
+
+        section = ini_path.read_text()
+        define_at, undef_at = self._flag_order(
+            section, "-D DISPLAY_CLASS=SSD1306Display", "-UDISPLAY_CLASS"
+        )
+        self.assertLess(define_at, undef_at)
 
     def test_partitions_override_vendors_file_and_uses_project_relative_path(self):
         self._make_mod("hotspot-ota", {"0001": "id: \"0001\"\ntitle: x\nrequires: []\n"})
