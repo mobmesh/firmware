@@ -63,9 +63,11 @@ flasher:
   #
   # ota.fw.url is where `ota wan` pulls an update from, so it must point at
   # this exact board+variant's image, not a generic path.
+  #
+  # Not seeded here: `powersaving on` -- light sleep with no serial wake source,
+  # so commands after it are silently dropped. Enable at commissioning instead.
   post_flash_commands:
     repeater:
       - "set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin"
-      - "powersaving on"
       - "set tx 20"
 
