@@ -286,6 +286,9 @@ def cmd_resolve_targets(args):
             "vendor_flasher_assets": t["vendor_flasher_assets"],
             "make_latest": t["make_latest"],
             "mods": t["mods"],
+            # Optional. Raw flags appended after upstream's, so they can override
+            # what the env already sets.
+            "build_flags_append": t.get("build_flags_append") or [],
         })
 
     # Targets sharing an upstream_tag_prefix publish to the same shared release (see
@@ -354,6 +357,24 @@ def find_key_line(section_lines: list, key: str):
     return None
 
 
+def find_value_block_end(section_lines: list, key_idx: int):
+    """Index of the last continuation line of a multi-line INI value.
+
+    Continuations are indented; commented-out flags sit at column 0 between
+    them, so skip those rather than treating them as the next key.
+    """
+    last = key_idx
+    for i in range(key_idx + 1, len(section_lines)):
+        line = section_lines[i]
+        if not line.strip():
+            break
+        if line[:1].isspace():
+            last = i
+        elif not line.lstrip().startswith((";", "#")):
+            break
+    return last
+
+
 def cmd_inject_env(args):
     board = args.board
     env = args.env
@@ -391,6 +412,12 @@ def cmd_inject_env(args):
         else:
             override_flag_lines.append(f"-D {key}={value}")
 
+    # Raw flags appended after upstream's own, so they win when both set the same
+    # macro (e.g. "-UDISPLAY_CLASS"). Prepended flags cannot. Board-level first,
+    # then this target's.
+    append_flag_lines = [str(f) for f in (overrides.get("build_flags_append") or [])]
+    append_flag_lines += [f.strip() for f in (getattr(args, "append_flags", "") or "").split(",") if f.strip()]
+
     all_build_flags_lines = env_flag_lines + override_flag_lines
     partitions_override = overrides.get("partitions_override")
 
@@ -427,6 +454,10 @@ def cmd_inject_env(args):
     indent = "  "
     section_lines[bf_idx + 1 : bf_idx + 1] = [f"{indent}{l}\n" for l in all_build_flags_lines]
 
+    if append_flag_lines:
+        bf_end = find_value_block_end(section_lines, bf_idx)
+        section_lines[bf_end + 1 : bf_end + 1] = [f"{indent}{l}\n" for l in append_flag_lines]
+
     if src_filter_entries:
         sf_idx = find_key_line(section_lines, "build_src_filter")
         if sf_idx is None:
@@ -437,6 +468,7 @@ def cmd_inject_env(args):
     ini_path.write_text("".join(lines))
     print(
         f"OK: injected {len(all_build_flags_lines)} build flag(s)"
+        + (f", {len(append_flag_lines)} appended flag(s)" if append_flag_lines else "")
         + (", 1 partitions override" if partitions_override else "")
         + (f", {len(src_filter_entries)} build_src_filter entrie(s)" if src_filter_entries else "")
         + f" into [env:{env}] in {ini_path}"
@@ -474,6 +506,13 @@ def main():
     p_ie.add_argument("--env", required=True)
     p_ie.add_argument("--platformio-ini", required=True)
     p_ie.add_argument("--mods", required=True, help="comma-separated mod names, e.g. hotspot-ota")
+    # Values start with '-', so argparse needs the --flag=value form:
+    #   --append-flags="-UDISPLAY_CLASS,-UFOO"
+    p_ie.add_argument(
+        "--append-flags", default="",
+        help="comma-separated raw flags appended after upstream's own, e.g. -UDISPLAY_CLASS. "
+             "PlatformIO splits on spaces, so use the joined form (-UFOO, not -U FOO).",
+    )
     p_ie.set_defaults(func=cmd_inject_env)
 
     args = parser.parse_args()

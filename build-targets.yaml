@@ -34,6 +34,11 @@ targets:
     # so they must agree on make_latest/release_title -- resolve-targets enforces this.
     make_latest: true
     mods: [hotspot-ota, timing-safety]
+    # Repeaters ship headless: the OLED is pointless in a sealed box on a tower,
+    # and dropping it also compiles out the button's long-press power-off, which
+    # would otherwise deep-sleep a node with no wake source. Room servers keep it.
+    # Joined form required -- PlatformIO splits "-U FOO" into a bare -U.
+    build_flags_append: ["-UDISPLAY_CLASS"]
 
   - board: heltec_v4
     role: room_server

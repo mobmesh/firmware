@@ -230,7 +230,8 @@ jobs:
             --board ${{ matrix.board_id }} \
             --env ${{ matrix.build_env }} \
             --platformio-ini "upstream-src/variants/${{ matrix.board_id }}/platformio.ini" \
-            --mods "${{ join(matrix.mods, ',') }}"
+            --mods "${{ join(matrix.mods, ',') }}" \
+            --append-flags="${{ join(matrix.build_flags_append, ',') }}"
           cd upstream-src
           DIFF=$(git diff -- "variants/${{ matrix.board_id }}/platformio.ini")
           if [ -z "$DIFF" ]; then
