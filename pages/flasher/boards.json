@@ -62,6 +62,7 @@
       "room_server": {
         "label": "Room",
         "assetBasename": "xiao_c3_room_ota_ts",
+        "version": "v1.17.0",
         "firmwareFile": "xiao_c3/room_server/firmware.bin",
         "firmwareShaFile": "xiao_c3/room_server/firmware.bin.sha256"
       }
