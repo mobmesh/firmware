@@ -26,6 +26,7 @@
       "room_server": {
         "label": "Room",
         "assetBasename": "heltec_v4_room_ota_ts",
+        "version": "v1.17.0",
         "firmwareFile": "heltec_v4/room_server/firmware.bin",
         "firmwareShaFile": "heltec_v4/room_server/firmware.bin.sha256"
       }
