@@ -22,7 +22,6 @@
         "firmwareShaFile": "heltec_v4/repeater/firmware.bin.sha256",
         "postFlashCommands": [
           "set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin",
-          "powersaving on",
           "set tx 20"
         ]
       },
