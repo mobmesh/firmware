@@ -1,0 +1,145 @@
+# Early warning for patch drift.
+#
+# sync-build-release only notices drift when upstream *tags a release* -- i.e. at the
+# exact moment we want to ship. This runs daily against upstream's moving branches so
+# breakage surfaces days or weeks earlier, decoupled from release pressure.
+#
+# It never builds and never publishes. It only answers two questions:
+#   1. do our patches still apply to upstream's current branches?
+#   2. has an upstream PR we are carrying been merged, making a patch redundant?
+#
+# Question 2 exists because a patch that quietly stops being *needed* has no failure
+# signal of its own -- it keeps applying cleanly while duplicating a fix upstream has
+# since made. That is how two hunks of timing-safety survived until a rebase forced
+# someone to read the surrounding code.
+name: patch-drift-canary
+
+on:
+  schedule:
+    - cron: "40 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  UPSTREAM_REPO: meshcore-dev/MeshCore
+  ISSUE_TITLE: "Patch drift against upstream branches"
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo (patches only)
+        uses: actions/checkout@v7
+
+      - id: probe
+        name: Probe patches against upstream branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pip install --quiet pyyaml
+          REPORT=report.md
+          : > "$REPORT"
+          DRIFT=false
+
+          # --- 1. do the patches still apply? -------------------------------------
+          # Patch order across mods is the union used by every target in build-targets.yaml;
+          # all targets currently share the same mod list, so one probe covers them all.
+          MODS=$(python3 -c "
+          import yaml
+          t = yaml.safe_load(open('build-targets.yaml'))['targets']
+          seen = []
+          for x in t:
+              for m in x['mods']:
+                  if m not in seen: seen.append(m)
+          print(' '.join(seen))
+          ")
+          echo "mods: $MODS"
+
+          for ref in main dev; do
+            rm -rf probe-src
+            git clone --quiet --depth 1 --branch "$ref" \
+              "https://github.com/${UPSTREAM_REPO}.git" probe-src 2>/dev/null || {
+                echo "- \`$ref\`: **could not clone** (branch missing?)" >> "$REPORT"
+                continue
+              }
+            sha=$(git -C probe-src rev-parse --short HEAD)
+            failed=""
+            for mod in $MODS; do
+              for patch in "mods/$mod/patches"/*.patch; do
+                if ! git -C probe-src apply --check "../$patch" 2>/dev/null; then
+                  failed="$failed $mod/$(basename "$patch")"
+                  break 2
+                fi
+                git -C probe-src apply "../$patch"
+              done
+            done
+            if [ -n "$failed" ]; then
+              DRIFT=true
+              echo "- \`$ref\` (\`$sha\`): **FAILS** at$failed" >> "$REPORT"
+            else
+              echo "- \`$ref\` (\`$sha\`): all patches apply" >> "$REPORT"
+            fi
+          done
+
+          # --- 2. has an upstream PR we carry been merged? -------------------------
+          # Sidecars may declare `upstream_prs: [1972, 1349]`. A merged PR means the patch
+          # carrying it is probably now redundant and should be re-reviewed, not just rebased.
+          PRS=$(python3 -c "
+          import glob, yaml
+          out = []
+          for f in sorted(glob.glob('mods/*/patches/*.meta.yaml')):
+              d = yaml.safe_load(open(f)) or {}
+              for pr in d.get('upstream_prs') or []:
+                  out.append(f\"{f.split('/')[1]}/{d.get('id','?')}:{pr}\")
+          print(' '.join(out))
+          ")
+          for entry in $PRS; do
+            patch="${entry%%:*}"; pr="${entry##*:}"
+            state=$(gh api "repos/${UPSTREAM_REPO}/pulls/${pr}" \
+              --jq 'if .merged then "MERGED" else .state end' 2>/dev/null || echo "unknown")
+            if [ "$state" = "MERGED" ]; then
+              DRIFT=true
+              echo "- \`$patch\` carries upstream PR #${pr}, which is now **MERGED** -- the patch may be redundant" >> "$REPORT"
+            else
+              echo "- \`$patch\` carries upstream PR #${pr} (${state}) -- still needed" >> "$REPORT"
+            fi
+          done
+
+          echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"
+          { echo 'report<<REPORT_EOF'; cat "$REPORT"; echo 'REPORT_EOF'; } >> "$GITHUB_OUTPUT"
+          cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
+
+      # One long-lived tracking issue rather than a new one per day.
+      - name: Open, update, or close the tracking issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const drift = ${{ steps.probe.outputs.drift }};
+            const report = `${{ steps.probe.outputs.report }}`;
+            const title = process.env.ISSUE_TITLE;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `${report}\n\nChecked ${new Date().toISOString().slice(0,10)} by [patch-drift-canary](${runUrl}).\n\nThis is a warning, not a build failure -- releases still build from tagged upstream refs. See docs/rebasing-patches.md.`;
+
+            const existing = (await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'patch-drift',
+            })).data.find(i => i.title === title);
+
+            if (drift) {
+              if (existing) {
+                await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: existing.number, body });
+              } else {
+                await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo,
+                  title, body, labels: ['patch-drift'] });
+              }
+            } else if (existing) {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Patches apply cleanly again as of ${runUrl} -- closing.\n\n${report}` });
+              await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing.number, state: 'closed' });
+            }

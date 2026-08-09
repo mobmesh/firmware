@@ -163,20 +163,64 @@ jobs:
           done
           echo "Sidecar dependency order OK: applied order was:$applied"
 
-      - name: Apply maintained patches in order (fail loudly on drift, do not attempt auto-merge)
+      # Strict apply is still the gate: a patch that does not apply cleanly never ships.
+      # On failure we additionally attempt a three-way merge, purely to hand the maintainer
+      # a starting point for the rebase -- the step fails either way. Each patch is committed
+      # as it applies, so a rescued patch can be emitted as an exact one-commit diff.
+      - id: apply
+        name: Apply maintained patches in order (fail loudly on drift; emit a rescue diff, never auto-merge)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
           cd upstream-src
+          git config user.email "ci@localhost"
+          git config user.name "patch-apply"
+          RESCUE="$GITHUB_WORKSPACE/patch-rescue"
           IFS=',' read -ra MODS <<< "${{ join(matrix.mods, ',') }}"
           for mod in "${MODS[@]}"; do
             for patch in "../mods/$mod/patches"/*.patch; do
-              git apply --check "$patch" || {
-                echo "::error::$patch no longer applies cleanly against ${{ steps.pick.outputs.ref }}. Manual rebase required."
-                exit 1
-              }
-              git apply "$patch"
+              name="$mod/$(basename "$patch")"
+              if git apply --check "$patch" 2>/dev/null; then
+                git apply "$patch"
+                git add -A && git commit -qm "$name"
+                continue
+              fi
+
+              echo "::error::$patch no longer applies cleanly against ${{ steps.pick.outputs.ref }}. Manual rebase required."
+              mkdir -p "$RESCUE"
+              git apply --check "$patch" 2> "$RESCUE/00-apply-errors.txt" || true
+
+              if git apply -3 "$patch" 2>/dev/null; then
+                verdict="three-way merge resolved it with no conflicts"
+              elif git ls-files -u | grep -q .; then
+                verdict="three-way merge left CONFLICT MARKERS -- needs manual resolution"
+              else
+                verdict="three-way merge could not apply it at all"
+                git checkout -- . 2>/dev/null || true
+              fi
+              echo "$verdict" | tee "$RESCUE/00-verdict.txt"
+
+              # Emit the rescued patch as a one-commit diff, same format as mods/*/patches/*.patch
+              git add -A
+              git commit -qm "rescued: $name" || true
+              out="$RESCUE/$(echo "$name" | tr '/' '_')"
+              git diff HEAD~1 HEAD > "$out" 2>/dev/null || true
+
+              {
+                echo "rescue_attempted=true"
+                echo "rescue_verdict=$verdict"
+                echo "rescue_patch=$name"
+              } >> "$GITHUB_OUTPUT"
+              exit 1
             done
           done
+
+      - name: Upload rescue diff for the failing patch
+        if: failure() && steps.apply.outputs.rescue_attempted == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: patch-rescue-${{ matrix.board_id }}-${{ matrix.id }}-${{ steps.pick.outputs.ref }}
+          path: patch-rescue/
+          if-no-files-found: warn
 
       - name: Inject this target's mod + board build flags into platformio.ini
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
@@ -527,7 +571,18 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `[${{ matrix.board_id }}/${{ matrix.id }}] Patch or build failed against ${{ steps.pick.outputs.ref }}`,
-              body: `sync-build-release (${{ matrix.board_id }}/${{ matrix.id }}) failed for upstream ref \`${{ steps.pick.outputs.ref }}\`. Check the workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              body: [
+                `sync-build-release (${{ matrix.board_id }}/${{ matrix.id }}) failed for upstream ref \`${{ steps.pick.outputs.ref }}\`.`,
+                ``,
+                `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+                ``,
+                `${{ steps.apply.outputs.rescue_attempted == 'true'
+                     && format('**Patch drift**: `{0}` no longer applies. A three-way merge was attempted as a starting point -- {1}. The rescued diff is attached to the run as artifact `patch-rescue-{2}-{3}-{4}`. It is NOT validated and was NOT built; treat it as a head start on the rebase, not a fix. See docs/rebasing-patches.md.',
+                             steps.apply.outputs.rescue_patch,
+                             steps.apply.outputs.rescue_verdict,
+                             matrix.board_id, matrix.id, steps.pick.outputs.ref)
+                     || 'The failure was not in the patch-apply step -- check the build log.' }}`,
+              ].join('\n')
             });
 
   # Runs only after every matrix combination above has succeeded (GitHub Actions' default
