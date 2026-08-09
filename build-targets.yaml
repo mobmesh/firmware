@@ -30,14 +30,11 @@ targets:
     asset_role_abbrev: rep
     sync_docs: true
     vendor_flasher_assets: true
-    # All targets sharing upstream_tag_prefix "repeater" publish to the same release,
-    # so they must agree on make_latest/release_title -- resolve-targets enforces this.
+    # If true, must match across all targets of this role.
     make_latest: true
     mods: [hotspot-ota, timing-safety]
-    # Repeaters ship headless: the OLED is pointless in a sealed box on a tower,
-    # and dropping it also compiles out the button's long-press power-off, which
-    # would otherwise deep-sleep a node with no wake source. Room servers keep it.
-    # Joined form required -- PlatformIO splits "-U FOO" into a bare -U.
+    # Headless: drops the OLED and the button's long-press power-off.
+    # Joined form -- PlatformIO splits "-U FOO" into a bare -U.
     build_flags_append: ["-UDISPLAY_CLASS"]
 
   - board: heltec_v4
@@ -59,8 +56,7 @@ targets:
     asset_role_abbrev: rep
     sync_docs: false
     vendor_flasher_assets: true
-    # Must match heltec_v4's repeater entry -- both publish to the same shared release
-    # (same upstream_tag_prefix), and make_latest is a release-level flag, not per-asset.
+    # If true, must match across all targets of this role.
     make_latest: true
     mods: [hotspot-ota, timing-safety]
 
