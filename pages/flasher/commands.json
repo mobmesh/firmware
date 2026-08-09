@@ -2,12 +2,17 @@
   {
     "usage": "reboot",
     "parameters": [],
-    "note": ""
+    "note": "No reply is sent."
+  },
+  {
+    "usage": "poweroff / shutdown",
+    "parameters": [],
+    "note": "No reply is sent."
   },
   {
     "usage": "clkreboot",
     "parameters": [],
-    "note": ""
+    "note": "No reply is sent."
   },
   {
     "usage": "clock sync",
@@ -176,11 +181,18 @@
     "note": ""
   },
   {
+    "usage": "get radio.fem.rxgain / set radio.fem.rxgain <state>",
+    "parameters": [
+      "`state`: `on`|`off`"
+    ],
+    "note": ""
+  },
+  {
     "usage": "get name / set name <name>",
     "parameters": [
       "`name`: Node name"
     ],
-    "note": "Max length varies. If a location is set, the max length is 24 bytes; 32 otherwise. Emoji and unicode characters may take more than one byte."
+    "note": "Advertised names can use up to 23 bytes when location is included and 31 bytes otherwise. Emoji and Unicode characters may take more than one byte. Names that exceed the available advert space are truncated at a valid UTF-8 code point boundary."
   },
   {
     "usage": "get lat / set lat <degrees>",
@@ -317,6 +329,13 @@
     "note": ""
   },
   {
+    "usage": "get cad / set cad <on|off>",
+    "parameters": [
+      "`on|off`: Enable or disable hardware CAD"
+    ],
+    "note": ""
+  },
+  {
     "usage": "get agc.reset.interval / set agc.reset.interval <value>",
     "parameters": [
       "`value`: Interval in seconds rounded down to a multiple of 4 (17 becomes 16). 0 to disable."
@@ -357,6 +376,13 @@
       "`value`: Maximum flood hop count (0-64) for a packet without a scope (no region set)"
     ],
     "note": "An alternative to region denyf *, setting flood.max.unscoped to a lower value such as 3 would allow for local unscoped messages to propagate, while preventing noisy neighbors from flooding a local region."
+  },
+  {
+    "usage": "get flood.max.advert / set flood.max.advert <value>",
+    "parameters": [
+      "`value`: Maximum flood hop count (0-64) for an advert packet"
+    ],
+    "note": ""
   },
   {
     "usage": "setperm <pubkey> <permissions>",
@@ -538,6 +564,11 @@
     "parameters": [
       "`secret`: ESP-NOW bridge secret, up to 15 characters"
     ],
+    "note": ""
+  },
+  {
+    "usage": "eth.status",
+    "parameters": [],
     "note": ""
   }
 ]
