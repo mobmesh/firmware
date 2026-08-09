@@ -60,7 +60,7 @@ index 27ab9b8..7e1474d 100644
  **Usage:**
  - `erase`
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
-index a714db6..5604bb4 100644
+index a714db6..58702be 100644
 --- a/examples/simple_repeater/main.cpp
 +++ b/examples/simple_repeater/main.cpp
 @@ -3,6 +3,10 @@
@@ -102,19 +102,26 @@ index a714db6..5604bb4 100644
  
    fast_rng.begin(radio_driver.getRngSeed());
  
-@@ -195,6 +216,10 @@ void loop() {
- #ifdef HAS_EXTERNAL_WATCHDOG
-   external_watchdog.loop();
- #endif
+@@ -123,6 +144,9 @@ void setup() {
+ }
+ 
+ void loop() {
 +#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
 +  RollbackGuard::poll();
 +#endif
+   // Handle Serial CLI
+   int len = strlen(command);
+   while (Serial.available() && len < sizeof(command)-1) {
+@@ -195,6 +219,7 @@ void loop() {
+ #ifdef HAS_EXTERNAL_WATCHDOG
+   external_watchdog.loop();
+ #endif
 +
    if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
  #if defined(NRF52_PLATFORM)
      board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
 diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
-index d833fff..778fd7e 100644
+index d833fff..a692c63 100644
 --- a/examples/simple_room_server/main.cpp
 +++ b/examples/simple_room_server/main.cpp
 @@ -8,6 +8,10 @@
@@ -152,18 +159,25 @@ index d833fff..778fd7e 100644
  
    fast_rng.begin(radio_driver.getRngSeed());
  
-@@ -157,4 +177,9 @@ void loop() {
+@@ -104,6 +124,9 @@ void setup() {
+ }
+ 
+ void loop() {
++#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
++  RollbackGuard::poll();
++#endif
+   int len = strlen(command);
+   while (Serial.available() && len < sizeof(command)-1) {
+     char c = Serial.read();
+@@ -157,4 +180,6 @@ void loop() {
  #ifdef HAS_EXTERNAL_WATCHDOG
    external_watchdog.loop();
  #endif
 +
 +
-+#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
-+  RollbackGuard::poll();
-+#endif
  }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index 29addbb..c5c23e6 100644
+index a022856..3e44405 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -15,6 +15,10 @@
@@ -190,7 +204,7 @@ index 29addbb..c5c23e6 100644
  #endif
      } else if (memcmp(command, "start ota", 9) == 0) {
        if (!_board->startOTAUpdate(_prefs->node_name, reply)) {
-@@ -1059,6 +1069,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -895,6 +905,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
      sprintf(reply, "> %s", cfg.url[0] ? cfg.url : "(not set)");
    } else if (memcmp(config, "ota.wan.pwr", 11) == 0) {
      sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
@@ -199,8 +213,8 @@ index 29addbb..c5c23e6 100644
 +  } else if (memcmp(config, "ota.slot", 8) == 0) {
 +    sprintf(reply, "> %s", RollbackGuard::status());
  #endif
-   } else {
-     sprintf(reply, "??: %s", config);
+   } else if (memcmp(config, "af", 2) == 0) {
+     sprintf(reply, "> %s", StrHelper::ftoa(_prefs->airtime_factor));
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
 index 0000000..8246a20

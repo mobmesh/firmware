@@ -157,7 +157,7 @@ index 89e60b1..5f9ec85 100644
    // Power management interface (boards with power management override these)
    virtual bool isExternalPowered() { return false; }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index 07181e1..29addbb 100644
+index 07181e1..a022856 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
 @@ -5,6 +5,16 @@
@@ -290,10 +290,10 @@ index 07181e1..29addbb 100644
    } else if (memcmp(config, "prv.key ", 8) == 0) {
      uint8_t prv_key[PRV_KEY_SIZE];
      bool success = mesh::Utils::fromHex(prv_key, PRV_KEY_SIZE, &config[8]);
-@@ -952,6 +1052,14 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
-     if (tmp == reply) {
-       sprintf(reply, "No extra SF configured");
-     }
+@@ -788,6 +888,14 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+     int dc_int = (int)dc;
+     int dc_frac = (int)((dc - dc_int) * 10.0f + 0.5f);
+     sprintf(reply, "> %d.%d%%", dc_int, dc_frac);
 +#if defined(WITH_HOTSPOT_OTA)
 +  } else if (memcmp(config, "ota.fw.url", 10) == 0) {
 +    HotspotOtaConfig cfg;
@@ -302,9 +302,9 @@ index 07181e1..29addbb 100644
 +  } else if (memcmp(config, "ota.wan.pwr", 11) == 0) {
 +    sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
 +#endif
-   } else {
-     sprintf(reply, "??: %s", config);
-   }
+   } else if (memcmp(config, "af", 2) == 0) {
+     sprintf(reply, "> %s", StrHelper::ftoa(_prefs->airtime_factor));
+   } else if (memcmp(config, "int.thresh", 10) == 0) {
 diff --git a/src/helpers/ESP32Board.cpp b/src/helpers/ESP32Board.cpp
 index a55abb2..13b61fa 100644
 --- a/src/helpers/ESP32Board.cpp
