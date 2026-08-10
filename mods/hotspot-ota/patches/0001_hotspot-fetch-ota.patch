@@ -1,149 +1,3 @@
-diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index b618ae2..27ab9b8 100644
---- a/docs/cli_commands.md
-+++ b/docs/cli_commands.md
-@@ -89,6 +89,141 @@ This document provides an overview of CLI commands that can be sent to MeshCore
- 
- ---
- 
-+### Start an Over-The-Air (OTA) firmware update via a joined WiFi network
-+**Usage:**
-+- `start ota wan <url>`
-+
-+**Parameters:**
-+- `url`: HTTP(S) URL of the firmware `.bin` to download and flash
-+
-+**Note:** Requires `ota.wan.wifi` to be set first (see below). Joins the configured WiFi network as
-+a station, downloads the file, verifies it against `ota.fw.sha256` (or a `<url>.sha256` sidecar
-+fetched automatically if `ota.fw.sha256` isn't set), confirms the download is actually a build of
-+this project (refuses otherwise, even if the checksum matches -- catches `<url>` mistakenly pointing
-+at a different, unmodified MeshCore build), and reboots on success. Does not reboot on failure.
-+
-+The authenticity check aborts as soon as it's clear the download isn't a match, rather than pulling
-+the whole file over what may be a metered cellular connection -- normally within the first 64KB, or
-+however far in a `<url>.sha256` sidecar says to look (a `<hash>:<offset>` sidecar, generated
-+automatically by this project's own release builds, carries the exact position for that specific
-+build). See `set ota.fw.marker` below for the rare case where neither applies.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+### Start an Over-The-Air (OTA) firmware update using the configured default URL
-+**Usage:**
-+- `start ota wan update`
-+
-+**Note:** Identical to `start ota wan <url>`, using the URL persisted via `set ota.fw.url` instead
-+of one supplied on the command line. Fails with `ERR: ota.fw.url not configured` if none has been
-+set. Exists to keep remote admin updates short over LoRa -- a full firmware URL can be well over 100
-+characters, and `start ota wan update` is 21.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### View or change the WiFi credentials used by `start ota wan`
-+**Usage:**
-+- `set ota.wan.wifi <ssid>,<password>`
-+
-+**Parameters:**
-+- `ssid`: WiFi network name
-+- `password`: WiFi network password
-+
-+**Note:** Persists across firmware updates (stored separately from node prefs). Set once; does not
-+need to be resupplied for future updates unless the network's credentials change.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### View or change the manually-supplied firmware hash used by `start ota wan`
-+**Usage:**
-+- `set ota.fw.sha256 <hex>`
-+- `set ota.fw.sha256 clear`
-+
-+**Parameters:**
-+- `hex`: 64-character lowercase hex SHA-256 digest of the target firmware `.bin`
-+
-+**Note:** RAM-only — cleared on every boot, never persisted. Once set, this hash verifies the
-+download and is **not** overridden by a `<url>.sha256` sidecar. `set ota.fw.sha256 clear` removes it
-+so sidecar-fetch takes effect again — do this before pointing `start ota wan` at a different
-+firmware image, or a stale hash will block its sidecar.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### View or change the default URL used by `start ota wan update`
-+**Usage:**
-+- `get ota.fw.url`
-+- `set ota.fw.url <url>`
-+
-+**Parameters:**
-+- `url`: HTTP(S) URL of the firmware `.bin` to download and flash
-+
-+**Note:** Persisted — unlike `ota.fw.sha256`/`ota.fw.marker`, this names a stable download location
-+for this device rather than a one-time override. Overwrite to change it; there is no `clear`.
-+Rejects (does not truncate) a URL longer than the field allows.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### View or change whether `start ota wan` checks the download's authenticity marker
-+**Usage:**
-+- `set ota.fw.marker <on|off>`
-+
-+**Parameters:**
-+- `on` / `off`: Enables or disables the marker/authenticity scan (default `on`)
-+
-+**Note:** RAM-only and one-time — consumed by the very next `start ota wan` call regardless of
-+outcome, and always starts back at `on` on every boot (never persisted, never survives a reboot).
-+`off` is a last resort for a download that fails the authenticity check with no `<url>.sha256`
-+offset available to explain why (self-hosted firmware not built by this project's own release
-+pipeline, for example) — not intended for routine use, since it skips the check that exists
-+specifically to catch a mistaken `<url>`. This only ever skips the marker scan — it never bypasses
-+the `ota.fw.sha256` hash check, which is always enforced.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### View or manually control the GPIO47 WAN power switch
-+**Usage:**
-+- `get ota.wan.pwr`
-+- `set ota.wan.pwr <on|off>`
-+
-+**Parameters:**
-+- `on` / `off`: Drives GPIO47 (the WAN power-switch control pin) directly
-+
-+**Note:** Diagnostic and recovery command, independent of `start ota wan` — does not join WiFi,
-+download, or flash anything. Use to confirm or force the rail off if state is ever in doubt (e.g.
-+after a crash or watchdog reset mid-update).
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### Pre-flight check the WiFi join and WAN connectivity before `start ota wan`
-+**Usage:**
-+- `ota wan join`
-+- `ota wan check`
-+- `ota wan leave`
-+
-+**Note:** `ota wan join` joins the configured WiFi network only (no WAN check, no download),
-+returning in one quick attempt (~15s worst case) instead of `start ota wan`'s full patient join
-+budget (~115s). `ota wan check` checks WAN reachability on demand, repeatable without rejoining.
-+`ota wan leave` disconnects and drops WAN power for a clean retry. A successful `ota wan join` lets
-+`start ota wan` skip its own join step right after.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
- ### Erase/Factory Reset
- **Usage:**
- - `erase`
 diff --git a/src/MeshCore.h b/src/MeshCore.h
 index 89e60b1..5f9ec85 100644
 --- a/src/MeshCore.h
@@ -305,50 +159,6 @@ index 07181e1..a022856 100644
    } else if (memcmp(config, "af", 2) == 0) {
      sprintf(reply, "> %s", StrHelper::ftoa(_prefs->airtime_factor));
    } else if (memcmp(config, "int.thresh", 10) == 0) {
-diff --git a/src/helpers/ESP32Board.cpp b/src/helpers/ESP32Board.cpp
-index a55abb2..97e1213 100644
---- a/src/helpers/ESP32Board.cpp
-+++ b/src/helpers/ESP32Board.cpp
-@@ -39,10 +39,39 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
-   return true;
- }
- 
-+#if defined(WITH_HOTSPOT_OTA)
-+#include <helpers/esp32/HotspotOTA.h>
-+#include <helpers/TxtDataHelpers.h>   // StrHelper -- there is no standalone StrHelper.h
-+
-+bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
-+  HotspotOtaConfig cfg;
-+  HotspotOTA::loadConfig(cfg);
-+  // Reject outright rather than silently truncate to a wrong-but-valid-looking URL.
-+  if (strlen(url) >= sizeof(cfg.url)) {
-+    sprintf(reply, "ERR: URL too long (max %d chars)", (int)sizeof(cfg.url) - 1);
-+    return false;
-+  }
-+  StrHelper::strncpy(cfg.url, url, sizeof(cfg.url));
-+
-+  inhibit_sleep = true;
-+  bool ok = HotspotOTA::run(cfg, reply);   // owns GPIO47 power-switch sequencing internally
-+  if (ok) reboot();                        // doesn't return
-+  inhibit_sleep = false;                   // failure returns here -- re-allow sleep
-+  return ok;
-+}
-+#else
-+bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
-+  return false; // not supported
-+}
-+#endif
-+
- #else
- bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
-   return false; // not supported
- }
-+bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
-+  return false; // not supported
-+}
- #endif
- 
- void ESP32Board::powerOff() {
 diff --git a/src/helpers/ESP32Board.h b/src/helpers/ESP32Board.h
 index d7eb5fe..e88a785 100644
 --- a/src/helpers/ESP32Board.h
@@ -777,3 +587,43 @@ index 0000000..7513e4a
 +  void wifiDisconnect();
 +  bool checkWan(char reply[]);
 +}
+diff --git a/src/helpers/esp32/HotspotOtaBoard.cpp b/src/helpers/esp32/HotspotOtaBoard.cpp
+new file mode 100644
+index 0000000..8a5d1e6
+--- /dev/null
++++ b/src/helpers/esp32/HotspotOtaBoard.cpp
+@@ -0,0 +1,34 @@
++// ESP32Board::startOTAUpdateFromURL lives here rather than in upstream's
++// ESP32Board.cpp -- a member may be defined in any translation unit, so the
++// patch to that file is only the one-line declaration in ESP32Board.h.
++#include <helpers/ESP32Board.h>
++#include <target.h>
++
++// Same gate upstream puts around startOTAUpdate(): no WiFi stack, no URL update.
++#if defined(WITH_HOTSPOT_OTA) && defined(ADMIN_PASSWORD) && !defined(DISABLE_WIFI_OTA)
++
++#include <helpers/esp32/HotspotOTA.h>
++#include <helpers/TxtDataHelpers.h>   // StrHelper -- there is no standalone StrHelper.h
++
++bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
++  HotspotOtaConfig cfg;
++  HotspotOTA::loadConfig(cfg);
++  // Reject outright rather than silently truncate to a wrong-but-valid-looking URL.
++  if (strlen(url) >= sizeof(cfg.url)) {
++    sprintf(reply, "ERR: URL too long (max %d chars)", (int)sizeof(cfg.url) - 1);
++    return false;
++  }
++  StrHelper::strncpy(cfg.url, url, sizeof(cfg.url));
++
++  inhibit_sleep = true;
++  bool ok = HotspotOTA::run(cfg, reply);   // owns GPIO47 power-switch sequencing internally
++  if (ok) reboot();                        // doesn't return
++  inhibit_sleep = false;                   // failure returns here -- re-allow sleep
++  return ok;
++}
++
++#else
++bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
++  return false; // not supported
++}
++#endif

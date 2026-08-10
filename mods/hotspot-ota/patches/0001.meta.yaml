@@ -2,4 +2,4 @@ id: "0001"
 title: hotspot-fetch-ota
 requires: []
 env_flag: WITH_HOTSPOT_OTA
-build_src_filter: ["+<helpers/esp32/HotspotOTA.cpp>"]
+build_src_filter: ["+<helpers/esp32/HotspotOTA.cpp>", "+<helpers/esp32/HotspotOtaBoard.cpp>"]
