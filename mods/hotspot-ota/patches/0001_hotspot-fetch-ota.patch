@@ -11,13 +11,115 @@ index 89e60b1..5f9ec85 100644
    // Power management interface (boards with power management override these)
    virtual bool isExternalPowered() { return false; }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index 07181e1..a022856 100644
+index 07181e1..e80e77e 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
-@@ -5,6 +5,16 @@
- #include "TxtDataHelpers.h"
- #include <RTClib.h>
+@@ -179,7 +179,8 @@ uint8_t CommonCLI::buildAdvertData(uint8_t node_type, uint8_t* app_data) {
+ }
  
+ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* reply) {
+-    if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
++    if (handleModCommand(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
++    } else if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
+       _board->powerOff();  // doesn't return
+     } else if (memcmp(command, "reboot", 6) == 0) {
+       _board->reboot();  // doesn't return
+@@ -446,7 +447,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+ 
+ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* reply) {
+   const char* config = &command[4];
+-  if (memcmp(config, "dutycycle ", 10) == 0) {
++  if (handleModSetCmd(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
++  } else if (memcmp(config, "dutycycle ", 10) == 0) {
+     float dc = atof(&config[10]);
+     if (dc < 1 || dc > 100) {
+       strcpy(reply, "ERROR: dutycycle must be 1-100");
+@@ -783,7 +785,8 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+ 
+ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* reply) {
+   const char* config = &command[4];
+-  if (memcmp(config, "dutycycle", 9) == 0) {
++  if (handleModGetCmd(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
++  } else if (memcmp(config, "dutycycle", 9) == 0) {
+     float dc = 100.0f / (_prefs->airtime_factor + 1.0f);
+     int dc_int = (int)dc;
+     int dc_frac = (int)((dc - dc_int) * 10.0f + 0.5f);
+diff --git a/src/helpers/CommonCLI.h b/src/helpers/CommonCLI.h
+index 2a9ec43..97bd0f3 100644
+--- a/src/helpers/CommonCLI.h
++++ b/src/helpers/CommonCLI.h
+@@ -265,6 +265,11 @@ class CommonCLI {
+   void handleGetCmd(uint32_t sender_timestamp, char* command, char* reply);
+   void handleSetCmd(uint32_t sender_timestamp, char* command, char* reply);
+ 
++  // Defined in helpers/esp32/CommonCliMods.cpp -- return true if the mod took the command.
++  bool handleModCommand(uint32_t sender_timestamp, char* command, char* reply);
++  bool handleModSetCmd(uint32_t sender_timestamp, char* command, char* reply);
++  bool handleModGetCmd(uint32_t sender_timestamp, char* command, char* reply);
++
+ public:
+   CommonCLI(mesh::MainBoard& board, mesh::RTCClock& rtc, SensorManager& sensors, RegionMap& region_map, ClientACL& acl, NodePrefs* prefs, CommonCLICallbacks* callbacks)
+       : _board(&board), _rtc(&rtc), _sensors(&sensors), _region_map(&region_map), _acl(&acl), _prefs(prefs), _callbacks(callbacks) { }
+diff --git a/src/helpers/ESP32Board.h b/src/helpers/ESP32Board.h
+index d7eb5fe..e88a785 100644
+--- a/src/helpers/ESP32Board.h
++++ b/src/helpers/ESP32Board.h
+@@ -155,6 +155,7 @@ public:
+   }
+ 
+   bool startOTAUpdate(const char* id, char reply[]) override;
++  bool startOTAUpdateFromURL(const char* url, char reply[]) override;
+ 
+   void setInhibitSleep(bool inhibit) {
+     inhibit_sleep = inhibit;
+diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
+new file mode 100644
+index 0000000..9ca21bc
+--- /dev/null
++++ b/src/helpers/ModHooks.cpp
+@@ -0,0 +1,13 @@
++#include <helpers/ModHooks.h>
++#include <target.h>   // radio_init(), board
++
++bool modRadioInit(const char* build_id) {
++  return radio_init();
++}
++
++void modLoop() {
++}
++
++bool modWantsPowerSaving() {
++  return false;
++}
+diff --git a/src/helpers/ModHooks.h b/src/helpers/ModHooks.h
+new file mode 100644
+index 0000000..8ab58a9
+--- /dev/null
++++ b/src/helpers/ModHooks.h
+@@ -0,0 +1,9 @@
++#pragma once
++
++// One hook surface for every mod, so upstream's main.cpp carries a handful of
++// one-line calls instead of each mod's code inline -- and so two mods never
++// have to edit the same region of it. Bodies live in ModHooks.cpp (ours).
++
++bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
++void modLoop();                            // called first in loop()
++bool modWantsPowerSaving();                // OR'd with the operator's powersaving_enabled
+diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
+new file mode 100644
+index 0000000..b170987
+--- /dev/null
++++ b/src/helpers/esp32/CommonCliMods.cpp
+@@ -0,0 +1,145 @@
++// Every CLI command our mods add lives here, so upstream's CommonCLI.cpp carries
++// only a one-line dispatch hook per verb instead of the branches themselves.
++// Called before upstream's own chain, which is what lets `start ota wan ...` be
++// matched ahead of upstream's shorter `start ota` prefix.
++#include <helpers/CommonCLI.h>
++#include <helpers/TxtDataHelpers.h>
++#include <target.h>
++
 +#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
 +#include <helpers/esp32/HotspotOTA.h>
 +#endif
@@ -28,59 +130,48 @@ index 07181e1..a022856 100644
 +#define OTA_MOD_BUILD_DATE "unknown"
 +#endif
 +
- #ifndef BRIDGE_MAX_BAUD
- #define BRIDGE_MAX_BAUD 115200
- #endif
-@@ -205,6 +215,34 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
-       } else {
-         strcpy(reply, "ERR: clock cannot go backwards");
-       }
++bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
++  if (memcmp(command, "ver", 3) == 0) {
++    // Shadows upstream's own `ver` branch, which never runs while this mod is built in.
++    sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
 +#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
-+    } else if (memcmp(command, "start ota wan update", 21) == 0 && (command[21] == 0 || command[21] == ' ')) {
-+      // Checked ahead of the generic "start ota wan " prefix below, or "update" would be parsed
-+      // as a literal URL. Uses the persisted ota.fw.url instead of one supplied on the command line.
-+      HotspotOtaConfig cfg;
-+      HotspotOTA::loadConfig(cfg);
-+      if (cfg.url[0] == 0) {
-+        strcpy(reply, "ERR: ota.fw.url not configured");
-+      } else if (!_board->startOTAUpdateFromURL(cfg.url, reply)) {
-+        // reply[] already carries the specific error from HotspotOTA::run
-+      }
++  } else if (memcmp(command, "start ota wan update", 21) == 0 && (command[21] == 0 || command[21] == ' ')) {
++    // Checked ahead of the generic "start ota wan " prefix below, or "update" would be parsed
++    // as a literal URL. Uses the persisted ota.fw.url instead of one supplied on the command line.
++    HotspotOtaConfig cfg;
++    HotspotOTA::loadConfig(cfg);
++    if (cfg.url[0] == 0) {
++      strcpy(reply, "ERR: ota.fw.url not configured");
++    } else if (!_board->startOTAUpdateFromURL(cfg.url, reply)) {
++      // reply[] already carries the specific error from HotspotOTA::run
++    }
 +#endif
-+    } else if (memcmp(command, "start ota wan ", 14) == 0) {
-+      if (!_board->startOTAUpdateFromURL(&command[14], reply)) {
-+        // reply[] already carries the specific error from HotspotOTA::run
-+      }
++  } else if (memcmp(command, "start ota wan ", 14) == 0) {
++    if (!_board->startOTAUpdateFromURL(&command[14], reply)) {
++      // reply[] already carries the specific error from HotspotOTA::run
++    }
 +#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
-+    } else if (memcmp(command, "ota wan join", 12) == 0) {
-+      // Pre-flight check -- joins WiFi only, so `ota wan check` can be repeated without rejoining,
-+      // and `start ota wan` skips its own join after this (see alreadyConnectedTo()).
-+      HotspotOTA::wifiConnect(reply);
-+    } else if (memcmp(command, "ota wan leave", 13) == 0) {
-+      HotspotOTA::wifiDisconnect();
-+      strcpy(reply, "OK - disconnected");
-+    } else if (memcmp(command, "ota wan check", 13) == 0) {
-+      // Pre-flight check -- see `ota wan join`. Assumes WiFi already joined.
-+      HotspotOTA::checkWan(reply);
++  } else if (memcmp(command, "ota wan join", 12) == 0) {
++    // Pre-flight check -- joins WiFi only, so `ota wan check` can be repeated without rejoining,
++    // and `start ota wan` skips its own join after this (see alreadyConnectedTo()).
++    HotspotOTA::wifiConnect(reply);
++  } else if (memcmp(command, "ota wan leave", 13) == 0) {
++    HotspotOTA::wifiDisconnect();
++    strcpy(reply, "OK - disconnected");
++  } else if (memcmp(command, "ota wan check", 13) == 0) {
++    // Pre-flight check -- see `ota wan join`. Assumes WiFi already joined.
++    HotspotOTA::checkWan(reply);
 +#endif
-     } else if (memcmp(command, "start ota", 9) == 0) {
-       if (!_board->startOTAUpdate(_prefs->node_name, reply)) {
-         strcpy(reply, "Error");
-@@ -269,7 +307,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
-       bool s = _callbacks->formatFileSystem();
-       sprintf(reply, "File system erase: %s", s ? "OK" : "Err");
-     } else if (memcmp(command, "ver", 3) == 0) {
--      sprintf(reply, "%s (Build: %s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate());
-+      sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
-     } else if (memcmp(command, "board", 5) == 0) {
-       sprintf(reply, "%s", _board->getManufacturerName());
-     } else if (memcmp(command, "sensor get ", 11) == 0) {
-@@ -506,6 +544,68 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
-     StrHelper::strncpy(_prefs->guest_password, &config[15], sizeof(_prefs->guest_password));
-     savePrefs();
-     strcpy(reply, "OK");
++  } else {
++    return false;   // not ours -- upstream's chain runs
++  }
++  return true;
++}
++
++bool CommonCLI::handleModSetCmd(uint32_t sender_timestamp, char* command, char* reply) {
++  char* config = &command[4];
 +#if defined(WITH_HOTSPOT_OTA)
-+  } else if (memcmp(config, "ota.wan.wifi ", 13) == 0) {
++  if (memcmp(config, "ota.wan.wifi ", 13) == 0) {
 +    // format: set ota.wan.wifi <ssid>,<password>
 +    HotspotOtaConfig cfg;
 +    HotspotOTA::loadConfig(cfg);
@@ -140,37 +231,32 @@ index 07181e1..a022856 100644
 +    } else {
 +      strcpy(reply, "ERR: expected on|off");
 +    }
++  } else {
++    return false;   // not ours -- upstream's chain runs
++  }
++  return true;
++#else
++  return false;
 +#endif
-   } else if (memcmp(config, "prv.key ", 8) == 0) {
-     uint8_t prv_key[PRV_KEY_SIZE];
-     bool success = mesh::Utils::fromHex(prv_key, PRV_KEY_SIZE, &config[8]);
-@@ -788,6 +888,14 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
-     int dc_int = (int)dc;
-     int dc_frac = (int)((dc - dc_int) * 10.0f + 0.5f);
-     sprintf(reply, "> %d.%d%%", dc_int, dc_frac);
++}
++
++bool CommonCLI::handleModGetCmd(uint32_t sender_timestamp, char* command, char* reply) {
++  char* config = &command[4];
 +#if defined(WITH_HOTSPOT_OTA)
-+  } else if (memcmp(config, "ota.fw.url", 10) == 0) {
++  if (memcmp(config, "ota.fw.url", 10) == 0) {
 +    HotspotOtaConfig cfg;
 +    HotspotOTA::loadConfig(cfg);
 +    sprintf(reply, "> %s", cfg.url[0] ? cfg.url : "(not set)");
 +  } else if (memcmp(config, "ota.wan.pwr", 11) == 0) {
 +    sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
++  } else {
++    return false;   // not ours -- upstream's chain runs
++  }
++  return true;
++#else
++  return false;
 +#endif
-   } else if (memcmp(config, "af", 2) == 0) {
-     sprintf(reply, "> %s", StrHelper::ftoa(_prefs->airtime_factor));
-   } else if (memcmp(config, "int.thresh", 10) == 0) {
-diff --git a/src/helpers/ESP32Board.h b/src/helpers/ESP32Board.h
-index d7eb5fe..e88a785 100644
---- a/src/helpers/ESP32Board.h
-+++ b/src/helpers/ESP32Board.h
-@@ -155,6 +155,7 @@ public:
-   }
- 
-   bool startOTAUpdate(const char* id, char reply[]) override;
-+  bool startOTAUpdateFromURL(const char* url, char reply[]) override;
- 
-   void setInhibitSleep(bool inhibit) {
-     inhibit_sleep = inhibit;
++}
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
 index 0000000..5dc4807

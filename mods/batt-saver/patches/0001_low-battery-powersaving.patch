@@ -1,36 +1,35 @@
-diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
-index 58702be..4fff22a 100644
---- a/examples/simple_repeater/main.cpp
-+++ b/examples/simple_repeater/main.cpp
-@@ -34,6 +34,11 @@ static char ethernet_command[160];
- // For power saving
- unsigned long POWERSAVING_FIRSTSLEEP_SECS = 120; // The first sleep (if enabled) from boot
- 
-+#ifdef WITH_BATT_SAVER
-+  #include <helpers/esp32/BattSaver.h>
-+  static BattSaver batt_saver(board);
-+#endif
-+
- #if defined(PIN_USER_BTN) && defined(_SEEED_SENSECAP_SOLAR_H_)
- static unsigned long userBtnDownAt = 0;
- #define USER_BTN_HOLD_OFF_MILLIS 1500
-@@ -220,7 +225,15 @@ void loop() {
-   external_watchdog.loop();
+diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
+index 195d809..251b003 100644
+--- a/src/helpers/ModHooks.cpp
++++ b/src/helpers/ModHooks.cpp
+@@ -7,6 +7,11 @@
+ #include <helpers/esp32/RollbackGuard.h>
  #endif
  
--  if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
++#ifdef WITH_BATT_SAVER
++#include <helpers/esp32/BattSaver.h>
++static BattSaver batt_saver(board);
++#endif
++
+ bool modRadioInit(const char* build_id) {
+ #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
+   SPIFFS.begin(true);   // RollbackGuard's failure counter needs it mounted before use; safe to call twice
+@@ -32,8 +37,15 @@ void modLoop() {
+ #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
+   RollbackGuard::poll();
+ #endif
 +#ifdef WITH_BATT_SAVER
 +  batt_saver.loop();
-+  // Operator intent OR low battery; never written back to NodePrefs.
-+  const bool powersaving_wanted =
-+      the_mesh.getNodePrefs()->powersaving_enabled || batt_saver.isActive();
-+#else
-+  const bool powersaving_wanted = the_mesh.getNodePrefs()->powersaving_enabled;
 +#endif
-+  if (powersaving_wanted && !the_mesh.hasPendingWork()) {
- #if defined(NRF52_PLATFORM)
-     board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
- #else
+ }
+ 
+ bool modWantsPowerSaving() {
++#ifdef WITH_BATT_SAVER
++  return batt_saver.isActive();   // runtime only; NodePrefs is never written
++#else
+   return false;
++#endif
+ }
 diff --git a/src/helpers/esp32/BattSaver.h b/src/helpers/esp32/BattSaver.h
 new file mode 100644
 index 0000000..7a90f40
