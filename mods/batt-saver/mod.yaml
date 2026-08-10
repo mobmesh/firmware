@@ -1,0 +1,5 @@
+# Mod-level facts, distinct from the per-patch sidecars (0001.meta.yaml)
+# which declare per-patch env contributions. This file holds facts about
+# the mod as a whole.
+name: batt-saver
+suffix: bs

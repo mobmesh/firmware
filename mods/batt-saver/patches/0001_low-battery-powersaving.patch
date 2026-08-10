@@ -1,0 +1,130 @@
+diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
+index 58702be..4fff22a 100644
+--- a/examples/simple_repeater/main.cpp
++++ b/examples/simple_repeater/main.cpp
+@@ -34,6 +34,11 @@ static char ethernet_command[160];
+ // For power saving
+ unsigned long POWERSAVING_FIRSTSLEEP_SECS = 120; // The first sleep (if enabled) from boot
+ 
++#ifdef WITH_BATT_SAVER
++  #include <helpers/esp32/BattSaver.h>
++  static BattSaver batt_saver(board);
++#endif
++
+ #if defined(PIN_USER_BTN) && defined(_SEEED_SENSECAP_SOLAR_H_)
+ static unsigned long userBtnDownAt = 0;
+ #define USER_BTN_HOLD_OFF_MILLIS 1500
+@@ -220,7 +225,15 @@ void loop() {
+   external_watchdog.loop();
+ #endif
+ 
+-  if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
++#ifdef WITH_BATT_SAVER
++  batt_saver.loop();
++  // Operator intent OR low battery; never written back to NodePrefs.
++  const bool powersaving_wanted =
++      the_mesh.getNodePrefs()->powersaving_enabled || batt_saver.isActive();
++#else
++  const bool powersaving_wanted = the_mesh.getNodePrefs()->powersaving_enabled;
++#endif
++  if (powersaving_wanted && !the_mesh.hasPendingWork()) {
+ #if defined(NRF52_PLATFORM)
+     board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
+ #else
+diff --git a/src/helpers/esp32/BattSaver.h b/src/helpers/esp32/BattSaver.h
+new file mode 100644
+index 0000000..7a90f40
+--- /dev/null
++++ b/src/helpers/esp32/BattSaver.h
+@@ -0,0 +1,91 @@
++#pragma once
++
++#include <Arduino.h>
++#include <MeshCore.h>
++
++// Engages MeshCore's existing power-saving sleep when the battery is low, and
++// releases it once it recovers. Runtime-only: never writes NodePrefs, which is
++// operator intent and hits flash on every change.
++
++#ifndef BATT_SAVER_ON_MV
++  #define BATT_SAVER_ON_MV 3500
++#endif
++// Wide gap is required: sleeping removes load, which raises the reading.
++#ifndef BATT_SAVER_OFF_MV
++  #define BATT_SAVER_OFF_MV 3800
++#endif
++#ifndef BATT_SAVER_SAMPLE_INTERVAL_MS
++  #define BATT_SAVER_SAMPLE_INTERVAL_MS 60000
++#endif
++// Rejects the transient sag under a TX burst.
++#ifndef BATT_SAVER_CONSECUTIVE_SAMPLES
++  #define BATT_SAVER_CONSECUTIVE_SAMPLES 3
++#endif
++// Above this it's a charger rail, not a cell (heltec_v4 with no battery: ~4244).
++#ifndef BATT_SAVER_IMPLAUSIBLE_MV
++  #define BATT_SAVER_IMPLAUSIBLE_MV 4500
++#endif
++// Bypass the FEM LNA while saving. Off by default: measured at only ~0.3mA of
++// a ~5.5mA sleeping floor, which does not justify the lost RX sensitivity.
++#ifndef BATT_SAVER_DROP_FEM_LNA
++  #define BATT_SAVER_DROP_FEM_LNA 0
++#endif
++
++class BattSaver {
++  mesh::MainBoard* _board;
++  unsigned long _next_sample_at;
++  uint8_t _agree;
++  bool _active;
++  bool _lna_was_enabled;   // hardware state captured when we engaged
++  uint16_t _last_mv;
++  uint32_t _transitions;
++
++public:
++  BattSaver(mesh::MainBoard& board)
++    : _board(&board), _next_sample_at(0), _agree(0), _active(false),
++      _lna_was_enabled(false), _last_mv(0), _transitions(0) { }
++
++  // No sleep inhibit here -- ESP32Board::sleep() already refuses while
++  // inhibit_sleep is set, which covers OTA on every path.
++  bool isActive() const { return _active; }
++  uint16_t lastMilliVolts() const { return _last_mv; }
++  uint32_t transitionCount() const { return _transitions; }
++
++  void loop() {
++    unsigned long now = millis();
++    if ((long)(now - _next_sample_at) < 0) return;   // rollover-safe
++    _next_sample_at = now + BATT_SAVER_SAMPLE_INTERVAL_MS;
++
++    uint16_t mv = _board->getBattMilliVolts();
++    _last_mv = mv;
++
++    if (mv == 0 || mv >= BATT_SAVER_IMPLAUSIBLE_MV) {  // no cell to protect
++      _agree = 0;
++      if (_active) setActive(false);
++      return;
++    }
++
++    bool wants = _active ? (mv < BATT_SAVER_OFF_MV) : (mv <= BATT_SAVER_ON_MV);
++    if (wants == _active) { _agree = 0; return; }
++
++    if (++_agree < BATT_SAVER_CONSECUTIVE_SAMPLES) return;
++    _agree = 0;
++    setActive(wants);
++  }
++
++private:
++  void setActive(bool on) {
++    _active = on;
++    _transitions++;
++#if BATT_SAVER_DROP_FEM_LNA
++    if (!_board->canControlLoRaFemLna()) return;
++    if (on) {
++      // Capture rather than assume, so release restores the operator's setting.
++      _lna_was_enabled = _board->isLoRaFemLnaEnabled();
++      if (_lna_was_enabled) _board->setLoRaFemLnaEnabled(false);
++    } else if (_lna_was_enabled) {
++      _board->setLoRaFemLnaEnabled(true);
++    }
++#endif
++  }
++};

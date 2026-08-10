@@ -34,6 +34,11 @@ build_flags:
   OTA_WAN_CHECK_ATTEMPTS: 3
   OTA_WAN_CHECK_RETRY_DELAY_MS: 10000
 
+# Low-battery power saving (mods/batt-saver). Only takes effect on targets that
+# list the mod. Gap must stay wide -- sleeping sheds load and raises the reading.
+  BATT_SAVER_ON_MV: 3300    # engage saving at or below
+  BATT_SAVER_OFF_MV: 3600   # release saving at or above
+
 # Optional: only set when a board's default partition scheme (from upstream's
 # boards/<name>.json) doesn't leave enough OTA slot room for this project's
 # added features. Not needed for heltec_v4 today. When set to a filename (e.g.
