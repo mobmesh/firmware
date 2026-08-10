@@ -306,10 +306,10 @@ index 07181e1..a022856 100644
      sprintf(reply, "> %s", StrHelper::ftoa(_prefs->airtime_factor));
    } else if (memcmp(config, "int.thresh", 10) == 0) {
 diff --git a/src/helpers/ESP32Board.cpp b/src/helpers/ESP32Board.cpp
-index a55abb2..13b61fa 100644
+index a55abb2..97e1213 100644
 --- a/src/helpers/ESP32Board.cpp
 +++ b/src/helpers/ESP32Board.cpp
-@@ -39,10 +39,38 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
+@@ -39,10 +39,39 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
    return true;
  }
  
@@ -330,6 +330,7 @@ index a55abb2..13b61fa 100644
 +  inhibit_sleep = true;
 +  bool ok = HotspotOTA::run(cfg, reply);   // owns GPIO47 power-switch sequencing internally
 +  if (ok) reboot();                        // doesn't return
++  inhibit_sleep = false;                   // failure returns here -- re-allow sleep
 +  return ok;
 +}
 +#else
