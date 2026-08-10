@@ -136,8 +136,10 @@ upstream's `startOTAUpdate()` and our own `hotspot-ota` patch set it around the
 download. Since the guard sits inside `sleep()` itself, it applies no matter who
 asked for the sleep -- so a low battery cannot interrupt an update in progress.
 
-This mod therefore carries no inhibit API of its own, and has no ordering
-dependency on `hotspot-ota`.
+This mod therefore carries no inhibit API of its own. It does depend on
+`hotspot-ota` for a different reason: it hooks into `helpers/ModHooks.cpp`
+rather than editing upstream's `main.cpp`, and that file comes from
+`hotspot-ota/0001`.
 
 ## Debugging
 
