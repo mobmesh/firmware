@@ -47,71 +47,6 @@
     "note": ""
   },
   {
-    "usage": "start ota wan <url>",
-    "parameters": [
-      "`url`: HTTP(S) URL of the firmware `.bin` to download and flash"
-    ],
-    "note": "Requires ota.wan.wifi to be set first (see below). Joins the configured WiFi network as a station, downloads the file, verifies it against ota.fw.sha256 (or a <url>.sha256 sidecar fetched automatically if ota.fw.sha256 isn't set), confirms the download is actually a build of this project (refuses otherwise, even if the checksum matches -- catches <url> mistakenly pointing at a different, unmodified MeshCore build), and reboots on success. Does not reboot on failure. The authenticity check aborts as soon as it's clear the download isn't a match, rather than pulling the whole file over what may be a metered cellular connection -- normally within the first 64KB, or however far in a <url>.sha256 sidecar says to look (a <hash>:<offset> sidecar, generated automatically by this project's own release builds, carries the exact position for that specific build). See set ota.fw.marker below for the rare case where neither applies."
-  },
-  {
-    "usage": "start ota wan update",
-    "parameters": [],
-    "note": "Identical to start ota wan <url>, using the URL persisted via set ota.fw.url instead of one supplied on the command line. Fails with ERR: ota.fw.url not configured if none has been set. Exists to keep remote admin updates short over LoRa -- a full firmware URL can be well over 100 characters, and start ota wan update is 21."
-  },
-  {
-    "usage": "set ota.wan.wifi <ssid>,<password>",
-    "parameters": [
-      "`ssid`: WiFi network name",
-      "`password`: WiFi network password"
-    ],
-    "note": "Persists across firmware updates (stored separately from node prefs). Set once; does not need to be resupplied for future updates unless the network's credentials change."
-  },
-  {
-    "usage": "set ota.fw.sha256 <hex> / set ota.fw.sha256 clear",
-    "parameters": [
-      "`hex`: 64-character lowercase hex SHA-256 digest of the target firmware `.bin`"
-    ],
-    "note": "RAM-only \u2014 cleared on every boot, never persisted. Once set, this hash verifies the download and is not overridden by a <url>.sha256 sidecar. set ota.fw.sha256 clear removes it so sidecar-fetch takes effect again \u2014 do this before pointing start ota wan at a different firmware image, or a stale hash will block its sidecar."
-  },
-  {
-    "usage": "get ota.fw.url / set ota.fw.url <url>",
-    "parameters": [
-      "`url`: HTTP(S) URL of the firmware `.bin` to download and flash"
-    ],
-    "note": "Persisted \u2014 unlike ota.fw.sha256/ota.fw.marker, this names a stable download location for this device rather than a one-time override. Overwrite to change it; there is no clear. Rejects (does not truncate) a URL longer than the field allows."
-  },
-  {
-    "usage": "set ota.fw.marker <on|off>",
-    "parameters": [
-      "`on` / `off`: Enables or disables the marker/authenticity scan (default `on`)"
-    ],
-    "note": "RAM-only and one-time \u2014 consumed by the very next start ota wan call regardless of outcome, and always starts back at on on every boot (never persisted, never survives a reboot). off is a last resort for a download that fails the authenticity check with no <url>.sha256 offset available to explain why (self-hosted firmware not built by this project's own release pipeline, for example) \u2014 not intended for routine use, since it skips the check that exists specifically to catch a mistaken <url>. This only ever skips the marker scan \u2014 it never bypasses the ota.fw.sha256 hash check, which is always enforced."
-  },
-  {
-    "usage": "get ota.wan.pwr / set ota.wan.pwr <on|off>",
-    "parameters": [
-      "`on` / `off`: Drives GPIO47 (the WAN power-switch control pin) directly"
-    ],
-    "note": "Diagnostic and recovery command, independent of start ota wan \u2014 does not join WiFi, download, or flash anything. Use to confirm or force the rail off if state is ever in doubt (e.g. after a crash or watchdog reset mid-update)."
-  },
-  {
-    "usage": "ota wan join / ota wan check / ota wan leave",
-    "parameters": [],
-    "note": "ota wan join joins the configured WiFi network only (no WAN check, no download), returning in one quick attempt (~15s worst case) instead of start ota wan's full patient join budget (~115s). ota wan check checks WAN reachability on demand, repeatable without rejoining. ota wan leave disconnects and drops WAN power for a clean retry. A successful ota wan join lets start ota wan skip its own join step right after."
-  },
-  {
-    "usage": "get ota.slot",
-    "parameters": [],
-    "note": "Confirms automatically after the confirm delay with a working radio; rejects immediately (rollback + reboot) if radio_init() fails on a probationary boot."
-  },
-  {
-    "usage": "ota slot boot <A|B>",
-    "parameters": [
-      "`A` / `B`: The OTA slot to boot into next (`A` = `ota_0`, `B` = `ota_1`) -- see `get ota.slot`."
-    ],
-    "note": "Points the bootloader at the requested slot and reboots into it immediately without touching flash contents -- useful when a USB flash lands on the currently-inactive slot (e.g. after an earlier start ota wan update flipped which slot is active) and appears not to take effect. Refuses if the requested slot is already active, doesn't exist, or has no valid app image flashed to it. Switching also re-arms rollback probation for the target slot, even if it was previously valid -- ESP-IDF marks any newly-selected boot partition new, which the bootloader promotes to pending on that boot. get ota.slot will report pending right after the swap; this is expected, not a fault, and confirms valid again after the normal ~90s confirm delay."
-  },
-  {
     "usage": "erase",
     "parameters": [],
     "note": ""
@@ -570,5 +505,70 @@
     "usage": "eth.status",
     "parameters": [],
     "note": ""
+  },
+  {
+    "usage": "start ota wan <url>",
+    "parameters": [
+      "`url`: HTTP(S) URL of the firmware `.bin` to download and flash"
+    ],
+    "note": "Requires ota.wan.wifi to be set first (see below). Joins the configured WiFi network as a station, downloads the file, verifies it against ota.fw.sha256 (or a <url>.sha256 sidecar fetched automatically if ota.fw.sha256 isn't set), confirms the download is actually a build of this project (refuses otherwise, even if the checksum matches -- catches <url> mistakenly pointing at a different, unmodified MeshCore build), and reboots on success. Does not reboot on failure. The authenticity check aborts as soon as it's clear the download isn't a match, rather than pulling the whole file over what may be a metered cellular connection -- normally within the first 64KB, or however far in a <url>.sha256 sidecar says to look (a <hash>:<offset> sidecar, generated automatically by this project's own release builds, carries the exact position for that specific build). See set ota.fw.marker below for the rare case where neither applies."
+  },
+  {
+    "usage": "start ota wan update",
+    "parameters": [],
+    "note": "Identical to start ota wan <url>, using the URL persisted via set ota.fw.url instead of one supplied on the command line. Fails with ERR: ota.fw.url not configured if none has been set. Exists to keep remote admin updates short over LoRa -- a full firmware URL can be well over 100 characters, and start ota wan update is 21."
+  },
+  {
+    "usage": "set ota.wan.wifi <ssid>,<password>",
+    "parameters": [
+      "`ssid`: WiFi network name",
+      "`password`: WiFi network password"
+    ],
+    "note": "Persists across firmware updates (stored separately from node prefs). Set once; does not need to be resupplied for future updates unless the network's credentials change."
+  },
+  {
+    "usage": "set ota.fw.sha256 <hex> / set ota.fw.sha256 clear",
+    "parameters": [
+      "`hex`: 64-character lowercase hex SHA-256 digest of the target firmware `.bin`"
+    ],
+    "note": "RAM-only \u2014 cleared on every boot, never persisted. Once set, this hash verifies the download and is not overridden by a <url>.sha256 sidecar. set ota.fw.sha256 clear removes it so sidecar-fetch takes effect again \u2014 do this before pointing start ota wan at a different firmware image, or a stale hash will block its sidecar."
+  },
+  {
+    "usage": "get ota.fw.url / set ota.fw.url <url>",
+    "parameters": [
+      "`url`: HTTP(S) URL of the firmware `.bin` to download and flash"
+    ],
+    "note": "Persisted \u2014 unlike ota.fw.sha256/ota.fw.marker, this names a stable download location for this device rather than a one-time override. Overwrite to change it; there is no clear. Rejects (does not truncate) a URL longer than the field allows."
+  },
+  {
+    "usage": "set ota.fw.marker <on|off>",
+    "parameters": [
+      "`on` / `off`: Enables or disables the marker/authenticity scan (default `on`)"
+    ],
+    "note": "RAM-only and one-time \u2014 consumed by the very next start ota wan call regardless of outcome, and always starts back at on on every boot (never persisted, never survives a reboot). off is a last resort for a download that fails the authenticity check with no <url>.sha256 offset available to explain why (self-hosted firmware not built by this project's own release pipeline, for example) \u2014 not intended for routine use, since it skips the check that exists specifically to catch a mistaken <url>. This only ever skips the marker scan \u2014 it never bypasses the ota.fw.sha256 hash check, which is always enforced."
+  },
+  {
+    "usage": "get ota.wan.pwr / set ota.wan.pwr <on|off>",
+    "parameters": [
+      "`on` / `off`: Drives GPIO47 (the WAN power-switch control pin) directly"
+    ],
+    "note": "Diagnostic and recovery command, independent of start ota wan \u2014 does not join WiFi, download, or flash anything. Use to confirm or force the rail off if state is ever in doubt (e.g. after a crash or watchdog reset mid-update)."
+  },
+  {
+    "usage": "ota wan join / ota wan check / ota wan leave",
+    "parameters": [],
+    "note": "ota wan join joins the configured WiFi network only (no WAN check, no download), returning in one quick attempt (~15s worst case) instead of start ota wan's full patient join budget (~115s). ota wan check checks WAN reachability on demand, repeatable without rejoining. ota wan leave disconnects and drops WAN power for a clean retry. A successful ota wan join lets start ota wan skip its own join step right after."
+  },
+  {
+    "usage": "get ota.slot",
+    "parameters": [],
+    "note": "Confirms automatically after the confirm delay with a working radio; rejects immediately (rollback + reboot) if radio_init() fails on a probationary boot."
+  },
+  {
+    "usage": "ota slot boot <A|B>",
+    "parameters": [
+      "`A` / `B`: The OTA slot to boot into next (`A` = `ota_0`, `B` = `ota_1`) -- see `get ota.slot`."
+    ],
+    "note": "Points the bootloader at the requested slot and reboots into it immediately without touching flash contents -- useful when a USB flash lands on the currently-inactive slot (e.g. after an earlier start ota wan update flipped which slot is active) and appears not to take effect. Refuses if the requested slot is already active, doesn't exist, or has no valid app image flashed to it. Switching also re-arms rollback probation for the target slot, even if it was previously valid -- ESP-IDF marks any newly-selected boot partition new, which the bootloader promotes to pending on that boot. get ota.slot will report pending right after the swap; this is expected, not a fault, and confirms valid again after the normal ~90s confirm delay."
   }
 ]

@@ -71,7 +71,7 @@ env contributions.
 
 ## CLI docs sync is still single-mod (known boundary, not solved here)
 
-`build-release.yml`'s `cli-additions.md`/`cli_commands.md` sync steps and
+`build-release.yml`'s `cli_commands.md` sync step and
 `scripts/generate-commands-json.py` still hardcode `mods/hotspot-ota/docs/`
 as the one place CLI documentation lives. Patch application and env
 injection are mod-agnostic as of this change; doc aggregation isn't. If a
