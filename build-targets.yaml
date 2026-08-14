@@ -32,7 +32,7 @@ targets:
     vendor_flasher_assets: true
     # If true, must match across all targets of this role.
     make_latest: true
-    mods: [hotspot-ota, timing-safety]
+    mods: [shim, hotspot-ota, timing-safety]
     # Headless: drops the OLED and the button's long-press power-off.
     # Joined form -- PlatformIO splits "-U FOO" into a bare -U.
     build_flags_append: ["-UDISPLAY_CLASS"]
@@ -46,7 +46,7 @@ targets:
     sync_docs: false
     vendor_flasher_assets: false
     make_latest: false
-    mods: [hotspot-ota, timing-safety]
+    mods: [shim, hotspot-ota, timing-safety]
 
   - board: xiao_c3
     role: repeater
@@ -58,7 +58,7 @@ targets:
     vendor_flasher_assets: true
     # If true, must match across all targets of this role.
     make_latest: true
-    mods: [hotspot-ota, timing-safety]
+    mods: [shim, hotspot-ota, timing-safety]
 
   - board: xiao_c3
     role: room_server
@@ -69,4 +69,4 @@ targets:
     sync_docs: false
     vendor_flasher_assets: false
     make_latest: false
-    mods: [hotspot-ota, timing-safety]
+    mods: [shim, hotspot-ota, timing-safety]
