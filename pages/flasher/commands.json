@@ -123,6 +123,13 @@
     "note": ""
   },
   {
+    "usage": "get radio.fem.txgain / set radio.fem.txgain <state>",
+    "parameters": [
+      "`state`: `on`|`off`"
+    ],
+    "note": ""
+  },
+  {
     "usage": "get name / set name <name>",
     "parameters": [
       "`name`: Node name"
