@@ -1,20 +1,20 @@
 diff --git a/src/MeshCore.h b/src/MeshCore.h
-index 89e60b1..5f9ec85 100644
+index e67371e..6bb49ec 100644
 --- a/src/MeshCore.h
 +++ b/src/MeshCore.h
-@@ -67,6 +67,7 @@ public:
-   virtual bool setLoRaFemLnaEnabled(bool enable) { return false; }
-   virtual bool canControlLoRaFemLna() const { return false; }
-   virtual bool isLoRaFemLnaEnabled() const { return false; }
+@@ -71,6 +71,7 @@ public:
+   virtual bool setLoRaFemPaGainEnabled(bool enable) { return false; }
+   virtual bool canControlLoRaFemPaGain() const { return false; }
+   virtual bool isLoRaFemPaGainEnabled() const { return false; }
 +  virtual bool startOTAUpdateFromURL(const char* url, char reply[]) { return false; }   // not supported
  
    // Power management interface (boards with power management override these)
    virtual bool isExternalPowered() { return false; }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index 07181e1..e80e77e 100644
+index b318bb5..d5d2f12 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
-@@ -179,7 +179,8 @@ uint8_t CommonCLI::buildAdvertData(uint8_t node_type, uint8_t* app_data) {
+@@ -180,7 +180,8 @@ uint8_t CommonCLI::buildAdvertData(uint8_t node_type, uint8_t* app_data) {
  }
  
  void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* reply) {
@@ -24,7 +24,7 @@ index 07181e1..e80e77e 100644
        _board->powerOff();  // doesn't return
      } else if (memcmp(command, "reboot", 6) == 0) {
        _board->reboot();  // doesn't return
-@@ -446,7 +447,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+@@ -447,7 +448,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
  
  void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* reply) {
    const char* config = &command[4];
@@ -34,7 +34,7 @@ index 07181e1..e80e77e 100644
      float dc = atof(&config[10]);
      if (dc < 1 || dc > 100) {
        strcpy(reply, "ERROR: dutycycle must be 1-100");
-@@ -783,7 +785,8 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -806,7 +808,8 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
  
  void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* reply) {
    const char* config = &command[4];
@@ -45,10 +45,10 @@ index 07181e1..e80e77e 100644
      int dc_int = (int)dc;
      int dc_frac = (int)((dc - dc_int) * 10.0f + 0.5f);
 diff --git a/src/helpers/CommonCLI.h b/src/helpers/CommonCLI.h
-index 2a9ec43..97bd0f3 100644
+index 237c758..8d2c019 100644
 --- a/src/helpers/CommonCLI.h
 +++ b/src/helpers/CommonCLI.h
-@@ -265,6 +265,11 @@ class CommonCLI {
+@@ -267,6 +267,11 @@ class CommonCLI {
    void handleGetCmd(uint32_t sender_timestamp, char* command, char* reply);
    void handleSetCmd(uint32_t sender_timestamp, char* command, char* reply);
  
