@@ -28,7 +28,7 @@
       "room_server": {
         "label": "Room",
         "assetBasename": "heltec_v4_room_ota_ts",
-        "version": "v1.17.0",
+        "version": "v1.17.1",
         "firmwareFile": "heltec_v4/room_server/firmware.bin",
         "firmwareShaFile": "heltec_v4/room_server/firmware.bin.sha256"
       }
@@ -70,5 +70,5 @@
     "bootloaderFile": "xiao_c3/bootloader.bin",
     "partitionsFile": "xiao_c3/partitions.bin"
   },
-  "_version": "v1.17.0"
+  "_version": "v1.17.1"
 }
