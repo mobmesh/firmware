@@ -3,6 +3,31 @@
 Notes on patch conventions and ESP32 stack usage, for anyone editing
 `patches/*.patch` or code under `src/helpers/esp32/`.
 
+## Keep upstream edits to a hook, put the code in our own file
+
+Every upstream line a patch adds is a line that can conflict on the next
+release, so the rule is: patch the smallest hook you can and put the body in a
+file we own, added through the sidecar's `build_src_filter`. Three hooks exist
+today, and a new mod should reuse them rather than add a fourth:
+
+| To add | Hook | Our file |
+| --- | --- | --- |
+| A CLI command | `handleModCommand` / `handleModSetCmd` / `handleModGetCmd` | `helpers/esp32/CommonCliMods.cpp` |
+| Setup or loop behaviour | `modRadioInit` / `modLoop` / `modWantsPowerSaving` | `helpers/ModHooks.cpp` |
+| A member of an upstream class | declare it in the upstream header only | e.g. `helpers/esp32/HotspotOtaBoard.cpp` |
+
+Two things make this work. A member function may be **defined in any
+translation unit**, so an upstream `.cpp` never needs the body. And the CLI
+hooks are called **before** upstream's own if-else chain, not at its terminal
+`else` -- that is what lets `start ota wan <url>` be matched ahead of upstream's
+shorter `start ota` prefix, and it means a hook can deliberately shadow an
+upstream command (`ver` does).
+
+The other payoff is that two mods no longer edit the same region of the same
+upstream file. `batt-saver` and `hotspot-ota` both used to patch
+`simple_repeater/main.cpp`, which is why `batt-saver`'s patch had to be
+generated against `hotspot-ota/0002`; both now go through `ModHooks.cpp`.
+
 ## Patch naming and dependency sidecars
 
 Each patch is named `<zero-padded-numeric-ID>_<descriptive-name>.patch` --
@@ -71,7 +96,7 @@ env contributions.
 
 ## CLI docs sync is still single-mod (known boundary, not solved here)
 
-`build-release.yml`'s `cli-additions.md`/`cli_commands.md` sync steps and
+`build-release.yml`'s `cli_commands.md` sync step and
 `scripts/generate-commands-json.py` still hardcode `mods/hotspot-ota/docs/`
 as the one place CLI documentation lives. Patch application and env
 injection are mod-agnostic as of this change; doc aggregation isn't. If a
@@ -87,7 +112,10 @@ MeshCore's CLI dispatch (`CommonCLI::handleGetCmd()`, `handleSetCmd()`,
 function body per verb. A stack-local variable added to one branch adds to
 that whole function's combined frame size, not just the branch's own
 footprint -- so a modestly-sized local here costs more stack budget than the
-same variable would cost almost anywhere else in the codebase.
+same variable would cost almost anywhere else in the codebase. Our own commands
+now sit outside those functions (see the hook section above), so a local in
+`CommonCliMods.cpp` costs only its own frame -- but the guidance still applies
+to anything added to the upstream branches themselves.
 
 `setup()` (in `examples/simple_repeater/main.cpp` and
 `examples/simple_room_server/main.cpp`) is similar in a different way: it's
