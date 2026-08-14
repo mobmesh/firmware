@@ -1,0 +1,7 @@
+id: "0001"
+title: calibrated-battery-read
+requires: []
+# Upstream PR this patch tracks. patch-drift-canary checks its state daily: once
+# MERGED, this patch is probably redundant and should be re-reviewed, not just
+# rebased -- see docs/rebasing-patches.md.
+upstream_prs: [2689]
