@@ -15,8 +15,8 @@ The intent is a solar or battery repeater that looks after itself: it slows
 down before it dies rather than after, and it comes back on its own without a
 site visit.
 
-**Repeater only.** The room server firmware has no sleep path at all in
-v1.17.0, so there is nothing for this mod to switch.
+**Repeater only.** The room server firmware has no sleep path at all, so there is
+nothing for this mod to switch.
 
 ## What It Actually Does
 
@@ -70,8 +70,8 @@ engagement that favours uptime, leaving little runway once it triggers.
 
 The gap between the two voltage marks should stay wide. On heltec_v4 the
 battery reading quantises to roughly 17 mV per step and depends on a per-unit
-calibration value (`set adc.multiplier`, default 5.42), so treat any single
-reading as approximate.
+calibration value (`set adc.multiplier`, defaulting to `ADC_MULTIPLIER` in
+`variants/heltec_v4/overrides.yaml`), so treat any single reading as approximate.
 
 ## Dropping the LNA (off by default)
 
@@ -119,7 +119,7 @@ Not enabled on any target yet -- **this has not been tested on hardware.** To
 try it, add `batt-saver` to a target's `mods:` list in `build-targets.yaml`:
 
 ```yaml
-    mods: [hotspot-ota, timing-safety, batt-saver]
+    mods: [shim, hotspot-ota, timing-safety, batt-saver]
 ```
 
 That changes the asset basename (the mod contributes the suffix `bs`), so the
@@ -136,10 +136,10 @@ upstream's `startOTAUpdate()` and our own `hotspot-ota` patch set it around the
 download. Since the guard sits inside `sleep()` itself, it applies no matter who
 asked for the sleep -- so a low battery cannot interrupt an update in progress.
 
-This mod therefore carries no inhibit API of its own. It does depend on
-`hotspot-ota` for a different reason: it hooks into `helpers/ModHooks.cpp`
-rather than editing upstream's `main.cpp`, and that file comes from
-`hotspot-ota/0001`.
+This mod therefore carries no inhibit API of its own. It hooks into
+`helpers/ModHooks.cpp` rather than editing upstream's `main.cpp`; that file comes
+from `shim/0001`. It also declares `hotspot-ota/0002` as a context dependency,
+since that patch edits the same regions of `ModHooks.cpp`.
 
 ## Debugging
 

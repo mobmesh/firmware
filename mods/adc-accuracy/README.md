@@ -31,7 +31,7 @@ path itself. Both were needed; neither depends on the other.
 Add `adc-accuracy` to a target's `mods:` list in `build-targets.yaml`:
 
 ```yaml
-    mods: [hotspot-ota, timing-safety, adc-accuracy]
+    mods: [shim, hotspot-ota, timing-safety, adc-accuracy]
 ```
 
 **Contributes no suffix.** This is a correctness fix, not a feature -- enabling

@@ -10,11 +10,6 @@ Neither of these needs GPS, a phone app, or an internet connection to matter. Th
 
 ## Why This Exists
 
-Both issues are already known upstream, but the fixes have been sitting in open pull requests for months without being merged:
-
-- https://github.com/meshcore-dev/MeshCore/pull/1972
-- https://github.com/meshcore-dev/MeshCore/pull/1349
-
-This mod brings just those two fixes into our builds now instead of waiting on upstream.
+Both issues are known upstream and both fixes remain unmerged (upstream PRs 1972 and 1349, tracked in `patches/0001.meta.yaml` and checked daily by patch-drift-canary). This mod carries just those two fixes.
 
 One thing on purpose that this mod does *not* do: the second upstream PR also removes the safety check on the `time` CLI command that stops the clock from being set backward by hand. We left that part out. (Automatic NTP sync, on builds where it's enabled, doesn't go through that check and corrects the clock in either direction.) Nothing in our current builds actually needs it yet (no GPS, no phone app syncing time), and removing that check outright trades one problem for a different, unreviewed one. If we add automatic internet time sync later, that piece can be revisited properly alongside it.

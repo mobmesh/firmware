@@ -10,56 +10,6 @@ index e67371e..6bb49ec 100644
  
    // Power management interface (boards with power management override these)
    virtual bool isExternalPowered() { return false; }
-diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index b318bb5..d5d2f12 100644
---- a/src/helpers/CommonCLI.cpp
-+++ b/src/helpers/CommonCLI.cpp
-@@ -180,7 +180,8 @@ uint8_t CommonCLI::buildAdvertData(uint8_t node_type, uint8_t* app_data) {
- }
- 
- void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* reply) {
--    if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
-+    if (handleModCommand(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
-+    } else if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
-       _board->powerOff();  // doesn't return
-     } else if (memcmp(command, "reboot", 6) == 0) {
-       _board->reboot();  // doesn't return
-@@ -447,7 +448,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
- 
- void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* reply) {
-   const char* config = &command[4];
--  if (memcmp(config, "dutycycle ", 10) == 0) {
-+  if (handleModSetCmd(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
-+  } else if (memcmp(config, "dutycycle ", 10) == 0) {
-     float dc = atof(&config[10]);
-     if (dc < 1 || dc > 100) {
-       strcpy(reply, "ERROR: dutycycle must be 1-100");
-@@ -806,7 +808,8 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
- 
- void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* reply) {
-   const char* config = &command[4];
--  if (memcmp(config, "dutycycle", 9) == 0) {
-+  if (handleModGetCmd(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
-+  } else if (memcmp(config, "dutycycle", 9) == 0) {
-     float dc = 100.0f / (_prefs->airtime_factor + 1.0f);
-     int dc_int = (int)dc;
-     int dc_frac = (int)((dc - dc_int) * 10.0f + 0.5f);
-diff --git a/src/helpers/CommonCLI.h b/src/helpers/CommonCLI.h
-index 237c758..8d2c019 100644
---- a/src/helpers/CommonCLI.h
-+++ b/src/helpers/CommonCLI.h
-@@ -267,6 +267,11 @@ class CommonCLI {
-   void handleGetCmd(uint32_t sender_timestamp, char* command, char* reply);
-   void handleSetCmd(uint32_t sender_timestamp, char* command, char* reply);
- 
-+  // Defined in helpers/esp32/CommonCliMods.cpp -- return true if the mod took the command.
-+  bool handleModCommand(uint32_t sender_timestamp, char* command, char* reply);
-+  bool handleModSetCmd(uint32_t sender_timestamp, char* command, char* reply);
-+  bool handleModGetCmd(uint32_t sender_timestamp, char* command, char* reply);
-+
- public:
-   CommonCLI(mesh::MainBoard& board, mesh::RTCClock& rtc, SensorManager& sensors, RegionMap& region_map, ClientACL& acl, NodePrefs* prefs, CommonCLICallbacks* callbacks)
-       : _board(&board), _rtc(&rtc), _sensors(&sensors), _region_map(&region_map), _acl(&acl), _prefs(prefs), _callbacks(callbacks) { }
 diff --git a/src/helpers/ESP32Board.h b/src/helpers/ESP32Board.h
 index d7eb5fe..e88a785 100644
 --- a/src/helpers/ESP32Board.h
@@ -72,54 +22,21 @@ index d7eb5fe..e88a785 100644
  
    void setInhibitSleep(bool inhibit) {
      inhibit_sleep = inhibit;
-diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
-new file mode 100644
-index 0000000..9ca21bc
---- /dev/null
-+++ b/src/helpers/ModHooks.cpp
-@@ -0,0 +1,13 @@
-+#include <helpers/ModHooks.h>
-+#include <target.h>   // radio_init(), board
-+
-+bool modRadioInit(const char* build_id) {
-+  return radio_init();
-+}
-+
-+void modLoop() {
-+}
-+
-+bool modWantsPowerSaving() {
-+  return false;
-+}
-diff --git a/src/helpers/ModHooks.h b/src/helpers/ModHooks.h
-new file mode 100644
-index 0000000..8ab58a9
---- /dev/null
-+++ b/src/helpers/ModHooks.h
-@@ -0,0 +1,9 @@
-+#pragma once
-+
-+// One hook surface for every mod, so upstream's main.cpp carries a handful of
-+// one-line calls instead of each mod's code inline -- and so two mods never
-+// have to edit the same region of it. Bodies live in ModHooks.cpp (ours).
-+
-+bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
-+void modLoop();                            // called first in loop()
-+bool modWantsPowerSaving();                // OR'd with the operator's powersaving_enabled
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-new file mode 100644
-index 0000000..b170987
---- /dev/null
+index 26df75c..b170987 100644
+--- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
-@@ -0,0 +1,145 @@
+@@ -1,16 +1,145 @@
+-// Hook points for mod CLI commands, dispatched ahead of upstream's own chain so a
+-// mod can match a longer prefix first. No-ops until a mod fills them in.
 +// Every CLI command our mods add lives here, so upstream's CommonCLI.cpp carries
 +// only a one-line dispatch hook per verb instead of the branches themselves.
 +// Called before upstream's own chain, which is what lets `start ota wan ...` be
 +// matched ahead of upstream's shorter `start ota` prefix.
-+#include <helpers/CommonCLI.h>
+ #include <helpers/CommonCLI.h>
 +#include <helpers/TxtDataHelpers.h>
-+#include <target.h>
-+
+ #include <target.h>
+ 
 +#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
 +#include <helpers/esp32/HotspotOTA.h>
 +#endif
@@ -130,7 +47,8 @@ index 0000000..b170987
 +#define OTA_MOD_BUILD_DATE "unknown"
 +#endif
 +
-+bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
+ bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
+-  return false;
 +  if (memcmp(command, "ver", 3) == 0) {
 +    // Shadows upstream's own `ver` branch, which never runs while this mod is built in.
 +    sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
@@ -166,9 +84,9 @@ index 0000000..b170987
 +    return false;   // not ours -- upstream's chain runs
 +  }
 +  return true;
-+}
-+
-+bool CommonCLI::handleModSetCmd(uint32_t sender_timestamp, char* command, char* reply) {
+ }
+ 
+ bool CommonCLI::handleModSetCmd(uint32_t sender_timestamp, char* command, char* reply) {
 +  char* config = &command[4];
 +#if defined(WITH_HOTSPOT_OTA)
 +  if (memcmp(config, "ota.wan.wifi ", 13) == 0) {
@@ -236,11 +154,11 @@ index 0000000..b170987
 +  }
 +  return true;
 +#else
-+  return false;
+   return false;
 +#endif
-+}
-+
-+bool CommonCLI::handleModGetCmd(uint32_t sender_timestamp, char* command, char* reply) {
+ }
+ 
+ bool CommonCLI::handleModGetCmd(uint32_t sender_timestamp, char* command, char* reply) {
 +  char* config = &command[4];
 +#if defined(WITH_HOTSPOT_OTA)
 +  if (memcmp(config, "ota.fw.url", 10) == 0) {
@@ -254,9 +172,9 @@ index 0000000..b170987
 +  }
 +  return true;
 +#else
-+  return false;
+   return false;
 +#endif
-+}
+ }
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
 index 0000000..5dc4807
