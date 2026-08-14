@@ -1,5 +1,5 @@
 diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
-index c93ba1a..6a4851a 100644
+index 7d0179f..80017bf 100644
 --- a/examples/simple_repeater/MyMesh.cpp
 +++ b/examples/simple_repeater/MyMesh.cpp
 @@ -1,5 +1,6 @@
@@ -18,7 +18,7 @@ index c93ba1a..6a4851a 100644
          memcpy(&results_buffer[results_offset], neighbour->id.pub_key, pubkey_prefix_length); results_offset += pubkey_prefix_length;
          memcpy(&results_buffer[results_offset], &heard_seconds_ago, 4); results_offset += 4;
          memcpy(&results_buffer[results_offset], &neighbour->snr, 1); results_offset += 1;
-@@ -1097,7 +1098,7 @@ void MyMesh::formatNeighborsReply(char *reply) {
+@@ -1118,7 +1119,7 @@ void MyMesh::formatNeighborsReply(char *reply) {
      mesh::Utils::toHex(hex, neighbour->id.pub_key, 4);
  
      // add next neighbour
