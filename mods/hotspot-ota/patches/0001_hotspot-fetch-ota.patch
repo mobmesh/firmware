@@ -1,169 +1,125 @@
-diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index b618ae2..27ab9b8 100644
---- a/docs/cli_commands.md
-+++ b/docs/cli_commands.md
-@@ -89,6 +89,141 @@ This document provides an overview of CLI commands that can be sent to MeshCore
- 
- ---
- 
-+### Start an Over-The-Air (OTA) firmware update via a joined WiFi network
-+**Usage:**
-+- `start ota wan <url>`
-+
-+**Parameters:**
-+- `url`: HTTP(S) URL of the firmware `.bin` to download and flash
-+
-+**Note:** Requires `ota.wan.wifi` to be set first (see below). Joins the configured WiFi network as
-+a station, downloads the file, verifies it against `ota.fw.sha256` (or a `<url>.sha256` sidecar
-+fetched automatically if `ota.fw.sha256` isn't set), confirms the download is actually a build of
-+this project (refuses otherwise, even if the checksum matches -- catches `<url>` mistakenly pointing
-+at a different, unmodified MeshCore build), and reboots on success. Does not reboot on failure.
-+
-+The authenticity check aborts as soon as it's clear the download isn't a match, rather than pulling
-+the whole file over what may be a metered cellular connection -- normally within the first 64KB, or
-+however far in a `<url>.sha256` sidecar says to look (a `<hash>:<offset>` sidecar, generated
-+automatically by this project's own release builds, carries the exact position for that specific
-+build). See `set ota.fw.marker` below for the rare case where neither applies.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+### Start an Over-The-Air (OTA) firmware update using the configured default URL
-+**Usage:**
-+- `start ota wan update`
-+
-+**Note:** Identical to `start ota wan <url>`, using the URL persisted via `set ota.fw.url` instead
-+of one supplied on the command line. Fails with `ERR: ota.fw.url not configured` if none has been
-+set. Exists to keep remote admin updates short over LoRa -- a full firmware URL can be well over 100
-+characters, and `start ota wan update` is 21.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### View or change the WiFi credentials used by `start ota wan`
-+**Usage:**
-+- `set ota.wan.wifi <ssid>,<password>`
-+
-+**Parameters:**
-+- `ssid`: WiFi network name
-+- `password`: WiFi network password
-+
-+**Note:** Persists across firmware updates (stored separately from node prefs). Set once; does not
-+need to be resupplied for future updates unless the network's credentials change.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### View or change the manually-supplied firmware hash used by `start ota wan`
-+**Usage:**
-+- `set ota.fw.sha256 <hex>`
-+- `set ota.fw.sha256 clear`
-+
-+**Parameters:**
-+- `hex`: 64-character lowercase hex SHA-256 digest of the target firmware `.bin`
-+
-+**Note:** RAM-only — cleared on every boot, never persisted. Once set, this hash verifies the
-+download and is **not** overridden by a `<url>.sha256` sidecar. `set ota.fw.sha256 clear` removes it
-+so sidecar-fetch takes effect again — do this before pointing `start ota wan` at a different
-+firmware image, or a stale hash will block its sidecar.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### View or change the default URL used by `start ota wan update`
-+**Usage:**
-+- `get ota.fw.url`
-+- `set ota.fw.url <url>`
-+
-+**Parameters:**
-+- `url`: HTTP(S) URL of the firmware `.bin` to download and flash
-+
-+**Note:** Persisted — unlike `ota.fw.sha256`/`ota.fw.marker`, this names a stable download location
-+for this device rather than a one-time override. Overwrite to change it; there is no `clear`.
-+Rejects (does not truncate) a URL longer than the field allows.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### View or change whether `start ota wan` checks the download's authenticity marker
-+**Usage:**
-+- `set ota.fw.marker <on|off>`
-+
-+**Parameters:**
-+- `on` / `off`: Enables or disables the marker/authenticity scan (default `on`)
-+
-+**Note:** RAM-only and one-time — consumed by the very next `start ota wan` call regardless of
-+outcome, and always starts back at `on` on every boot (never persisted, never survives a reboot).
-+`off` is a last resort for a download that fails the authenticity check with no `<url>.sha256`
-+offset available to explain why (self-hosted firmware not built by this project's own release
-+pipeline, for example) — not intended for routine use, since it skips the check that exists
-+specifically to catch a mistaken `<url>`. This only ever skips the marker scan — it never bypasses
-+the `ota.fw.sha256` hash check, which is always enforced.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### View or manually control the GPIO47 WAN power switch
-+**Usage:**
-+- `get ota.wan.pwr`
-+- `set ota.wan.pwr <on|off>`
-+
-+**Parameters:**
-+- `on` / `off`: Drives GPIO47 (the WAN power-switch control pin) directly
-+
-+**Note:** Diagnostic and recovery command, independent of `start ota wan` — does not join WiFi,
-+download, or flash anything. Use to confirm or force the rail off if state is ever in doubt (e.g.
-+after a crash or watchdog reset mid-update).
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### Pre-flight check the WiFi join and WAN connectivity before `start ota wan`
-+**Usage:**
-+- `ota wan join`
-+- `ota wan check`
-+- `ota wan leave`
-+
-+**Note:** `ota wan join` joins the configured WiFi network only (no WAN check, no download),
-+returning in one quick attempt (~15s worst case) instead of `start ota wan`'s full patient join
-+budget (~115s). `ota wan check` checks WAN reachability on demand, repeatable without rejoining.
-+`ota wan leave` disconnects and drops WAN power for a clean retry. A successful `ota wan join` lets
-+`start ota wan` skip its own join step right after.
-+
-+**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
- ### Erase/Factory Reset
- **Usage:**
- - `erase`
 diff --git a/src/MeshCore.h b/src/MeshCore.h
-index 89e60b1..5f9ec85 100644
+index e67371e..6bb49ec 100644
 --- a/src/MeshCore.h
 +++ b/src/MeshCore.h
-@@ -67,6 +67,7 @@ public:
-   virtual bool setLoRaFemLnaEnabled(bool enable) { return false; }
-   virtual bool canControlLoRaFemLna() const { return false; }
-   virtual bool isLoRaFemLnaEnabled() const { return false; }
+@@ -71,6 +71,7 @@ public:
+   virtual bool setLoRaFemPaGainEnabled(bool enable) { return false; }
+   virtual bool canControlLoRaFemPaGain() const { return false; }
+   virtual bool isLoRaFemPaGainEnabled() const { return false; }
 +  virtual bool startOTAUpdateFromURL(const char* url, char reply[]) { return false; }   // not supported
  
    // Power management interface (boards with power management override these)
    virtual bool isExternalPowered() { return false; }
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index 07181e1..a022856 100644
+index b318bb5..d5d2f12 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
-@@ -5,6 +5,16 @@
- #include "TxtDataHelpers.h"
- #include <RTClib.h>
+@@ -180,7 +180,8 @@ uint8_t CommonCLI::buildAdvertData(uint8_t node_type, uint8_t* app_data) {
+ }
  
+ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* reply) {
+-    if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
++    if (handleModCommand(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
++    } else if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
+       _board->powerOff();  // doesn't return
+     } else if (memcmp(command, "reboot", 6) == 0) {
+       _board->reboot();  // doesn't return
+@@ -447,7 +448,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+ 
+ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* reply) {
+   const char* config = &command[4];
+-  if (memcmp(config, "dutycycle ", 10) == 0) {
++  if (handleModSetCmd(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
++  } else if (memcmp(config, "dutycycle ", 10) == 0) {
+     float dc = atof(&config[10]);
+     if (dc < 1 || dc > 100) {
+       strcpy(reply, "ERROR: dutycycle must be 1-100");
+@@ -806,7 +808,8 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+ 
+ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* reply) {
+   const char* config = &command[4];
+-  if (memcmp(config, "dutycycle", 9) == 0) {
++  if (handleModGetCmd(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
++  } else if (memcmp(config, "dutycycle", 9) == 0) {
+     float dc = 100.0f / (_prefs->airtime_factor + 1.0f);
+     int dc_int = (int)dc;
+     int dc_frac = (int)((dc - dc_int) * 10.0f + 0.5f);
+diff --git a/src/helpers/CommonCLI.h b/src/helpers/CommonCLI.h
+index 237c758..8d2c019 100644
+--- a/src/helpers/CommonCLI.h
++++ b/src/helpers/CommonCLI.h
+@@ -267,6 +267,11 @@ class CommonCLI {
+   void handleGetCmd(uint32_t sender_timestamp, char* command, char* reply);
+   void handleSetCmd(uint32_t sender_timestamp, char* command, char* reply);
+ 
++  // Defined in helpers/esp32/CommonCliMods.cpp -- return true if the mod took the command.
++  bool handleModCommand(uint32_t sender_timestamp, char* command, char* reply);
++  bool handleModSetCmd(uint32_t sender_timestamp, char* command, char* reply);
++  bool handleModGetCmd(uint32_t sender_timestamp, char* command, char* reply);
++
+ public:
+   CommonCLI(mesh::MainBoard& board, mesh::RTCClock& rtc, SensorManager& sensors, RegionMap& region_map, ClientACL& acl, NodePrefs* prefs, CommonCLICallbacks* callbacks)
+       : _board(&board), _rtc(&rtc), _sensors(&sensors), _region_map(&region_map), _acl(&acl), _prefs(prefs), _callbacks(callbacks) { }
+diff --git a/src/helpers/ESP32Board.h b/src/helpers/ESP32Board.h
+index d7eb5fe..e88a785 100644
+--- a/src/helpers/ESP32Board.h
++++ b/src/helpers/ESP32Board.h
+@@ -155,6 +155,7 @@ public:
+   }
+ 
+   bool startOTAUpdate(const char* id, char reply[]) override;
++  bool startOTAUpdateFromURL(const char* url, char reply[]) override;
+ 
+   void setInhibitSleep(bool inhibit) {
+     inhibit_sleep = inhibit;
+diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
+new file mode 100644
+index 0000000..9ca21bc
+--- /dev/null
++++ b/src/helpers/ModHooks.cpp
+@@ -0,0 +1,13 @@
++#include <helpers/ModHooks.h>
++#include <target.h>   // radio_init(), board
++
++bool modRadioInit(const char* build_id) {
++  return radio_init();
++}
++
++void modLoop() {
++}
++
++bool modWantsPowerSaving() {
++  return false;
++}
+diff --git a/src/helpers/ModHooks.h b/src/helpers/ModHooks.h
+new file mode 100644
+index 0000000..8ab58a9
+--- /dev/null
++++ b/src/helpers/ModHooks.h
+@@ -0,0 +1,9 @@
++#pragma once
++
++// One hook surface for every mod, so upstream's main.cpp carries a handful of
++// one-line calls instead of each mod's code inline -- and so two mods never
++// have to edit the same region of it. Bodies live in ModHooks.cpp (ours).
++
++bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
++void modLoop();                            // called first in loop()
++bool modWantsPowerSaving();                // OR'd with the operator's powersaving_enabled
+diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
+new file mode 100644
+index 0000000..b170987
+--- /dev/null
++++ b/src/helpers/esp32/CommonCliMods.cpp
+@@ -0,0 +1,145 @@
++// Every CLI command our mods add lives here, so upstream's CommonCLI.cpp carries
++// only a one-line dispatch hook per verb instead of the branches themselves.
++// Called before upstream's own chain, which is what lets `start ota wan ...` be
++// matched ahead of upstream's shorter `start ota` prefix.
++#include <helpers/CommonCLI.h>
++#include <helpers/TxtDataHelpers.h>
++#include <target.h>
++
 +#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
 +#include <helpers/esp32/HotspotOTA.h>
 +#endif
@@ -174,59 +130,48 @@ index 07181e1..a022856 100644
 +#define OTA_MOD_BUILD_DATE "unknown"
 +#endif
 +
- #ifndef BRIDGE_MAX_BAUD
- #define BRIDGE_MAX_BAUD 115200
- #endif
-@@ -205,6 +215,34 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
-       } else {
-         strcpy(reply, "ERR: clock cannot go backwards");
-       }
++bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
++  if (memcmp(command, "ver", 3) == 0) {
++    // Shadows upstream's own `ver` branch, which never runs while this mod is built in.
++    sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
 +#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
-+    } else if (memcmp(command, "start ota wan update", 21) == 0 && (command[21] == 0 || command[21] == ' ')) {
-+      // Checked ahead of the generic "start ota wan " prefix below, or "update" would be parsed
-+      // as a literal URL. Uses the persisted ota.fw.url instead of one supplied on the command line.
-+      HotspotOtaConfig cfg;
-+      HotspotOTA::loadConfig(cfg);
-+      if (cfg.url[0] == 0) {
-+        strcpy(reply, "ERR: ota.fw.url not configured");
-+      } else if (!_board->startOTAUpdateFromURL(cfg.url, reply)) {
-+        // reply[] already carries the specific error from HotspotOTA::run
-+      }
++  } else if (memcmp(command, "start ota wan update", 21) == 0 && (command[21] == 0 || command[21] == ' ')) {
++    // Checked ahead of the generic "start ota wan " prefix below, or "update" would be parsed
++    // as a literal URL. Uses the persisted ota.fw.url instead of one supplied on the command line.
++    HotspotOtaConfig cfg;
++    HotspotOTA::loadConfig(cfg);
++    if (cfg.url[0] == 0) {
++      strcpy(reply, "ERR: ota.fw.url not configured");
++    } else if (!_board->startOTAUpdateFromURL(cfg.url, reply)) {
++      // reply[] already carries the specific error from HotspotOTA::run
++    }
 +#endif
-+    } else if (memcmp(command, "start ota wan ", 14) == 0) {
-+      if (!_board->startOTAUpdateFromURL(&command[14], reply)) {
-+        // reply[] already carries the specific error from HotspotOTA::run
-+      }
++  } else if (memcmp(command, "start ota wan ", 14) == 0) {
++    if (!_board->startOTAUpdateFromURL(&command[14], reply)) {
++      // reply[] already carries the specific error from HotspotOTA::run
++    }
 +#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
-+    } else if (memcmp(command, "ota wan join", 12) == 0) {
-+      // Pre-flight check -- joins WiFi only, so `ota wan check` can be repeated without rejoining,
-+      // and `start ota wan` skips its own join after this (see alreadyConnectedTo()).
-+      HotspotOTA::wifiConnect(reply);
-+    } else if (memcmp(command, "ota wan leave", 13) == 0) {
-+      HotspotOTA::wifiDisconnect();
-+      strcpy(reply, "OK - disconnected");
-+    } else if (memcmp(command, "ota wan check", 13) == 0) {
-+      // Pre-flight check -- see `ota wan join`. Assumes WiFi already joined.
-+      HotspotOTA::checkWan(reply);
++  } else if (memcmp(command, "ota wan join", 12) == 0) {
++    // Pre-flight check -- joins WiFi only, so `ota wan check` can be repeated without rejoining,
++    // and `start ota wan` skips its own join after this (see alreadyConnectedTo()).
++    HotspotOTA::wifiConnect(reply);
++  } else if (memcmp(command, "ota wan leave", 13) == 0) {
++    HotspotOTA::wifiDisconnect();
++    strcpy(reply, "OK - disconnected");
++  } else if (memcmp(command, "ota wan check", 13) == 0) {
++    // Pre-flight check -- see `ota wan join`. Assumes WiFi already joined.
++    HotspotOTA::checkWan(reply);
 +#endif
-     } else if (memcmp(command, "start ota", 9) == 0) {
-       if (!_board->startOTAUpdate(_prefs->node_name, reply)) {
-         strcpy(reply, "Error");
-@@ -269,7 +307,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
-       bool s = _callbacks->formatFileSystem();
-       sprintf(reply, "File system erase: %s", s ? "OK" : "Err");
-     } else if (memcmp(command, "ver", 3) == 0) {
--      sprintf(reply, "%s (Build: %s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate());
-+      sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
-     } else if (memcmp(command, "board", 5) == 0) {
-       sprintf(reply, "%s", _board->getManufacturerName());
-     } else if (memcmp(command, "sensor get ", 11) == 0) {
-@@ -506,6 +544,68 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
-     StrHelper::strncpy(_prefs->guest_password, &config[15], sizeof(_prefs->guest_password));
-     savePrefs();
-     strcpy(reply, "OK");
++  } else {
++    return false;   // not ours -- upstream's chain runs
++  }
++  return true;
++}
++
++bool CommonCLI::handleModSetCmd(uint32_t sender_timestamp, char* command, char* reply) {
++  char* config = &command[4];
 +#if defined(WITH_HOTSPOT_OTA)
-+  } else if (memcmp(config, "ota.wan.wifi ", 13) == 0) {
++  if (memcmp(config, "ota.wan.wifi ", 13) == 0) {
 +    // format: set ota.wan.wifi <ssid>,<password>
 +    HotspotOtaConfig cfg;
 +    HotspotOTA::loadConfig(cfg);
@@ -286,81 +231,32 @@ index 07181e1..a022856 100644
 +    } else {
 +      strcpy(reply, "ERR: expected on|off");
 +    }
++  } else {
++    return false;   // not ours -- upstream's chain runs
++  }
++  return true;
++#else
++  return false;
 +#endif
-   } else if (memcmp(config, "prv.key ", 8) == 0) {
-     uint8_t prv_key[PRV_KEY_SIZE];
-     bool success = mesh::Utils::fromHex(prv_key, PRV_KEY_SIZE, &config[8]);
-@@ -788,6 +888,14 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
-     int dc_int = (int)dc;
-     int dc_frac = (int)((dc - dc_int) * 10.0f + 0.5f);
-     sprintf(reply, "> %d.%d%%", dc_int, dc_frac);
++}
++
++bool CommonCLI::handleModGetCmd(uint32_t sender_timestamp, char* command, char* reply) {
++  char* config = &command[4];
 +#if defined(WITH_HOTSPOT_OTA)
-+  } else if (memcmp(config, "ota.fw.url", 10) == 0) {
++  if (memcmp(config, "ota.fw.url", 10) == 0) {
 +    HotspotOtaConfig cfg;
 +    HotspotOTA::loadConfig(cfg);
 +    sprintf(reply, "> %s", cfg.url[0] ? cfg.url : "(not set)");
 +  } else if (memcmp(config, "ota.wan.pwr", 11) == 0) {
 +    sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
-+#endif
-   } else if (memcmp(config, "af", 2) == 0) {
-     sprintf(reply, "> %s", StrHelper::ftoa(_prefs->airtime_factor));
-   } else if (memcmp(config, "int.thresh", 10) == 0) {
-diff --git a/src/helpers/ESP32Board.cpp b/src/helpers/ESP32Board.cpp
-index a55abb2..97e1213 100644
---- a/src/helpers/ESP32Board.cpp
-+++ b/src/helpers/ESP32Board.cpp
-@@ -39,10 +39,39 @@ bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
-   return true;
- }
- 
-+#if defined(WITH_HOTSPOT_OTA)
-+#include <helpers/esp32/HotspotOTA.h>
-+#include <helpers/TxtDataHelpers.h>   // StrHelper -- there is no standalone StrHelper.h
-+
-+bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
-+  HotspotOtaConfig cfg;
-+  HotspotOTA::loadConfig(cfg);
-+  // Reject outright rather than silently truncate to a wrong-but-valid-looking URL.
-+  if (strlen(url) >= sizeof(cfg.url)) {
-+    sprintf(reply, "ERR: URL too long (max %d chars)", (int)sizeof(cfg.url) - 1);
-+    return false;
++  } else {
++    return false;   // not ours -- upstream's chain runs
 +  }
-+  StrHelper::strncpy(cfg.url, url, sizeof(cfg.url));
-+
-+  inhibit_sleep = true;
-+  bool ok = HotspotOTA::run(cfg, reply);   // owns GPIO47 power-switch sequencing internally
-+  if (ok) reboot();                        // doesn't return
-+  inhibit_sleep = false;                   // failure returns here -- re-allow sleep
-+  return ok;
-+}
++  return true;
 +#else
-+bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
-+  return false; // not supported
-+}
++  return false;
 +#endif
-+
- #else
- bool ESP32Board::startOTAUpdate(const char* id, char reply[]) {
-   return false; // not supported
- }
-+bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
-+  return false; // not supported
 +}
- #endif
- 
- void ESP32Board::powerOff() {
-diff --git a/src/helpers/ESP32Board.h b/src/helpers/ESP32Board.h
-index d7eb5fe..e88a785 100644
---- a/src/helpers/ESP32Board.h
-+++ b/src/helpers/ESP32Board.h
-@@ -155,6 +155,7 @@ public:
-   }
- 
-   bool startOTAUpdate(const char* id, char reply[]) override;
-+  bool startOTAUpdateFromURL(const char* url, char reply[]) override;
- 
-   void setInhibitSleep(bool inhibit) {
-     inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
 index 0000000..5dc4807
@@ -777,3 +673,43 @@ index 0000000..7513e4a
 +  void wifiDisconnect();
 +  bool checkWan(char reply[]);
 +}
+diff --git a/src/helpers/esp32/HotspotOtaBoard.cpp b/src/helpers/esp32/HotspotOtaBoard.cpp
+new file mode 100644
+index 0000000..8a5d1e6
+--- /dev/null
++++ b/src/helpers/esp32/HotspotOtaBoard.cpp
+@@ -0,0 +1,34 @@
++// ESP32Board::startOTAUpdateFromURL lives here rather than in upstream's
++// ESP32Board.cpp -- a member may be defined in any translation unit, so the
++// patch to that file is only the one-line declaration in ESP32Board.h.
++#include <helpers/ESP32Board.h>
++#include <target.h>
++
++// Same gate upstream puts around startOTAUpdate(): no WiFi stack, no URL update.
++#if defined(WITH_HOTSPOT_OTA) && defined(ADMIN_PASSWORD) && !defined(DISABLE_WIFI_OTA)
++
++#include <helpers/esp32/HotspotOTA.h>
++#include <helpers/TxtDataHelpers.h>   // StrHelper -- there is no standalone StrHelper.h
++
++bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
++  HotspotOtaConfig cfg;
++  HotspotOTA::loadConfig(cfg);
++  // Reject outright rather than silently truncate to a wrong-but-valid-looking URL.
++  if (strlen(url) >= sizeof(cfg.url)) {
++    sprintf(reply, "ERR: URL too long (max %d chars)", (int)sizeof(cfg.url) - 1);
++    return false;
++  }
++  StrHelper::strncpy(cfg.url, url, sizeof(cfg.url));
++
++  inhibit_sleep = true;
++  bool ok = HotspotOTA::run(cfg, reply);   // owns GPIO47 power-switch sequencing internally
++  if (ok) reboot();                        // doesn't return
++  inhibit_sleep = false;                   // failure returns here -- re-allow sleep
++  return ok;
++}
++
++#else
++bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
++  return false; // not supported
++}
++#endif

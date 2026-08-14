@@ -1,220 +1,151 @@
-diff --git a/docs/cli_commands.md b/docs/cli_commands.md
-index 27ab9b8..7e1474d 100644
---- a/docs/cli_commands.md
-+++ b/docs/cli_commands.md
-@@ -224,6 +224,56 @@ budget (~115s). `ota wan check` checks WAN reachability on demand, repeatable wi
- 
- ---
- 
-+#### View the active OTA slot and post-update rollback confirmation status
-+**Usage:**
-+- `get ota.slot`
-+
-+**Returns:** `Slots: A=<ver> (active, <state>) | B=<ver> (<state>)`, or with `B` active if that's the
-+running slot (`A` = `ota_0`, `B` = `ota_1`). `<ver>` is that slot's firmware version plus the short
-+build commit hash it came from (e.g. `v1.16.0-0f11a30`) -- the hash distinguishes two slots that
-+happen to share the same version number but came from different builds. Self-reported into SPIFFS
-+the first time that slot actually boots -- a slot that's never booted (see `n/a` below) reports `v?`
-+since nothing's been recorded for it yet. The active slot's `<state>` is one of:
-+- `pending`: This boot is on probation after an OTA update (via either `start ota` or `start ota wan`).
-+  The device will automatically confirm itself as valid ~90 seconds after boot if the radio initializes
-+  correctly; an unconfirmed reset before then reverts to the previous firmware automatically.
-+- `valid`: Already confirmed, or this boot isn't the result of an OTA update in the first place.
-+- `n/a`: Rollback state could not be queried for the running partition.
-+
-+The other (non-active) slot's `<state>` is read the same way regardless of which slot is running:
-+`valid` (confirmed good), `invalid` (rejected by a previous rollback), `aborted` (an update to it
-+never finished), `new` (flashed but not yet booted), or `n/a` (never involved in an OTA update, e.g.
-+a factory/USB-only flash).
-+
-+**Note:** Confirms automatically after the confirm delay with a working radio; rejects immediately
-+(rollback + reboot) if `radio_init()` fails on a probationary boot.
-+
-+**Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
-+#### Manually switch which OTA slot boots
-+**Usage:**
-+- `ota slot boot <A|B>`
-+
-+**Parameters:**
-+- `A` / `B`: The OTA slot to boot into next (`A` = `ota_0`, `B` = `ota_1`) -- see `get ota.slot`.
-+
-+**Note:** Points the bootloader at the requested slot and **reboots into it immediately** without
-+touching flash contents -- useful when a USB flash lands on the currently-inactive slot (e.g. after
-+an earlier `start ota wan` update flipped which slot is active) and appears not to take effect.
-+Refuses if the requested slot is already active, doesn't exist, or has no valid app image flashed to
-+it.
-+
-+Switching also re-arms rollback probation for the target slot, even if it was previously `valid` --
-+ESP-IDF marks any newly-selected boot partition `new`, which the bootloader promotes to `pending` on
-+that boot. `get ota.slot` will report `pending` right after the swap; this is expected, not a fault,
-+and confirms `valid` again after the normal ~90s confirm delay.
-+
-+**Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag (Heltec V4 repeater/room server only)
-+
-+---
-+
- ### Erase/Factory Reset
- **Usage:**
- - `erase`
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
-index a714db6..58702be 100644
+index a714db6..8d5b884 100644
 --- a/examples/simple_repeater/main.cpp
 +++ b/examples/simple_repeater/main.cpp
-@@ -3,6 +3,10 @@
+@@ -2,6 +2,7 @@
+ #include <Mesh.h>
  
  #include "MyMesh.h"
++#include <helpers/ModHooks.h>
  
-+#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
-+#include <helpers/esp32/RollbackGuard.h>
-+#endif
-+
  #ifdef DISPLAY_CLASS
    #include "UITask.h"
-   static UITask ui_task(board, display);
-@@ -60,10 +64,27 @@ void setup() {
+@@ -60,7 +61,7 @@ void setup() {
    }
  #endif
  
-+#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
-+  SPIFFS.begin(true);   // RollbackGuard's failure counter needs it mounted before use; safe to call twice
-+
-+  // A few immediate retries catch a transient glitch before falling back to onRadioInitFailure()'s
-+  // cross-boot retry-with-cap.
-+  bool radio_ok = false;
-+  for (int attempt = 0; attempt < 3; attempt++) {
-+    if (radio_init()) { radio_ok = true; break; }
-+    delay(500);
-+  }
-+  if (!radio_ok) {
-+    MESH_DEBUG_PRINTLN("Radio init failed!");
-+    RollbackGuard::onRadioInitFailure();   // does not return
-+  }
-+  RollbackGuard::begin(FIRMWARE_VERSION "-" OTA_MOD_SHORT_SHA);
-+#else
-   if (!radio_init()) {
+-  if (!radio_init()) {
++  if (!modRadioInit(FIRMWARE_VERSION "-" OTA_MOD_SHORT_SHA)) {
      MESH_DEBUG_PRINTLN("Radio init failed!");
      halt();
    }
-+#endif
- 
-   fast_rng.begin(radio_driver.getRngSeed());
- 
-@@ -123,6 +144,9 @@ void setup() {
+@@ -123,6 +124,7 @@ void setup() {
  }
  
  void loop() {
-+#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
-+  RollbackGuard::poll();
-+#endif
++  modLoop();
    // Handle Serial CLI
    int len = strlen(command);
    while (Serial.available() && len < sizeof(command)-1) {
-@@ -195,6 +219,7 @@ void loop() {
+@@ -195,7 +197,7 @@ void loop() {
  #ifdef HAS_EXTERNAL_WATCHDOG
    external_watchdog.loop();
  #endif
-+
-   if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
+-  if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
++  if ((the_mesh.getNodePrefs()->powersaving_enabled || modWantsPowerSaving()) && !the_mesh.hasPendingWork()) {
  #if defined(NRF52_PLATFORM)
      board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
+ #else
 diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
-index d833fff..a692c63 100644
+index d833fff..f2abfe8 100644
 --- a/examples/simple_room_server/main.cpp
 +++ b/examples/simple_room_server/main.cpp
-@@ -8,6 +8,10 @@
-   #include <helpers/nrf52/EthernetCLI.h>
- #endif
+@@ -2,6 +2,7 @@
+ #include <Mesh.h>
  
-+#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
-+#include <helpers/esp32/RollbackGuard.h>
-+#endif
-+
- #ifdef DISPLAY_CLASS
-   #include "UITask.h"
-   static UITask ui_task(display);
-@@ -45,7 +49,23 @@ void setup() {
+ #include "MyMesh.h"
++#include <helpers/ModHooks.h>
+ 
+ #ifdef ETHERNET_ENABLED
+   #define ETHERNET_CLI_BANNER "MeshCore Room Server CLI"
+@@ -45,7 +46,7 @@ void setup() {
    }
  #endif
  
+-  if (!radio_init()) { halt(); }
++  if (!modRadioInit(FIRMWARE_VERSION "-" OTA_MOD_SHORT_SHA)) { halt(); }
+ 
+   fast_rng.begin(radio_driver.getRngSeed());
+ 
+@@ -104,6 +105,7 @@ void setup() {
+ }
+ 
+ void loop() {
++  modLoop();
+   int len = strlen(command);
+   while (Serial.available() && len < sizeof(command)-1) {
+     char c = Serial.read();
+diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
+index 9ca21bc..195d809 100644
+--- a/src/helpers/ModHooks.cpp
++++ b/src/helpers/ModHooks.cpp
+@@ -1,11 +1,37 @@
+ #include <helpers/ModHooks.h>
++#include <MeshCore.h>
+ #include <target.h>   // radio_init(), board
+ 
++#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
++#include <SPIFFS.h>
++#include <helpers/esp32/RollbackGuard.h>
++#endif
++
+ bool modRadioInit(const char* build_id) {
 +#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
 +  SPIFFS.begin(true);   // RollbackGuard's failure counter needs it mounted before use; safe to call twice
 +
 +  // A few immediate retries catch a transient glitch before falling back to onRadioInitFailure()'s
 +  // cross-boot retry-with-cap.
-+  bool radio_ok = false;
 +  for (int attempt = 0; attempt < 3; attempt++) {
-+    if (radio_init()) { radio_ok = true; break; }
++    if (radio_init()) {
++      RollbackGuard::begin(build_id);
++      return true;
++    }
 +    delay(500);
 +  }
-+  if (!radio_ok) {
-+    RollbackGuard::onRadioInitFailure();   // does not return
-+  }
-+  RollbackGuard::begin(FIRMWARE_VERSION "-" OTA_MOD_SHORT_SHA);
++  MESH_DEBUG_PRINTLN("Radio init failed!");
++  RollbackGuard::onRadioInitFailure();   // does not return
++  return false;
 +#else
-   if (!radio_init()) { halt(); }
+   return radio_init();
 +#endif
- 
-   fast_rng.begin(radio_driver.getRngSeed());
- 
-@@ -104,6 +124,9 @@ void setup() {
  }
  
- void loop() {
+ void modLoop() {
 +#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
 +  RollbackGuard::poll();
 +#endif
-   int len = strlen(command);
-   while (Serial.available() && len < sizeof(command)-1) {
-     char c = Serial.read();
-@@ -157,4 +180,6 @@ void loop() {
- #ifdef HAS_EXTERNAL_WATCHDOG
-   external_watchdog.loop();
- #endif
-+
-+
  }
-diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index a022856..3e44405 100644
---- a/src/helpers/CommonCLI.cpp
-+++ b/src/helpers/CommonCLI.cpp
-@@ -15,6 +15,10 @@
- #define OTA_MOD_BUILD_DATE "unknown"
+ 
+ bool modWantsPowerSaving() {
+diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
+index b170987..4b7326e 100644
+--- a/src/helpers/esp32/CommonCliMods.cpp
++++ b/src/helpers/esp32/CommonCliMods.cpp
+@@ -10,6 +10,10 @@
+ #include <helpers/esp32/HotspotOTA.h>
  #endif
  
 +#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
 +#include <helpers/esp32/RollbackGuard.h>
 +#endif
 +
- #ifndef BRIDGE_MAX_BAUD
- #define BRIDGE_MAX_BAUD 115200
- #endif
-@@ -242,6 +246,12 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
-     } else if (memcmp(command, "ota wan check", 13) == 0) {
-       // Pre-flight check -- see `ota wan join`. Assumes WiFi already joined.
-       HotspotOTA::checkWan(reply);
+ // Set via a CI build flag to this build's date, so `ver` can show it distinct from upstream's own
+ // FIRMWARE_BUILD_DATE. Falls back to "unknown" for local/dev builds.
+ #ifndef OTA_MOD_BUILD_DATE
+@@ -47,6 +51,12 @@ bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char*
+   } else if (memcmp(command, "ota wan check", 13) == 0) {
+     // Pre-flight check -- see `ota wan join`. Assumes WiFi already joined.
+     HotspotOTA::checkWan(reply);
 +#endif
 +#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
-+    } else if (memcmp(command, "ota slot boot ", 14) == 0) {
-+      if (RollbackGuard::setActivePartition(command[14], reply)) {
-+        _board->reboot();  // doesn't return
-+      }
++  } else if (memcmp(command, "ota slot boot ", 14) == 0) {
++    if (RollbackGuard::setActivePartition(command[14], reply)) {
++      _board->reboot();  // doesn't return
++    }
  #endif
-     } else if (memcmp(command, "start ota", 9) == 0) {
-       if (!_board->startOTAUpdate(_prefs->node_name, reply)) {
-@@ -895,6 +905,10 @@ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* rep
+   } else {
+     return false;   // not ours -- upstream's chain runs
+@@ -135,6 +145,10 @@ bool CommonCLI::handleModGetCmd(uint32_t sender_timestamp, char* command, char*
      sprintf(reply, "> %s", cfg.url[0] ? cfg.url : "(not set)");
    } else if (memcmp(config, "ota.wan.pwr", 11) == 0) {
      sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
-+#endif
 +#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
 +  } else if (memcmp(config, "ota.slot", 8) == 0) {
 +    sprintf(reply, "> %s", RollbackGuard::status());
- #endif
-   } else if (memcmp(config, "af", 2) == 0) {
-     sprintf(reply, "> %s", StrHelper::ftoa(_prefs->airtime_factor));
++#endif
+   } else {
+     return false;   // not ours -- upstream's chain runs
+   }
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
 index 0000000..8246a20
