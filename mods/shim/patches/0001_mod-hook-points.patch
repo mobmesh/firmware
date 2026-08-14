@@ -1,0 +1,173 @@
+diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
+index a714db6..8d5b884 100644
+--- a/examples/simple_repeater/main.cpp
++++ b/examples/simple_repeater/main.cpp
+@@ -2,6 +2,7 @@
+ #include <Mesh.h>
+ 
+ #include "MyMesh.h"
++#include <helpers/ModHooks.h>
+ 
+ #ifdef DISPLAY_CLASS
+   #include "UITask.h"
+@@ -60,7 +61,7 @@ void setup() {
+   }
+ #endif
+ 
+-  if (!radio_init()) {
++  if (!modRadioInit(FIRMWARE_VERSION "-" OTA_MOD_SHORT_SHA)) {
+     MESH_DEBUG_PRINTLN("Radio init failed!");
+     halt();
+   }
+@@ -123,6 +124,7 @@ void setup() {
+ }
+ 
+ void loop() {
++  modLoop();
+   // Handle Serial CLI
+   int len = strlen(command);
+   while (Serial.available() && len < sizeof(command)-1) {
+@@ -195,7 +197,7 @@ void loop() {
+ #ifdef HAS_EXTERNAL_WATCHDOG
+   external_watchdog.loop();
+ #endif
+-  if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
++  if ((the_mesh.getNodePrefs()->powersaving_enabled || modWantsPowerSaving()) && !the_mesh.hasPendingWork()) {
+ #if defined(NRF52_PLATFORM)
+     board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
+ #else
+diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
+index d833fff..f2abfe8 100644
+--- a/examples/simple_room_server/main.cpp
++++ b/examples/simple_room_server/main.cpp
+@@ -2,6 +2,7 @@
+ #include <Mesh.h>
+ 
+ #include "MyMesh.h"
++#include <helpers/ModHooks.h>
+ 
+ #ifdef ETHERNET_ENABLED
+   #define ETHERNET_CLI_BANNER "MeshCore Room Server CLI"
+@@ -45,7 +46,7 @@ void setup() {
+   }
+ #endif
+ 
+-  if (!radio_init()) { halt(); }
++  if (!modRadioInit(FIRMWARE_VERSION "-" OTA_MOD_SHORT_SHA)) { halt(); }
+ 
+   fast_rng.begin(radio_driver.getRngSeed());
+ 
+@@ -104,6 +105,7 @@ void setup() {
+ }
+ 
+ void loop() {
++  modLoop();
+   int len = strlen(command);
+   while (Serial.available() && len < sizeof(command)-1) {
+     char c = Serial.read();
+diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
+index b318bb5..d5d2f12 100644
+--- a/src/helpers/CommonCLI.cpp
++++ b/src/helpers/CommonCLI.cpp
+@@ -180,7 +180,8 @@ uint8_t CommonCLI::buildAdvertData(uint8_t node_type, uint8_t* app_data) {
+ }
+ 
+ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* reply) {
+-    if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
++    if (handleModCommand(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
++    } else if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
+       _board->powerOff();  // doesn't return
+     } else if (memcmp(command, "reboot", 6) == 0) {
+       _board->reboot();  // doesn't return
+@@ -447,7 +448,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+ 
+ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* reply) {
+   const char* config = &command[4];
+-  if (memcmp(config, "dutycycle ", 10) == 0) {
++  if (handleModSetCmd(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
++  } else if (memcmp(config, "dutycycle ", 10) == 0) {
+     float dc = atof(&config[10]);
+     if (dc < 1 || dc > 100) {
+       strcpy(reply, "ERROR: dutycycle must be 1-100");
+@@ -806,7 +808,8 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+ 
+ void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* reply) {
+   const char* config = &command[4];
+-  if (memcmp(config, "dutycycle", 9) == 0) {
++  if (handleModGetCmd(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
++  } else if (memcmp(config, "dutycycle", 9) == 0) {
+     float dc = 100.0f / (_prefs->airtime_factor + 1.0f);
+     int dc_int = (int)dc;
+     int dc_frac = (int)((dc - dc_int) * 10.0f + 0.5f);
+diff --git a/src/helpers/CommonCLI.h b/src/helpers/CommonCLI.h
+index 237c758..8d2c019 100644
+--- a/src/helpers/CommonCLI.h
++++ b/src/helpers/CommonCLI.h
+@@ -267,6 +267,11 @@ class CommonCLI {
+   void handleGetCmd(uint32_t sender_timestamp, char* command, char* reply);
+   void handleSetCmd(uint32_t sender_timestamp, char* command, char* reply);
+ 
++  // Defined in helpers/esp32/CommonCliMods.cpp -- return true if the mod took the command.
++  bool handleModCommand(uint32_t sender_timestamp, char* command, char* reply);
++  bool handleModSetCmd(uint32_t sender_timestamp, char* command, char* reply);
++  bool handleModGetCmd(uint32_t sender_timestamp, char* command, char* reply);
++
+ public:
+   CommonCLI(mesh::MainBoard& board, mesh::RTCClock& rtc, SensorManager& sensors, RegionMap& region_map, ClientACL& acl, NodePrefs* prefs, CommonCLICallbacks* callbacks)
+       : _board(&board), _rtc(&rtc), _sensors(&sensors), _region_map(&region_map), _acl(&acl), _prefs(prefs), _callbacks(callbacks) { }
+diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
+new file mode 100644
+index 0000000..9ca21bc
+--- /dev/null
++++ b/src/helpers/ModHooks.cpp
+@@ -0,0 +1,13 @@
++#include <helpers/ModHooks.h>
++#include <target.h>   // radio_init(), board
++
++bool modRadioInit(const char* build_id) {
++  return radio_init();
++}
++
++void modLoop() {
++}
++
++bool modWantsPowerSaving() {
++  return false;
++}
+diff --git a/src/helpers/ModHooks.h b/src/helpers/ModHooks.h
+new file mode 100644
+index 0000000..8ab58a9
+--- /dev/null
++++ b/src/helpers/ModHooks.h
+@@ -0,0 +1,9 @@
++#pragma once
++
++// One hook surface for every mod, so upstream's main.cpp carries a handful of
++// one-line calls instead of each mod's code inline -- and so two mods never
++// have to edit the same region of it. Bodies live in ModHooks.cpp (ours).
++
++bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
++void modLoop();                            // called first in loop()
++bool modWantsPowerSaving();                // OR'd with the operator's powersaving_enabled
+diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
+new file mode 100644
+index 0000000..26df75c
+--- /dev/null
++++ b/src/helpers/esp32/CommonCliMods.cpp
+@@ -0,0 +1,16 @@
++// Hook points for mod CLI commands, dispatched ahead of upstream's own chain so a
++// mod can match a longer prefix first. No-ops until a mod fills them in.
++#include <helpers/CommonCLI.h>
++#include <target.h>
++
++bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
++  return false;
++}
++
++bool CommonCLI::handleModSetCmd(uint32_t sender_timestamp, char* command, char* reply) {
++  return false;
++}
++
++bool CommonCLI::handleModGetCmd(uint32_t sender_timestamp, char* command, char* reply) {
++  return false;
++}

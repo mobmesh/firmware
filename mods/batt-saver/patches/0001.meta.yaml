@@ -1,7 +1,6 @@
 id: "0001"
 title: low-battery-powersaving
-# Hooks into helpers/ModHooks.cpp, which hotspot-ota/0001 creates and 0002
-# fills in -- no upstream file is touched by this mod at all.
-requires: ["hotspot-ota/0002"]
+# Context dependency only: hotspot-ota/0002 edits the same ModHooks.cpp regions.
+requires: ["shim/0001", "hotspot-ota/0002"]
 env_flag: WITH_BATT_SAVER
 build_src_filter: []

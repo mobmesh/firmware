@@ -23,10 +23,10 @@ hooks are called **before** upstream's own if-else chain, not at its terminal
 shorter `start ota` prefix, and it means a hook can deliberately shadow an
 upstream command (`ver` does).
 
-The other payoff is that two mods no longer edit the same region of the same
-upstream file. `batt-saver` and `hotspot-ota` both used to patch
-`simple_repeater/main.cpp`, which is why `batt-saver`'s patch had to be
-generated against `hotspot-ota/0002`; both now go through `ModHooks.cpp`.
+The other payoff is that no mod edits upstream's `simple_repeater/main.cpp`
+directly -- they go through `ModHooks.cpp`, which `shim/0001` creates. Mods still
+share that file, so a patch touching the same regions as another remains a context
+dependency (`batt-saver` on `hotspot-ota/0002`).
 
 ## Patch naming and dependency sidecars
 
@@ -48,7 +48,7 @@ unconditionally):
 ```yaml
 id: "0002"
 title: ota-rollback-guard
-requires: ["hotspot-ota/0001"]   # mod-qualified patch IDs that must already be applied
+requires: ["shim/0001", "hotspot-ota/0001"]   # mod-qualified patch IDs that must already be applied
 env_flag: WITH_OTA_ROLLBACK_GUARD           # optional -- see below
 build_src_filter: ["+<helpers/esp32/RollbackGuard.cpp>"]   # optional -- see below
 ```
