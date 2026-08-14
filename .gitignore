@@ -4,6 +4,9 @@ __pycache__/
 # Local planning scratch -- deliberately never committed
 docs/region-catalog-plan.md
 
+# MCP server config -- local only, never synced
+.vscode/mcp.json
+
 # macOS
 .DS_Store
 .AppleDouble

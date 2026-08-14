@@ -358,5 +358,61 @@ class BoardsJsonTestCase(unittest.TestCase):
         self.assertNotIn("postFlashCommands", variant)
 
 
+class ResolveTargetsTestCase(unittest.TestCase):
+    """cmd_resolve_targets: asset_basename assembly from mod suffixes."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo_root = Path(self.tmp.name)
+        self._orig_repo_root = gbc.REPO_ROOT
+        gbc.REPO_ROOT = self.repo_root
+        self.addCleanup(self._restore)
+        self.addCleanup(self.tmp.cleanup)
+
+    def _restore(self):
+        gbc.REPO_ROOT = self._orig_repo_root
+
+    def _write(self, rel_path: str, content: str) -> Path:
+        path = self.repo_root / rel_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        return path
+
+    def _make_mod(self, name: str, suffix: str):
+        self._write(f"mods/{name}/mod.yaml", f"name: {name}\nsuffix: \"{suffix}\"\n")
+
+    def _run(self, mods) -> dict:
+        self._write("build-targets.yaml", "targets:\n" + (
+            "  - board: heltec_v4\n"
+            "    role: repeater\n"
+            "    build_env: heltec_v4_repeater\n"
+            "    upstream_tag_prefix: repeater\n"
+            "    release_title: Repeater\n"
+            "    asset_role_abbrev: rep\n"
+            "    sync_docs: true\n"
+            "    vendor_flasher_assets: true\n"
+            "    make_latest: true\n"
+            f"    mods: [{', '.join(mods)}]\n"
+        ))
+        out = self.repo_root / "out.json"
+        gbc.cmd_resolve_targets(argparse.Namespace(out=str(out)))
+        return json.loads(out.read_text())["include"][0]
+
+    def test_empty_suffix_mod_does_not_alter_asset_basename(self):
+        self._make_mod("hotspot-ota", "ota")
+        self._make_mod("adc-accuracy", "")
+
+        row = self._run(["hotspot-ota", "adc-accuracy"])
+
+        self.assertEqual(row["asset_basename"], "heltec_v4_rep_ota")
+
+    def test_all_empty_suffixes_leave_bare_board_and_role(self):
+        self._make_mod("adc-accuracy", "")
+
+        row = self._run(["adc-accuracy"])
+
+        self.assertEqual(row["asset_basename"], "heltec_v4_rep")
+
+
 if __name__ == "__main__":
     unittest.main()

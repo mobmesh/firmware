@@ -272,7 +272,9 @@ def cmd_resolve_targets(args):
                 sys.exit(f"error: build-targets.yaml entry for board '{t.get('board')}' "
                           f"role '{t.get('role')}' is missing required field '{field}'")
 
-        suffixes = [load_mod(name)["suffix"] for name in t["mods"]]
+        # A mod may declare an empty suffix (e.g. a measurement-accuracy fix
+        # rather than a feature) to leave the asset filename unchanged.
+        suffixes = [s for s in (load_mod(name)["suffix"] for name in t["mods"]) if s]
         asset_basename = "_".join([t["board"], t["asset_role_abbrev"], *suffixes])
 
         rows.append({
