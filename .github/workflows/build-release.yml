@@ -566,23 +566,33 @@ jobs:
       - name: Notify on patch/build failure
         if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && steps.rollback_check.outputs.failed != 'true'
         uses: actions/github-script@v7
+        env:
+          BOARD_ID: ${{ matrix.board_id }}
+          VARIANT_ID: ${{ matrix.id }}
+          UPSTREAM_REF: ${{ steps.pick.outputs.ref }}
+          RESCUE_ATTEMPTED: ${{ steps.apply.outputs.rescue_attempted }}
+          RESCUE_PATCH: ${{ steps.apply.outputs.rescue_patch }}
+          RESCUE_VERDICT: ${{ steps.apply.outputs.rescue_verdict }}
         with:
+          # Values arrive via env, never interpolated into this script -- the drift text
+          # carries markdown backticks that terminate a JS template literal early.
           script: |
+            const { BOARD_ID, VARIANT_ID, UPSTREAM_REF,
+                    RESCUE_ATTEMPTED, RESCUE_PATCH, RESCUE_VERDICT } = process.env;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const detail = RESCUE_ATTEMPTED === 'true'
+              ? `**Patch drift**: \`${RESCUE_PATCH}\` no longer applies. A three-way merge was attempted as a starting point -- ${RESCUE_VERDICT}. The rescued diff is attached to the run as artifact \`patch-rescue-${BOARD_ID}-${VARIANT_ID}-${UPSTREAM_REF}\`. It is NOT validated and was NOT built; treat it as a head start on the rebase, not a fix. See docs/rebasing-patches.md.`
+              : 'The failure was not in the patch-apply step -- check the build log.';
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `[${{ matrix.board_id }}/${{ matrix.id }}] Patch or build failed against ${{ steps.pick.outputs.ref }}`,
+              title: `[${BOARD_ID}/${VARIANT_ID}] Patch or build failed against ${UPSTREAM_REF}`,
               body: [
-                `sync-build-release (${{ matrix.board_id }}/${{ matrix.id }}) failed for upstream ref \`${{ steps.pick.outputs.ref }}\`.`,
+                `sync-build-release (${BOARD_ID}/${VARIANT_ID}) failed for upstream ref \`${UPSTREAM_REF}\`.`,
                 ``,
-                `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+                `Workflow run: ${runUrl}`,
                 ``,
-                `${{ steps.apply.outputs.rescue_attempted == 'true'
-                     && format('**Patch drift**: `{0}` no longer applies. A three-way merge was attempted as a starting point -- {1}. The rescued diff is attached to the run as artifact `patch-rescue-{2}-{3}-{4}`. It is NOT validated and was NOT built; treat it as a head start on the rebase, not a fix. See docs/rebasing-patches.md.',
-                             steps.apply.outputs.rescue_patch,
-                             steps.apply.outputs.rescue_verdict,
-                             matrix.board_id, matrix.id, steps.pick.outputs.ref)
-                     || 'The failure was not in the patch-apply step -- check the build log.' }}`,
+                detail,
               ].join('\n')
             });
 
