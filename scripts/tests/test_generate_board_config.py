@@ -400,16 +400,16 @@ class ResolveTargetsTestCase(unittest.TestCase):
 
     def test_empty_suffix_mod_does_not_alter_asset_basename(self):
         self._make_mod("hotspot-ota", "ota")
-        self._make_mod("adc-accuracy", "")
+        self._make_mod("shim", "")
 
-        row = self._run(["hotspot-ota", "adc-accuracy"])
+        row = self._run(["hotspot-ota", "shim"])
 
         self.assertEqual(row["asset_basename"], "heltec_v4_rep_ota")
 
     def test_all_empty_suffixes_leave_bare_board_and_role(self):
-        self._make_mod("adc-accuracy", "")
+        self._make_mod("shim", "")
 
-        row = self._run(["adc-accuracy"])
+        row = self._run(["shim"])
 
         self.assertEqual(row["asset_basename"], "heltec_v4_rep")
 
