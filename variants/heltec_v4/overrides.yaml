@@ -43,6 +43,13 @@ build_flags:
   BATT_SAVER_ON_MV: 3300    # engage saving at or below
   BATT_SAVER_OFF_MV: 3600   # release saving at or above
 
+# Never-strand guards (mods/boot-pwrcheck). MIN_MV sits below BATT_SAVER_ON_MV so
+# power saving gets a chance to extend runtime before the node stops entirely.
+  BOOT_PWRCHECK_MIN_MV: 3200      # sleep at boot below this, rather than start the radio
+  BOOT_PWRCHECK_RETRY_SECS: 900   # sleep this long, then reboot and re-check
+  POWEROFF_MIN_SECS: 60           # `poweroff <secs>` bounds; 0 is always refused
+  POWEROFF_MAX_SECS: 86400
+
 # Optional: only set when a board's default partition scheme (from upstream's
 # boards/<name>.json) doesn't leave enough OTA slot room for this project's
 # added features. Not needed for heltec_v4 today. When set to a filename (e.g.
