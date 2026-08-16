@@ -108,6 +108,26 @@ jobs:
             fi
           done
 
+          # --- 3. has an upstream default we override been changed? ----------------
+          # We override ADC_MULTIPLIER in variants/heltec_v4/overrides.yaml with a
+          # bench-measured value. If upstream revises its own default, ours silently
+          # masks it -- worth re-measuring, not worth failing a build over.
+          EXPECTED_ADC_MULT=5.42
+          if [ -d probe-src ]; then
+            found=$(grep -oE '^ *# *define +ADC_MULTIPLIER +[0-9.]+' \
+              probe-src/variants/heltec_v4/HeltecV4Board.h 2>/dev/null \
+              | grep -oE '[0-9.]+$' || echo "")
+            if [ -z "$found" ]; then
+              DRIFT=true
+              echo "- upstream's \\\`ADC_MULTIPLIER\\\` default could not be found in HeltecV4Board.h -- our override may no longer apply" >> "$REPORT"
+            elif [ "$found" != "$EXPECTED_ADC_MULT" ]; then
+              DRIFT=true
+              echo "- upstream changed \\\`ADC_MULTIPLIER\\\` from ${EXPECTED_ADC_MULT} to ${found}; ours stays 5.32 (bench-measured) -- worth re-measuring" >> "$REPORT"
+            else
+              echo "- upstream \\\`ADC_MULTIPLIER\\\` still ${found}; ours overrides with 5.32 (bench-measured)" >> "$REPORT"
+            fi
+          fi
+
           echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"
           { echo 'report<<REPORT_EOF'; cat "$REPORT"; echo 'REPORT_EOF'; } >> "$GITHUB_OUTPUT"
           cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
