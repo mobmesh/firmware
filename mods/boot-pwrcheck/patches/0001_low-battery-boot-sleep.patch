@@ -1,0 +1,37 @@
+diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
+index 195d809..ba62909 100644
+--- a/src/helpers/ModHooks.cpp
++++ b/src/helpers/ModHooks.cpp
+@@ -7,7 +7,32 @@
+ #include <helpers/esp32/RollbackGuard.h>
+ #endif
+ 
++#if defined(ESP32) && defined(WITH_BOOT_PWRCHECK)
++#include <helpers/ESP32Board.h>
++#ifndef BOOT_PWRCHECK_MIN_MV
++#define BOOT_PWRCHECK_MIN_MV 3200
++#endif
++#ifndef BOOT_PWRCHECK_RETRY_SECS
++#define BOOT_PWRCHECK_RETRY_SECS 900
++#endif
++
++// Runs before radio_init(), so the radio is still off and drawing nothing. A pack too
++// weak to survive radio startup would otherwise brown out mid-init and reboot forever.
++static void bootPwrCheck() {
++  uint16_t mv = board.getBattMilliVolts();
++  if (mv == 0) return;               // no reading (USB-powered, no divider) -- not our call
++  if (mv >= BOOT_PWRCHECK_MIN_MV) return;
++
++  Serial.printf("batt %umV below %umV -- deep sleep %us\n",
++                mv, (unsigned)BOOT_PWRCHECK_MIN_MV, (unsigned)BOOT_PWRCHECK_RETRY_SECS);
++  board.enterDeepSleep(BOOT_PWRCHECK_RETRY_SECS);   // powers the radio off; does not return
++}
++#endif
++
+ bool modRadioInit(const char* build_id) {
++#if defined(ESP32) && defined(WITH_BOOT_PWRCHECK)
++  bootPwrCheck();
++#endif
+ #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
+   SPIFFS.begin(true);   // RollbackGuard's failure counter needs it mounted before use; safe to call twice
+ 
