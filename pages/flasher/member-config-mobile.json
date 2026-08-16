@@ -2,12 +2,12 @@
   "_comment": "Settings for the GulfCoastMesh Mobile option, sent to the device's CLI after a flash. Run in order; a leading underscore parks a note or a command without deleting it.",
 
   "_units": "advert.interval: minutes (60-240). flood.advert.interval: hours (3-168). agc.reset.interval: seconds, rounded down to a multiple of 4. Both intervals take 0 to disable.",
-  "_radio": "Sets freq/bw/sf/cr together. Out-of-range is rejected, not clamped. Needs a reboot, which the flasher sends itself after the list.",
+  "_radio": "Sets freq/bw/sf/cr together, COMMA-separated -- spaces parse as one field and the command is rejected. Out-of-range is rejected, not clamped. Needs a reboot, which the flasher sends itself after the list.",
   "_regions": "def walks a cursor from the wildcard *: a bare token creates a child and moves onto it, 'name|jump' creates a child then jumps elsewhere. Cursor resets to * per command. 160 chars max per line.",
   "_regions_notes": "def merges into the existing tree rather than replacing it; 'region remove' first for a clean slate. 'region save' persists it. 'region allowf *' is what carries unscoped floods -- they match no named region, so the wildcard's flag decides, and a preserved region file could have it denied.",
 
   "commands": [
-    "set radio 910.525 62.5 7 8",
+    "set radio 910.525,62.5,7,8",
     "set advert.interval 240",
     "set flood.advert.interval 23",
     "set path.hash.mode 1",
