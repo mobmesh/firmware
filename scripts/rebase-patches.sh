@@ -27,10 +27,10 @@ patch_list() {
   python3 - "$REPO_ROOT" <<'PY'
 import sys, glob, os, yaml
 root = sys.argv[1]
-targets = yaml.safe_load(open(os.path.join(root, "build-targets.yaml")))["targets"]
-mods = []
-for t in targets:
-    for m in t["mods"]:
+data = yaml.safe_load(open(os.path.join(root, "build-targets.yaml")))
+mods = list(data.get("core_mods") or [])
+for t in data["targets"]:
+    for m in (t.get("mods") or []):
         if m not in mods:
             mods.append(m)
 for m in mods:

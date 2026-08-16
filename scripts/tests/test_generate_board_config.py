@@ -381,8 +381,9 @@ class ResolveTargetsTestCase(unittest.TestCase):
     def _make_mod(self, name: str, suffix: str):
         self._write(f"mods/{name}/mod.yaml", f"name: {name}\nsuffix: \"{suffix}\"\n")
 
-    def _run(self, mods) -> dict:
-        self._write("build-targets.yaml", "targets:\n" + (
+    def _run(self, mods, core=None) -> dict:
+        head = f"core_mods: [{', '.join(core)}]\n" if core else ""
+        self._write("build-targets.yaml", head + "targets:\n" + (
             "  - board: heltec_v4\n"
             "    role: repeater\n"
             "    build_env: heltec_v4_repeater\n"
@@ -412,6 +413,37 @@ class ResolveTargetsTestCase(unittest.TestCase):
         row = self._run(["shim"])
 
         self.assertEqual(row["asset_basename"], "heltec_v4_rep")
+
+    def test_core_mods_apply_before_target_mods(self):
+        self._make_mod("shim", "")
+        self._make_mod("hotspot-ota", "ota")
+        self._make_mod("batt-saver", "bs")
+
+        row = self._run(["batt-saver"], core=["shim", "hotspot-ota"])
+
+        self.assertEqual(row["mods"], ["shim", "hotspot-ota", "batt-saver"])
+        self.assertEqual(row["asset_basename"], "heltec_v4_rep_ota_bs")
+
+    def test_core_mods_alone_are_enough(self):
+        self._make_mod("shim", "")
+        self._make_mod("hotspot-ota", "ota")
+
+        row = self._run([], core=["shim", "hotspot-ota"])
+
+        self.assertEqual(row["mods"], ["shim", "hotspot-ota"])
+
+    def test_target_repeating_a_core_mod_does_not_duplicate_or_reorder(self):
+        self._make_mod("shim", "")
+        self._make_mod("hotspot-ota", "ota")
+
+        row = self._run(["hotspot-ota"], core=["shim", "hotspot-ota"])
+
+        self.assertEqual(row["mods"], ["shim", "hotspot-ota"])
+        self.assertEqual(row["asset_basename"], "heltec_v4_rep_ota")
+
+    def test_no_mods_anywhere_is_an_error(self):
+        with self.assertRaises(SystemExit):
+            self._run([])
 
 
 if __name__ == "__main__":
