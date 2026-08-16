@@ -18,8 +18,8 @@ It creates the files those calls land in -- `helpers/ModHooks.{h,cpp}` and
 `CommonCliMods.cpp` is dispatched ahead of upstream's own chain, so a mod can match
 a longer prefix before a shorter upstream one (`start ota wan ...` before `start ota`).
 
-Mods that rewrite upstream code rather than add call sites -- `timing-safety`,
-`adc-accuracy` -- have nothing to hook and depend on nothing.
+Mods that rewrite upstream code rather than add call sites -- `timing-safety` --
+have nothing to hook and depend on nothing.
 
 ## Limitation: shared hook bodies
 

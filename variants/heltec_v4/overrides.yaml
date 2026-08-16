@@ -27,12 +27,9 @@
 build_flags:
   PIN_HOTSPOT_PWR: 47
 
-  # Corrects upstream's default (5.42) to match the Heltec V4 schematic's actual
-  # divider: (390k + 100k) / 100k = 4.9. Overrides the #ifndef default in
-  # HeltecV4Board.h without patching it. Doesn't affect any unit where an
-  # operator has already run `set adc.multiplier` -- that's stored in NodePrefs
-  # and takes priority over this compile-time default.
-  ADC_MULTIPLIER: 4.9
+  # Bench-measured across 3 boards; the schematic ratio (4.9) reads ~270 mV low
+  # and upstream's 5.42 reads ~90 mV high. A stored `set adc.multiplier` wins over this.
+  ADC_MULTIPLIER: 5.32
   OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS: 15000
   OTA_WIFI_JOIN_RETRY_DELAY_MS: 5000
   OTA_WIFI_JOIN_MAX_ATTEMPTS: 6
