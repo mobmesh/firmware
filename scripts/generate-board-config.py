@@ -141,6 +141,25 @@ def load_build_targets() -> list:
     return data.get("targets") or []
 
 
+def load_core_mods() -> list:
+    path = REPO_ROOT / "build-targets.yaml"
+    with path.open() as f:
+        data = yaml.safe_load(f) or {}
+    return data.get("core_mods") or []
+
+
+def target_mods(target: dict, core: list = None) -> list:
+    """core_mods first, then the target's own extras. Order is the apply order,
+    so a target listing a core mod again does not move or duplicate it."""
+    if core is None:
+        core = load_core_mods()
+    out = list(core)
+    for m in target.get("mods") or []:
+        if m not in out:
+            out.append(m)
+    return out
+
+
 def load_mod_patch_sidecars(mod_name: str) -> list:
     patches_dir = REPO_ROOT / "mods" / mod_name / "patches"
     if not patches_dir.exists():
@@ -264,17 +283,23 @@ def cmd_resolve_targets(args):
     if not targets:
         sys.exit("error: build-targets.yaml has no targets")
 
+    core = load_core_mods()
     rows = []
     for t in targets:
         for field in ("board", "role", "build_env", "upstream_tag_prefix", "release_title",
-                      "asset_role_abbrev", "sync_docs", "vendor_flasher_assets", "make_latest", "mods"):
+                      "asset_role_abbrev", "sync_docs", "vendor_flasher_assets", "make_latest"):
             if field not in t:
                 sys.exit(f"error: build-targets.yaml entry for board '{t.get('board')}' "
                           f"role '{t.get('role')}' is missing required field '{field}'")
 
-        # A mod may declare an empty suffix (e.g. a measurement-accuracy fix
-        # rather than a feature) to leave the asset filename unchanged.
-        suffixes = [s for s in (load_mod(name)["suffix"] for name in t["mods"]) if s]
+        mods = target_mods(t, core)
+        if not mods:
+            sys.exit(f"error: build-targets.yaml entry for board '{t.get('board')}' "
+                      f"role '{t.get('role')}' resolves to no mods (set core_mods or mods)")
+
+        # A mod may declare an empty suffix (e.g. a framework or failsafe rather
+        # than a feature) to leave the asset filename unchanged.
+        suffixes = [s for s in (load_mod(name)["suffix"] for name in mods) if s]
         asset_basename = "_".join([t["board"], t["asset_role_abbrev"], *suffixes])
 
         rows.append({
@@ -287,7 +312,7 @@ def cmd_resolve_targets(args):
             "sync_docs": t["sync_docs"],
             "vendor_flasher_assets": t["vendor_flasher_assets"],
             "make_latest": t["make_latest"],
-            "mods": t["mods"],
+            "mods": mods,
             # Optional. Raw flags appended after upstream's, so they can override
             # what the env already sets.
             "build_flags_append": t.get("build_flags_append") or [],
