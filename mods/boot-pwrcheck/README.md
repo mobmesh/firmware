@@ -66,7 +66,9 @@ reports `ESP_RST_DEEPSLEEP` and the brownout would go unnoticed.
 | `POWEROFF_MAX_SECS` | 86400 | Reject longer waits |
 
 `BOOT_PWRCHECK_MIN_MV` should sit below `BATT_SAVER_ON_MV` (3300 on heltec_v4) so
-power saving gets a chance to extend runtime before the node stops entirely.
+power saving gets a chance to extend runtime before the node stops entirely, and
+above `BATT_SAVER_SLEEP_MAX_MV` so a hibernating node can return to service.
+`mods/batt-saver/README.md` has the full ladder.
 
 **Contributes no suffix** -- a failsafe, not a feature.
 

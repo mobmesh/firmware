@@ -63,6 +63,28 @@ The deep-sleep rung's own settings *are* persisted, in an NVS namespace of our
 own rather than `NodePrefs` -- no upstream struct to drift, and an absent key
 stays distinguishable from a stored 0.
 
+## The Ladder
+
+What happens as a heltec_v4 repeater's battery falls, highest to lowest:
+
+| mV | Name | What happens |
+| --- | --- | --- |
+| 3600 | `BATT_SAVER_OFF_MV` | Stops napping |
+| 3300 | `BATT_SAVER_ON_MV` | Starts napping |
+| 3150 | `BOOT_PWRCHECK_MIN_MV` | Won't come back into service below this |
+| 2800 | `BATT_SAVER_SLEEP_MV` | Hibernates |
+| 2400 | *(measured)* | Can't boot at all below this |
+
+The 3150 line belongs to `mods/boot-pwrcheck` and is listed because the two mods
+have to agree: a hibernate voltage above it would leave a node hibernating and
+immediately qualifying to run again, forever.
+
+One number is changeable from the CLI:
+
+    powersaving safe.mv <n>     hibernate voltage; 2500-3149, or 0 to disable
+
+Everything else is a build-time setting in `variants/<board>/overrides.yaml`.
+
 ## Tuning
 
 Thresholds are build flags, set per board in `variants/<board>/overrides.yaml`

@@ -45,8 +45,10 @@ build_flags:
 
 # Leave service before a brownout, so a solar pack keeps the reserve that lets it
 # climb back. Gauge units: the boot floor it guards against is measured the same way.
-  BATT_SAVER_SLEEP_MV: 2800   # 0 disables; ~2.97 V at the pins on this board
-  BATT_SAVER_SLEEP_SECS: 60   # first wait only; boot-pwrcheck owns the backoff after
+  BATT_SAVER_SLEEP_MV: 2800     # 0 disables; ~2.97 V at the pins on this board
+  BATT_SAVER_SLEEP_SECS: 60     # first wait only; boot-pwrcheck owns the backoff after
+  BATT_SAVER_SLEEP_MAX_MV: 3149 # must stay under BOOT_PWRCHECK_MIN_MV below, or a
+                                # hibernating node qualifies to run again on wake
 
 # Never-strand guards (mods/boot-pwrcheck). MIN_MV sits below BATT_SAVER_ON_MV so
 # power saving gets a chance to extend runtime before the node stops entirely.

@@ -32,10 +32,10 @@ index 195d809..e182e6b 100644
  }
 diff --git a/src/helpers/esp32/BattSaver.h b/src/helpers/esp32/BattSaver.h
 new file mode 100644
-index 0000000..c7f6966
+index 0000000..f23b0a0
 --- /dev/null
 +++ b/src/helpers/esp32/BattSaver.h
-@@ -0,0 +1,181 @@
+@@ -0,0 +1,187 @@
 +#pragma once
 +
 +#include <Arduino.h>
@@ -88,6 +88,12 @@ index 0000000..c7f6966
 +// so the rung would never fire before a brownout did.
 +#ifndef BATT_SAVER_SLEEP_FLOOR_MV
 +  #define BATT_SAVER_SLEEP_FLOOR_MV 2500
++#endif
++// Upper rail for a stored threshold. Must stay under whatever the board needs to
++// read before it will return to service, or a node hibernates and immediately
++// qualifies to run again -- alive, but only between naps.
++#ifndef BATT_SAVER_SLEEP_MAX_MV
++  #define BATT_SAVER_SLEEP_MAX_MV BATT_SAVER_ON_MV
 +#endif
 +
 +class BattSaver {
@@ -146,7 +152,7 @@ index 0000000..c7f6966
 +  // 0 disables the rung outright. Anything else must clear the boot floor and stay
 +  // under the duty-cycle rung, or a healthy node sleeps on a 60s cycle.
 +  bool setSleepMilliVolts(uint16_t mv) {
-+    if (mv != 0 && (mv < BATT_SAVER_SLEEP_FLOOR_MV || mv >= BATT_SAVER_ON_MV)) return false;
++    if (mv != 0 && (mv < BATT_SAVER_SLEEP_FLOOR_MV || mv > BATT_SAVER_SLEEP_MAX_MV)) return false;
 +    ensureLoaded();
 +    _sleep_mv = mv;
 +    Preferences p;
@@ -218,7 +224,7 @@ index 0000000..c7f6966
 +  }
 +};
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index 4b7326e..342af64 100644
+index 4b7326e..3b13a55 100644
 --- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
 @@ -20,7 +20,64 @@
@@ -238,7 +244,7 @@ index 4b7326e..342af64 100644
 +    uint32_t mv = (uint32_t) atol(command + 20);
 +    if (!batt_saver.setSleepMilliVolts((uint16_t) mv)) {
 +      sprintf(reply, "ERR: %u-%u or 0", (unsigned)BATT_SAVER_SLEEP_FLOOR_MV,
-+              (unsigned)(BATT_SAVER_ON_MV - 1));
++              (unsigned)BATT_SAVER_SLEEP_MAX_MV);
 +    } else if (mv == 0) {
 +      strcpy(reply, "OK - safe.mv 0 (rung disabled)");
 +    } else {
