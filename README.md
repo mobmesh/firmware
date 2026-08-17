@@ -16,7 +16,8 @@ Mods add features or changes to the standard MeshCore firmware. Each mod is main
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`hotspot-ota`](https://github.com/mobmesh/firmware/tree/main/mods/hotspot-ota) | Adds remote firmware updates over WiFi ( or cellular hotspot) and automatic rollback protection. A device can connect to an existing WiFi network, download a firmware image, verify it, and install it without needing to be onsite with the node. | Remote OTA updates, power control of external cell modems, firmware SHA-256 verification, firmware authenticity checks, OTA slot management, automatic rollback / recovery after failed updates, automatic clock sync via NTP whenever WiFi is joined, remote updates through MeshCore CLI commands |
 | [`timing-safety`](https://github.com/mobmesh/firmware/tree/main/mods/timing-safety) | Small fixes for how the firmware tracks time. Keeps timers working correctly on devices that run for many weeks, and stops "time since last heard from" numbers from showing garbage right after a reboot. | Long-uptime timer fix, safer elapsed-time math across reboots |
-| [`boot-pwrcheck`](https://github.com/mobmesh/firmware/tree/main/mods/boot-pwrcheck) | Keeps a node from stranding itself on a flat battery. On a weak pack it sleeps at boot instead of starting the radio, then wakes on a widening schedule to try again, so the node recovers on its own once the battery does. Also stops a mistyped `poweroff` from shutting a node down permanently. | Low-battery boot sleep with backoff, automatic recovery, `poweroff` requires a wake time and is refused over the mesh |
+| [`boot-pwrcheck`](https://github.com/mobmesh/firmware/tree/main/mods/boot-pwrcheck) | Keeps a bad situation from becoming an unrecoverable one. Brownouts happen -- a flat pack, a cold morning, a cloudy week. Left alone, a node that browns out reboots straight into a loop that burns through whatever charge is left and ends in a trip up the tower. With this it sleeps instead, retries on a widening schedule, and comes back by itself once the battery does. It also stops a mistyped `poweroff` from ending a node permanently. | Low-battery boot sleep with backoff, automatic recovery, `poweroff` requires a wake time and is refused over the mesh |
+| [`batt-saver`](https://github.com/mobmesh/firmware/tree/main/mods/batt-saver) | Keeps an eye on the battery and adds two modes beyond the standard `powersaving on` / `off`. `powersaving auto` turns power saving on only once the battery falls past a threshold you set, and off again when it recovers, rather than running it around the clock. `powersaving safe` is the brownout failsafe: the node hibernates just short of the voltage where it would start bootlooping, which can buy days of standby and avoids the reset loop that finishes off a pack. | Power saving that engages only when it's needed, hibernation before the bootloop threshold, both off until enabled, thresholds set over serial or the mesh and kept across reboots |
 
 More information about each mod can be found in its own README under `mods/<name>/`.
 
@@ -36,7 +37,7 @@ Some mods may add extra options or requirements for a traditional flasher. Check
 
 # Behind the Curtain
 
-* `mods/<name>/` contains the different features or modifications. Each mod has its own `patches/*.patch` files, along with a `.meta.yaml` file for each patch. The metadata files define patch dependencies. Each mod also has its own documentation. The feature mods are `hotspot-ota`, `timing-safety` and `boot-pwrcheck`; `shim` is internal plumbing that owns the hook points the others attach to.
+* `mods/<name>/` contains the different features or modifications. Each mod has its own `patches/*.patch` files, along with a `.meta.yaml` file for each patch. The metadata files define patch dependencies. Each mod also has its own documentation. The feature mods are `hotspot-ota`, `timing-safety`, `boot-pwrcheck` and `batt-saver`; `shim` is internal plumbing that owns the hook points the others attach to.
 
 * `variants/<board>/` contains configuration changes that are specific to a board. This includes things like GPIO pins, timing values, and sometimes a custom partition layout. The folder structure follows the same `variants/<board>/` layout used by upstream MeshCore.
 
@@ -114,4 +115,4 @@ For example, `hotspot-ota` requires an external power switch to control an exter
 
 ## About
 
-Custom firmware for MeshCore by the Gulf Coast Mesh - Mobile, Al group.
+Custom firmware for MeshCore by Mobmesh a member of GulfCoastMesh
