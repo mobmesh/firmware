@@ -40,6 +40,22 @@ Bare `poweroff` is refused rather than defaulted, so old muscle memory fails saf
 The confirmation is written straight to `Serial`, because `enterDeepSleep()` does not
 return and `reply[]` would never be printed.
 
+## 0003 - brownout clock rebase
+
+`ESP32RTCClock::begin()` re-baselines only on a power-on reset, so a brownout that
+scrambles the RTC leaves the garbage in place. Neither `time <epoch>` nor `clock sync`
+will move a clock backwards, so a node that comes back reading years in the future
+stays that way until NTP corrects it or someone disconnects the battery.
+
+On `ESP_RST_BROWNOUT` this resets the clock to the same epoch a power-on would use.
+It rebases unconditionally rather than judging whether the value looks wrong, because
+a plausible-looking wrong date is indistinguishable from a real one: discarding a good
+clock costs one re-sync, since forward corrections always work, while keeping a corrupt
+one costs a site visit.
+
+Runs before the battery check, which may sleep and never return -- the next wake
+reports `ESP_RST_DEEPSLEEP` and the brownout would go unnoticed.
+
 ## Tuning
 
 | Flag | Default | Meaning |
