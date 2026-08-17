@@ -1,9 +1,9 @@
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index 4b7326e..6ea4484 100644
+index 342af64..472f40f 100644
 --- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
-@@ -20,7 +20,36 @@
- #define OTA_MOD_BUILD_DATE "unknown"
+@@ -25,6 +25,15 @@
+ extern BattSaver batt_saver;
  #endif
  
 +#if defined(ESP_PLATFORM) && defined(WITH_BOOT_PWRCHECK)
@@ -16,6 +16,13 @@ index 4b7326e..6ea4484 100644
 +#endif
 +
  bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
+ #ifdef WITH_BATT_SAVER
+   // Claimed ahead of upstream's 11-char "powersaving" prefix, which would answer
+@@ -77,6 +86,26 @@ bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char*
+     }
+     return true;
+   }
++#endif
 +#if defined(ESP_PLATFORM) && defined(WITH_BOOT_PWRCHECK)
 +  // Claimed ahead of upstream's own branch, which calls powerOff() -> enterDeepSleep(0)
 +  // and never wakes. A node that cannot wake itself needs a site visit.
@@ -35,7 +42,6 @@ index 4b7326e..6ea4484 100644
 +    }
 +    return true;
 +  }
-+#endif
+ #endif
    if (memcmp(command, "ver", 3) == 0) {
      // Shadows upstream's own `ver` branch, which never runs while this mod is built in.
-     sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
