@@ -45,7 +45,7 @@ build_flags:
 
 # Never-strand guards (mods/boot-pwrcheck). MIN_MV sits below BATT_SAVER_ON_MV so
 # power saving gets a chance to extend runtime before the node stops entirely.
-  BOOT_PWRCHECK_MIN_MV: 3200      # sleep at boot below this, rather than start the radio
+  BOOT_PWRCHECK_MIN_MV: 3150      # sleep at boot below this, rather than start the radio
   BOOT_PWRCHECK_RETRY_SECS: 900   # sleep this long, then reboot and re-check
   POWEROFF_MIN_SECS: 60           # `poweroff <secs>` bounds; 0 is always refused
   POWEROFF_MAX_SECS: 86400
