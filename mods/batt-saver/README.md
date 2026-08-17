@@ -41,10 +41,15 @@ again, and oscillate forever. Transmitting has the same effect in reverse -- a
 transmission burst pulls the voltage down briefly, and that dip is not a flat
 battery.
 
-It also ignores readings above 4.5 V, because a node running on USB or a bench
-supply is measuring the charger rail rather than a cell. A Heltec V4 with no
-battery attached at all reports roughly 4.24 V, which would otherwise look like
-a perfectly healthy full battery forever.
+A reading of 0 mV is ignored, since both rungs act on low voltage and a zero
+would otherwise read as flat. That is what a board powered through its 3.3 V
+pins reports: the divider feeding the ADC sits on the battery node, which those
+pins bypass entirely.
+
+High readings need no guard. On USB the charger drives that same node to its
+float voltage with or without a cell attached, so a bare board reads around
+4.24 V against a full cell's 4.2 V -- indistinguishable, and irrelevant, since
+nothing engages above the marks either way.
 
 ## What It Deliberately Does Not Do
 
@@ -96,7 +101,6 @@ alongside the `OTA_*` values. Defaults:
 | `BATT_SAVER_OFF_MV` | 3800 | Stop napping at or above this |
 | `BATT_SAVER_SAMPLE_INTERVAL_MS` | 60000 | How often to read the battery |
 | `BATT_SAVER_CONSECUTIVE_SAMPLES` | 3 | Agreeing readings needed to switch |
-| `BATT_SAVER_IMPLAUSIBLE_MV` | 4500 | Above this, assume no battery |
 | `BATT_SAVER_DROP_FEM_LNA` | 0 | Also bypass the FEM LNA while saving |
 | `BATT_SAVER_AUTO_DEFAULT` | 0 | Napping auto-engage; off unless asked for |
 | `BATT_SAVER_SLEEP_MV` | 0 | Leave service below this; 0 disables the rung |
@@ -139,15 +143,6 @@ restores the LNA if it was the one that turned it off, so an operator running
 `radio.fem.rxgain off` is not overridden. Nothing is persisted. Boards without
 FEM control (xiao_c3) skip it entirely.
 
-### Upstream bug worth knowing
-
-`CommonCLI.h` maps both JSON prefs keys to the same field:
-
-    def("rxgain",     _parent->rx_boosted_gain);
-    def("fem_rxgain", _parent->rx_boosted_gain);   // should be radio_fem_rxgain
-
-Since v1.17.0 stores config in `/prefs.json`, `radio.fem.rxgain` does not
-round-trip a reboot -- it reloads whatever `radio.rxgain` was. Note that
 `radio.rxgain` (SX1262 boosted gain) and `radio.fem.rxgain` (FEM LNA) are
 different settings; this mod only touches the latter.
 

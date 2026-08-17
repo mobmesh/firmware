@@ -9,13 +9,6 @@ default. `safe` persists both its threshold and its on/off flag; `auto` does not
 Decide whether that asymmetry is wanted -- a runtime-only override cannot strand a
 node, but it also means an operator's choice is lost on every reset.
 
-## 2. Debounce the implausible-reading release
-
-`BattSaver::loop()` calls `setActive(false)` immediately on `mv == 0 ||
-mv >= BATT_SAVER_IMPLAUSIBLE_MV`, skipping the `_agree` counter every other
-transition goes through. One spurious high read drops saving. Route it through
-`_agree`, or comment why it's exempt.
-
 ## 3. Compile it in CI -- done
 
 `heltec_v4 repeater` lists the mod, so CI applies and builds it.

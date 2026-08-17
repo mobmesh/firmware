@@ -32,10 +32,10 @@ index 195d809..e182e6b 100644
  }
 diff --git a/src/helpers/esp32/BattSaver.h b/src/helpers/esp32/BattSaver.h
 new file mode 100644
-index 0000000..f23b0a0
+index 0000000..b24b5f3
 --- /dev/null
 +++ b/src/helpers/esp32/BattSaver.h
-@@ -0,0 +1,187 @@
+@@ -0,0 +1,185 @@
 +#pragma once
 +
 +#include <Arduino.h>
@@ -60,10 +60,6 @@ index 0000000..f23b0a0
 +// Rejects the transient sag under a TX burst.
 +#ifndef BATT_SAVER_CONSECUTIVE_SAMPLES
 +  #define BATT_SAVER_CONSECUTIVE_SAMPLES 3
-+#endif
-+// Above this it's a charger rail, not a cell (heltec_v4 with no battery: ~4244).
-+#ifndef BATT_SAVER_IMPLAUSIBLE_MV
-+  #define BATT_SAVER_IMPLAUSIBLE_MV 4500
 +#endif
 +// Bypass the FEM LNA while saving. Off by default: measured at only ~0.3mA of
 +// a ~5.5mA sleeping floor, which does not justify the lost RX sensitivity.
@@ -170,7 +166,9 @@ index 0000000..f23b0a0
 +    uint16_t mv = _board->getBattMilliVolts();
 +    _last_mv = mv;
 +
-+    if (mv == 0 || mv >= BATT_SAVER_IMPLAUSIBLE_MV) {  // no cell to protect
++    // No reading at all. Both rungs act on low voltage, so a 0 would otherwise
++    // read as flat. A high reading needs no guard -- it can only release.
++    if (mv == 0) {
 +      _agree = 0;
 +      _sleep_agree = 0;
 +      if (_active) setActive(false);
