@@ -60,7 +60,7 @@ reports `ESP_RST_DEEPSLEEP` and the brownout would go unnoticed.
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
-| `BOOT_PWRCHECK_MIN_MV` | 3200 | Sleep at boot below this |
+| `BOOT_PWRCHECK_MIN_MV` | 3150 | Sleep at boot below this |
 | `BOOT_PWRCHECK_RETRY_SECS` | 900 | Ceiling the backoff settles onto |
 | `POWEROFF_MIN_SECS` | 60 | Reject shorter waits |
 | `POWEROFF_MAX_SECS` | 86400 | Reject longer waits |
