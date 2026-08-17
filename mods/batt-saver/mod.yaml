@@ -2,4 +2,4 @@
 # which declare per-patch env contributions. This file holds facts about
 # the mod as a whole.
 name: batt-saver
-suffix: bs
+suffix: ""   # failsafe, not a feature -- see boot-pwrcheck
