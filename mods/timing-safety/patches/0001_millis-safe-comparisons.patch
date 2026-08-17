@@ -113,10 +113,10 @@ index 8e4c2fc..43888b9 100644
      }
    }
 diff --git a/src/helpers/ArduinoHelpers.h b/src/helpers/ArduinoHelpers.h
-index 97596da..2cf8159 100644
+index 97596da..80d7d1c 100644
 --- a/src/helpers/ArduinoHelpers.h
 +++ b/src/helpers/ArduinoHelpers.h
-@@ -24,6 +24,28 @@ public:
+@@ -24,6 +24,33 @@ public:
    unsigned long getMillis() override { return millis(); }
  };
  
@@ -135,11 +135,16 @@ index 97596da..2cf8159 100644
 +// e.g. after a reboot resets VolatileRTCClock to its fallback epoch while persisted
 +// timestamps still reflect real prior time).
 +// Returns 0 if recorded_timestamp is in the "future" relative to current_time.
++#define SAFE_ELAPSED_MAX_SECS (365UL * 24 * 60 * 60)
++
 +inline uint32_t safeElapsedSecs(uint32_t current_time, uint32_t recorded_timestamp) {
 +  if (recorded_timestamp > current_time) {
 +    return 0;  // Clock was corrected backwards; treat as "just now"
 +  }
-+  return current_time - recorded_timestamp;
++  // Forwards correction leaves stored timestamps looking ancient -- cap instead of
++  // reporting years, which reads as corruption rather than staleness.
++  uint32_t elapsed = current_time - recorded_timestamp;
++  return elapsed > SAFE_ELAPSED_MAX_SECS ? SAFE_ELAPSED_MAX_SECS : elapsed;
 +}
 +
  class StdRNG : public mesh::RNG {
