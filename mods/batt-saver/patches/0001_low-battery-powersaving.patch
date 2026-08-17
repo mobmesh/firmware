@@ -1,5 +1,5 @@
 diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
-index 195d809..251b003 100644
+index 195d809..e182e6b 100644
 --- a/src/helpers/ModHooks.cpp
 +++ b/src/helpers/ModHooks.cpp
 @@ -7,6 +7,11 @@
@@ -8,7 +8,7 @@ index 195d809..251b003 100644
  
 +#ifdef WITH_BATT_SAVER
 +#include <helpers/esp32/BattSaver.h>
-+static BattSaver batt_saver(board);
++BattSaver batt_saver(board);   // extern'd by CommonCliMods.cpp
 +#endif
 +
  bool modRadioInit(const char* build_id) {
@@ -32,14 +32,16 @@ index 195d809..251b003 100644
  }
 diff --git a/src/helpers/esp32/BattSaver.h b/src/helpers/esp32/BattSaver.h
 new file mode 100644
-index 0000000..7a90f40
+index 0000000..c7f6966
 --- /dev/null
 +++ b/src/helpers/esp32/BattSaver.h
-@@ -0,0 +1,91 @@
+@@ -0,0 +1,181 @@
 +#pragma once
 +
 +#include <Arduino.h>
 +#include <MeshCore.h>
++#include <helpers/ESP32Board.h>   // enterDeepSleep()
++#include <Preferences.h>          // stored overrides
 +
 +// Engages MeshCore's existing power-saving sleep when the battery is low, and
 +// releases it once it recovers. Runtime-only: never writes NodePrefs, which is
@@ -68,24 +70,89 @@ index 0000000..7a90f40
 +#ifndef BATT_SAVER_DROP_FEM_LNA
 +  #define BATT_SAVER_DROP_FEM_LNA 0
 +#endif
++// Auto-engage is opt-in: light sleep drops serial and thins RX, so it stays off
++// until an operator asks for it. The deep-sleep rung below is independent.
++#ifndef BATT_SAVER_AUTO_DEFAULT
++  #define BATT_SAVER_AUTO_DEFAULT 0
++#endif
++// Leave service entirely below this, keeping the reserve a solar pack needs to
++// climb back. 0 disables the rung.
++#ifndef BATT_SAVER_SLEEP_MV
++  #define BATT_SAVER_SLEEP_MV 0
++#endif
++// First wait only; boot-pwrcheck owns the backoff from the next boot.
++#ifndef BATT_SAVER_SLEEP_SECS
++  #define BATT_SAVER_SLEEP_SECS 60
++#endif
++// Lower rail for a stored threshold -- under this the board cannot reliably boot,
++// so the rung would never fire before a brownout did.
++#ifndef BATT_SAVER_SLEEP_FLOOR_MV
++  #define BATT_SAVER_SLEEP_FLOOR_MV 2500
++#endif
 +
 +class BattSaver {
-+  mesh::MainBoard* _board;
++  ESP32Board* _board;
 +  unsigned long _next_sample_at;
 +  uint8_t _agree;
++  uint8_t _sleep_agree;
++  bool _auto;
 +  bool _active;
 +  bool _lna_was_enabled;   // hardware state captured when we engaged
 +  uint16_t _last_mv;
 +  uint32_t _transitions;
++  uint16_t _sleep_mv;
++  uint8_t _safe_on;     // 0/1, or UNSET before anything is stored
++  bool _loaded;
++
++  static const uint8_t SAFE_UNSET = 0xFF;
++
++  // NVS, not upstream's NodePrefs: no struct to drift, and an absent key stays
++  // distinguishable from a stored 0 -- which is what lets `off` persist while a
++  // board default of 2800 remains in place.
++  void ensureLoaded() {
++    if (_loaded) return;
++    _loaded = true;
++    Preferences p;
++    if (p.begin("mobmesh", true)) {
++      _sleep_mv = p.getUShort("safe_mv", BATT_SAVER_SLEEP_MV);
++      _safe_on = p.getUChar("safe_on", SAFE_UNSET);
++      p.end();
++    }
++    if (_safe_on == SAFE_UNSET) _safe_on = (_sleep_mv > 0) ? 1 : 0;
++  }
 +
 +public:
-+  BattSaver(mesh::MainBoard& board)
-+    : _board(&board), _next_sample_at(0), _agree(0), _active(false),
-+      _lna_was_enabled(false), _last_mv(0), _transitions(0) { }
++  BattSaver(ESP32Board& board)
++    : _board(&board), _next_sample_at(0), _agree(0), _sleep_agree(0),
++      _auto(BATT_SAVER_AUTO_DEFAULT), _active(false),
++      _lna_was_enabled(false), _last_mv(0), _transitions(0),
++      _sleep_mv(BATT_SAVER_SLEEP_MV), _safe_on(SAFE_UNSET), _loaded(false) { }
 +
 +  // No sleep inhibit here -- ESP32Board::sleep() already refuses while
 +  // inhibit_sleep is set, which covers OTA on every path.
 +  bool isActive() const { return _active; }
++  bool isAuto() const { return _auto; }
++  void setAuto(bool on) { _auto = on; if (!on && _active) setActive(false); }
++
++  uint16_t sleepMilliVolts() { ensureLoaded(); return _sleep_mv; }
++  bool safeEnabled() { ensureLoaded(); return _safe_on == 1; }
++
++  void setSafeEnabled(bool on) {
++    ensureLoaded();
++    _safe_on = on ? 1 : 0;
++    store("safe_on", (uint8_t)_safe_on);
++  }
++
++  // 0 disables the rung outright. Anything else must clear the boot floor and stay
++  // under the duty-cycle rung, or a healthy node sleeps on a 60s cycle.
++  bool setSleepMilliVolts(uint16_t mv) {
++    if (mv != 0 && (mv < BATT_SAVER_SLEEP_FLOOR_MV || mv >= BATT_SAVER_ON_MV)) return false;
++    ensureLoaded();
++    _sleep_mv = mv;
++    Preferences p;
++    if (p.begin("mobmesh", false)) { p.putUShort("safe_mv", mv); p.end(); }
++    return true;
++  }
 +  uint16_t lastMilliVolts() const { return _last_mv; }
 +  uint32_t transitionCount() const { return _transitions; }
 +
@@ -99,9 +166,27 @@ index 0000000..7a90f40
 +
 +    if (mv == 0 || mv >= BATT_SAVER_IMPLAUSIBLE_MV) {  // no cell to protect
 +      _agree = 0;
++      _sleep_agree = 0;
 +      if (_active) setActive(false);
 +      return;
 +    }
++
++    // Checked first: leaving service outranks any duty-cycle decision, and the
++    // consecutive count is what keeps a transmit's sag from triggering it.
++    ensureLoaded();
++    if (_safe_on == 1 && _sleep_mv > 0 && mv < _sleep_mv) {
++      if (++_sleep_agree >= BATT_SAVER_CONSECUTIVE_SAMPLES) {
++        Serial.printf("batt %umV below %umV for %us -- leaving service\n",
++                      mv, (unsigned)_sleep_mv,
++                      (unsigned)(BATT_SAVER_SAMPLE_INTERVAL_MS / 1000
++                                 * BATT_SAVER_CONSECUTIVE_SAMPLES));
++        _board->enterDeepSleep(BATT_SAVER_SLEEP_SECS);   // does not return
++      }
++    } else {
++      _sleep_agree = 0;
++    }
++
++    if (!_auto) { _agree = 0; if (_active) setActive(false); return; }
 +
 +    bool wants = _active ? (mv < BATT_SAVER_OFF_MV) : (mv <= BATT_SAVER_ON_MV);
 +    if (wants == _active) { _agree = 0; return; }
@@ -112,6 +197,11 @@ index 0000000..7a90f40
 +  }
 +
 +private:
++  void store(const char* key, uint8_t v) {
++    Preferences p;
++    if (p.begin("mobmesh", false)) { p.putUChar(key, v); p.end(); }
++  }
++
 +  void setActive(bool on) {
 +    _active = on;
 +    _transitions++;
@@ -127,3 +217,72 @@ index 0000000..7a90f40
 +#endif
 +  }
 +};
+diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
+index 4b7326e..342af64 100644
+--- a/src/helpers/esp32/CommonCliMods.cpp
++++ b/src/helpers/esp32/CommonCliMods.cpp
+@@ -20,7 +20,64 @@
+ #define OTA_MOD_BUILD_DATE "unknown"
+ #endif
+ 
++#ifdef WITH_BATT_SAVER
++#include <helpers/esp32/BattSaver.h>
++extern BattSaver batt_saver;
++#endif
++
+ bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
++#ifdef WITH_BATT_SAVER
++  // Claimed ahead of upstream's 11-char "powersaving" prefix, which would answer
++  // any of these as a status query and look like it worked.
++  if (memcmp(command, "powersaving safe.mv ", 20) == 0) {
++    uint32_t mv = (uint32_t) atol(command + 20);
++    if (!batt_saver.setSleepMilliVolts((uint16_t) mv)) {
++      sprintf(reply, "ERR: %u-%u or 0", (unsigned)BATT_SAVER_SLEEP_FLOOR_MV,
++              (unsigned)(BATT_SAVER_ON_MV - 1));
++    } else if (mv == 0) {
++      strcpy(reply, "OK - safe.mv 0 (rung disabled)");
++    } else {
++      sprintf(reply, "OK - safe.mv %umV%s", (unsigned)mv,
++              batt_saver.safeEnabled() ? "" : " (safe is off)");
++    }
++    return true;
++  }
++  if (memcmp(command, "powersaving safe", 16) == 0
++      && (command[16] == 0 || command[16] == ' ')) {
++    const char* arg = (command[16] == ' ') ? command + 17 : "";
++    if (*arg == 0) {
++      sprintf(reply, "safe %s, %umV, batt %umV", batt_saver.safeEnabled() ? "on" : "off",
++              (unsigned)batt_saver.sleepMilliVolts(), (unsigned)batt_saver.lastMilliVolts());
++    } else if (memcmp(arg, "on", 2) == 0) {
++      if (batt_saver.sleepMilliVolts() == 0) {
++        strcpy(reply, "ERR: no threshold -- set powersaving safe.mv first");
++      } else {
++        batt_saver.setSafeEnabled(true);
++        sprintf(reply, "OK - safe on, %umV", (unsigned)batt_saver.sleepMilliVolts());
++      }
++    } else if (memcmp(arg, "off", 3) == 0) {
++      batt_saver.setSafeEnabled(false);
++      sprintf(reply, "OK - safe off (%umV kept)", (unsigned)batt_saver.sleepMilliVolts());
++    } else {
++      strcpy(reply, "ERR: usage: powersaving safe [on|off]");
++    }
++    return true;
++  }
++  if (memcmp(command, "powersaving auto", 16) == 0
++      && (command[16] == 0 || command[16] == ' ')) {
++    const char* arg = (command[16] == ' ') ? command + 17 : "";
++    if (*arg == 0) {
++      sprintf(reply, "auto %s, active %s, transitions %u", batt_saver.isAuto() ? "on" : "off",
++              batt_saver.isActive() ? "yes" : "no", (unsigned)batt_saver.transitionCount());
++    } else if (memcmp(arg, "on", 2) == 0 || memcmp(arg, "off", 3) == 0) {
++      batt_saver.setAuto(*arg == 'o' && arg[1] == 'n');
++      sprintf(reply, "OK - auto %s", batt_saver.isAuto() ? "on" : "off");
++    } else {
++      strcpy(reply, "ERR: usage: powersaving auto [on|off]");
++    }
++    return true;
++  }
++#endif
+   if (memcmp(command, "ver", 3) == 0) {
+     // Shadows upstream's own `ver` branch, which never runs while this mod is built in.
+     sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);

@@ -1,8 +1,8 @@
 diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
-index 5d9c01f..ef816e1 100644
+index d3e9506..631704a 100644
 --- a/src/helpers/ModHooks.cpp
 +++ b/src/helpers/ModHooks.cpp
-@@ -52,8 +52,27 @@ static void bootPwrCheck() {
+@@ -57,8 +57,27 @@ static void bootPwrCheck() {
  }
  #endif
  

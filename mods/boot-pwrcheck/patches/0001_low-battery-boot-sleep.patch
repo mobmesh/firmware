@@ -1,9 +1,9 @@
 diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
-index 195d809..5d9c01f 100644
+index e182e6b..d3e9506 100644
 --- a/src/helpers/ModHooks.cpp
 +++ b/src/helpers/ModHooks.cpp
-@@ -7,7 +7,55 @@
- #include <helpers/esp32/RollbackGuard.h>
+@@ -12,7 +12,55 @@
+ BattSaver batt_saver(board);   // extern'd by CommonCliMods.cpp
  #endif
  
 +#if defined(ESP32) && defined(WITH_BOOT_PWRCHECK)

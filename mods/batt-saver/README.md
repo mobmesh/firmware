@@ -6,17 +6,25 @@ immediately if a radio packet arrives. It saves real power, but it is a manual
 switch: somebody has to type `powersaving on`, and somebody has to remember to
 type `powersaving off` again later.
 
-This mod turns that switch automatically, based on the battery. When the
+This mod can turn that switch automatically, based on the battery. When the
 battery falls low the node starts napping to stretch what is left. When the
 battery recovers -- the sun comes back, or someone swaps the cell -- it stops
-napping and goes back to normal.
+napping and goes back to normal. **That behaviour is off by default** and is
+enabled with `powersaving auto on`.
+
+Below the napping mark sits a second, independent rung: at
+`BATT_SAVER_SLEEP_MV` the node leaves service entirely and deep-sleeps, keeping
+the reserve a solar pack needs to climb back. Napping stretches runtime; this
+stops spending it. The two are separate switches, not stages of one.
 
 The intent is a solar or battery repeater that looks after itself: it slows
 down before it dies rather than after, and it comes back on its own without a
 site visit.
 
-**Repeater only.** The room server firmware has no sleep path at all, so there is
-nothing for this mod to switch.
+**Repeater only, for now.** The napping rung has nothing to switch on a room
+server -- that firmware has no sleep path. The deep-sleep rung would work there,
+since it calls `enterDeepSleep()` directly, and would inherit the board's
+`BATT_SAVER_SLEEP_MV`. Untested, not impossible.
 
 ## What It Actually Does
 
@@ -48,8 +56,12 @@ itself once would come back afterwards reporting `powersaving on` forever --
 quietly overwriting a choice a human made, with no record of why.
 
 Instead the mod keeps its own in-memory flag and the sleep decision becomes
-"the operator asked for it **or** the battery is low". `get powersaving` keeps
-reporting what the operator asked for, and nothing is persisted.
+"the operator asked for it **or** the battery is low". `powersaving` keeps
+reporting what the operator asked for.
+
+The deep-sleep rung's own settings *are* persisted, in an NVS namespace of our
+own rather than `NodePrefs` -- no upstream struct to drift, and an absent key
+stays distinguishable from a stored 0.
 
 ## Tuning
 
@@ -64,6 +76,10 @@ alongside the `OTA_*` values. Defaults:
 | `BATT_SAVER_CONSECUTIVE_SAMPLES` | 3 | Agreeing readings needed to switch |
 | `BATT_SAVER_IMPLAUSIBLE_MV` | 4500 | Above this, assume no battery |
 | `BATT_SAVER_DROP_FEM_LNA` | 0 | Also bypass the FEM LNA while saving |
+| `BATT_SAVER_AUTO_DEFAULT` | 0 | Napping auto-engage; off unless asked for |
+| `BATT_SAVER_SLEEP_MV` | 0 | Leave service below this; 0 disables the rung |
+| `BATT_SAVER_SLEEP_SECS` | 60 | First wait only; boot-pwrcheck backs off after |
+| `BATT_SAVER_SLEEP_FLOOR_MV` | 2500 | Lower rail accepted for a stored threshold |
 
 `variants/heltec_v4/overrides.yaml` currently sets 3300 / 3600 -- a late
 engagement that favours uptime, leaving little runway once it triggers.
@@ -115,15 +131,18 @@ different settings; this mod only touches the latter.
 
 ## Enabling It
 
-Not enabled on any target yet -- **this has not been tested on hardware.** To
-try it, add `batt-saver` to a target's `mods:` list in `build-targets.yaml`:
+Add `batt-saver` to a target's `mods:` list in `build-targets.yaml`:
 
 ```yaml
     mods: [shim, hotspot-ota, timing-safety, batt-saver]
 ```
 
-That changes the asset basename (the mod contributes the suffix `bs`), so the
-released filenames change accordingly.
+The mod contributes no suffix, so asset basenames are unchanged -- it is a
+failsafe rather than a feature, same reasoning as `boot-pwrcheck`.
+
+Neither rung engages on its own: `BATT_SAVER_AUTO_DEFAULT` is 0, and
+`BATT_SAVER_SLEEP_MV` is 0 unless a board states a measured value. A board whose
+gauge has never been characterised stays dark.
 
 ## OTA Updates Are Already Safe
 
@@ -152,5 +171,17 @@ visible over the mesh, since it is the first field of the repeater status
 response and is also published as channel 1 of the telemetry data, both
 available without admin rights.
 
-`BattSaver` also keeps a transition counter and the last reading in memory for
-whatever diagnostic surface gets added later.
+## Commands
+
+Claimed ahead of upstream's `powersaving` handler, which matches on an 11-character
+prefix and would otherwise answer these as a status query.
+
+    powersaving safe              on/off, threshold, last reading
+    powersaving safe.mv <mv>      set threshold; 2500-3299, or 0 to disable
+    powersaving safe on|off       toggle the rung, leaving the threshold alone
+    powersaving auto              napping state, active flag, transition count
+    powersaving auto on|off       toggle automatic napping
+
+`safe.mv` and `safe on|off` persist. They are deliberately separate, so a
+threshold can be tuned for a site and the rung still switched off without losing
+it. `auto` is runtime only -- a reboot restores the compiled default.
