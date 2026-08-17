@@ -1,0 +1,6 @@
+id: "0001"
+title: low-battery-boot-sleep
+# Context dependency only: hotspot-ota/0002 edits the same ModHooks.cpp regions.
+requires: ["shim/0001", "hotspot-ota/0002"]
+env_flag: WITH_BOOT_PWRCHECK
+build_src_filter: []
