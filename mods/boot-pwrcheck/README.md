@@ -1,8 +1,8 @@
 # boot-pwrcheck - Never Strand a Node
 
-Two guards against a repeater that cannot recover without a site visit. Both use
-`ESP32Board::enterDeepSleep(secs)` with a non-zero time, which powers the radio off
-and reboots on the timer.
+Guards against a repeater that cannot recover without a site visit. The sleep paths
+use `ESP32Board::enterDeepSleep(secs)` with a non-zero time, which powers the radio
+off and reboots on the timer.
 
 ## 0001 - low-battery boot sleep
 
@@ -56,12 +56,33 @@ one costs a site visit.
 Runs before the battery check, which may sleep and never return -- the next wake
 reports `ESP_RST_DEEPSLEEP` and the brownout would go unnoticed.
 
+## 0004 - runtime low-battery sleep
+
+The boot check only runs at boot, so a draining node stays in service until it browns
+out. That is survivable now, but it spends the reserve a solar pack needs to climb
+back: deep sleep draws 3-4 mA while a reset loop draws 20-54 mA, and at dawn the panel
+has to beat whichever one the node is in.
+
+From `modLoop()`, samples the battery every `RUNTIME_SLEEP_CHECK_SECS` and deep-sleeps
+after `RUNTIME_SLEEP_CONSECUTIVE` readings below `RUNTIME_SLEEP_MV`. The boot check
+owns the backoff from the first wake, so there is one retry schedule, not two.
+
+The consecutive count is what stops a transmit triggering it -- a dip lasts under a
+second against a 30s sampler. Measured at 45 mV above the threshold with adverts every
+5s: 12% of samples fell below it, none four in a row, 60 transmits with no sleep.
+
+`RUNTIME_SLEEP_MV` defaults to 0, which disables the check, so a board only gets this
+once its gauge has been characterised.
+
 ## Tuning
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
 | `BOOT_PWRCHECK_MIN_MV` | 3200 | Sleep at boot below this |
 | `BOOT_PWRCHECK_RETRY_SECS` | 900 | Ceiling the backoff settles onto |
+| `RUNTIME_SLEEP_MV` | 0 | Leave service below this while running; 0 disables |
+| `RUNTIME_SLEEP_CHECK_SECS` | 30 | Sampling interval for the runtime check |
+| `RUNTIME_SLEEP_CONSECUTIVE` | 4 | Consecutive low readings before sleeping |
 | `POWEROFF_MIN_SECS` | 60 | Reject shorter waits |
 | `POWEROFF_MAX_SECS` | 86400 | Reject longer waits |
 
@@ -77,5 +98,8 @@ boot, and watch the supply's current readout: a drop to the few-mA sleep floor m
 the sleep path was taken, and current returning after the backoff interval proves the
 timer wake. Serial prints the reason and the interval before it sleeps.
 
-The check is boot-only, so lowering the supply under a running node does nothing --
-it has to be rebooted to hand control to the guard.
+To exercise 0004 instead, leave the node running and lower the supply below
+`RUNTIME_SLEEP_MV`: it should stay in service for
+`RUNTIME_SLEEP_CHECK_SECS * RUNTIME_SLEEP_CONSECUTIVE` before sleeping, not drop out
+immediately. With `RUNTIME_SLEEP_MV` at 0 the boot check is the only one that fires,
+so the supply has to be lowered and the node rebooted.

@@ -46,7 +46,13 @@ build_flags:
 # Never-strand guards (mods/boot-pwrcheck). MIN_MV sits below BATT_SAVER_ON_MV so
 # power saving gets a chance to extend runtime before the node stops entirely.
   BOOT_PWRCHECK_MIN_MV: 3150      # sleep at boot below this, rather than start the radio
-  BOOT_PWRCHECK_RETRY_SECS: 900   # sleep this long, then reboot and re-check
+  BOOT_PWRCHECK_RETRY_SECS: 900   # ceiling the retry backoff settles onto
+
+# Leave service before a brownout, so a solar pack keeps the reserve that lets it
+# climb back. Gauge units: the boot floor it guards against is measured the same way.
+  RUNTIME_SLEEP_MV: 2800          # 0 disables; ~2.97 V at the pins on this board
+  RUNTIME_SLEEP_CHECK_SECS: 30
+  RUNTIME_SLEEP_CONSECUTIVE: 4    # ~2 min low before acting, so a TX dip can't trip it
   POWEROFF_MIN_SECS: 60           # `poweroff <secs>` bounds; 0 is always refused
   POWEROFF_MAX_SECS: 86400
 

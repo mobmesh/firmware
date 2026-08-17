@@ -1,0 +1,6 @@
+id: "0004"
+title: runtime-low-batt-sleep
+# Reuses 0001's backoff table; millis_passed() comes from timing-safety.
+requires: ["shim/0001", "hotspot-ota/0002", "boot-pwrcheck/0001", "timing-safety/0001"]
+env_flag: WITH_BOOT_PWRCHECK
+build_src_filter: []
