@@ -21,6 +21,11 @@
 # never copied from another board or reused across runs. Distinct from sync_docs,
 # which governs global project docs (CLI docs, commands.json) and should stay set on
 # exactly one target repo-wide, not one per board.
+# Applied to every target, in this order, before any target-specific mods below.
+# Keep entries here only while they genuinely ship everywhere -- a mod that becomes
+# optional belongs in a target's own `mods:` list instead.
+core_mods: [shim, hotspot-ota, timing-safety]
+
 targets:
   - board: heltec_v4
     role: repeater
@@ -32,7 +37,8 @@ targets:
     vendor_flasher_assets: true
     # If true, must match across all targets of this role.
     make_latest: true
-    mods: [shim, hotspot-ota, timing-safety]
+    # heltec_v4 only: its battery divider is the one that has been bench-measured.
+    mods: [boot-pwrcheck]
     # Headless: drops the OLED and the button's long-press power-off.
     # Joined form -- PlatformIO splits "-U FOO" into a bare -U.
     build_flags_append: ["-UDISPLAY_CLASS"]
@@ -46,7 +52,7 @@ targets:
     sync_docs: false
     vendor_flasher_assets: false
     make_latest: false
-    mods: [shim, hotspot-ota, timing-safety]
+    mods: []      # extras beyond core_mods
 
   - board: xiao_c3
     role: repeater
@@ -58,7 +64,7 @@ targets:
     vendor_flasher_assets: true
     # If true, must match across all targets of this role.
     make_latest: true
-    mods: [shim, hotspot-ota, timing-safety]
+    mods: []      # extras beyond core_mods
 
   - board: xiao_c3
     role: room_server
@@ -69,4 +75,4 @@ targets:
     sync_docs: false
     vendor_flasher_assets: false
     make_latest: false
-    mods: [shim, hotspot-ota, timing-safety]
+    mods: []      # extras beyond core_mods

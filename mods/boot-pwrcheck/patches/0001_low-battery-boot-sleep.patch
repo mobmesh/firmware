@@ -1,0 +1,60 @@
+diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
+index 195d809..5d9c01f 100644
+--- a/src/helpers/ModHooks.cpp
++++ b/src/helpers/ModHooks.cpp
+@@ -7,7 +7,55 @@
+ #include <helpers/esp32/RollbackGuard.h>
+ #endif
+ 
++#if defined(ESP32) && defined(WITH_BOOT_PWRCHECK)
++#include <helpers/ESP32Board.h>
++#ifndef BOOT_PWRCHECK_MIN_MV
++#define BOOT_PWRCHECK_MIN_MV 3200
++#endif
++#ifndef BOOT_PWRCHECK_RETRY_SECS
++#define BOOT_PWRCHECK_RETRY_SECS 900
++#endif
++
++// Retry schedule in seconds; the last step is the ceiling. A transient dip recovers
++// in about a minute, a real depletion settles onto the ceiling within ~20 minutes.
++static const uint16_t BOOT_PWRCHECK_BACKOFF[] = {60, 120, 300, 600, BOOT_PWRCHECK_RETRY_SECS};
++
++// RTC slow memory, not flash -- survives deep sleep and costs no write at low voltage.
++RTC_DATA_ATTR static uint32_t bootPwrCheckMagic;
++RTC_DATA_ATTR static uint32_t bootPwrCheckFails;
++
++// Runs before radio_init(), so the radio is still off and drawing nothing. A pack too
++// weak to survive radio startup would otherwise brown out mid-init and reboot forever.
++static void bootPwrCheck() {
++  uint16_t mv = board.getBattMilliVolts();
++  if (mv == 0) return;               // no reading (USB-powered, no divider) -- not our call
++
++  if (bootPwrCheckMagic != 0x50575243UL) {   // cold boot, or RTC contents lost
++    bootPwrCheckMagic = 0x50575243UL;
++    bootPwrCheckFails = 0;
++  }
++  if (mv >= BOOT_PWRCHECK_MIN_MV) {
++    bootPwrCheckFails = 0;           // recovered -- next depletion starts responsive again
++    return;
++  }
++
++  // Corrupt or absent RTC content lands on index 0, the shortest wait, so a bad read
++  // costs a little current and never a stranded node.
++  const uint32_t n = sizeof(BOOT_PWRCHECK_BACKOFF) / sizeof(BOOT_PWRCHECK_BACKOFF[0]);
++  uint16_t secs = BOOT_PWRCHECK_BACKOFF[bootPwrCheckFails < n ? bootPwrCheckFails : n - 1];
++  bootPwrCheckFails++;
++
++  Serial.printf("batt %umV below %umV -- deep sleep %us (retry %u)\n",
++                mv, (unsigned)BOOT_PWRCHECK_MIN_MV, (unsigned)secs,
++                (unsigned)bootPwrCheckFails);
++  board.enterDeepSleep(secs);        // powers the radio off; does not return
++}
++#endif
++
+ bool modRadioInit(const char* build_id) {
++#if defined(ESP32) && defined(WITH_BOOT_PWRCHECK)
++  bootPwrCheck();
++#endif
+ #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
+   SPIFFS.begin(true);   // RollbackGuard's failure counter needs it mounted before use; safe to call twice
+ 

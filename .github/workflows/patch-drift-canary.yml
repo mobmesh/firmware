@@ -49,10 +49,10 @@ jobs:
           # all targets currently share the same mod list, so one probe covers them all.
           MODS=$(python3 -c "
           import yaml
-          t = yaml.safe_load(open('build-targets.yaml'))['targets']
-          seen = []
-          for x in t:
-              for m in x['mods']:
+          d = yaml.safe_load(open('build-targets.yaml'))
+          seen = list(d.get('core_mods') or [])
+          for x in d['targets']:
+              for m in (x.get('mods') or []):
                   if m not in seen: seen.append(m)
           print(' '.join(seen))
           ")

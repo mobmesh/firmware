@@ -16,8 +16,7 @@ Mods add features or changes to the standard MeshCore firmware. Each mod is main
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`hotspot-ota`](https://github.com/mobmesh/firmware/tree/main/mods/hotspot-ota) | Adds remote firmware updates over WiFi ( or cellular hotspot) and automatic rollback protection. A device can connect to an existing WiFi network, download a firmware image, verify it, and install it without needing to be onsite with the node. | Remote OTA updates, power control of external cell modems, firmware SHA-256 verification, firmware authenticity checks, OTA slot management, automatic rollback / recovery after failed updates, automatic clock sync via NTP whenever WiFi is joined, remote updates through MeshCore CLI commands |
 | [`timing-safety`](https://github.com/mobmesh/firmware/tree/main/mods/timing-safety) | Small fixes for how the firmware tracks time. Keeps timers working correctly on devices that run for many weeks, and stops "time since last heard from" numbers from showing garbage right after a reboot. | Long-uptime timer fix, safer elapsed-time math across reboots |
-
-The [`hotspot-ota`](https://github.com/mobmesh/firmware/tree/main/mods/hotspot-ota) mod is especially useful for MeshCore nodes that are installed in remote or hard-to-reach locations. Updates can be started and performed remotely (off-site) over the LoRa mesh, while rollback protection helps recover the device if a new firmware version fails during startup.
+| [`boot-pwrcheck`](https://github.com/mobmesh/firmware/tree/main/mods/boot-pwrcheck) | Keeps a node from stranding itself on a flat battery. On a weak pack it sleeps at boot instead of starting the radio, then wakes on a widening schedule to try again, so the node recovers on its own once the battery does. Also stops a mistyped `poweroff` from shutting a node down permanently. | Low-battery boot sleep with backoff, automatic recovery, `poweroff` requires a wake time and is refused over the mesh |
 
 More information about each mod can be found in its own README under `mods/<name>/`.
 
@@ -37,7 +36,7 @@ Some mods may add extra options or requirements for a traditional flasher. Check
 
 # Behind the Curtain
 
-* `mods/<name>/` contains the different features or modifications. Each mod has its own `patches/*.patch` files, along with a `.meta.yaml` file for each patch. The metadata files define patch dependencies. Each mod also has its own documentation. There are currently two mods: `hotspot-ota` and `timing-safety`.
+* `mods/<name>/` contains the different features or modifications. Each mod has its own `patches/*.patch` files, along with a `.meta.yaml` file for each patch. The metadata files define patch dependencies. Each mod also has its own documentation. The feature mods are `hotspot-ota`, `timing-safety` and `boot-pwrcheck`; `shim` is internal plumbing that owns the hook points the others attach to.
 
 * `variants/<board>/` contains configuration changes that are specific to a board. This includes things like GPIO pins, timing values, and sometimes a custom partition layout. The folder structure follows the same `variants/<board>/` layout used by upstream MeshCore.
 
