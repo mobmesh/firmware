@@ -41,34 +41,35 @@ build_flags:
 # mods/power-guard. All in gauge millivolts, highest to lowest -- the ordering is
 # the contract; see that mod's README for the ladder.
 #
-# Napping. Gap must stay wide -- sleeping sheds load and raises the reading.
-  BATT_SAVER_OFF_MV: 3600   # release saving at or above
-  BATT_SAVER_ON_MV: 3300    # engage saving at or below
+# Automatic power saving -- `powersaving auto`. Gap must stay wide: sleeping sheds
+# load and raises the reading.
+  POWER_GUARD_AUTO_OFF_MV: 3600   # release saving at or above
+  POWER_GUARD_AUTO_ON_MV: 3300    # engage saving at or below
 
-# Return to service. Sits below ON_MV so napping gets a chance to extend runtime
-# before the node stops entirely, and above SLEEP_MAX_MV so anything that
-# hibernates can boot back up.
-  BOOT_PWRCHECK_MIN_MV: 3150
+# Return to service. Sits below AUTO_ON_MV so power saving gets a chance to extend
+# runtime before the node stops entirely. The safe rung's CLI ceiling derives from
+# this, so anything that leaves service can always come back.
+  POWER_GUARD_RESUME_MV: 3150
 
-# Hibernate. Leaves service before a brownout so a solar pack keeps the reserve
-# that lets it climb back.
-  BATT_SAVER_SLEEP_MAX_MV: 3149 # CLI ceiling; must stay under MIN_MV above
-  BATT_SAVER_SLEEP_MV: 2800     # 0 disables; ~2.97 V at the pins on this board
-  BATT_SAVER_SLEEP_FLOOR_MV: 2500  # CLI floor; ~100 mV over this board's measured
-                                   # ~2400 boot floor, so the rung can still fire
-  BATT_SAVER_SLEEP_SECS: 60     # first wait only; the boot check backs off after
+# Leaving service -- `powersaving safe`. Goes before a brownout does, so a solar pack
+# keeps the reserve that lets it climb back. The CLI ceiling derives from RESUME_MV
+# above, so there is nothing here to keep in step with it.
+  POWER_GUARD_SAFE_MV: 2800       # 0 disables; ~2.97 V at the pins on this board
+  POWER_GUARD_SAFE_FLOOR_MV: 2500 # CLI floor; ~100 mV over this board's measured
+                                  # ~2400 boot floor, so the rung can still fire
+  POWER_GUARD_SAFE_SECS: 60       # first wait only; the boot check backs off after
 
 # Sampling. Together these are the debounce window -- 3 x 60 s -- which is what
-# stops a transmit's voltage sag from being read as a flat pack.
-  BATT_SAVER_SAMPLE_INTERVAL_MS: 60000
-  BATT_SAVER_CONSECUTIVE_SAMPLES: 3
+# stops a transmit's voltage sag from being read as a flat pack. Shared by both rungs.
+  POWER_GUARD_SAMPLE_INTERVAL_MS: 60000
+  POWER_GUARD_CONSECUTIVE_SAMPLES: 3
 
 # Retry backoff: doubles from the start value until it reaches the ceiling.
-  BOOT_PWRCHECK_BACKOFF_START_SECS: 60
-  BOOT_PWRCHECK_RETRY_SECS: 900
+  POWER_GUARD_BACKOFF_START_SECS: 60
+  POWER_GUARD_BACKOFF_MAX_SECS: 900
 
-  POWEROFF_MIN_SECS: 60           # `poweroff <secs>` bounds; 0 is always refused
-  POWEROFF_MAX_SECS: 86400
+  POWER_GUARD_POWEROFF_MIN_SECS: 60           # `poweroff <secs>` bounds; 0 is always refused
+  POWER_GUARD_POWEROFF_MAX_SECS: 86400
 
 # Optional: only set when a board's default partition scheme (from upstream's
 # boards/<name>.json) doesn't leave enough OTA slot room for this project's

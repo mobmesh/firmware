@@ -1,8 +1,8 @@
 diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
-index 195d809..43b8092 100644
+index 195d809..7e11ba3 100644
 --- a/src/helpers/ModHooks.cpp
 +++ b/src/helpers/ModHooks.cpp
-@@ -7,7 +7,96 @@
+@@ -7,7 +7,95 @@
  #include <helpers/esp32/RollbackGuard.h>
  #endif
  
@@ -19,14 +19,11 @@ index 195d809..43b8092 100644
 +#define POWER_GUARD_HAS_POWERDOWN 1
 +#include <PowerGuard.h>
 +#endif
-+#ifndef BOOT_PWRCHECK_MIN_MV
-+#define BOOT_PWRCHECK_MIN_MV 3200
++#ifndef POWER_GUARD_BACKOFF_MAX_SECS
++#define POWER_GUARD_BACKOFF_MAX_SECS 900
 +#endif
-+#ifndef BOOT_PWRCHECK_RETRY_SECS
-+#define BOOT_PWRCHECK_RETRY_SECS 900
-+#endif
-+#ifndef BOOT_PWRCHECK_BACKOFF_START_SECS
-+#define BOOT_PWRCHECK_BACKOFF_START_SECS 60
++#ifndef POWER_GUARD_BACKOFF_START_SECS
++#define POWER_GUARD_BACKOFF_START_SECS 60
 +#endif
 +
 +// RTC slow memory, not flash -- survives deep sleep and costs no write at low voltage.
@@ -42,6 +39,8 @@ index 195d809..43b8092 100644
 +  // leaves the pins usable with no control flow to reason about.
 +  powerGuardReleaseHolds();
 +#endif
++  if (POWER_GUARD_RESUME_MV == 0) return;   // board states no threshold
++
 +  uint16_t mv = board.getBattMilliVolts();
 +  if (mv == 0) return;               // no reading (USB-powered, no divider) -- not our call
 +
@@ -49,7 +48,7 @@ index 195d809..43b8092 100644
 +    bootPwrCheckMagic = 0x50575243UL;
 +    bootPwrCheckFails = 0;
 +  }
-+  if (mv >= BOOT_PWRCHECK_MIN_MV) {
++  if (mv >= POWER_GUARD_RESUME_MV) {
 +    bootPwrCheckFails = 0;           // recovered -- next depletion starts responsive again
 +    return;
 +  }
@@ -58,12 +57,12 @@ index 195d809..43b8092 100644
 +  // a minute, a real depletion settles onto the ceiling. Corrupt or absent RTC content
 +  // lands on the shortest wait, so a bad read costs current and never a stranded node.
 +  uint32_t shift = bootPwrCheckFails < 16 ? bootPwrCheckFails : 16;
-+  uint32_t secs = (uint32_t)BOOT_PWRCHECK_BACKOFF_START_SECS << shift;
-+  if (secs > BOOT_PWRCHECK_RETRY_SECS) secs = BOOT_PWRCHECK_RETRY_SECS;
++  uint32_t secs = (uint32_t)POWER_GUARD_BACKOFF_START_SECS << shift;
++  if (secs > POWER_GUARD_BACKOFF_MAX_SECS) secs = POWER_GUARD_BACKOFF_MAX_SECS;
 +  bootPwrCheckFails++;
 +
 +  Serial.printf("batt %umV below %umV -- deep sleep %us (retry %u)\n",
-+                mv, (unsigned)BOOT_PWRCHECK_MIN_MV, (unsigned)secs,
++                mv, (unsigned)POWER_GUARD_RESUME_MV, (unsigned)secs,
 +                (unsigned)bootPwrCheckFails);
 +  Serial.flush();
 +#ifdef POWER_GUARD_HAS_POWERDOWN
@@ -75,8 +74,8 @@ index 195d809..43b8092 100644
 +
 +#if defined(ESP32) && defined(WITH_POWER_GUARD)
 +#include <esp_system.h>
-+#ifndef BOOT_CLOCK_FALLBACK_EPOCH
-+#define BOOT_CLOCK_FALLBACK_EPOCH 1715770351UL   // same baseline a power-on reset uses
++#ifndef POWER_GUARD_CLOCK_FALLBACK_EPOCH
++#define POWER_GUARD_CLOCK_FALLBACK_EPOCH 1715770351UL   // same baseline a power-on reset uses
 +#endif
 +
 +// A brownout can leave the RTC holding garbage, and nothing moves a clock backwards,
@@ -84,10 +83,10 @@ index 195d809..43b8092 100644
 +static void bootClockGuard() {
 +  if (esp_reset_reason() != ESP_RST_BROWNOUT) return;
 +  uint32_t now = rtc_clock.getCurrentTime();
-+  if (now == BOOT_CLOCK_FALLBACK_EPOCH) return;
++  if (now == POWER_GUARD_CLOCK_FALLBACK_EPOCH) return;
 +  Serial.printf("brownout reset -- clock %u rebased to %u\n",
-+                (unsigned)now, (unsigned)BOOT_CLOCK_FALLBACK_EPOCH);
-+  rtc_clock.setCurrentTime(BOOT_CLOCK_FALLBACK_EPOCH);
++                (unsigned)now, (unsigned)POWER_GUARD_CLOCK_FALLBACK_EPOCH);
++  rtc_clock.setCurrentTime(POWER_GUARD_CLOCK_FALLBACK_EPOCH);
 +}
 +#endif
 +
@@ -99,7 +98,7 @@ index 195d809..43b8092 100644
  #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
    SPIFFS.begin(true);   // RollbackGuard's failure counter needs it mounted before use; safe to call twice
  
-@@ -32,8 +121,15 @@ void modLoop() {
+@@ -32,8 +120,15 @@ void modLoop() {
  #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
    RollbackGuard::poll();
  #endif
@@ -117,10 +116,10 @@ index 195d809..43b8092 100644
  }
 diff --git a/src/helpers/esp32/BattSaver.h b/src/helpers/esp32/BattSaver.h
 new file mode 100644
-index 0000000..b24b5f3
+index 0000000..45179ed
 --- /dev/null
 +++ b/src/helpers/esp32/BattSaver.h
-@@ -0,0 +1,185 @@
+@@ -0,0 +1,205 @@
 +#pragma once
 +
 +#include <Arduino.h>
@@ -132,49 +131,65 @@ index 0000000..b24b5f3
 +// releases it once it recovers. Runtime-only: never writes NodePrefs, which is
 +// operator intent and hits flash on every change.
 +
-+#ifndef BATT_SAVER_ON_MV
-+  #define BATT_SAVER_ON_MV 3500
++// 0 disables the rung. No default worth having: a threshold is a fact about a
++// board's divider, and inheriting another board's measurement is how a node ends up
++// power saving at the wrong voltage.
++#ifndef POWER_GUARD_AUTO_ON_MV
++  #define POWER_GUARD_AUTO_ON_MV 0
 +#endif
 +// Wide gap is required: sleeping removes load, which raises the reading.
-+#ifndef BATT_SAVER_OFF_MV
-+  #define BATT_SAVER_OFF_MV 3800
++#ifndef POWER_GUARD_AUTO_OFF_MV
++  #define POWER_GUARD_AUTO_OFF_MV 0
 +#endif
-+#ifndef BATT_SAVER_SAMPLE_INTERVAL_MS
-+  #define BATT_SAVER_SAMPLE_INTERVAL_MS 60000
++#ifndef POWER_GUARD_SAMPLE_INTERVAL_MS
++  #define POWER_GUARD_SAMPLE_INTERVAL_MS 60000
 +#endif
 +// Rejects the transient sag under a TX burst.
-+#ifndef BATT_SAVER_CONSECUTIVE_SAMPLES
-+  #define BATT_SAVER_CONSECUTIVE_SAMPLES 3
++#ifndef POWER_GUARD_CONSECUTIVE_SAMPLES
++  #define POWER_GUARD_CONSECUTIVE_SAMPLES 3
 +#endif
 +// Bypass the FEM LNA while saving. Off by default: measured at only ~0.3mA of
 +// a ~5.5mA sleeping floor, which does not justify the lost RX sensitivity.
-+#ifndef BATT_SAVER_DROP_FEM_LNA
-+  #define BATT_SAVER_DROP_FEM_LNA 0
++#ifndef POWER_GUARD_AUTO_DROP_FEM_LNA
++  #define POWER_GUARD_AUTO_DROP_FEM_LNA 0
 +#endif
-+// Auto-engage is opt-in: light sleep drops serial and thins RX, so it stays off
-+// until an operator asks for it. The deep-sleep rung below is independent.
-+#ifndef BATT_SAVER_AUTO_DEFAULT
-+  #define BATT_SAVER_AUTO_DEFAULT 0
++// Automatic power saving is opt-in: light sleep drops serial and thins RX, so it
++// stays off until an operator asks for it. The safe rung below is independent.
++#ifndef POWER_GUARD_AUTO_DEFAULT
++  #define POWER_GUARD_AUTO_DEFAULT 0
 +#endif
 +// Leave service entirely below this, keeping the reserve a solar pack needs to
 +// climb back. 0 disables the rung.
-+#ifndef BATT_SAVER_SLEEP_MV
-+  #define BATT_SAVER_SLEEP_MV 0
++#ifndef POWER_GUARD_SAFE_MV
++  #define POWER_GUARD_SAFE_MV 0
 +#endif
 +// First wait only; boot-pwrcheck owns the backoff from the next boot.
-+#ifndef BATT_SAVER_SLEEP_SECS
-+  #define BATT_SAVER_SLEEP_SECS 60
++#ifndef POWER_GUARD_SAFE_SECS
++  #define POWER_GUARD_SAFE_SECS 60
 +#endif
 +// Lower rail for a stored threshold -- under this the board cannot reliably boot,
 +// so the rung would never fire before a brownout did.
-+#ifndef BATT_SAVER_SLEEP_FLOOR_MV
-+  #define BATT_SAVER_SLEEP_FLOOR_MV 2500
++// 0 means no floor enforced. The real one is a board's measured boot floor, which
++// this cannot know.
++#ifndef POWER_GUARD_SAFE_FLOOR_MV
++  #define POWER_GUARD_SAFE_FLOOR_MV 0
 +#endif
 +// Upper rail for a stored threshold. Must stay under whatever the board needs to
 +// read before it will return to service, or a node hibernates and immediately
-+// qualifies to run again -- alive, but only between naps.
-+#ifndef BATT_SAVER_SLEEP_MAX_MV
-+  #define BATT_SAVER_SLEEP_MAX_MV BATT_SAVER_ON_MV
++// qualifies to run again -- alive, but only between sleeps.
++// Return-to-service mark. Lives here rather than beside the boot check that uses it,
++// because the CLI ceiling below derives from it and both translation units need it.
++// 0 disables the check.
++#ifndef POWER_GUARD_RESUME_MV
++  #define POWER_GUARD_RESUME_MV 0
++#endif
++
++// Defaults to one below the return-to-service mark, which is the invariant: a
++// threshold at or above it leaves a node hibernating and immediately qualifying to
++// run again. Deriving it means a board cannot get that wrong by omission.
++#ifndef POWER_GUARD_SAFE_MAX_MV
++  #define POWER_GUARD_SAFE_MAX_MV \
++    (POWER_GUARD_RESUME_MV > 0 ? POWER_GUARD_RESUME_MV - 1 : 0)
 +#endif
 +
 +class BattSaver {
@@ -201,7 +216,7 @@ index 0000000..b24b5f3
 +    _loaded = true;
 +    Preferences p;
 +    if (p.begin("mobmesh", true)) {
-+      _sleep_mv = p.getUShort("safe_mv", BATT_SAVER_SLEEP_MV);
++      _sleep_mv = p.getUShort("safe_mv", POWER_GUARD_SAFE_MV);
 +      _safe_on = p.getUChar("safe_on", SAFE_UNSET);
 +      p.end();
 +    }
@@ -211,9 +226,9 @@ index 0000000..b24b5f3
 +public:
 +  BattSaver(ESP32Board& board)
 +    : _board(&board), _next_sample_at(0), _agree(0), _sleep_agree(0),
-+      _auto(BATT_SAVER_AUTO_DEFAULT), _active(false),
++      _auto(POWER_GUARD_AUTO_DEFAULT), _active(false),
 +      _lna_was_enabled(false), _last_mv(0), _transitions(0),
-+      _sleep_mv(BATT_SAVER_SLEEP_MV), _safe_on(SAFE_UNSET), _loaded(false) { }
++      _sleep_mv(POWER_GUARD_SAFE_MV), _safe_on(SAFE_UNSET), _loaded(false) { }
 +
 +  // No sleep inhibit here -- ESP32Board::sleep() already refuses while
 +  // inhibit_sleep is set, which covers OTA on every path.
@@ -233,7 +248,7 @@ index 0000000..b24b5f3
 +  // 0 disables the rung outright. Anything else must clear the boot floor and stay
 +  // under the duty-cycle rung, or a healthy node sleeps on a 60s cycle.
 +  bool setSleepMilliVolts(uint16_t mv) {
-+    if (mv != 0 && (mv < BATT_SAVER_SLEEP_FLOOR_MV || mv > BATT_SAVER_SLEEP_MAX_MV)) return false;
++    if (mv != 0 && (mv < POWER_GUARD_SAFE_FLOOR_MV || mv > POWER_GUARD_SAFE_MAX_MV)) return false;
 +    ensureLoaded();
 +    _sleep_mv = mv;
 +    Preferences p;
@@ -246,7 +261,7 @@ index 0000000..b24b5f3
 +  void loop() {
 +    unsigned long now = millis();
 +    if ((long)(now - _next_sample_at) < 0) return;   // rollover-safe
-+    _next_sample_at = now + BATT_SAVER_SAMPLE_INTERVAL_MS;
++    _next_sample_at = now + POWER_GUARD_SAMPLE_INTERVAL_MS;
 +
 +    uint16_t mv = _board->getBattMilliVolts();
 +    _last_mv = mv;
@@ -264,23 +279,27 @@ index 0000000..b24b5f3
 +    // consecutive count is what keeps a transmit's sag from triggering it.
 +    ensureLoaded();
 +    if (_safe_on == 1 && _sleep_mv > 0 && mv < _sleep_mv) {
-+      if (++_sleep_agree >= BATT_SAVER_CONSECUTIVE_SAMPLES) {
++      if (++_sleep_agree >= POWER_GUARD_CONSECUTIVE_SAMPLES) {
 +        Serial.printf("batt %umV below %umV for %us -- leaving service\n",
 +                      mv, (unsigned)_sleep_mv,
-+                      (unsigned)(BATT_SAVER_SAMPLE_INTERVAL_MS / 1000
-+                                 * BATT_SAVER_CONSECUTIVE_SAMPLES));
-+        _board->enterDeepSleep(BATT_SAVER_SLEEP_SECS);   // does not return
++                      (unsigned)(POWER_GUARD_SAMPLE_INTERVAL_MS / 1000
++                                 * POWER_GUARD_CONSECUTIVE_SAMPLES));
++        _board->enterDeepSleep(POWER_GUARD_SAFE_SECS);   // does not return
 +      }
 +    } else {
 +      _sleep_agree = 0;
 +    }
 +
-+    if (!_auto) { _agree = 0; if (_active) setActive(false); return; }
++    if (!_auto || POWER_GUARD_AUTO_ON_MV == 0) {
++      _agree = 0;
++      if (_active) setActive(false);
++      return;
++    }
 +
-+    bool wants = _active ? (mv < BATT_SAVER_OFF_MV) : (mv <= BATT_SAVER_ON_MV);
++    bool wants = _active ? (mv < POWER_GUARD_AUTO_OFF_MV) : (mv <= POWER_GUARD_AUTO_ON_MV);
 +    if (wants == _active) { _agree = 0; return; }
 +
-+    if (++_agree < BATT_SAVER_CONSECUTIVE_SAMPLES) return;
++    if (++_agree < POWER_GUARD_CONSECUTIVE_SAMPLES) return;
 +    _agree = 0;
 +    setActive(wants);
 +  }
@@ -294,7 +313,7 @@ index 0000000..b24b5f3
 +  void setActive(bool on) {
 +    _active = on;
 +    _transitions++;
-+#if BATT_SAVER_DROP_FEM_LNA
++#if POWER_GUARD_AUTO_DROP_FEM_LNA
 +    if (!_board->canControlLoRaFemLna()) return;
 +    if (on) {
 +      // Capture rather than assume, so release restores the operator's setting.
@@ -307,7 +326,7 @@ index 0000000..b24b5f3
 +  }
 +};
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index 4b7326e..80ec416 100644
+index 4b7326e..c15de3f 100644
 --- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
 @@ -20,7 +20,100 @@
@@ -324,11 +343,11 @@ index 4b7326e..80ec416 100644
 +#define POWER_GUARD_HAS_POWERDOWN 1
 +#include <PowerGuard.h>
 +#endif
-+#ifndef POWEROFF_MIN_SECS
-+#define POWEROFF_MIN_SECS 60
++#ifndef POWER_GUARD_POWEROFF_MIN_SECS
++#define POWER_GUARD_POWEROFF_MIN_SECS 60
 +#endif
-+#ifndef POWEROFF_MAX_SECS
-+#define POWEROFF_MAX_SECS 86400
++#ifndef POWER_GUARD_POWEROFF_MAX_SECS
++#define POWER_GUARD_POWEROFF_MAX_SECS 86400
 +#endif
 +#endif
 +
@@ -339,8 +358,8 @@ index 4b7326e..80ec416 100644
 +  if (memcmp(command, "powersaving safe.mv ", 20) == 0) {
 +    uint32_t mv = (uint32_t) atol(command + 20);
 +    if (!batt_saver.setSleepMilliVolts((uint16_t) mv)) {
-+      sprintf(reply, "ERR: %u-%u or 0", (unsigned)BATT_SAVER_SLEEP_FLOOR_MV,
-+              (unsigned)BATT_SAVER_SLEEP_MAX_MV);
++      sprintf(reply, "ERR: %u-%u or 0", (unsigned)POWER_GUARD_SAFE_FLOOR_MV,
++              (unsigned)POWER_GUARD_SAFE_MAX_MV);
 +    } else if (mv == 0) {
 +      strcpy(reply, "OK - safe.mv 0 (rung disabled)");
 +    } else {
@@ -392,9 +411,9 @@ index 4b7326e..80ec416 100644
 +    uint32_t secs = (*arg == ' ') ? (uint32_t) atol(arg + 1) : 0;
 +    if (sender_timestamp != 0) {
 +      strcpy(reply, "ERR: poweroff is serial-only");
-+    } else if (secs < POWEROFF_MIN_SECS || secs > POWEROFF_MAX_SECS) {
++    } else if (secs < POWER_GUARD_POWEROFF_MIN_SECS || secs > POWER_GUARD_POWEROFF_MAX_SECS) {
 +      sprintf(reply, "ERR: usage: poweroff <secs> (%u-%u)",
-+              (unsigned)POWEROFF_MIN_SECS, (unsigned)POWEROFF_MAX_SECS);
++              (unsigned)POWER_GUARD_POWEROFF_MIN_SECS, (unsigned)POWER_GUARD_POWEROFF_MAX_SECS);
 +    } else {
 +      // enterDeepSleep() never returns, so reply[] would never be printed -- say it here.
 +      Serial.printf("OK - deep sleep %us (%uh%um), then reboots\n",

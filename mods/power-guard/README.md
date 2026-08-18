@@ -6,7 +6,7 @@ two mods, `batt-saver` and `boot-pwrcheck`, merged because they were never separ
 -- they edit the same regions, share one threshold ladder, and the ordering between
 them is a contract nothing could enforce across a mod boundary.
 
-**Repeater only, for now.** The napping rung has nothing to switch on a room server
+**Repeater only, for now.** The power saving rung has nothing to switch on a room server
 -- that firmware has no sleep path. Everything else would work there, and would
 inherit the board's thresholds. Untested, not impossible.
 
@@ -16,58 +16,58 @@ What happens as a heltec_v4 repeater's battery falls, highest to lowest:
 
 | mV | Name | What happens |
 | --- | --- | --- |
-| 3600 | `BATT_SAVER_OFF_MV` | Stops napping |
-| 3300 | `BATT_SAVER_ON_MV` | Starts napping |
-| 3150 | `BOOT_PWRCHECK_MIN_MV` | Won't come back into service below this |
-| 2800 | `BATT_SAVER_SLEEP_MV` | Hibernates |
+| 3600 | `POWER_GUARD_AUTO_OFF_MV` | Stops power saving |
+| 3300 | `POWER_GUARD_AUTO_ON_MV` | Starts power saving |
+| 3150 | `POWER_GUARD_RESUME_MV` | Won't come back into service below this |
+| 2800 | `POWER_GUARD_SAFE_MV` | Leaves service |
 | 2400 | *(measured)* | Can't boot at all below this |
 
-The ordering is the contract. Hibernate must sit under the return-to-service mark,
-or a node hibernates and immediately qualifies to run again -- alive, but only
-between naps. `BATT_SAVER_SLEEP_MAX_MV` (3149) is the CLI ceiling that enforces it.
+The ordering is the contract. The safe mark must sit under the return-to-service one,
+or a node leaves service and immediately qualifies to run again -- alive, but only
+between sleeps. `POWER_GUARD_SAFE_MAX_MV` (3149) is the CLI ceiling that enforces it.
 
 All values are gauge millivolts, not volts at the pins. The two differ by roughly
 30 mV at 3.7 V and 200 mV at 2.6 V on this board, and the boot floor is measured the
 same way, so comparing gauge against gauge keeps the error out of the margin.
 
-## Napping
+## Automatic power saving
 
-MeshCore already has a power-saving mode: short naps whenever the node has nothing
+MeshCore already has a power-saving mode: short sleeps whenever the node has nothing
 to do, waking immediately on a packet. It is a manual switch. This turns it on and
-off from the battery instead -- below `BATT_SAVER_ON_MV`, off again above
-`BATT_SAVER_OFF_MV`.
+off from the battery instead -- below `POWER_GUARD_AUTO_ON_MV`, off again above
+`POWER_GUARD_AUTO_OFF_MV`.
 
 **Off by default.** Light sleep drops serial and thins RX, so it waits for
 `powersaving auto on`.
 
 The two marks are far apart, and it insists on several agreeing readings rather than
-one, for the same reason: **napping changes the reading.** A sleeping node draws
+one, for the same reason: **power saving changes the reading.** A sleeping node draws
 less, so measured voltage rises the moment saving engages. Close marks would make it
 decide it had recovered, wake, sag, and oscillate. Transmitting does the same in
 reverse -- a burst pulls voltage down briefly, and that dip is not a flat battery.
 
-## Hibernating
+## Leaving service
 
-Below `BATT_SAVER_SLEEP_MV` the node leaves service entirely and deep-sleeps.
-Napping stretches runtime; this stops spending it, keeping the reserve a solar pack
+Below `POWER_GUARD_SAFE_MV` the node leaves service entirely and deep-sleeps.
+Power saving stretches runtime; this stops spending it, keeping the reserve a solar pack
 needs to climb back. With the rails down (see below) deep sleep draws microamps
 against 20-54 mA for a reset loop, and at dawn the panel has to beat whichever state
 the node is in -- a difference of three orders of magnitude, not a margin.
 
-Sampled from `modLoop()`, and it takes `BATT_SAVER_CONSECUTIVE_SAMPLES` agreeing
+Sampled from `modLoop()`, and it takes `POWER_GUARD_CONSECUTIVE_SAMPLES` agreeing
 readings. That count is what keeps a transmit from triggering it: a dip lasts well
 under a second against a 60 s sampler. Measured on board 1 at 45 mV above the
 threshold with adverts every 5 s -- 13% of samples fell below it, never three in a
 row, 41 transmits and no sleep.
 
-It sleeps `BATT_SAVER_SLEEP_SECS` once and the boot check owns the schedule after,
+It sleeps `POWER_GUARD_SAFE_SECS` once and the boot check owns the schedule after,
 so there is one retry ladder rather than two.
 
 ## Checking at boot
 
 Runs at the top of `modRadioInit()`, before `radio_init()` powers the radio up. Below
-`BOOT_PWRCHECK_MIN_MV` the node deep-sleeps and reboots to check again, doubling from
-`BOOT_PWRCHECK_BACKOFF_START_SECS` until it reaches `BOOT_PWRCHECK_RETRY_SECS`. A
+`POWER_GUARD_RESUME_MV` the node deep-sleeps and reboots to check again, doubling from
+`POWER_GUARD_BACKOFF_START_SECS` until it reaches `POWER_GUARD_BACKOFF_MAX_SECS`. A
 check that passes resets the backoff, so a brief dip costs a minute rather than
 inheriting a long interval from an earlier depletion.
 
@@ -184,7 +184,7 @@ Bare `poweroff` is refused rather than defaulted, so old muscle memory fails saf
 The confirmation is written straight to `Serial`, because `enterDeepSleep()` does not
 return and `reply[]` would never be printed.
 
-It shares the rail power-down above, so a deliberate day-long hibernation gets the
+It shares the rail power-down above, so a deliberate day-long sleep gets the
 same floor as the boot check rather than spending 4 mA for 24 hours.
 
 ## Rebasing the clock after a brownout
@@ -211,8 +211,8 @@ prefix and would otherwise answer these as a status query.
     powersaving safe              on/off, threshold, last reading
     powersaving safe.mv <mv>      set threshold; FLOOR-MAX, or 0 to disable
     powersaving safe on|off       toggle the rung, leaving the threshold alone
-    powersaving auto              napping state, active flag, transition count
-    powersaving auto on|off       toggle automatic napping
+    powersaving auto              power saving state, active flag, transition count
+    powersaving auto on|off       toggle automatic power saving
 
 `safe.mv` and `safe on|off` persist in an NVS namespace of our own -- no upstream
 struct to drift, no flash write on the low-battery path, and an absent key stays
@@ -223,30 +223,66 @@ the compiled default.
 
 ## Tuning
 
-Set per board in `variants/<board>/overrides.yaml`. Defaults are what a board gets if
-it says nothing.
+Set per board in `variants/<board>/overrides.yaml`. The values below are what
+heltec_v4 ships, measured on that board's divider -- they are not recommendations for
+any other.
 
-| Flag | Default | Meaning |
+**Every voltage defaults to 0, meaning off.** A threshold is a fact about a board's
+divider and its measured boot floor, so there is no sensible default: a board that
+says nothing gets a mod that does nothing, rather than one quietly running someone
+else's numbers.
+
+### Automatic power saving
+
+| Flag | heltec_v4 | Meaning |
 | --- | --- | --- |
-| `BATT_SAVER_OFF_MV` | 3800 | Stop napping at or above |
-| `BATT_SAVER_ON_MV` | 3500 | Start napping at or below |
-| `BATT_SAVER_AUTO_DEFAULT` | 0 | Napping auto-engage; off unless asked for |
-| `BATT_SAVER_SLEEP_MV` | 0 | Hibernate below this; 0 disables the rung |
-| `BATT_SAVER_SLEEP_SECS` | 60 | First hibernate wait only |
-| `BATT_SAVER_SLEEP_FLOOR_MV` | 2500 | CLI floor for `safe.mv` |
-| `BATT_SAVER_SLEEP_MAX_MV` | `ON_MV` | CLI ceiling; must stay under `MIN_MV` |
-| `BATT_SAVER_SAMPLE_INTERVAL_MS` | 60000 | How often to read the battery |
-| `BATT_SAVER_CONSECUTIVE_SAMPLES` | 3 | Agreeing readings needed to act |
-| `BATT_SAVER_DROP_FEM_LNA` | 0 | Also bypass the FEM LNA while napping |
-| `BOOT_PWRCHECK_MIN_MV` | 3200 | Won't return to service below this |
-| `BOOT_PWRCHECK_BACKOFF_START_SECS` | 60 | First retry wait; doubles from here |
-| `BOOT_PWRCHECK_RETRY_SECS` | 900 | Ceiling the backoff settles onto |
-| `POWEROFF_MIN_SECS` | 60 | Reject shorter waits |
-| `POWEROFF_MAX_SECS` | 86400 | Reject longer waits |
+| `POWER_GUARD_AUTO_ON_MV` | 3300 | Start power saving at or below; 0 disables the rung |
+| `POWER_GUARD_AUTO_OFF_MV` | 3600 | Stop power saving at or above |
+| `POWER_GUARD_AUTO_DEFAULT` | 0 | Auto-engage; off unless asked for |
+| `POWER_GUARD_AUTO_DROP_FEM_LNA` | 0 | Also bypass the FEM LNA while power saving |
 
-`BATT_SAVER_SLEEP_FLOOR_MV` is a board fact, not a preference -- it should sit just
-above that board's measured boot floor, or the rung can never fire before a brownout
-does. 2500 is right for heltec_v4 and unverified anywhere else.
+### Leaving service
+
+| Flag | heltec_v4 | Meaning |
+| --- | --- | --- |
+| `POWER_GUARD_SAFE_MV` | 2800 | Leave service below this; 0 disables the rung |
+| `POWER_GUARD_SAFE_FLOOR_MV` | 2500 | CLI floor for `safe.mv`; 0 means unenforced |
+| `POWER_GUARD_SAFE_MAX_MV` | *derived* | CLI ceiling, `RESUME_MV - 1` |
+| `POWER_GUARD_SAFE_SECS` | 60 | First leave service wait only |
+
+### Checking at boot
+
+| Flag | heltec_v4 | Meaning |
+| --- | --- | --- |
+| `POWER_GUARD_RESUME_MV` | 3150 | Won't return below this; 0 disables the boot check |
+| `POWER_GUARD_BACKOFF_START_SECS` | 60 | First retry wait; doubles from here |
+| `POWER_GUARD_BACKOFF_MAX_SECS` | 900 | Ceiling the backoff settles onto |
+
+### Sampling
+
+Shared by both rungs. Together they are the debounce window -- three readings a minute
+apart -- which is what stops a transmit's voltage sag reading as a flat pack.
+
+| Flag | heltec_v4 | Meaning |
+| --- | --- | --- |
+| `POWER_GUARD_SAMPLE_INTERVAL_MS` | 60000 | How often to read the battery |
+| `POWER_GUARD_CONSECUTIVE_SAMPLES` | 3 | Agreeing readings needed to act |
+
+### `poweroff` bounds
+
+| Flag | heltec_v4 | Meaning |
+| --- | --- | --- |
+| `POWER_GUARD_POWEROFF_MIN_SECS` | 60 | Reject shorter waits |
+| `POWER_GUARD_POWEROFF_MAX_SECS` | 86400 | Reject longer waits |
+
+`POWER_GUARD_SAFE_MAX_MV` is derived rather than set, at `RESUME_MV - 1`. That is
+the invariant -- a leave service threshold at or above the return-to-service mark leaves
+a node leaving service and immediately qualifying to run again -- so deriving it means a
+board cannot break it by omission.
+
+`POWER_GUARD_SAFE_FLOOR_MV` should sit just above that board's measured boot floor,
+or the CLI would accept a leave service threshold the node can never act on before a
+brownout does. 2500 is right for heltec_v4 and unverified anywhere else.
 
 The battery reading quantises to roughly 17 mV per step on heltec_v4 and depends on a
 per-unit calibration (`set adc.multiplier`, defaulting to `ADC_MULTIPLIER`), so treat
@@ -267,23 +303,23 @@ low", and `powersaving` keeps reporting what the operator asked for.
 
 ## Dropping the LNA (off by default)
 
-While napping the mod can also bypass the LoRa front-end LNA, and restore it on
+While power saving the mod can also bypass the LoRa front-end LNA, and restore it on
 release. **Disabled by default**, because it does not pay for itself.
 
-Measured on a Heltec V4.3: roughly **0.3 mA** against a **~5.5 mA** napping floor --
+Measured on a Heltec V4.3: roughly **0.3 mA** against a **~5.5 mA** power saving floor --
 about 5%, in exchange for around 10 dB of RX sensitivity. A repeater that hears
 meaningfully less is a routing hazard: neighbours keep routing through a node that no
 longer covers what it advertised, and from outside it looks like a partial fault
 rather than deliberate conservation.
 
-That ~5.5 mA is the *napping* floor -- light sleep, radio still in RX. Hibernation is
-a different path and a different number.
+That ~5.5 mA is the *power saving* floor -- light sleep, radio still in RX. Leaving
+service is a different path and a different number.
 
-The saving is small because the napping floor is dominated by the SX1262 sitting in
-RX; the radio must stay listening to wake on a packet. The nap itself is where the
+The saving is small because the power saving floor is dominated by the SX1262 sitting in
+RX; the radio must stay listening to wake on a packet. The sleep itself is where the
 power goes: an awake ESP32-S3 draws tens of mA against that floor.
 
-Set `BATT_SAVER_DROP_FEM_LNA: 1` to enable it anyway -- reasonable only where survival
+Set `POWER_GUARD_AUTO_DROP_FEM_LNA: 1` to enable it anyway -- reasonable only where survival
 clearly beats coverage. If enabled, the mod reads the current hardware state before
 bypassing and only restores the LNA if it was the one that turned it off, so an
 operator running `radio.fem.rxgain off` is not overridden. Nothing is persisted.
@@ -300,13 +336,14 @@ Add `power-guard` to a target's `mods:` list in `build-targets.yaml`:
     mods: [power-guard]
 ```
 
-Neither rung engages on its own: `BATT_SAVER_AUTO_DEFAULT` is 0, and
-`BATT_SAVER_SLEEP_MV` is 0 unless a board states a measured value. A board whose gauge
+Adding it to a target is not enough on its own -- every voltage defaults to 0, so a
+board that states no thresholds gets a mod that does nothing. Power saving needs
+`POWER_GUARD_AUTO_DEFAULT` or `powersaving auto on` as well. A board whose gauge
 has never been characterised stays dark.
 
 ## OTA updates are already safe
 
-A napping node could not otherwise complete an OTA update -- `start ota wan` needs
+A power saving node could not otherwise complete an OTA update -- `start ota wan` needs
 sustained uptime and a live WiFi association, and a 30-second sleep mid-download would
 break it. That is handled already, and not by this mod.
 
@@ -324,27 +361,27 @@ upstream files; both come from `shim/0001`. It also declares `hotspot-ota/0001` 
 
 A bench supply on the battery JST is the rig, USB disconnected.
 
-**Boot check.** Set the supply below `BOOT_PWRCHECK_MIN_MV`, boot, and watch the
+**Boot check.** Set the supply below `POWER_GUARD_RESUME_MV`, boot, and watch the
 current readout: a drop to the sleep floor means the sleep path was taken, and current
 returning after the backoff interval proves the timer wake. Serial prints the reason
 and the interval before it sleeps.
 
-**Hibernate rung.** Leave the node running and lower the supply below
-`BATT_SAVER_SLEEP_MV`. It should stay in service for
+**Safe rung.** Leave the node running and lower the supply below
+`POWER_GUARD_SAFE_MV`. It should stay in service for
 `SAMPLE_INTERVAL_MS * CONSECUTIVE_SAMPLES` before sleeping, not drop out immediately,
 then hand off to the boot check's backoff.
 
-**That a transmit does not trip it.** Hold the gauge just above `BATT_SAVER_SLEEP_MV`
+**That a transmit does not trip it.** Hold the gauge just above `POWER_GUARD_SAFE_MV`
 and fire adverts at full power. It must stay in service.
 
-**Napping rung.** Not yet run on hardware. Verify engage and release at the real
-marks, that mesh CLI still reaches a napping node, and measured current in both
+**Power saving rung.** Not yet run on hardware. Verify engage and release at the real
+marks, that mesh CLI still reaches a power saving node, and measured current in both
 states.
 
 ## Debugging
 
 Our heltec_v4 repeaters ship headless (`-UDISPLAY_CLASS`), so there is no screen. A
-node that engages napping gives no local indication at all, and serial goes quiet --
+node that engages power saving gives no local indication at all, and serial goes quiet --
 light sleep has no serial wake source, so commands typed at it are silently dropped.
 LoRa still wakes it, so the mesh side stays reachable.
 
