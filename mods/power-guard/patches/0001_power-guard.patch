@@ -1,30 +1,99 @@
 diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
-index 195d809..e182e6b 100644
+index 195d809..a338351 100644
 --- a/src/helpers/ModHooks.cpp
 +++ b/src/helpers/ModHooks.cpp
-@@ -7,6 +7,11 @@
+@@ -7,7 +7,80 @@
  #include <helpers/esp32/RollbackGuard.h>
  #endif
  
-+#ifdef WITH_BATT_SAVER
++#ifdef WITH_POWER_GUARD
 +#include <helpers/esp32/BattSaver.h>
 +BattSaver batt_saver(board);   // extern'd by CommonCliMods.cpp
 +#endif
 +
++#if defined(ESP32) && defined(WITH_POWER_GUARD)
++#include <helpers/ESP32Board.h>
++#ifndef BOOT_PWRCHECK_MIN_MV
++#define BOOT_PWRCHECK_MIN_MV 3200
++#endif
++#ifndef BOOT_PWRCHECK_RETRY_SECS
++#define BOOT_PWRCHECK_RETRY_SECS 900
++#endif
++#ifndef BOOT_PWRCHECK_BACKOFF_START_SECS
++#define BOOT_PWRCHECK_BACKOFF_START_SECS 60
++#endif
++
++// RTC slow memory, not flash -- survives deep sleep and costs no write at low voltage.
++RTC_DATA_ATTR static uint32_t bootPwrCheckMagic;
++RTC_DATA_ATTR static uint32_t bootPwrCheckFails;
++
++// Runs before radio_init(), so the radio is still off and drawing nothing. A pack too
++// weak to survive radio startup would otherwise brown out mid-init and reboot forever.
++static void bootPwrCheck() {
++  uint16_t mv = board.getBattMilliVolts();
++  if (mv == 0) return;               // no reading (USB-powered, no divider) -- not our call
++
++  if (bootPwrCheckMagic != 0x50575243UL) {   // cold boot, or RTC contents lost
++    bootPwrCheckMagic = 0x50575243UL;
++    bootPwrCheckFails = 0;
++  }
++  if (mv >= BOOT_PWRCHECK_MIN_MV) {
++    bootPwrCheckFails = 0;           // recovered -- next depletion starts responsive again
++    return;
++  }
++
++  // Doubles from the start value up to the ceiling: a transient dip recovers in about
++  // a minute, a real depletion settles onto the ceiling. Corrupt or absent RTC content
++  // lands on the shortest wait, so a bad read costs current and never a stranded node.
++  uint32_t shift = bootPwrCheckFails < 16 ? bootPwrCheckFails : 16;
++  uint32_t secs = (uint32_t)BOOT_PWRCHECK_BACKOFF_START_SECS << shift;
++  if (secs > BOOT_PWRCHECK_RETRY_SECS) secs = BOOT_PWRCHECK_RETRY_SECS;
++  bootPwrCheckFails++;
++
++  Serial.printf("batt %umV below %umV -- deep sleep %us (retry %u)\n",
++                mv, (unsigned)BOOT_PWRCHECK_MIN_MV, (unsigned)secs,
++                (unsigned)bootPwrCheckFails);
++  board.enterDeepSleep((uint32_t)secs);        // powers the radio off; does not return
++}
++#endif
++
++#if defined(ESP32) && defined(WITH_POWER_GUARD)
++#include <esp_system.h>
++#ifndef BOOT_CLOCK_FALLBACK_EPOCH
++#define BOOT_CLOCK_FALLBACK_EPOCH 1715770351UL   // same baseline a power-on reset uses
++#endif
++
++// A brownout can leave the RTC holding garbage, and nothing moves a clock backwards,
++// so without this a corrupt value stands until NTP or someone pulls the battery.
++static void bootClockGuard() {
++  if (esp_reset_reason() != ESP_RST_BROWNOUT) return;
++  uint32_t now = rtc_clock.getCurrentTime();
++  if (now == BOOT_CLOCK_FALLBACK_EPOCH) return;
++  Serial.printf("brownout reset -- clock %u rebased to %u\n",
++                (unsigned)now, (unsigned)BOOT_CLOCK_FALLBACK_EPOCH);
++  rtc_clock.setCurrentTime(BOOT_CLOCK_FALLBACK_EPOCH);
++}
++#endif
++
  bool modRadioInit(const char* build_id) {
++#if defined(ESP32) && defined(WITH_POWER_GUARD)
++  bootClockGuard();
++  bootPwrCheck();
++#endif
  #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
    SPIFFS.begin(true);   // RollbackGuard's failure counter needs it mounted before use; safe to call twice
-@@ -32,8 +37,15 @@ void modLoop() {
+ 
+@@ -32,8 +105,15 @@ void modLoop() {
  #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
    RollbackGuard::poll();
  #endif
-+#ifdef WITH_BATT_SAVER
++#ifdef WITH_POWER_GUARD
 +  batt_saver.loop();
 +#endif
  }
  
  bool modWantsPowerSaving() {
-+#ifdef WITH_BATT_SAVER
++#ifdef WITH_POWER_GUARD
 +  return batt_saver.isActive();   // runtime only; NodePrefs is never written
 +#else
    return false;
@@ -222,20 +291,26 @@ index 0000000..b24b5f3
 +  }
 +};
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index 4b7326e..3b13a55 100644
+index 4b7326e..158fcad 100644
 --- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
-@@ -20,7 +20,64 @@
+@@ -20,7 +20,89 @@
  #define OTA_MOD_BUILD_DATE "unknown"
  #endif
  
-+#ifdef WITH_BATT_SAVER
++#if defined(ESP_PLATFORM) && defined(WITH_POWER_GUARD)
 +#include <helpers/esp32/BattSaver.h>
 +extern BattSaver batt_saver;
++#ifndef POWEROFF_MIN_SECS
++#define POWEROFF_MIN_SECS 60
++#endif
++#ifndef POWEROFF_MAX_SECS
++#define POWEROFF_MAX_SECS 86400
++#endif
 +#endif
 +
  bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
-+#ifdef WITH_BATT_SAVER
++#if defined(ESP_PLATFORM) && defined(WITH_POWER_GUARD)
 +  // Claimed ahead of upstream's 11-char "powersaving" prefix, which would answer
 +  // any of these as a status query and look like it worked.
 +  if (memcmp(command, "powersaving safe.mv ", 20) == 0) {
@@ -283,6 +358,25 @@ index 4b7326e..3b13a55 100644
 +      sprintf(reply, "OK - auto %s", batt_saver.isAuto() ? "on" : "off");
 +    } else {
 +      strcpy(reply, "ERR: usage: powersaving auto [on|off]");
++    }
++    return true;
++  }
++
++  // Claimed ahead of upstream's own branch, which calls powerOff() -> enterDeepSleep(0)
++  // and never wakes. A node that cannot wake itself needs a site visit.
++  if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
++    const char* arg = command + 8;   // both verbs are 8 chars
++    uint32_t secs = (*arg == ' ') ? (uint32_t) atol(arg + 1) : 0;
++    if (sender_timestamp != 0) {
++      strcpy(reply, "ERR: poweroff is serial-only");
++    } else if (secs < POWEROFF_MIN_SECS || secs > POWEROFF_MAX_SECS) {
++      sprintf(reply, "ERR: usage: poweroff <secs> (%u-%u)",
++              (unsigned)POWEROFF_MIN_SECS, (unsigned)POWEROFF_MAX_SECS);
++    } else {
++      // enterDeepSleep() never returns, so reply[] would never be printed -- say it here.
++      Serial.printf("OK - deep sleep %us (%uh%um), then reboots\n",
++                    (unsigned)secs, (unsigned)(secs / 3600), (unsigned)((secs % 3600) / 60));
++      board.enterDeepSleep(secs);   // does not return
 +    }
 +    return true;
 +  }

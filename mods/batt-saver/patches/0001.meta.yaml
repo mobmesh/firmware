@@ -1,6 +1,0 @@
-id: "0001"
-title: low-battery-powersaving
-# Context dependency only: hotspot-ota/0002 edits the same ModHooks.cpp regions.
-requires: ["shim/0001", "hotspot-ota/0002"]
-env_flag: WITH_BATT_SAVER
-build_src_filter: []

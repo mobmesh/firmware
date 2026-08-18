@@ -38,22 +38,35 @@ build_flags:
   OTA_WAN_CHECK_ATTEMPTS: 3
   OTA_WAN_CHECK_RETRY_DELAY_MS: 10000
 
-# Low-battery power saving (mods/batt-saver). Only takes effect on targets that
-# list the mod. Gap must stay wide -- sleeping sheds load and raises the reading.
-  BATT_SAVER_ON_MV: 3300    # engage saving at or below
+# mods/power-guard. All in gauge millivolts, highest to lowest -- the ordering is
+# the contract; see that mod's README for the ladder.
+#
+# Napping. Gap must stay wide -- sleeping sheds load and raises the reading.
   BATT_SAVER_OFF_MV: 3600   # release saving at or above
+  BATT_SAVER_ON_MV: 3300    # engage saving at or below
 
-# Leave service before a brownout, so a solar pack keeps the reserve that lets it
-# climb back. Gauge units: the boot floor it guards against is measured the same way.
+# Return to service. Sits below ON_MV so napping gets a chance to extend runtime
+# before the node stops entirely, and above SLEEP_MAX_MV so anything that
+# hibernates can boot back up.
+  BOOT_PWRCHECK_MIN_MV: 3150
+
+# Hibernate. Leaves service before a brownout so a solar pack keeps the reserve
+# that lets it climb back.
+  BATT_SAVER_SLEEP_MAX_MV: 3149 # CLI ceiling; must stay under MIN_MV above
   BATT_SAVER_SLEEP_MV: 2800     # 0 disables; ~2.97 V at the pins on this board
-  BATT_SAVER_SLEEP_SECS: 60     # first wait only; boot-pwrcheck owns the backoff after
-  BATT_SAVER_SLEEP_MAX_MV: 3149 # must stay under BOOT_PWRCHECK_MIN_MV below, or a
-                                # hibernating node qualifies to run again on wake
+  BATT_SAVER_SLEEP_FLOOR_MV: 2500  # CLI floor; ~100 mV over this board's measured
+                                   # ~2400 boot floor, so the rung can still fire
+  BATT_SAVER_SLEEP_SECS: 60     # first wait only; the boot check backs off after
 
-# Never-strand guards (mods/boot-pwrcheck). MIN_MV sits below BATT_SAVER_ON_MV so
-# power saving gets a chance to extend runtime before the node stops entirely.
-  BOOT_PWRCHECK_MIN_MV: 3150      # sleep at boot below this, rather than start the radio
-  BOOT_PWRCHECK_RETRY_SECS: 900   # ceiling the retry backoff settles onto
+# Sampling. Together these are the debounce window -- 3 x 60 s -- which is what
+# stops a transmit's voltage sag from being read as a flat pack.
+  BATT_SAVER_SAMPLE_INTERVAL_MS: 60000
+  BATT_SAVER_CONSECUTIVE_SAMPLES: 3
+
+# Retry backoff: doubles from the start value until it reaches the ceiling.
+  BOOT_PWRCHECK_BACKOFF_START_SECS: 60
+  BOOT_PWRCHECK_RETRY_SECS: 900
+
   POWEROFF_MIN_SECS: 60           # `poweroff <secs>` bounds; 0 is always refused
   POWEROFF_MAX_SECS: 86400
 
