@@ -1,10 +1,14 @@
 # power-guard - Never Strand a Node
 
+**A repeater that stops to save itself draws microamps, not milliamps.**
+
+Upstream's deep sleep leaves the LoRa front-end rail powered -- about **4 mA**, which
+is a node spending its last charge on retries that reach nothing. Cut that rail and it
+is **~14 uA**, three hundred times lower, so the reserve a solar pack needs to climb
+back at dawn is still there in the morning.
+
 Everything this project does about power: when a node conserves, when it stops
-relaying, when it comes back, and what happens if it browns out anyway. Formerly
-two mods, `batt-saver` and `boot-pwrcheck`, merged because they were never separable
--- they edit the same regions, share one threshold ladder, and the ordering between
-them is a contract nothing could enforce across a mod boundary.
+relaying, when it comes back, and what happens if it browns out anyway.
 
 **Repeater only, for now.** The power saving rung has nothing to switch on a room server
 -- that firmware has no sleep path. Everything else would work there, and would
@@ -50,7 +54,7 @@ reverse -- a burst pulls voltage down briefly, and that dip is not a flat batter
 
 Below `POWER_GUARD_SAFE_MV` the node leaves service entirely and deep-sleeps.
 Power saving stretches runtime; this stops spending it, keeping the reserve a solar pack
-needs to climb back. With the rails down (see below) deep sleep draws microamps
+needs to climb back. With the rail down (see below) deep sleep draws around 14 uA
 against 20-54 mA for a reset loop, and at dawn the panel has to beat whichever state
 the node is in -- a difference of three orders of magnitude, not a margin.
 
@@ -89,6 +93,12 @@ bench supply is already left alone.
 a stock sleep leaves the FEM rail powered. That cost **4 mA**, measured -- a node too
 flat to run was spending its remaining charge on every retry, which is the failure
 this mod exists to prevent, just slower.
+
+**With the rail down the figure is ~14 uA**, roughly three hundred times lower.
+Heltec's own community forum has the same result: a board measured at 300 uA of
+residual peaks in deep sleep dropped to about 13 uA once the FEM was switched off at
+GPIO7, which is the step upstream's sleep path does not take. Our own meter stops at
+milliamps, so we can confirm the drop but not the endpoint -- see Measured below.
 
 `variants/heltec_v4/PowerGuard.h` drops it. Board hardware lives there, beside the
 `LoRaFEMControl` it drives; the mod's policy stays board-independent. A board that
@@ -148,9 +158,14 @@ mattering.
 
 ### Measured
 
-Sleep current fell from 4 mA to below the resolution of a mA-range meter, same supply
-voltage and same command either side. Reference implementations for this board report
-~13.8 uA; we have no meter that reaches it.
+Sleep current fell from 4 mA to below the resolution of a mA-range meter, with the
+same supply voltage and the same command either side, so the only variable was the
+rail power-down.
+
+The endpoint is unmeasured here. Independent reports for this board, using a meter
+that reaches microamps, put it at 13-14 uA once the FEM rail is cut. That is
+consistent with what we can see but is not our number, and should not be quoted as
+though it were.
 
 The radiated path was checked with a second node rather than trusting `advert`'s
 return value, which only means the packet was queued:
