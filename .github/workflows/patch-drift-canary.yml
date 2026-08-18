@@ -128,6 +128,24 @@ jobs:
             fi
           fi
 
+          # --- 4. does upstream still sleep the radio the way power-guard assumes? --
+          # power-guard's poweroff path calls radio_driver.powerOff() and relies on it
+          # reaching the SX1262's sleep. If that stops sleeping the chip, the radio
+          # stays awake through a deliberate hibernation -- higher current, not a
+          # stranded node, so warn rather than fail.
+          #
+          # Only meaningful while some target actually builds the mod; $MODS is the
+          # union across build-targets.yaml, so this goes quiet if it is dropped.
+          if [ -d probe-src ] && echo " $MODS " | grep -q " power-guard "; then
+            if grep -qE 'sleep\(false\)' \
+              probe-src/src/helpers/radiolib/CustomSX1262Wrapper.h 2>/dev/null; then
+              echo "- upstream \\\`CustomSX1262Wrapper::powerOff()\\\` still sleeps the SX1262; power-guard's poweroff path relies on it" >> "$REPORT"
+            else
+              DRIFT=true
+              echo "- upstream \\\`CustomSX1262Wrapper::powerOff()\\\` no longer calls \\\`sleep(false)\\\` -- power-guard's poweroff path may leave the radio awake (see mods/power-guard/README.md)" >> "$REPORT"
+            fi
+          fi
+
           echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"
           { echo 'report<<REPORT_EOF'; cat "$REPORT"; echo 'REPORT_EOF'; } >> "$GITHUB_OUTPUT"
           cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
