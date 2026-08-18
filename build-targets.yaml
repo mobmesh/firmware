@@ -38,7 +38,7 @@ targets:
     # If true, must match across all targets of this role.
     make_latest: true
     # heltec_v4 only: its battery divider is the one that has been bench-measured.
-    mods: [batt-saver, boot-pwrcheck]
+    mods: [power-guard]
     # Headless: drops the OLED and the button's long-press power-off.
     # Joined form -- PlatformIO splits "-U FOO" into a bare -U.
     build_flags_append: ["-UDISPLAY_CLASS"]

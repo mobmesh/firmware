@@ -1,5 +1,0 @@
-id: "0002"
-title: poweroff-requires-wake-time
-# Context dependency only: hotspot-ota/0001 edits the same CommonCliMods.cpp regions.
-requires: ["shim/0001", "hotspot-ota/0001", "boot-pwrcheck/0001"]
-build_src_filter: []

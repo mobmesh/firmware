@@ -1,6 +1,0 @@
-id: "0003"
-title: brownout-clock-rebase
-# Context dependency only: shares ModHooks.cpp regions with 0001.
-requires: ["shim/0001", "hotspot-ota/0002", "boot-pwrcheck/0001"]
-env_flag: WITH_BOOT_PWRCHECK
-build_src_filter: []

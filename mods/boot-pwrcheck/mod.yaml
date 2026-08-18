@@ -1,3 +1,0 @@
-name: boot-pwrcheck
-# No suffix -- a failsafe, not a feature; must not change asset filenames.
-suffix: ""
