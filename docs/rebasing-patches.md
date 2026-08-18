@@ -85,12 +85,21 @@ can break the build. Build every env in `build-targets.yaml`:
 
 ```sh
 python3 -m venv /tmp/pioenv && /tmp/pioenv/bin/pip install -q platformio pyyaml
-# for each target: inject the flags CI would inject, then build
+
+# For each target: inject the flags CI would inject, then build. Run inject-env from
+# the repo root, and pass that target's full mod list from build-targets.yaml --
+# core_mods first. Omitting a mod silently drops its build_src_filter entries and the
+# link fails on an undefined reference rather than anything that names the cause.
 python3 scripts/generate-board-config.py inject-env \
   --board heltec_v4 --env heltec_v4_repeater \
   --platformio-ini <upstream>/variants/heltec_v4/platformio.ini \
-  --mods hotspot-ota,timing-safety
-(cd <upstream> && /tmp/pioenv/bin/pio run -e heltec_v4_repeater)
+  --mods shim,hotspot-ota,timing-safety,power-guard
+
+# inject-env refuses a second run once a board_build.partitions line is present, so
+# restore the file before re-injecting:
+#   git -C <upstream> checkout -- variants/heltec_v4/platformio.ini
+(cd <upstream> && PLATFORMIO_BUILD_FLAGS="-D 'OTA_MOD_BUILD_DATE=\"local\"' -D 'OTA_MOD_SHORT_SHA=\"local\"'" \
+  /tmp/pioenv/bin/pio run -e heltec_v4_repeater)
 ```
 
 For the 1.17.0 rebase all four envs built: heltec_v4 repeater 20.4% flash, room server
