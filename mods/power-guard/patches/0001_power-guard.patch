@@ -1,8 +1,8 @@
 diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
-index 195d809..a338351 100644
+index 195d809..43b8092 100644
 --- a/src/helpers/ModHooks.cpp
 +++ b/src/helpers/ModHooks.cpp
-@@ -7,7 +7,80 @@
+@@ -7,7 +7,96 @@
  #include <helpers/esp32/RollbackGuard.h>
  #endif
  
@@ -13,6 +13,12 @@ index 195d809..a338351 100644
 +
 +#if defined(ESP32) && defined(WITH_POWER_GUARD)
 +#include <helpers/ESP32Board.h>
++// Board-specific deep-sleep power-down. A board that ships no PowerGuard.h keeps the
++// stock sleep, which leaves its rails up.
++#ifdef P_LORA_PA_POWER
++#define POWER_GUARD_HAS_POWERDOWN 1
++#include <PowerGuard.h>
++#endif
 +#ifndef BOOT_PWRCHECK_MIN_MV
 +#define BOOT_PWRCHECK_MIN_MV 3200
 +#endif
@@ -30,6 +36,12 @@ index 195d809..a338351 100644
 +// Runs before radio_init(), so the radio is still off and drawing nothing. A pack too
 +// weak to survive radio startup would otherwise brown out mid-init and reboot forever.
 +static void bootPwrCheck() {
++#ifdef POWER_GUARD_HAS_POWERDOWN
++  // Holds survive the reset by design and upstream's own releases are not enough, so
++  // drop them every call whatever the reset reason -- then every path out of here
++  // leaves the pins usable with no control flow to reason about.
++  powerGuardReleaseHolds();
++#endif
 +  uint16_t mv = board.getBattMilliVolts();
 +  if (mv == 0) return;               // no reading (USB-powered, no divider) -- not our call
 +
@@ -53,6 +65,10 @@ index 195d809..a338351 100644
 +  Serial.printf("batt %umV below %umV -- deep sleep %us (retry %u)\n",
 +                mv, (unsigned)BOOT_PWRCHECK_MIN_MV, (unsigned)secs,
 +                (unsigned)bootPwrCheckFails);
++  Serial.flush();
++#ifdef POWER_GUARD_HAS_POWERDOWN
++  powerGuardDownPreRadio();
++#endif
 +  board.enterDeepSleep((uint32_t)secs);        // powers the radio off; does not return
 +}
 +#endif
@@ -83,7 +99,7 @@ index 195d809..a338351 100644
  #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
    SPIFFS.begin(true);   // RollbackGuard's failure counter needs it mounted before use; safe to call twice
  
-@@ -32,8 +105,15 @@ void modLoop() {
+@@ -32,8 +121,15 @@ void modLoop() {
  #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
    RollbackGuard::poll();
  #endif
@@ -291,16 +307,23 @@ index 0000000..b24b5f3
 +  }
 +};
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index 4b7326e..158fcad 100644
+index 4b7326e..80ec416 100644
 --- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
-@@ -20,7 +20,89 @@
+@@ -20,7 +20,100 @@
  #define OTA_MOD_BUILD_DATE "unknown"
  #endif
  
 +#if defined(ESP_PLATFORM) && defined(WITH_POWER_GUARD)
 +#include <helpers/esp32/BattSaver.h>
 +extern BattSaver batt_saver;
++// Board-specific rail power-down, where the board ships one. The radio is already
++// initialised on this path, so enterDeepSleep()'s own powerOff() sleeps the SX1262 --
++// only the rails are ours to drop.
++#ifdef P_LORA_PA_POWER
++#define POWER_GUARD_HAS_POWERDOWN 1
++#include <PowerGuard.h>
++#endif
 +#ifndef POWEROFF_MIN_SECS
 +#define POWEROFF_MIN_SECS 60
 +#endif
@@ -376,6 +399,10 @@ index 4b7326e..158fcad 100644
 +      // enterDeepSleep() never returns, so reply[] would never be printed -- say it here.
 +      Serial.printf("OK - deep sleep %us (%uh%um), then reboots\n",
 +                    (unsigned)secs, (unsigned)(secs / 3600), (unsigned)((secs % 3600) / 60));
++      Serial.flush();
++#ifdef POWER_GUARD_HAS_POWERDOWN
++      powerGuardDownPostRadio();
++#endif
 +      board.enterDeepSleep(secs);   // does not return
 +    }
 +    return true;
@@ -384,3 +411,96 @@ index 4b7326e..158fcad 100644
    if (memcmp(command, "ver", 3) == 0) {
      // Shadows upstream's own `ver` branch, which never runs while this mod is built in.
      sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
+diff --git a/variants/heltec_v4/PowerGuard.h b/variants/heltec_v4/PowerGuard.h
+new file mode 100644
+index 0000000..9641648
+--- /dev/null
++++ b/variants/heltec_v4/PowerGuard.h
+@@ -0,0 +1,87 @@
++#pragma once
++
++// Board-specific power-down for mods/power-guard's deep sleeps. Everything here is
++// heltec_v4 hardware; the mod's policy stays board-independent. A board that ships no
++// PowerGuard.h simply does not call these.
++//
++// Both pins are in the S3's RTC range, so one hold mechanism covers them, and both
++// releases are ours. A hold survives the wake reset by design, so a missed release
++// leaves a node that transmits and is never heard.
++
++#include <Arduino.h>
++#include <SPI.h>
++#include <driver/rtc_io.h>
++#include <target.h>   // board, radio_driver
++
++// Vfem, the FEM's own supply (TLV75733PDBVR, schematic U3). EN carries a 5.1M pull-up
++// to VDD_3V3, so at sleep entry the pad driver powers down and the pull-up switches
++// the rail back on -- it must be driven low AND latched, not merely written low.
++//
++// Not Vext: that is a separate rail feeding the display, and this board has no RF
++// switch to keep alive (the PE4259 belonged to V2.1, not V4).
++static inline void powerGuardFemOff() {
++  // CSD low before its rail drops, so we are not driving a logic high into an
++  // unpowered chip's input while enterDeepSleep() flushes serial.
++  board.loRaFEMControl.setSleepModeEnable();
++  digitalWrite(P_LORA_PA_POWER, LOW);
++  rtc_gpio_hold_en((gpio_num_t)P_LORA_PA_POWER);
++}
++
++// NSS high and latched. Doing this ourselves, after the radio is already asleep,
++// means enterDeepSleep()'s own powerOff() and hold are harmlessly blocked -- so the
++// order it does things in stops being something we depend on.
++static inline void powerGuardHoldNss() {
++  digitalWrite(P_LORA_NSS, HIGH);
++  rtc_gpio_hold_en((gpio_num_t)P_LORA_NSS);
++}
++
++// Pre-radio_init path. The SPI bus was never begun, so radio_driver.powerOff()
++// silently does nothing -- we issue SetSleep (0x84) directly, which is valid straight
++// from STDBY_RC after reset and needs no TCXO, calibration or PLL.
++static inline void powerGuardDownPreRadio() {
++  powerGuardFemOff();
++
++  // Level before direction: pinMode(OUTPUT) enables the driver with whatever is in the
++  // output register, which on this path has never been written, so setting the level
++  // first is what stops NSS asserting for an instant.
++  digitalWrite(P_LORA_NSS, HIGH);
++  pinMode(P_LORA_NSS, OUTPUT);
++  pinMode(P_LORA_BUSY, INPUT);
++  {
++    SPIClass spi(FSPI);
++    spi.begin(P_LORA_SCLK, P_LORA_MISO, P_LORA_MOSI);
++    uint32_t t0 = millis();
++    while (digitalRead(P_LORA_BUSY) && (millis() - t0) < 10) { }
++    if (digitalRead(P_LORA_BUSY)) {
++      // Command would be discarded and the chip left in STDBY_RC at ~600uA, with
++      // nothing else to say so.
++      Serial.println("power-guard: SX1262 BUSY stuck, sleep command not issued");
++    } else {
++      spi.beginTransaction(SPISettings(2000000, MSBFIRST, SPI_MODE0));
++      digitalWrite(P_LORA_NSS, LOW);
++      spi.transfer(0x84);   // SetSleep
++      spi.transfer(0x00);   // cold start, no RTC wake
++      digitalWrite(P_LORA_NSS, HIGH);   // sleep begins on this edge
++      spi.endTransaction();
++    }
++    spi.end();
++  }
++  powerGuardHoldNss();
++}
++
++// Post-radio_init path. The bus is up, so upstream's own sleep works -- call it here
++// rather than leaving it to enterDeepSleep, then latch NSS behind it.
++static inline void powerGuardDownPostRadio() {
++  powerGuardFemOff();
++  radio_driver.powerOff();
++  powerGuardHoldNss();
++}
++
++// Called first thing on every boot, whatever the reset reason, so every path out
++// leaves the pins usable. Releasing our own holds rather than relying on
++// LoRaFEMControl::init() and HeltecV4Board::begin() to do it: both already have, by
++// the time this runs, which makes these no-ops today and correct if that changes.
++static inline void powerGuardReleaseHolds() {
++  rtc_gpio_hold_dis((gpio_num_t)P_LORA_PA_POWER);
++  rtc_gpio_hold_dis((gpio_num_t)P_LORA_NSS);
++}

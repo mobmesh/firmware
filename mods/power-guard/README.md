@@ -50,8 +50,9 @@ reverse -- a burst pulls voltage down briefly, and that dip is not a flat batter
 
 Below `BATT_SAVER_SLEEP_MV` the node leaves service entirely and deep-sleeps.
 Napping stretches runtime; this stops spending it, keeping the reserve a solar pack
-needs to climb back. Deep sleep draws 3-4 mA against 20-54 mA for a reset loop, and
-at dawn the panel has to beat whichever state the node is in.
+needs to climb back. With the rails down (see below) deep sleep draws microamps
+against 20-54 mA for a reset loop, and at dawn the panel has to beat whichever state
+the node is in -- a difference of three orders of magnitude, not a margin.
 
 Sampled from `modLoop()`, and it takes `BATT_SAVER_CONSECUTIVE_SAMPLES` agreeing
 readings. That count is what keeps a transmit from triggering it: a dip lasts well
@@ -82,6 +83,89 @@ the divider feeding the ADC sits on the battery node, which those pins bypass. H
 readings need no guard -- nothing engages above the marks, so a board on USB or a
 bench supply is already left alone.
 
+## Powering down before sleep
+
+`enterDeepSleep()` handles the SX1262 driver and NSS, but nothing board-specific, so
+a stock sleep leaves the FEM rail powered. That cost **4 mA**, measured -- a node too
+flat to run was spending its remaining charge on every retry, which is the failure
+this mod exists to prevent, just slower.
+
+`variants/heltec_v4/PowerGuard.h` drops it. Board hardware lives there, beside the
+`LoRaFEMControl` it drives; the mod's policy stays board-independent. A board that
+ships no `PowerGuard.h` keeps the stock sleep, and needs no placeholder macros to say
+so -- the include is gated on the board defining `P_LORA_PA_POWER`.
+
+The FEM has its own supply (`TLV75733PDBVR`, schematic U3, output `Vfem`). Its enable
+pin carries a 5.1M pull-up to `VDD_3V3`, so at sleep entry the pad driver powers down
+and the pull-up switches the rail back on. It has to be driven low **and latched**,
+not merely written low.
+
+Two entry points, because the two sleep paths differ in one decisive way:
+
+| | radio state | how it is slept |
+| --- | --- | --- |
+| `powerGuardDownPreRadio()` | `radio_init()` has not run | `SetSleep` by hand |
+| `powerGuardDownPostRadio()` | already initialised | `radio_driver.powerOff()` |
+
+The boot check runs before `radio_init()`, so upstream's `powerOff()` silently does
+nothing there -- the SPI bus was never begun. We issue `SetSleep` (0x84) directly,
+which is valid straight from `STDBY_RC` after reset and needs no TCXO, calibration or
+PLL.
+
+**Both paths sleep the radio and latch NSS themselves, before calling
+`enterDeepSleep()`.** That is deliberate: a falling edge on NSS is exactly what wakes
+an SX126x, and RadioLib strobes CS low before any transfer whether or not its bus was
+begun. Latching first means `enterDeepSleep()`'s own `powerOff()` and hold are
+harmlessly blocked -- the chip is already asleep -- so the order it does things in
+stops being something this mod depends on.
+
+Both holds are released here too, first thing in the boot check, on every boot
+whatever the reset reason. `LoRaFEMControl::init()` and `HeltecV4Board::begin()` have
+both already released by then, which makes ours no-ops today and correct if that ever
+changes. Every hold has exactly one release; a missed one leaves a node that
+transmits and is never heard.
+
+### Vext is deliberately left alone
+
+An earlier version also dropped Vext, on the understanding that it fed a PE4259 RF
+switch. It does not -- that part belonged to the V2.1 boards. On V4 the Vext rail
+powers the onboard OLED, which this target builds out (`-UDISPLAY_CLASS`), and the
+`Ve` header pins for external sensors.
+
+Cutting a rail whose loads this mod cannot know about is the wrong default. A sensor
+may need warm-up, may hold state, may want a defined power sequence -- and breaking
+one that way looks like a flaky sensor rather than like us. MeshCore already has the
+right home for it: `enterDeepSleep()` stops the GPS through the sensor framework,
+which knows what is attached.
+
+If a deployment puts peripherals on `Ve` and wants them powered down while asleep,
+that belongs in the sensor framework, not in a blind `digitalWrite` here.
+
+Removing it also retired the mod's only non-RTC hold. `P_LORA_PA_POWER` and
+`P_LORA_NSS` are both in the S3's RTC range, so one mechanism covers both, and the
+question of whether `gpio_deep_sleep_hold_en()` latches survive a wake reset stopped
+mattering.
+
+### Measured
+
+Sleep current fell from 4 mA to below the resolution of a mA-range meter, same supply
+voltage and same command either side. Reference implementations for this board report
+~13.8 uA; we have no meter that reaches it.
+
+The radiated path was checked with a second node rather than trusting `advert`'s
+return value, which only means the packet was queued:
+
+    baseline                     SNR 48
+    after post-radio power-down  SNR 50
+    after pre-radio power-down   SNR 49
+
+with the neighbour entry cleared to `-none-` between each, so a stale row could not
+read as success. A latched-off PA or a radio left asleep would have shown nothing.
+
+FEM auto-detection was compared across a deep-sleep wake and a normal boot -- the
+first skips the startup delay `LoRaFEMControl::init()` applies -- and did not shift,
+so the LDO settles well inside that margin despite C15/C16 on its output.
+
 ## poweroff requires a wake time
 
 Upstream's `poweroff` / `shutdown` calls `powerOff()` -> `enterDeepSleep(0)`, which
@@ -99,6 +183,9 @@ Bare `poweroff` is refused rather than defaulted, so old muscle memory fails saf
 
 The confirmation is written straight to `Serial`, because `enterDeepSleep()` does not
 return and `reply[]` would never be printed.
+
+It shares the rail power-down above, so a deliberate day-long hibernation gets the
+same floor as the boot check rather than spending 4 mA for 24 hours.
 
 ## Rebasing the clock after a brownout
 
