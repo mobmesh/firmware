@@ -248,7 +248,7 @@ else's numbers.
 | `POWER_GUARD_SAFE_MV` | 2800 | Leave service below this; 0 disables the rung |
 | `POWER_GUARD_SAFE_FLOOR_MV` | 2500 | CLI floor for `safe.mv`; 0 means unenforced |
 | `POWER_GUARD_SAFE_MAX_MV` | *derived* | CLI ceiling, `RESUME_MV - 1` |
-| `POWER_GUARD_SAFE_SECS` | 60 | First leave service wait only |
+| `POWER_GUARD_SAFE_SECS` | 60 | First wait only, before the boot check takes over |
 
 ### Checking at boot
 
