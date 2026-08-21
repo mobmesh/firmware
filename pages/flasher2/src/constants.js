@@ -104,3 +104,58 @@ export const ROM_PORT_SETTLE_MS = 2000;
 // `matched`. esptool's own default for `connect`. Each attempt re-applies the reset
 // strategy, which is worth repeating here precisely because a reset *is* issued.
 export const ENTRY_CONNECT_ATTEMPTS = 7;
+
+// --- Flash writing (§7.1, §10.1) ---
+
+// `matched`. Nominal for native USB-Serial/JTAG; esptool renegotiates to it once
+// the stub is up, so it is not a clock constraint. Lower values cost real time on
+// a 1.3 MB image.
+export const ESPTOOL_BAUD_RATE = 2000000;
+
+// `protocol`. Applied to `flashMode`, `flashFreq` and `flashSize` alike. Each image
+// carries its own correct flash-config header, baked in at compile time; overriding
+// any of the three corrupts boot.
+export const FLASH_IMAGE_PARAMETER_KEEP = 'keep';
+
+// `design`. Compressed writes; the ROM and stub both support them and a uniform
+// 0xFF slot-B buffer costs almost nothing on the wire.
+export const FLASH_WRITE_COMPRESSED = true;
+
+// --- Exit to application (§7.1, §10.4) ---
+// `hard_reset` does not re-sample the boot strapping pins on these parts, so the
+// watchdog path is required rather than preferred. Register addresses are per-chip
+// and `matched` — taken from esptool's own `targets/esp32s3.py` and `esp32c3.py`;
+// the S3 set is undocumented in the TRM. Keyed by esptool's `CHIP_NAME`.
+export const WATCHDOG_RESET_REGISTERS = {
+  'ESP32-S3': {
+    WDTCONFIG0: 0x60008098,
+    WDTCONFIG1: 0x6000809c,
+    WDTWPROTECT: 0x600080b0,
+    OPTION1: 0x6000812c,
+  },
+  'ESP32-C3': {
+    WDTCONFIG0: 0x60008090,
+    WDTCONFIG1: 0x60008094,
+    WDTWPROTECT: 0x600080a8,
+    OPTION1: 0x600080f4,
+  },
+};
+
+// `matched`. RTC_CNTL_WDT_WKEY — unlocks WDTCONFIG*, and writing anything else
+// re-locks them. From esptool; §7.1 carries no entry for it.
+export const WATCHDOG_WRITE_PROTECT_KEY = 0x50d83aa1;
+
+// `matched`. WDT stage-0 timeout, from esptool's chip targets.
+export const WATCHDOG_TIMEOUT = 2000;
+
+// `matched`. WDT_CHIP_RESET_EN + reset width 5 + a stage-0 action of "reset system"
+// + enable. Undocumented in the S3 TRM; from esptool's chip targets.
+export const WATCHDOG_CHIP_RESET_VALUE = 0xd0000102;
+
+// `protocol`. OPTION1 bit 0 is FORCE_DOWNLOAD_BOOT. Measured: leaving it set —
+// which esptool's own `--after watchdog-reset` does — strands an S3 in download
+// mode indefinitely rather than booting the application.
+export const FORCE_DOWNLOAD_BOOT_MASK = 1;
+
+// `measured`. For the reset to take effect before anything else touches the bus.
+export const POST_WATCHDOG_RESET_WAIT_MS = 500;
