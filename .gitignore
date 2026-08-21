@@ -20,3 +20,9 @@ TODO.md
 # Internal notes stay local -- never published
 docs/conventions.md
 docs/oppie-testing-procedures.md
+
+# Browser automation scratch output
+.playwright-mcp/
+
+# Flasher rewrite scratch -- local only
+docs/flasher 2.0/
