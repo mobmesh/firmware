@@ -26,9 +26,7 @@ import {
 } from './constants.js';
 import { probeCliVersion } from './cli-session.js';
 import {
-  closeEsptoolSession,
   hardResetDevice,
-  openEsptoolSession,
   probeEsptoolSync,
   readFlashChunked,
   readFlashRegion,
@@ -244,11 +242,12 @@ export async function returnToApplication(session, { onStatus } = {}) {
   }
 }
 
-// §10.1. One executor for both ESP32 paths (C3); the device must already be confirmed in
-// download mode. `plan.verify.sha256` is the resolver's business (§4.2) — what is verified
-// here is the write, via esptool's MD5 against the device's own `flashMd5sum`.
-// `onProgress` gets one 0-1 fraction across all files, weighted by byte count.
-export async function executeFlashPlan(port, plan, { onProgress, onStatus } = {}) {
+// §10.1. One executor for both ESP32 paths (C3). Takes an open session, like the evidence
+// read and the restore: the restore has to write in the same download-mode session, before
+// the exit, so the caller owns the session and the reset out. `plan.verify.sha256` is the
+// resolver's business (§4.2) — what is verified here is the write, via esptool's MD5
+// against the device's own `flashMd5sum`. `onProgress` is one 0-1 fraction across all files.
+export async function executeFlashPlan(session, plan, { onProgress, onStatus } = {}) {
   if (plan.engine !== 'esptool') {
     throw new Error(`executeFlashPlan received a '${plan.engine}' plan; esptool only.`);
   }
@@ -269,62 +268,41 @@ export async function executeFlashPlan(port, plan, { onProgress, onStatus } = {}
     running += file.data.length;
   }
 
-  onStatus?.('Connecting to the device…');
-  let session;
-  try {
-    session = await openEsptoolSession(port);
-  } catch (error) {
-    throw new FlashWriteFailedError(
-      `Could not start a flashing session (${error.message}). Nothing has been written.`,
-      { cause: error, phase: 'connect' }
-    );
-  }
-
-  try {
-    // The full-chip erase runs before esptool's first progress callback and can take
+  // The full-chip erase runs before esptool's first progress callback and can take
     // most of a minute, so it is announced up front and the label flips once bytes
     // start moving.
-    let erasing = plan.eraseAll;
-    onStatus?.(erasing ? 'Erasing the device (this can take up to a minute)…' : 'Writing firmware…');
+  let erasing = plan.eraseAll;
+  onStatus?.(erasing ? 'Erasing the device (this can take up to a minute)…' : 'Writing firmware…');
 
-    try {
-      await writeFlashFiles(session, {
-        files,
-        eraseAll: plan.eraseAll,
-        onProgress: (fileIndex, written, total) => {
-          if (erasing) {
-            erasing = false;
-            onStatus?.('Writing firmware…');
-          }
-          if (!onProgress || totalBytes === 0) return;
-          const weight = files[fileIndex].data.length / totalBytes;
-          const base = fileStartBytes[fileIndex] / totalBytes;
-          onProgress(base + (total > 0 ? written / total : 1) * weight);
-        },
-      });
-    } catch (error) {
-      throw new FlashWriteFailedError(
-        `Writing the firmware failed (${error.message}). The device is part-written ` +
-          `and needs to be flashed again before it will run.`,
-        { cause: error, phase: 'write' }
-      );
-    }
-    onProgress?.(1);
-
-    // Same session by necessity — see returnToApplication.
-    const reset = await returnToApplication(session, { onStatus });
-    return {
-      chipName: session.chipName,
-      chipDescription: session.chipDescription,
-      bytesWritten: totalBytes,
-      reset,
-    };
-  } finally {
-    // The watchdog reset re-enumerates the device, so this usually closes a port
-    // that is already gone. It still has to run: esptool keeps a reader locked on
-    // the port, and the CLI probe that follows cannot open it until that is released.
-    await closeEsptoolSession(session);
+  try {
+    await writeFlashFiles(session, {
+      files,
+      eraseAll: plan.eraseAll,
+      onProgress: (fileIndex, written, total) => {
+        if (erasing) {
+          erasing = false;
+          onStatus?.('Writing firmware…');
+        }
+        if (!onProgress || totalBytes === 0) return;
+        const weight = files[fileIndex].data.length / totalBytes;
+        const base = fileStartBytes[fileIndex] / totalBytes;
+        onProgress(base + (total > 0 ? written / total : 1) * weight);
+      },
+    });
+  } catch (error) {
+    throw new FlashWriteFailedError(
+      `Writing the firmware failed (${error.message}). The device is part-written ` +
+        `and needs to be flashed again before it will run.`,
+      { cause: error, phase: 'write' }
+    );
   }
+  onProgress?.(1);
+
+  return {
+    chipName: session.chipName,
+    chipDescription: session.chipDescription,
+    bytesWritten: totalBytes,
+  };
 }
 
 // §10.5 input 1. A failed read raises: "could not read" and "there is nothing there"
@@ -490,8 +468,11 @@ export async function restoreFilesystem(
       return { action: 'skipped', reason: 'the filesystem partition was never disturbed' };
     }
 
-    await writeFilesystemImage(session, target.offset, backup.image.subarray(0, usedBytes), onProgress);
-    return { action: 'raw-copy', reason: `copied back ${Math.round(usedBytes / 1024)}K` };
+    // The whole partition, never just the used part: after an erase the remaining blocks
+    // carry no lookup magic, so SPIFFS mounts the image as unformatted and reformats it
+    // away. Measured — a 16K prefix cost the bench node its identity.
+    await writeFilesystemImage(session, target.offset, backup.image, onProgress);
+    return { action: 'raw-copy', reason: `copied back ${Math.round(usedBytes / 1024)}K of data` };
   } catch (error) {
     // Deliberately swallowed: see the contract above. The user loses settings, not
     // a working device, and the reason reaches them through the return value.
