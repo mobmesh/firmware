@@ -6,6 +6,8 @@
 import {
   CLI_COMMAND_TIMEOUT_MS,
   CLI_INTER_COMMAND_DELAY_MS,
+  CLI_LINE_ENDING,
+  CLI_LINE_TERMINATOR,
   CLI_PROBE_TIMEOUT_MS,
   CLI_RESPONSE_MARKER,
 } from './constants.js';
@@ -44,18 +46,41 @@ export function startCliSession(port) {
   const reader = decoderStream.readable.getReader();
   const writer = port.writable.getWriter();
 
+  const encoder = new TextEncoder();
   let buffer = '';
-  let pending = null; // { resolve, reject, timer }
+  let primed = false;
+  let pending = null; // { command, resolve, reject, timer, echoSeen }
 
   function deliverIfComplete() {
     if (!pending) return;
+
+    // Anchor on the device's echo of this command before looking for an answer.
+    // Residue that was queued in the stream *before* this session opened the port
+    // is delivered a task later — after `runCommand`'s clear, which can only reach
+    // what the drain loop has already pulled in — and would otherwise be paired
+    // with this command. Measured: straight after a flash, a `ver` probe returned
+    // the "Unknown command" a running node had emitted in reply to an earlier SYNC
+    // probe, reporting a confident wrong version. Stream order guarantees residue
+    // precedes the echo, so discarding through the echo discards all of it.
+    //
+    // Unverified on nRF52, which runs the same firmware and is assumed to echo the
+    // same way. A device that does not echo times out instead of answering — the
+    // conservative direction, and what §10.2 already treats as "did not answer".
+    if (!pending.echoSeen) {
+      const echo = `${pending.command}${CLI_LINE_ENDING}`;
+      const echoAt = buffer.indexOf(echo);
+      if (echoAt === -1) return;
+      buffer = buffer.slice(echoAt + echo.length);
+      pending.echoSeen = true;
+    }
+
     const markerAt = buffer.indexOf(CLI_RESPONSE_MARKER);
     if (markerAt === -1) return;
-    const lineEnd = buffer.indexOf('\r\n', markerAt);
+    const lineEnd = buffer.indexOf(CLI_LINE_ENDING, markerAt);
     if (lineEnd === -1) return;
 
     const answer = buffer.slice(markerAt + CLI_RESPONSE_MARKER.length, lineEnd).trim();
-    buffer = buffer.slice(lineEnd + 2);
+    buffer = buffer.slice(lineEnd + CLI_LINE_ENDING.length);
     const { resolve, timer } = pending;
     clearTimeout(timer);
     pending = null;
@@ -89,11 +114,27 @@ export function startCliSession(port) {
     // Discard anything already buffered. A response cannot precede its command, so
     // whatever is sitting there is residue — device boot chatter, or the
     // "Unknown command" a running node emits after something else wrote to the
-    // port (the §10.2 SYNC probe does exactly that). Pairing residue with this
-    // command would report a confident wrong answer.
+    // port (the §10.2 SYNC probe does exactly that). The echo anchor in
+    // `deliverIfComplete` covers residue still in flight; this covers what has
+    // already landed, and keeps a stale echo of the *same* command out of the way.
     buffer = '';
 
-    await writer.write(new TextEncoder().encode(`${command}\r`));
+    if (!primed) {
+      primed = true;
+      // A bare terminator ends any partial line the *device* is holding. Measured:
+      // the §10.2 SYNC probe leaves un-terminated SLIP bytes in a running node's
+      // line buffer, and the next command is appended to them — `<junk>ver` parses
+      // as "Unknown command", so the tool reports a confident wrong version for a
+      // device that is perfectly healthy. Recovery is device-side and nothing the
+      // host can read tells us it is needed, so it is always sent.
+      //
+      // Not waited on. Its reply arrives before this command's echo, and the echo
+      // anchor discards everything up to that — which is what makes sending it
+      // free rather than costing another round trip on a silent device.
+      await writer.write(encoder.encode(CLI_LINE_TERMINATOR));
+    }
+
+    await writer.write(encoder.encode(`${command}${CLI_LINE_TERMINATOR}`));
 
     const answer = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -104,7 +145,7 @@ export function startCliSession(port) {
         buffer = '';
         reject(new CliTimeoutError(command, timeoutMs));
       }, timeoutMs);
-      pending = { resolve, reject, timer };
+      pending = { command, resolve, reject, timer, echoSeen: false };
       // The answer may already be sitting in the buffer from before this call.
       deliverIfComplete();
     });

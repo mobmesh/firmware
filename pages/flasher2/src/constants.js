@@ -45,6 +45,14 @@ export const CLI_BAUD_RATE = 115200;
 // depends on it exactly — including both spaces.
 export const CLI_RESPONSE_MARKER = '  -> ';
 
+// `protocol`. What we send to end a command. The device is line-buffered on this
+// character, and appends anything not yet terminated to whatever arrives next.
+export const CLI_LINE_TERMINATOR = '\r';
+
+// `protocol`. What the device sends: it expands the terminator on the way back, so
+// both its echo of a command and the end of a response line carry this pair.
+export const CLI_LINE_ENDING = '\r\n';
+
 // `measured`. The first command after a fresh erase can land while the device is
 // still generating its identity keypair, which takes far longer than any later
 // command. CLI traffic during keypair generation is suspected of corrupting it.
