@@ -33,13 +33,8 @@ export class CliConnectionLostError extends Error {
   }
 }
 
-/**
- * Start a CLI session on an already-open port. One command in flight at a time.
- *
- * The caller owns the port: opening it, and closing it after `close()` releases
- * the stream locks. Sessions do not reopen ports — that is the acquisition
- * ladder's job (§5.3), and mixing the two hides which layer lost the device.
- */
+// One command in flight at a time. The caller owns the port: sessions never reopen one —
+// that is the ladder's job (§5.3), and mixing the two hides which layer lost the device.
 export function startCliSession(port) {
   const decoderStream = new TextDecoderStream();
   const readableClosed = port.readable.pipeTo(decoderStream.writable);
@@ -164,13 +159,8 @@ export function startCliSession(port) {
   return { runCommand, close };
 }
 
-/**
- * §10.2 state 1: does a running application answer?
- *
- * An affirmative signal only — a silent device is *not* reported as a bootloader
- * here, because silence is also what a device stuck in init looks like (§10.2
- * state 3). Returns the version string, or null for "did not answer".
- */
+// §10.2 state 1. Affirmative only: silence is also what a device stuck in init looks like,
+// so a null means "did not answer", never "is a bootloader".
 export async function probeCliVersion(port) {
   const session = startCliSession(port);
   try {

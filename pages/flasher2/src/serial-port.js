@@ -29,12 +29,8 @@ export class PortSelectionRequiredError extends Error {
   }
 }
 
-/**
- * Raised at the boundary of every `port.open()` call. Chrome reports an
- * unavailable port as a DOMException whose message wording is neither stable
- * API nor locale-independent, so the retry ladder classifies on this type
- * instead of on text (§12.3).
- */
+// Typed at the `port.open()` boundary — the donor message-matches Chrome's DOMException
+// wording, which is neither stable API nor locale-independent (§12.3).
 export class PortOpenFailedError extends Error {
   constructor(cause) {
     super('Could not open the serial port.');
@@ -79,12 +75,8 @@ export async function promptForSerialPort() {
   return serialApi().requestPort();
 }
 
-/**
- * Port identity comparison. `getPorts()` returns the same object instances
- * across calls in every browser observed, but the spec does not guarantee it;
- * matching on getInfo() instead would falsely match two identical boards, which
- * is worse. Assumption documented rather than defended.
- */
+// Matches on `getInfo()`, not object identity: `getPorts()` returning the same instances
+// is true in practice and false across a re-enumeration (§12.3).
 function isSamePort(a, b) {
   return a === b;
 }
@@ -122,12 +114,8 @@ async function openSerialPort(port, options) {
   }
 }
 
-/**
- * Readiness probe. Deliberately side-effecting: an open/close cycle is the only
- * reliable readiness signal Web Serial exposes, so the port is opened purely to
- * learn whether it can be. Harmless on the target boards — the port is closed
- * again before anything writes to it.
- */
+// Side-effecting by necessity — an open/close cycle is the only reliable readiness signal.
+// Harmless on these boards; confirmed on the bench.
 async function probeSerialPortUsable(port) {
   await closeSerialPortQuietly(port);
   try {
@@ -145,34 +133,11 @@ function sameUsbIdentity(a, b) {
   return a.usbVendorId === b.usbVendorId && a.usbProductId === b.usbProductId;
 }
 
-/**
- * Resolve the live port for a device, returning the port to continue with.
- *
- * **Deliberate deviation from §5.3 step 2 as written.** The spec says "wait for a
- * `connect` event"; do not "restore" that without re-measuring — waiting on the
- * handed-in port object costs the full CONNECT_TIMEOUT (measured 8506 ms vs 505 ms)
- * because a re-enumerated device arrives as a different object. See handoff.md,
- * "Deviations from the spec".
- *
- * Races two signals, because each covers the other's blind spot:
- *
- *   - a `connect` listener on `navigator.serial` wakes the moment the device
- *     returns, but is deaf to a reset that finished before we started listening —
- *     which is the common case, since the tool triggers the reset itself
- *   - a poll of the granted list sees a device that is already back, but only at
- *     the next interval
- *
- * The listener is registered *before* the first scan, so no arrival can slip
- * through the gap between the two. The poll then bounds the wait regardless of
- * whether any event ever fires.
- *
- * A re-enumerated device arrives as a *new* SerialPort: the held object is dropped
- * from `getPorts()`, reports `connected: false`, and raises NetworkError on open,
- * so neither signal can be replaced by "wait on the port we were handed".
- *
- * Matching is by USB vendor/product, all `getInfo()` exposes. Two identical boards
- * attached at once are indistinguishable here.
- */
+// Race a `navigator.serial` connect listener against a poll of the granted list, listener
+// attached *before* the first scan. Each covers the other's blind spot: the event is deaf to
+// a reset that finished before we listened — the common case, since we trigger it — and the
+// poll only wakes at its interval. Never waits on the handed-in port: a re-enumerated device
+// is a new SerialPort, and the old one can never fire `connect` again (8506 ms vs 505 ms).
 async function waitForDeviceOnBus(port, timeoutMs) {
   if (isPortConnected(port)) return port;
 
@@ -262,18 +227,9 @@ async function firstUsableGrantedPort(preferredPort, options) {
   return null;
 }
 
-/**
- * Capability: acquire a ready port with fallbacks (§5.3).
- *
- * Escalates strictly: held port, then every granted port with the held one
- * first, then — only when the caller supplies a re-entry gesture — one attempt
- * at putting the device back into its programming mode and running the first
- * two rungs again. That rung is last because re-touching a healthy device costs
- * a full re-enumeration cycle.
- *
- * `reenterProgrammingMode` is injected rather than imported so this module stays
- * MCU-agnostic; only the nRF52 path supplies one (§11.3).
- */
+// §5.3. Escalates strictly: held port, then every granted port with the held one first, then
+// — only if the caller supplies a gesture — one re-entry into programming mode and retry.
+// `reenterProgrammingMode` is injected so this stays MCU-agnostic; only nRF52 supplies one.
 export async function acquireUsableSerialPort({
   preferredPort = null,
   prompt = 'Select the serial port to continue.',

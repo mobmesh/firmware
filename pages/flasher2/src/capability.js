@@ -81,14 +81,7 @@ const INSECURE_COPY = {
   suggestion: 'Open the https:// version of this URL.',
 };
 
-/**
- * Failure copy for a support state. Every failure screen also offers the URL for
- * copying, so a user on the wrong device can move it to the right one — that
- * button is the UI's job, this returns only the words.
- *
- * @param {SerialSupport} support
- * @param {BrowserKind} browserKind
- */
+// Null when the browser can proceed; otherwise the copy to show instead of the wizard.
 export function compatibilityCopy(support, browserKind) {
   if (support === 'supported') return null;
   if (support === 'insecure') return INSECURE_COPY;

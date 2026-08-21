@@ -1,9 +1,6 @@
-// The flash plan — rewrite_code.md §4.1.
-//
-// Every path resolves to one of these before any hardware is touched. Manifest
-// resolvers produce it; engines consume it; neither knows about the other. This
-// is the reuse boundary that keeps the custom and stock ESP32 paths on one
-// executor (C3) and the two manifests on one resolver (C6).
+// The flash plan — §4.1. Every path resolves to one of these before hardware is touched.
+// Resolvers produce it, engines consume it: the boundary that keeps the custom and stock
+// ESP32 paths on one executor (C3) and the two manifests on one resolver (C6).
 
 /**
  * @typedef {{ data: ArrayBuffer, address: number }} FlashFile
@@ -18,10 +15,6 @@
  * @property {{ commands: string[] }|null} postFlash
  */
 
-/**
- * @param {Partial<FlashPlan> & { engine: 'esptool'|'dfu' }} fields
- * @returns {FlashPlan}
- */
 export function createFlashPlan(fields) {
   return {
     engine: fields.engine,
