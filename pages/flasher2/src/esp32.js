@@ -40,10 +40,11 @@ import {
   PARTITION_TABLE_MAX_BYTES,
   PARTITION_TABLE_OFFSET,
   findFilesystemPartition,
+  isSpiffsPartition,
   parsePartitionTable,
   partitionTablesMatch,
 } from './partitions.js';
-import { readSpiffsFiles } from './spiffs.js';
+import { buildSpiffsImage, readSpiffsFiles, spiffsUsedBytes } from './spiffs.js';
 import { closeSerialPortQuietly, listGrantedSerialPorts } from './serial-port.js';
 
 
@@ -548,4 +549,94 @@ export function decideWriteScope(evidence) {
     return { scope: 'full-layout', reason: 'the partition layout differs from the one being written' };
   }
   return { scope: 'app-slots-only', reason: 'a MeshCore filesystem on a matching layout' };
+}
+
+/**
+ * §10.6: put the user's filesystem back after a write that disturbed it.
+ *
+ * Two mechanisms, chosen by whether the partition changed size. A raw copy is
+ * possible only when it did not: every SPIFFS block's lookup magic derives from
+ * the image's block count, so the same bytes in a differently sized partition
+ * mount as unformatted and are reformatted away. A different size therefore means
+ * a full rebuild from the parsed file set.
+ *
+ * **Best-effort, and never throws.** The firmware is already written and working
+ * by this point; failing the flash over a restore would turn a recoverable loss of
+ * settings into a device the user cannot use. The read this works from is the part
+ * that must not fail, and that already happened in §10.5 — before anything was
+ * written or erased.
+ *
+ * Custom path only (C5): the stock path has no filesystem to preserve, and nRF52
+ * cannot read flash back at all.
+ *
+ * @returns {Promise<{ action: 'raw-copy'|'rebuilt'|'skipped', reason: string }>}
+ */
+export async function restoreFilesystem(
+  session,
+  { evidence, plannedPartitions, eraseAll },
+  { onStatus, onProgress } = {}
+) {
+  const backup = evidence.filesystem;
+  if (backup.status !== 'ok' || !backup.isMeshCore) {
+    return { action: 'skipped', reason: 'there was nothing of ours on this device to keep' };
+  }
+  if (backup.files.length === 0) {
+    return { action: 'skipped', reason: 'the filesystem held no files' };
+  }
+
+  const target = findFilesystemPartition(plannedPartitions);
+  if (!target) {
+    return { action: 'skipped', reason: 'the firmware being written has no filesystem partition' };
+  }
+
+  try {
+    onStatus?.('Restoring your settings…');
+    const resized = backup.partition.size !== target.size;
+
+    if (resized) {
+      if (!isSpiffsPartition(backup.partition)) {
+        // LittleFS lays out differently and this cannot rebuild it. Refusing is the
+        // safe answer: a raw copy into a resized partition is worse than none.
+        return { action: 'skipped', reason: 'the partition changed size and this filesystem is not SPIFFS' };
+      }
+      // The whole partition, not just the used part: the magic in the *unused*
+      // blocks is what marks the rest of it formatted.
+      const image = buildSpiffsImage(backup.files, target.size);
+      await writeFilesystemImage(session, target.offset, image, onProgress);
+      return {
+        action: 'rebuilt',
+        reason: `rebuilt ${backup.files.length} file(s) for a ${Math.round(target.size / 1024)}K partition`,
+      };
+    }
+
+    const usedBytes = isSpiffsPartition(backup.partition)
+      ? spiffsUsedBytes(backup.image)
+      : backup.image.length;
+    if (usedBytes === 0) {
+      return { action: 'skipped', reason: 'the filesystem had nothing allocated' };
+    }
+    // Same offset, same size, and nothing erased — what is on the device is already
+    // what would be written back.
+    if (!eraseAll && backup.partition.offset === target.offset) {
+      return { action: 'skipped', reason: 'the filesystem partition was never disturbed' };
+    }
+
+    await writeFilesystemImage(session, target.offset, backup.image.subarray(0, usedBytes), onProgress);
+    return { action: 'raw-copy', reason: `copied back ${Math.round(usedBytes / 1024)}K` };
+  } catch (error) {
+    // Deliberately swallowed: see the contract above. The user loses settings, not
+    // a working device, and the reason reaches them through the return value.
+    console.warn('[esp32] Could not restore the filesystem:', error);
+    return { action: 'skipped', reason: `the restore failed (${error.message})` };
+  }
+}
+
+function writeFilesystemImage(session, address, data, onProgress) {
+  return writeFlashFiles(session, {
+    files: [{ data, address }],
+    // Never here: this runs *after* the main write, and erasing the whole chip now
+    // would take the firmware with it. The write erases the region it covers.
+    eraseAll: false,
+    onProgress: (_fileIndex, written, total) => onProgress?.(total > 0 ? written / total : 1),
+  });
 }

@@ -5,15 +5,17 @@
 // structurally unreachable from the DFU path — nRF52 cannot read flash back, so a
 // stray call would fail confusingly mid-flash. Nothing here imports anything.
 //
-// Read-only. §10.6's rebuild-for-a-resized-partition is a separate concern and is
-// not here yet; §10.5 only needs to know *what files exist*.
+// Reads an image, and builds one. A rebuild is always from a parsed file set, never
+// in place, which is what lets the partition change size (§10.6): every block's
+// lookup magic derives from the image's block count, so a raw copy into a
+// differently sized partition produces something SPIFFS refuses to mount.
 //
 // Geometry and field layout follow ESP-IDF's `spiffsgen.py`. Fixed to 2-byte ids
 // and little-endian, which is what every board here uses.
 
 const OBJ_ID_BYTES = 2;
 const SPAN_INDEX_BYTES = 2;
-const BLOCK_INDEX_BYTES = 2;
+const PAGE_INDEX_BYTES = 2;
 const FLAG_BYTES = 1;
 const INDEX_SIZE_BYTES = 4;
 const INDEX_OBJ_TYPE_BYTES = 1;
@@ -21,6 +23,9 @@ const INDEX_OBJ_TYPE_BYTES = 1;
 // Page flag values. A page counts only when it is both used and final.
 const FLAG_USED_FINAL_INDEX = 0xf8;
 const FLAG_USED_FINAL = 0xfc;
+
+// Object type marker in a span-0 index page. Only regular files are written.
+const TYPE_FILE = 1;
 
 // Erased flash for a 2-byte id — a lookup slot reading this means "no page here".
 const EMPTY_OBJ_ID = 0xffff;
@@ -43,6 +48,12 @@ export function spiffsGeometry({ pageSize = 256, blockSize = 4096, nameBytes = 3
   const headerBytes = OBJ_ID_BYTES + SPAN_INDEX_BYTES + FLAG_BYTES;
   const headerPadding = 4 - (headerBytes % 4 === 0 ? 4 : headerBytes % 4);
 
+  // A span-0 index page carries size, type, name and meta before its page table;
+  // later spans are pure page tables and so hold more entries.
+  const alignedHeaderBytes = headerBytes + headerPadding;
+  const firstSpanHeaderBytes =
+    alignedHeaderBytes + INDEX_SIZE_BYTES + INDEX_OBJ_TYPE_BYTES + nameBytes + metaBytes;
+
   return {
     pageSize,
     blockSize,
@@ -53,8 +64,11 @@ export function spiffsGeometry({ pageSize = 256, blockSize = 4096, nameBytes = 3
     usablePagesPerBlock: pagesPerBlock - lookupPagesPerBlock,
     headerBytes,
     headerPadding,
+    alignedHeaderBytes,
     dataPageContentBytes: pageSize - headerBytes,
-    indexEntryBytes: BLOCK_INDEX_BYTES,
+    lookupSlotsPerPage: Math.floor(pageSize / OBJ_ID_BYTES),
+    firstSpanPageCapacity: Math.floor((pageSize - firstSpanHeaderBytes) / PAGE_INDEX_BYTES),
+    laterSpanPageCapacity: Math.floor((pageSize - alignedHeaderBytes) / PAGE_INDEX_BYTES),
   };
 }
 
@@ -177,4 +191,230 @@ function readIndexPage(page, view, geometry, file, decoder) {
   const terminator = nameBytes.indexOf(0);
   file.name = decoder.decode(terminator === -1 ? nameBytes : nameBytes.subarray(0, terminator));
   file.size = size;
+}
+
+// --- Builder --------------------------------------------------------------
+
+/** The file set does not fit the image. Callers treat this as "cannot restore", never as a flash failure. */
+export class SpiffsFullError extends Error {
+  constructor(message = 'The filesystem image is full') {
+    super(message);
+    this.name = 'SpiffsFullError';
+  }
+}
+
+// `protocol`. The seed SPIFFS mixes into every block's lookup magic. A block whose
+// magic does not match what the driver derives is treated as unformatted.
+const MAGIC_SEED = 0x20140529;
+
+/**
+ * The magic SPIFFS expects in a given block's lookup page.
+ *
+ * Derived from the page size *and the image's block count*, which is the whole
+ * reason a filesystem cannot simply be copied into a differently sized partition:
+ * every block's magic changes when the block count does.
+ */
+function blockMagic(blockIndex, blockCount, geometry) {
+  const magic = (MAGIC_SEED ^ geometry.pageSize) ^ (blockCount - blockIndex);
+  return magic & 0xffff;
+}
+
+/**
+ * Lay a file set out into a complete SPIFFS image of exactly `imageBytes`.
+ *
+ * Always a full rebuild, never an edit — that is what makes a resized partition
+ * possible (§10.6). The whole image is produced, not just the used part, because
+ * the magic in the *unused* blocks is what marks the rest of the partition
+ * formatted. An image missing it mounts as unformatted and SPIFFS reformats on
+ * first boot, destroying everything that was just restored.
+ *
+ * Object ids start at 1: 0 and 0xffff are reserved.
+ *
+ * @param {{ name: string, data: Uint8Array }[]} files
+ * @param {number} imageBytes  must be a whole number of blocks
+ * @throws {SpiffsFullError} the file set does not fit
+ */
+export function buildSpiffsImage(files, imageBytes, geometry = DEFAULT_SPIFFS_GEOMETRY) {
+  if (imageBytes % geometry.blockSize !== 0) {
+    throw new Error('SPIFFS image size must be a whole number of blocks');
+  }
+
+  const state = {
+    geometry,
+    blocks: [],
+    blockCount: Math.floor(imageBytes / geometry.blockSize),
+    nextObjId: 1,
+  };
+
+  for (const file of files) addFile(state, file.name, file.data);
+  return serialiseImage(state, imageBytes);
+}
+
+/** The last block if it still has a free page, otherwise a new one. */
+function blockWithSpace(state) {
+  const last = state.blocks[state.blocks.length - 1];
+  if (last && last.freePages > 0) return last;
+
+  if (state.blocks.length >= state.blockCount) throw new SpiffsFullError();
+  const block = {
+    index: state.blocks.length,
+    lookupSlots: [],
+    pages: [],
+    freePages: state.geometry.usablePagesPerBlock,
+  };
+  state.blocks.push(block);
+  return block;
+}
+
+/** Absolute page index within the image — what an index page's table stores. */
+function absolutePageIndex(state, block) {
+  return block.index * state.geometry.pagesPerBlock + state.geometry.lookupPagesPerBlock + block.pages.length;
+}
+
+function claimPage(state, block, page, isIndexPage) {
+  if (block.lookupSlots.length >= state.geometry.lookupSlotsPerPage) throw new SpiffsFullError();
+  block.lookupSlots.push({ objId: page.objId, isIndexPage });
+  block.pages.push(page);
+  block.freePages -= 1;
+  return page;
+}
+
+function beginObject(state, block, objId, size, name, spanIndex) {
+  return claimPage(
+    state,
+    block,
+    {
+      kind: 'index',
+      objId,
+      spanIndex,
+      size,
+      name,
+      dataPageIndexes: [],
+      capacity: spanIndex === 0 ? state.geometry.firstSpanPageCapacity : state.geometry.laterSpanPageCapacity,
+    },
+    true
+  );
+}
+
+function addFile(state, name, data) {
+  const encodedName = new TextEncoder().encode(name);
+  if (encodedName.length > state.geometry.nameBytes) {
+    throw new Error(`SPIFFS object name '${name}' is longer than ${state.geometry.nameBytes} bytes`);
+  }
+
+  const objId = state.nextObjId;
+  let indexSpan = 0;
+  let dataSpan = 0;
+  // A zero-length file is legitimate and gets an index page and no data pages.
+  let indexPage = beginObject(state, blockWithSpace(state), objId, data.length, name, indexSpan++);
+
+  let offset = 0;
+  while (offset < data.length) {
+    // An index page's table is finite. When it fills, the object continues under a
+    // further index span rather than the file being split — later spans carry no
+    // name or size and so hold more entries.
+    if (indexPage.dataPageIndexes.length >= indexPage.capacity) {
+      indexPage = beginObject(state, blockWithSpace(state), objId, data.length, name, indexSpan++);
+    }
+
+    // Re-resolved every iteration: the page above may have been the block's last.
+    const block = blockWithSpace(state);
+    const take = Math.min(state.geometry.dataPageContentBytes, data.length - offset);
+    const page = { kind: 'data', objId, spanIndex: dataSpan++, content: data.subarray(offset, offset + take) };
+    indexPage.dataPageIndexes.push(absolutePageIndex(state, block));
+    claimPage(state, block, page, false);
+    offset += take;
+  }
+
+  state.nextObjId += 1;
+}
+
+function serialiseImage(state, imageBytes) {
+  const { geometry } = state;
+  const image = new Uint8Array(imageBytes).fill(0xff);
+
+  // Every block, not just the ones holding files — see buildSpiffsImage.
+  for (let blockIndex = 0; blockIndex < state.blockCount; blockIndex += 1) {
+    const block = state.blocks[blockIndex];
+    const base = blockIndex * geometry.blockSize;
+
+    const lookup = new DataView(image.buffer, base, geometry.pageSize);
+    const slots = block ? block.lookupSlots : [];
+    slots.forEach((slot, position) => {
+      lookup.setUint16(
+        position * OBJ_ID_BYTES,
+        slot.isIndexPage ? slot.objId ^ OBJ_ID_INDEX_FLAG : slot.objId,
+        true
+      );
+    });
+    // Second-to-last slot. Slots between the real entries and it stay 0xffff,
+    // which is already the erased fill.
+    const magicSlot = geometry.lookupSlotsPerPage - 2;
+    if (slots.length <= magicSlot) {
+      lookup.setUint16(magicSlot * OBJ_ID_BYTES, blockMagic(blockIndex, state.blockCount, geometry), true);
+    }
+
+    if (!block) continue;
+
+    block.pages.forEach((page, position) => {
+      const pageStart = base + (geometry.lookupPagesPerBlock + position) * geometry.pageSize;
+      serialisePage(image, pageStart, page, geometry);
+    });
+  }
+
+  return image;
+}
+
+function serialisePage(image, start, page, geometry) {
+  const view = new DataView(image.buffer, start, geometry.pageSize);
+  const isIndexPage = page.kind === 'index';
+
+  view.setUint16(0, isIndexPage ? page.objId ^ OBJ_ID_INDEX_FLAG : page.objId, true);
+  view.setUint16(OBJ_ID_BYTES, page.spanIndex, true);
+  view.setUint8(OBJ_ID_BYTES + SPAN_INDEX_BYTES, isIndexPage ? FLAG_USED_FINAL_INDEX : FLAG_USED_FINAL);
+
+  if (!isIndexPage) {
+    image.set(page.content, start + geometry.headerBytes);
+    return;
+  }
+
+  let offset = geometry.alignedHeaderBytes;
+  if (page.spanIndex === 0) {
+    view.setUint32(offset, page.size, true);
+    offset += INDEX_SIZE_BYTES;
+    view.setUint8(offset, TYPE_FILE);
+    offset += INDEX_OBJ_TYPE_BYTES;
+
+    // Name through meta is zero-filled, not left at the erased 0xff — the driver
+    // reads the field as a C string and 0xff is not a terminator.
+    const encodedName = new TextEncoder().encode(page.name);
+    image.fill(0, start + offset, start + offset + geometry.nameBytes + geometry.metaBytes);
+    image.set(encodedName, start + offset);
+    offset += geometry.nameBytes + geometry.metaBytes;
+  }
+
+  for (const pageIndex of page.dataPageIndexes) {
+    view.setUint16(offset, pageIndex, true);
+    offset += PAGE_INDEX_BYTES;
+  }
+}
+
+/**
+ * Bytes up to and including the highest block SPIFFS has allocated.
+ *
+ * Lets a restore write only the part of a backup that holds anything, so a
+ * filesystem can be copied back into a partition no smaller than its used size
+ * even when the original was larger. SPIFFS only — LittleFS lays out differently.
+ */
+export function spiffsUsedBytes(image, geometry = DEFAULT_SPIFFS_GEOMETRY) {
+  const blockCount = Math.floor(image.length / geometry.blockSize);
+  for (let blockIndex = blockCount - 1; blockIndex >= 0; blockIndex -= 1) {
+    const lookup = new DataView(image.buffer, image.byteOffset + blockIndex * geometry.blockSize, geometry.pageSize);
+    for (let slot = 0; slot < geometry.usablePagesPerBlock; slot += 1) {
+      if (lookup.getUint16(slot * OBJ_ID_BYTES, true) !== EMPTY_OBJ_ID) {
+        return (blockIndex + 1) * geometry.blockSize;
+      }
+    }
+  }
+  return 0;
 }
