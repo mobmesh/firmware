@@ -183,6 +183,22 @@ export async function writeFlashFiles(session, { files, eraseAll, onProgress }) 
 }
 
 /**
+ * Read a region of flash back. Used by §10.5's evidence chain before anything is
+ * written or erased.
+ *
+ * Unchunked and without retry, which suits the reads that are one sector long. The
+ * filesystem read in §10.6 spans megabytes, where one dropped packet costs the whole
+ * partition — that needs the chunked, port-reopening variant and gets it there.
+ *
+ * @returns {Promise<Uint8Array>}
+ */
+export async function readFlashRegion(session, offset, size, onProgress) {
+  return session.loader.readFlash(offset, size, (_packet, read, total) => {
+    onProgress?.(total > 0 ? read / total : 1);
+  });
+}
+
+/**
  * Raw register write. The addresses and values are ESP32 device knowledge and live
  * with the device module (§10.4); only the call shape belongs here.
  */

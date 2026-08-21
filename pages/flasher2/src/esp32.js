@@ -30,10 +30,16 @@ import {
   hardResetDevice,
   openEsptoolSession,
   probeEsptoolSync,
+  readFlashRegion,
   resetIntoDownloadMode,
   writeEsptoolRegister,
   writeFlashFiles,
 } from './esptool.js';
+import {
+  PARTITION_TABLE_MAX_BYTES,
+  PARTITION_TABLE_OFFSET,
+  parsePartitionTable,
+} from './partitions.js';
 import { closeSerialPortQuietly, listGrantedSerialPorts } from './serial-port.js';
 
 
@@ -227,6 +233,18 @@ export class FlashWriteFailedError extends Error {
 }
 
 /**
+ * A read that had to succeed did not. §10.5 treats this as fatal on purpose: the
+ * decision it feeds is erase-vs-preserve, and a failed read must never be allowed
+ * to read as "nothing here".
+ */
+export class FlashReadFailedError extends Error {
+  constructor(message, { cause }) {
+    super(message, { cause });
+    this.name = 'FlashReadFailedError';
+  }
+}
+
+/**
  * §10.4: put the device back into the application.
  *
  * The RTC watchdog chip-reset sequence, not `hard_reset` — `hard_reset` does not
@@ -380,4 +398,28 @@ export async function executeFlashPlan(port, plan, { onProgress, onStatus } = {}
     // the port, and the CLI probe that follows cannot open it until that is released.
     await closeEsptoolSession(session);
   }
+}
+
+/**
+ * §10.5 input 1: the device's own partition table.
+ *
+ * A failed *read* raises — it must abort before anything is written or erased,
+ * because "could not read" and "there is nothing there" license opposite actions
+ * and only one of them is safe. An empty list is the other answer: the read
+ * worked and the chip is blank.
+ *
+ * @returns {Promise<import('./partitions.js').Partition[]>}
+ */
+export async function readPartitionTable(session) {
+  let raw;
+  try {
+    raw = await readFlashRegion(session, PARTITION_TABLE_OFFSET, PARTITION_TABLE_MAX_BYTES);
+  } catch (error) {
+    throw new FlashReadFailedError(
+      `Could not read the device's partition table (${error.message}). Nothing has been ` +
+        `written or erased — check the USB cable and port, then try again.`,
+      { cause: error }
+    );
+  }
+  return parsePartitionTable(raw);
 }
