@@ -328,7 +328,7 @@ function selectStockFile(device, entry, version, wipe) {
 export async function loadStockFirmwareSource(
   manifest,
   { deviceName, firmwareIndex = 0, version, wipe = false },
-  { onStatus } = {}
+  { onStatus, relayBase = STOCK_RELAY_BASE } = {}
 ) {
   const device = manifest.devices.find((d) => d.name === deviceName);
   if (!device) throw new ManifestError(`${STOCK_MANIFEST_FILE} has no device '${deviceName}'.`);
@@ -341,7 +341,7 @@ export async function loadStockFirmwareSource(
   const file = selectStockFile(device, entry, version, wipe);
 
   onStatus?.('Downloading firmware…');
-  const res = await fetch(new URL(file.name, STOCK_RELAY_BASE), { cache: 'no-store' });
+  const res = await fetch(new URL(file.name, relayBase), { cache: 'no-store' });
   if (!res.ok) {
     throw new ManifestError(`Could not download ${file.name} from the relay: HTTP ${res.status}.`);
   }
