@@ -36,18 +36,9 @@ const SUBTYPE_LITTLEFS = 0x83;
  * @property {string} label
  */
 
-/**
- * Decode entries until the first one without the magic.
- *
- * A table that is absent or unreadable decodes to an empty list rather than
- * raising: "no partitions" is a legitimate answer for a blank chip, and §10.5
- * distinguishes that from a *failed read*, which its caller must catch at the
- * read itself. Trailing bytes are the MD5 entry and padding, neither of which
- * carries the magic.
- *
- * @param {Uint8Array} bytes
- * @returns {Partition[]}
- */
+// Decodes until the first entry without the magic; trailing bytes are the MD5 entry and
+// padding. Absent or unreadable decodes to an empty list — "no partitions" is a legitimate
+// answer for a blank chip, and a *failed read* is the caller's to catch at the read.
 export function parsePartitionTable(bytes) {
   const partitions = [];
   const decoder = new TextDecoder();
@@ -72,13 +63,7 @@ export function parsePartitionTable(bytes) {
   return partitions;
 }
 
-/**
- * The first SPIFFS or LittleFS data partition, or undefined.
- *
- * Absent means a blank chip as far as §10.5 is concerned — there is no filesystem
- * to read, so there is nothing to preserve. Matched on type and subtype rather
- * than label: the label is a build-time string and boards do not agree on it.
- */
+// Matched on type and subtype, not label: the label is a build-time string boards disagree on.
 export function findFilesystemPartition(partitions) {
   return partitions.find(
     (partition) =>
@@ -92,14 +77,8 @@ export function isSpiffsPartition(partition) {
   return partition?.subtype === SUBTYPE_SPIFFS;
 }
 
-/**
- * §10.5 input 4: does the device's layout match the one about to be written?
- *
- * Entry by entry, never raw bytes — the table image carries an MD5 entry and
- * padding that differ between builds without the layout differing, so a byte
- * comparison reports a mismatch on every flash and forces a full-layout write
- * that was never needed.
- */
+// §10.5 input 4. Entry by entry, never raw bytes — the image carries an MD5 entry and padding
+// that differ between builds without the layout differing.
 export function partitionTablesMatch(a, b) {
   if (a.length !== b.length) return false;
   return a.every(

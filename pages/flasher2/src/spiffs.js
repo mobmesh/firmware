@@ -32,10 +32,7 @@ const EMPTY_OBJ_ID = 0xffff;
 // High bit of an object id marks an object *index* page rather than a data page.
 const OBJ_ID_INDEX_FLAG = 1 << (OBJ_ID_BYTES * 8 - 1);
 
-/**
- * Layout arithmetic for one SPIFFS geometry. Every derived value mirrors
- * `spiffsgen.py`'s field of the same meaning.
- */
+// Layout arithmetic for one geometry; every value mirrors `spiffsgen.py`.
 export function spiffsGeometry({ pageSize = 256, blockSize = 4096, nameBytes = 32, metaBytes = 4 } = {}) {
   if (blockSize % pageSize !== 0) throw new Error('SPIFFS block size must be a multiple of the page size');
 
@@ -78,24 +75,10 @@ export function spiffsGeometry({ pageSize = 256, blockSize = 4096, nameBytes = 3
  */
 export const DEFAULT_SPIFFS_GEOMETRY = spiffsGeometry();
 
-/**
- * Recover the files in a SPIFFS image.
- *
- * Two passes over each block, because SPIFFS stores a file's identity and its
- * contents in different places: a span-0 *index* page carries the name and size,
- * while the bytes live in numbered data pages that may sit in any block. Pages are
- * reassembled in span order at the end.
- *
- * Tolerant by design — it is pointed at whatever was on the device, which may be a
- * blank partition, another project's filesystem, or a partial write. Anything that
- * does not decode is skipped, and the answer is simply a shorter list. Callers use
- * the result as *evidence*, so a wrong "there is nothing here" is the expensive
- * error and an unparsable image must never masquerade as an empty one — that
- * distinction is the caller's, drawn from a read that either succeeded or raised.
- *
- * @param {Uint8Array} image
- * @returns {{ name: string, size: number, data: Uint8Array }[]}
- */
+// Two passes per block: a span-0 index page carries the name and size, the bytes live in
+// numbered data pages that may sit in any block. Tolerant — it is pointed at whatever was on
+// the device. Anything that does not decode is skipped, so callers must not read a short list
+// as "nothing here"; that distinction comes from a read that either succeeded or raised.
 export function readSpiffsFiles(image, geometry = DEFAULT_SPIFFS_GEOMETRY) {
   const files = new Map(); // realObjId -> { name, size, pages: [spanIndex, bytes][] }
   const decoder = new TextDecoder();
@@ -195,7 +178,7 @@ function readIndexPage(page, view, geometry, file, decoder) {
 
 // --- Builder --------------------------------------------------------------
 
-/** The file set does not fit the image. Callers treat this as "cannot restore", never as a flash failure. */
+// Means "cannot restore", never a flash failure.
 export class SpiffsFullError extends Error {
   constructor(message = 'The filesystem image is full') {
     super(message);
@@ -207,33 +190,16 @@ export class SpiffsFullError extends Error {
 // magic does not match what the driver derives is treated as unformatted.
 const MAGIC_SEED = 0x20140529;
 
-/**
- * The magic SPIFFS expects in a given block's lookup page.
- *
- * Derived from the page size *and the image's block count*, which is the whole
- * reason a filesystem cannot simply be copied into a differently sized partition:
- * every block's magic changes when the block count does.
- */
+// Derived from the page size and the image's block count — which is exactly why a filesystem
+// cannot be copied into a differently sized partition.
 function blockMagic(blockIndex, blockCount, geometry) {
   const magic = (MAGIC_SEED ^ geometry.pageSize) ^ (blockCount - blockIndex);
   return magic & 0xffff;
 }
 
-/**
- * Lay a file set out into a complete SPIFFS image of exactly `imageBytes`.
- *
- * Always a full rebuild, never an edit — that is what makes a resized partition
- * possible (§10.6). The whole image is produced, not just the used part, because
- * the magic in the *unused* blocks is what marks the rest of the partition
- * formatted. An image missing it mounts as unformatted and SPIFFS reformats on
- * first boot, destroying everything that was just restored.
- *
- * Object ids start at 1: 0 and 0xffff are reserved.
- *
- * @param {{ name: string, data: Uint8Array }[]} files
- * @param {number} imageBytes  must be a whole number of blocks
- * @throws {SpiffsFullError} the file set does not fit
- */
+// Always a full rebuild, never an edit — that is what allows a resized partition (§10.6).
+// The whole image is produced because the magic in the *unused* blocks marks the rest of the
+// partition formatted; without it SPIFFS reformats on first mount. Object ids start at 1.
 export function buildSpiffsImage(files, imageBytes, geometry = DEFAULT_SPIFFS_GEOMETRY) {
   if (imageBytes % geometry.blockSize !== 0) {
     throw new Error('SPIFFS image size must be a whole number of blocks');
@@ -399,13 +365,7 @@ function serialisePage(image, start, page, geometry) {
   }
 }
 
-/**
- * Bytes up to and including the highest block SPIFFS has allocated.
- *
- * Lets a restore write only the part of a backup that holds anything, so a
- * filesystem can be copied back into a partition no smaller than its used size
- * even when the original was larger. SPIFFS only — LittleFS lays out differently.
- */
+// Lets a restore write only the part of a backup holding anything. SPIFFS only.
 export function spiffsUsedBytes(image, geometry = DEFAULT_SPIFFS_GEOMETRY) {
   const blockCount = Math.floor(image.length / geometry.blockSize);
   for (let blockIndex = blockCount - 1; blockIndex >= 0; blockIndex -= 1) {

@@ -47,13 +47,8 @@ function timeout(milliseconds, message) {
   });
 }
 
-/**
- * A loader bound to a closed port. `baudRate` is the rate esptool renegotiates to
- * once the stub is up; probes never get that far and stay at the ROM's rate.
- *
- * The transport comes back alongside because it, not the loader, owns releasing
- * the port — esptool-js keeps a reader locked on it for as long as it is connected.
- */
+// `baudRate` is what esptool renegotiates to once the stub is up; probes never get that far.
+// The transport, not the loader, owns releasing the port.
 async function createLoader(port, baudRate) {
   const { ESPLoader, Transport } = await loadEsptoolApi();
   // Second argument is `tracing`, not a slip-reader switch: true hex-dumps every
@@ -70,18 +65,11 @@ async function createLoader(port, baudRate) {
   return { loader, transport };
 }
 
-/**
- * §10.2 state 2: does the ROM bootloader answer?
- *
- * Deliberately passive. `connect('no_reset')` makes `constructResetSequence` return
- * an empty list, so **no reset strategy is ever issued** — a probe that resets the
- * device destroys the state it was asked to identify, and state 3 (a device that
- * enumerates, stays silent and still holds valid SPIFFS) is exactly the state that
- * must survive being looked at.
- *
- * The port must be closed on entry; this opens and releases it. Answers only the
- * affirmative question — a `false` means "did not answer", never "is in app mode".
- */
+// §10.2 state 2. Passive: `no_reset` makes `constructResetSequence` return an empty list, so
+// no reset is ever issued — a probe that resets the device destroys state 3, the state it
+// exists to identify. `connect` is what opens the port and starts the read loop; calling
+// `sync()` alone reads a stream nobody is pumping. Takes a closed port; a false is only
+// "did not answer".
 export async function probeEsptoolSync(port) {
   const { loader, transport } = await createLoader(port, ESP_ROM_BAUD_RATE);
   try {
@@ -106,17 +94,8 @@ export async function probeEsptoolSync(port) {
   }
 }
 
-/**
- * §10.3, `0x1001` mechanism: delegate the reset to esptool-js.
- *
- * `default_reset` makes esptool pick its own strategy — `USBJTAGSerialReset` when
- * the port is a USB Serial/JTAG device, classic DTR/RTS otherwise. That path is
- * hardware-driven, needs no cooperating app, and can recover a hung device, which
- * the app-cooperative gesture cannot.
- *
- * Unlike the probe this is *not* passive: it resets the device by design. Success
- * means the ROM answered SYNC afterwards, so entry is confirmed, not assumed.
- */
+// §10.3, `0x1001`. `default_reset` makes esptool pick `USBJTAGSerialReset` — hardware-driven,
+// needs no cooperating app, recovers a hung device. Resets by design, unlike the probe.
 export async function resetIntoDownloadMode(port) {
   const { loader, transport } = await createLoader(port, ESP_ROM_BAUD_RATE);
   try {
@@ -129,20 +108,9 @@ export async function resetIntoDownloadMode(port) {
   }
 }
 
-/**
- * §10.1: a connected loader with the stub running, at the working baud rate.
- *
- * One session covers the whole flash *and* the §10.4 exit that follows it. That is
- * not a convenience: replicating the exit's register sequence across separate
- * connections never armed the watchdog, because each connection re-syncs with the
- * ROM in between and the unlock is undone.
- *
- * `default_reset` rather than `no_reset` even though §10.3 has just confirmed the
- * device is in download mode — this is the donor's proven path, and a redundant
- * reset of a device already in download mode costs a second and nothing else.
- *
- * The port must be closed on entry. Always pair with `closeEsptoolSession`.
- */
+// §10.1. One session covers the flash and the §10.4 exit that follows: the exit's register
+// sequence fails if anything re-syncs the ROM partway. `default_reset` rather than `no_reset`
+// is the donor's proven path. Takes a closed port; always pair with `closeEsptoolSession`.
 export async function openEsptoolSession(port) {
   const { loader, transport } = await createLoader(port, ESPTOOL_BAUD_RATE);
   try {
@@ -156,23 +124,14 @@ export async function openEsptoolSession(port) {
   }
 }
 
-/**
- * Releases the port. esptool-js keeps its own reader locked on the port for as long
- * as the transport is connected, so anything that opens the port afterwards — the
- * CLI session, another probe — fails on a locked stream until this has run.
- */
+// esptool keeps a reader locked on the port while connected, so anything opening it
+// afterwards fails on a locked stream until this runs.
 export async function closeEsptoolSession(session) {
   await session.transport.disconnect().catch(() => {});
 }
 
-/**
- * §10.1: write a plan's files at their offsets.
- *
- * `onProgress(fileIndex, written, total)` is esptool's own per-file signal, passed
- * through unweighted — the caller knows what the files mean and this does not.
- *
- * @param {{ data: Uint8Array, address: number }[]} files
- */
+// `onProgress(fileIndex, written, total)` is esptool's own per-file signal, unweighted —
+// the caller knows what the files mean.
 export async function writeFlashFiles(session, { files, eraseAll, onProgress }) {
   await session.loader.writeFlash({
     fileArray: files,
@@ -190,27 +149,15 @@ export async function writeFlashFiles(session, { files, eraseAll, onProgress }) 
   });
 }
 
-/**
- * Read a region of flash back. Used by §10.5's evidence chain before anything is
- * written or erased.
- *
- * Unchunked and without retry, which suits the reads that are one sector long. The
- * filesystem read in §10.6 spans megabytes, where one dropped packet costs the whole
- * partition — that needs the chunked, port-reopening variant and gets it there.
- *
- * @returns {Promise<Uint8Array>}
- */
+// Unchunked, for reads a sector long. Megabyte reads use `readFlashChunked`.
 export async function readFlashRegion(session, offset, size, onProgress) {
   return session.loader.readFlash(offset, size, (_packet, read, total) => {
     onProgress?.(total > 0 ? read / total : 1);
   });
 }
 
-/**
- * Reopen the port under a live session, leaving the stub running so a read can
- * resume mid-partition rather than starting over. The caller must re-issue whatever
- * was in flight — the transport is new, the loader's state is not.
- */
+// Leaves the stub running so a read resumes mid-partition. The caller re-issues what was
+// in flight — the transport is new, the loader's state is not.
 async function reopenEsptoolTransport(session) {
   const { loader, transport } = session;
   await transport.disconnect().catch(() => {});
@@ -219,20 +166,9 @@ async function reopenEsptoolTransport(session) {
   transport.flushInput?.();
 }
 
-/**
- * Read a region of flash back, in chunks, with retries and a port reopen behind
- * them. Used for the filesystem partition (§10.5 input 3, §10.6 backup), which is
- * megabytes long — a single lost packet there otherwise costs the whole read.
- *
- * Recovery resumes at the failed chunk rather than restarting, and a reopen is only
- * reached once a chunk's own retries are spent. Exhausting the reopens rethrows the
- * last failure: a partial read must never be handed back as if it were complete,
- * because §10.5 reads its result as evidence about what is on the device.
- *
- * `onNotice` surfaces retries, which otherwise look like a hang.
- *
- * @returns {Promise<Uint8Array>}
- */
+// Retries a chunk, then reopens the port behind it; recovery resumes at the failed chunk.
+// Exhausting the reopens rethrows: a partial read must never pass as complete, because
+// §10.5 reads the result as evidence. `onNotice` surfaces retries, which look like a hang.
 export async function readFlashChunked(session, offset, size, { onProgress, onNotice } = {}) {
   const out = new Uint8Array(size);
   let done = 0;
@@ -280,10 +216,7 @@ export async function readFlashChunked(session, offset, size, { onProgress, onNo
   return out;
 }
 
-/**
- * Raw register write. The addresses and values are ESP32 device knowledge and live
- * with the device module (§10.4); only the call shape belongs here.
- */
+// Addresses and values are device knowledge and live in §10.4; only the call shape is here.
 export async function writeEsptoolRegister(session, address, value, mask = 0xffffffff) {
   await session.loader.writeReg(address, value, mask);
 }
@@ -313,7 +246,8 @@ const MD5_SHIFTS = [
 const MD5_SINE_TABLE = new Uint32Array(64);
 for (let i = 0; i < 64; i++) MD5_SINE_TABLE[i] = Math.abs(Math.sin(i + 1)) * 0x100000000;
 
-/** @param {Uint8Array} bytes @returns {string} lowercase hex */
+// RFC 1321. Checked against a reference implementation over the empty string, the RFC
+// vectors, every padding boundary and 200 random buffers.
 function md5Hex(bytes) {
   const totalBits = bytes.length * 8;
   // Message plus a 0x80 terminator plus an 8-byte length, rounded up to 64 bytes.

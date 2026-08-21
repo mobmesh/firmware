@@ -52,11 +52,7 @@ function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-/**
- * Both automatic mechanisms failed. Carries the board's own button instruction,
- * because the wording differs per board (PGM+RST vs BOOT+RESET) and the UI should
- * not compose it.
- */
+// Carries the board's own button wording (PGM+RST vs BOOT+RESET); the UI must not compose it.
 export class ManualEntryRequiredError extends Error {
   constructor(instruction) {
     super(instruction);
@@ -65,14 +61,8 @@ export class ManualEntryRequiredError extends Error {
   }
 }
 
-/**
- * The legacy TinyUSB gesture. Native-USB boards have no RTS/DTR-to-EN wiring —
- * the *running app* watches for this signal pattern and calls `esp_restart()`.
- * That makes it the only automated path on legacy firmware, and also means it
- * does nothing at all on a device that is not running a cooperating app.
- *
- * Both transitions are required, spaced per §7.1.
- */
+// The running app watches for this signal pattern and calls `esp_restart()` — native-USB
+// boards have no RTS/DTR-to-EN wiring. Does nothing on a device with no cooperating app.
 async function fireLegacyEntryGesture(port) {
   if (!port.readable) await port.open({ baudRate: CLI_BAUD_RATE });
   try {
@@ -89,15 +79,8 @@ async function fireLegacyEntryGesture(port) {
   }
 }
 
-/**
- * Wait for the ROM identity to appear among granted ports.
- *
- * Entry from legacy app mode *changes the USB identity* (`0x0002` → `0x1001`), and
- * Web Serial authorises per device, so the ROM interface may never have been
- * granted on this machine. When that is the case no amount of waiting helps — the
- * caller escalates to the picker. Measured: a `0x0002`-only grant sees nothing
- * once the board enters download mode.
- */
+// Entry from legacy app mode changes the USB identity (`0x0002` -> `0x1001`), and Web Serial
+// authorises per device, so the ROM interface may never have been granted here.
 function isRomIdentity(port) {
   const info = port.getInfo();
   return (
@@ -134,16 +117,8 @@ async function waitForRomPort(timeoutMs, alreadyPresent = []) {
   return null;
 }
 
-/**
- * §10.3: bring a device into download mode and prove it got there.
- *
- * Mechanism is chosen by the observed product id, then the *other* mechanism is
- * tried on failure, then the manual button instruction. Returns the port that is
- * actually in download mode, which is frequently not the port passed in.
- *
- * @param {SerialPort} port
- * @param {{ manualInstruction: string, onStatus?: (message: string) => void }} options
- */
+// §10.3. Mechanism chosen by observed product id, the other tried on failure, then the
+// manual instruction. Returns the port now in download mode, often not the one passed in.
 export async function enterDownloadMode(port, { manualInstruction, onStatus } = {}) {
   const observedProductId = port.getInfo().usbProductId;
 
@@ -192,20 +167,10 @@ export const ESP32_MODE = {
   UNKNOWN: 'unknown',
 };
 
-/**
- * Resolve the device's mode from affirmative signals only.
- *
- * Order is fixed and load-bearing: the CLI is asked first, because a running
- * application is the state that must never be misread. Only its silence licenses
- * asking the ROM. Silence from both is `unknown` — a real, verified state (a board
- * whose radio never initialises enumerates stably, stays silent, and still holds a
- * valid filesystem). Treating that silence as "bootloader" is what erases a live
- * device, so it is reported, never guessed at.
- *
- * Takes a closed port and returns it closed. Both probes need exclusive use of it.
- *
- * @returns {Promise<{ mode: Esp32Mode, version: string|null }>}
- */
+// §10.2. Affirmative signals only. CLI first: a running application is the state that must
+// never be misread, and only its silence licenses asking the ROM. Silence from both is a
+// real, verified state — calling it "bootloader" is what erases a live device.
+// Takes a closed port and returns it closed.
 export async function resolveEsp32Mode(port) {
   await port.open({ baudRate: CLI_BAUD_RATE });
   let version = null;
@@ -223,12 +188,8 @@ export async function resolveEsp32Mode(port) {
   return { mode: answeredSync ? ESP32_MODE.BOOTLOADER : ESP32_MODE.UNKNOWN, version: null };
 }
 
-/**
- * A write or the connection that carried it failed. `phase` is what the UI needs to
- * say next: nothing was touched on `connect`, whereas a `write` failure leaves the
- * device part-written and it must not be sent back to the application as if it
- * were fine.
- */
+// `phase` is what the UI must say next: nothing was touched on `connect`, whereas a
+// `write` failure leaves the device part-written and unsafe to hand back.
 export class FlashWriteFailedError extends Error {
   constructor(message, { cause, phase }) {
     super(message, { cause });
@@ -237,11 +198,7 @@ export class FlashWriteFailedError extends Error {
   }
 }
 
-/**
- * A read that had to succeed did not. §10.5 treats this as fatal on purpose: the
- * decision it feeds is erase-vs-preserve, and a failed read must never be allowed
- * to read as "nothing here".
- */
+// Fatal by design — the decision this feeds is erase-vs-preserve.
 export class FlashReadFailedError extends Error {
   constructor(message, { cause }) {
     super(message, { cause });
@@ -249,27 +206,10 @@ export class FlashReadFailedError extends Error {
   }
 }
 
-/**
- * §10.4: put the device back into the application.
- *
- * The RTC watchdog chip-reset sequence, not `hard_reset` — `hard_reset` does not
- * re-sample the boot strapping pins on these parts, so the watchdog path is
- * required rather than preferred.
- *
- * FORCE_DOWNLOAD_BOOT is cleared *first*. Measured: esptool's own
- * `--after watchdog-reset`, which omits that clear, strands an S3 in download mode
- * indefinitely instead of booting the application.
- *
- * Takes a live session because the sequence only works inside one: the unlock,
- * the two config writes and the re-lock have to reach the chip with nothing
- * re-syncing the ROM in between.
- *
- * Never throws — the write it follows has already succeeded, and losing the
- * automatic reset costs the user a button press, not their firmware.
- *
- * @returns {Promise<'watchdog'|'hard-reset'|null>} how the device was reset, or
- *   null if it could not be.
- */
+// §10.4. `hard_reset` does not re-sample the boot strapping pins on these parts, and
+// leaving FORCE_DOWNLOAD_BOOT set — as esptool's `--after watchdog-reset` does — strands
+// the part in download mode. Needs a live session: nothing may re-sync the ROM between
+// the unlock and the re-lock. Never throws; the write it follows already succeeded.
 export async function returnToApplication(session, { onStatus } = {}) {
   onStatus?.('Restarting the device…');
   const registers = WATCHDOG_RESET_REGISTERS[session.chipName];
@@ -304,28 +244,10 @@ export async function returnToApplication(session, { onStatus } = {}) {
   }
 }
 
-/**
- * §10.1: write a flash plan to a device that is already in download mode.
- *
- * One executor serves both ESP32 paths (C3) — custom and stock differ only in what
- * the plan contains. The device must have been brought to download mode and
- * *confirmed* there by §10.3 first; this does not discriminate or enter.
- *
- * `plan.verify.sha256` is not checked here. It covers the provenance of the bytes
- * the resolver fetched and belongs with the fetch (§4.2 lists it as its own
- * module). What this verifies is the *write*: esptool compares its own MD5 of each
- * image against the device's `flashMd5sum` of the region it landed in, and throws
- * if they differ (§12.3 — that check is never stubbed).
- *
- * `onProgress` receives one continuous 0–1 fraction across all files, weighted by
- * byte count.
- *
- * @param {SerialPort} port  closed, in download mode
- * @param {import('./flash-plan.js').FlashPlan} plan
- * @param {{ onProgress?: (fraction: number) => void, onStatus?: (message: string) => void }} options
- * @returns {Promise<{ chipName: string, chipDescription: string, bytesWritten: number,
- *   reset: 'watchdog'|'hard-reset'|null }>}
- */
+// §10.1. One executor for both ESP32 paths (C3); the device must already be confirmed in
+// download mode. `plan.verify.sha256` is the resolver's business (§4.2) — what is verified
+// here is the write, via esptool's MD5 against the device's own `flashMd5sum`.
+// `onProgress` gets one 0-1 fraction across all files, weighted by byte count.
 export async function executeFlashPlan(port, plan, { onProgress, onStatus } = {}) {
   if (plan.engine !== 'esptool') {
     throw new Error(`executeFlashPlan received a '${plan.engine}' plan; esptool only.`);
@@ -405,16 +327,8 @@ export async function executeFlashPlan(port, plan, { onProgress, onStatus } = {}
   }
 }
 
-/**
- * §10.5 input 1: the device's own partition table.
- *
- * A failed *read* raises — it must abort before anything is written or erased,
- * because "could not read" and "there is nothing there" license opposite actions
- * and only one of them is safe. An empty list is the other answer: the read
- * worked and the chip is blank.
- *
- * @returns {Promise<import('./partitions.js').Partition[]>}
- */
+// §10.5 input 1. A failed read raises: "could not read" and "there is nothing there"
+// license opposite actions. An empty list is the blank-chip answer.
 export async function readPartitionTable(session) {
   let raw;
   try {
@@ -448,36 +362,18 @@ const MESHCORE_FILE_MARKERS = [
   '/s_contacts',
 ];
 
-/**
- * §10.5 input 3: is this filesystem MeshCore's?
- *
- * The filesystem's *contents* are what say "there is something here worth
- * keeping" — not how the device enumerated, which is the derivation C1 forbids.
- * An empty or unparsable filesystem answers no, which is correct either way: there
- * is nothing to preserve. Leading slashes are normalised because the firmware is
- * not consistent about writing them.
- */
+// §10.5 input 3. Contents are the evidence, never enumeration (C1). Only the first two
+// markers go back to v1.0.0c, so dropping the older names would stop recognising exactly
+// the devices with most to lose. Empty or unparsable answers no, which is correct.
 export function looksLikeMeshCore(files) {
   const bare = (name) => name.replace(/^\/+/, '');
   const present = new Set(files.map((file) => bare(file.name)));
   return MESHCORE_FILE_MARKERS.some((marker) => present.has(bare(marker)));
 }
 
-/**
- * §10.5, the reading half: gather every input the erase decision needs, before
- * anything is written or erased.
- *
- * Read first, decide second, write third — `decideWriteScope` is the second step
- * and is deliberately separate, because the workflow allows an explicit user
- * declaration to take precedence over the evidence entirely.
- *
- * Both reads are fatal on failure. "Could not read" and "there is nothing there"
- * license opposite actions, and a read error that degrades into the second answer
- * is exactly how a live device gets erased.
- *
- * @param {object} session          live esptool session, device in download mode
- * @param {import('./partitions.js').Partition[]} plannedPartitions  the table about to be written
- */
+// §10.5, reading half. Deciding is separate because an explicit user declaration may
+// override the evidence entirely. Both reads are fatal on failure; an *unparsable*
+// filesystem is a different answer and means nothing of ours is here.
 export async function readFlashEvidence(session, plannedPartitions, { onProgress, onStatus, onNotice } = {}) {
   onStatus?.('Checking what is on the device…');
   const partitions = await readPartitionTable(session);
@@ -525,19 +421,8 @@ export async function readFlashEvidence(session, plannedPartitions, { onProgress
 
 /** @typedef {'app-slots-only'|'full-layout'} WriteScope */
 
-/**
- * §10.5, the deciding half: how much of the flash this write has to cover.
- *
- * App slots only on *positive* evidence and nothing less — a MeshCore filesystem
- * that was read successfully, on a table still matching the one being written.
- * Everything else writes the full layout with a full erase: a blank chip, a
- * changed layout, or a filesystem that is not ours and so is not being kept.
- *
- * This is not the same question as whether the user's data survives. That is
- * §10.6's restore, which works from the backup regardless of what is written here.
- *
- * @returns {{ scope: WriteScope, reason: string }}
- */
+// §10.5, deciding half. App slots only on positive evidence and nothing less. Not the
+// same question as whether the user's data survives — that is §10.6's restore.
 export function decideWriteScope(evidence) {
   if (evidence.filesystem.status !== 'ok') {
     return { scope: 'full-layout', reason: 'no filesystem was found on this device' };
@@ -551,26 +436,10 @@ export function decideWriteScope(evidence) {
   return { scope: 'app-slots-only', reason: 'a MeshCore filesystem on a matching layout' };
 }
 
-/**
- * §10.6: put the user's filesystem back after a write that disturbed it.
- *
- * Two mechanisms, chosen by whether the partition changed size. A raw copy is
- * possible only when it did not: every SPIFFS block's lookup magic derives from
- * the image's block count, so the same bytes in a differently sized partition
- * mount as unformatted and are reformatted away. A different size therefore means
- * a full rebuild from the parsed file set.
- *
- * **Best-effort, and never throws.** The firmware is already written and working
- * by this point; failing the flash over a restore would turn a recoverable loss of
- * settings into a device the user cannot use. The read this works from is the part
- * that must not fail, and that already happened in §10.5 — before anything was
- * written or erased.
- *
- * Custom path only (C5): the stock path has no filesystem to preserve, and nRF52
- * cannot read flash back at all.
- *
- * @returns {Promise<{ action: 'raw-copy'|'rebuilt'|'skipped', reason: string }>}
- */
+// §10.6. A raw copy works only if the partition kept its size: every block's lookup magic
+// derives from the image's block count, so the same bytes in a resized partition mount as
+// unformatted and get reformatted away. Never throws — the firmware is already written,
+// and failing the flash over a lost setting would leave an unusable device. ESP32 only (C5).
 export async function restoreFilesystem(
   session,
   { evidence, plannedPartitions, eraseAll },
