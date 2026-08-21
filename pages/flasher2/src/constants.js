@@ -1,9 +1,16 @@
-// Constants register — rewrite_code.md §7. Every value carries its provenance
-// tag. Values tagged `measured`, `protocol` or `datasheet` are hardware facts
-// and may not be changed without a hardware retest (C0).
+// The constants register. This file is the list — rewrite_code.md §7 is where most
+// of these came from, not a second copy kept in step with it.
 //
-// Only values the built modules actually consume are declared here; the register
-// in §7 remains the complete list.
+// §7 exists because a reimplementation reads unexplained numbers as arbitrary and
+// normalises them away. That protection needs one auditable list, and a list that
+// lives beside the code cannot drift from it. Values established during
+// implementation and absent from §7 are tagged here the same way and carry the
+// same weight.
+//
+// Every value carries its provenance at the point of declaration. Values tagged
+// `measured`, `protocol` or `datasheet` are hardware facts and may not be changed
+// without a hardware retest (C0); `matched` needs a stated reason; `design` is a
+// judgement call and is safe to revisit.
 
 // --- Port lifecycle (§7.2) ---
 // Written into the nRF52 section of the register because that is where they were
