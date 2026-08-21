@@ -3,6 +3,11 @@
 // ESP32 paths on one executor (C3) and the two manifests on one resolver (C6).
 
 import { parsePartitionTable } from './partitions.js';
+import {
+  STOCK_ESP32_APP_ADDRESS,
+  STOCK_ESP32_MERGED_ADDRESS,
+  STOCK_RELAY_BASE,
+} from './constants.js';
 
 /**
  * @typedef {{ data: ArrayBuffer, address: number }} FlashFile
@@ -223,5 +228,154 @@ export function buildCustomFlashPlan(source, scope) {
     preserveFs: true,
     verify: sha256 ? { sha256 } : null,
     postFlash: variant.postFlashCommands ? { commands: variant.postFlashCommands } : null,
+  });
+}
+
+// --- §9: the stock manifest ---------------------------------------------------------
+// `mc-config.json` is mirrored same-origin by CI, so only the firmware bytes cross an
+// origin and need the relay. It normalises here and is never written back to (C6).
+// Upstream is volatile — device and role counts have moved 57 → 64 in a fortnight — so
+// nothing here validates against a count or a fixed set; unusable entries are dropped.
+
+export const STOCK_MANIFEST_FILE = 'mc-config.json';
+
+// A firmware entry carries either a `version` map (files we can relay) or a `github`
+// block (a release elsewhere, with no relay route). Only the first is flashable here.
+function normaliseStockFirmware(raw) {
+  const versions = raw?.version;
+  if (!versions || typeof versions !== 'object' || Array.isArray(versions)) return null;
+
+  const byVersion = {};
+  for (const [version, entry] of Object.entries(versions)) {
+    const files = (entry?.files ?? [])
+      .filter((file) => typeof file?.name === 'string' && typeof file?.type === 'string')
+      .map((file) => ({ type: file.type, name: file.name, title: file.title ?? null }));
+    if (files.length > 0) byVersion[version] = { files, notes: entry.notes ?? null };
+  }
+  if (Object.keys(byVersion).length === 0) return null;
+
+  return {
+    class: raw.class ?? null,
+    role: raw.role ?? null,
+    title: raw.title ?? null,
+    notice: raw.notice ?? null,
+    // Upstream's own order, newest first; the keys are version strings, not a list.
+    versionOrder: Object.keys(byVersion).filter((v) => byVersion[v]),
+    versions: byVersion,
+  };
+}
+
+export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}) {
+  const res = await fetch(assetUrl(baseUrl, STOCK_MANIFEST_FILE), { cache: 'no-store' });
+  if (!res.ok) throw new ManifestError(`Could not load ${STOCK_MANIFEST_FILE}: HTTP ${res.status}.`);
+
+  let raw;
+  try {
+    raw = await res.json();
+  } catch (error) {
+    throw new ManifestError(`${STOCK_MANIFEST_FILE} is not valid JSON (${error.message}).`, { cause: error });
+  }
+
+  const devices = [];
+  for (const device of raw.device ?? []) {
+    if (typeof device?.name !== 'string') continue;
+    const firmware = (device.firmware ?? []).map(normaliseStockFirmware).filter(Boolean);
+    devices.push({
+      name: device.name,
+      maker: device.maker ?? null,
+      // 'esp32' | 'nrf52' | 'noflash' — kept as-is so a UI can say why a device is not
+      // offered, rather than having it silently vanish from the list.
+      type: device.type ?? null,
+      icon: device.icon ?? null,
+      tooltip: device.tooltip ?? null,
+      erase: device.erase ?? null,
+      bootloader: device.bootloader ?? null,
+      firmware,
+    });
+  }
+  if (devices.length === 0) throw new ManifestError(`${STOCK_MANIFEST_FILE} lists no devices.`);
+
+  return { baseUrl, devices };
+}
+
+// Upstream device names are unique, but a role is not unique within a device — eight
+// devices carry the same role twice under different classes — so the entry is picked by
+// index into the device's own relay-backed list, not by role.
+function selectStockFile(device, entry, version, wipe) {
+  const files = entry.versions[version]?.files;
+  if (!files) throw new ManifestError(`'${device.name}' has no version '${version}'.`);
+
+  // ESP32: the merged image for a wipe, the bare app image for an update. Which one is
+  // the user's New/Update declaration, never the device's state (workflow Step 2).
+  // nRF52: the DFU package. `download` is the manual UF2 route and is never flashed here.
+  const wanted =
+    device.type === 'esp32'
+      ? [wipe ? 'flash-wipe' : 'flash-update']
+      : ['flash-update', 'flash'];
+
+  for (const type of wanted) {
+    const file = files.find((f) => f.type === type);
+    if (file) return file;
+  }
+  throw new ManifestError(
+    `'${device.name}' ${version} has no ${wanted.join(' or ')} file (only ` +
+      `${files.map((f) => f.type).join(', ')}).`
+  );
+}
+
+// Stage one, the peer of `loadCustomFirmwareSource`. Bytes come through the relay; there
+// is no sidecar, so `verify` stays null and the UI must say the firmware is unverified (C7).
+export async function loadStockFirmwareSource(
+  manifest,
+  { deviceName, firmwareIndex = 0, version, wipe = false },
+  { onStatus } = {}
+) {
+  const device = manifest.devices.find((d) => d.name === deviceName);
+  if (!device) throw new ManifestError(`${STOCK_MANIFEST_FILE} has no device '${deviceName}'.`);
+  if (device.type !== 'esp32' && device.type !== 'nrf52') {
+    throw new ManifestError(`'${device.name}' is type '${device.type}' and cannot be flashed here.`);
+  }
+  const entry = device.firmware[firmwareIndex];
+  if (!entry) throw new ManifestError(`'${device.name}' has no relay-backed firmware at index ${firmwareIndex}.`);
+
+  const file = selectStockFile(device, entry, version, wipe);
+
+  onStatus?.('Downloading firmware…');
+  const res = await fetch(new URL(file.name, STOCK_RELAY_BASE), { cache: 'no-store' });
+  if (!res.ok) {
+    throw new ManifestError(`Could not download ${file.name} from the relay: HTTP ${res.status}.`);
+  }
+  const bytes = new Uint8Array(await res.arrayBuffer());
+
+  return { device, entry, version, wipe, file, bytes };
+}
+
+// Stage two. One file, always: upstream's merged image already carries the bootloader and
+// partition table, and its update image is the app alone. The address follows from the
+// file that was chosen — the donor keeps it in mutable page state, where a wipe followed
+// by an update writes the app image to 0x0 (§12.3-class defect; do not reproduce).
+export function buildStockFlashPlan(source) {
+  const { device, bytes, wipe } = source;
+
+  if (device.type === 'nrf52') {
+    return createFlashPlan({
+      engine: 'dfu',
+      package: new Blob([bytes]),
+      // §10.6 is custom-path-only (C5), and DFU cannot read flash back regardless.
+      preserveFs: false,
+      verify: null,
+      postFlash: null,
+    });
+  }
+
+  return createFlashPlan({
+    engine: 'esptool',
+    files: [{ data: bytes, address: wipe ? STOCK_ESP32_MERGED_ADDRESS : STOCK_ESP32_APP_ADDRESS }],
+    eraseAll: wipe,
+    preserveFs: false,
+    verify: null,
+    // §10.7 applies here too, but the role → command-set table does not exist yet and
+    // `boards.json`'s commands are ours, not upstream's. Nothing is invented.
+    postFlash: null,
   });
 }

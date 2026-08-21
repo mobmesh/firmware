@@ -182,3 +182,15 @@ export const FLASH_READ_MAX_PORT_REOPENS = 4;
 
 // `measured`. Between disconnect and reconnect when recovering a read.
 export const PORT_REOPEN_SETTLE_MS = 100;
+
+// --- Stock firmware (§9) ---
+
+// `matched`. Upstream ships one merged image (app + partitions + bootloader) for a wipe
+// and a bare app image for an update; the two go to different addresses. Sourced from
+// flasher.meshcore.io's own flasher, which is what these files are built for.
+export const STOCK_ESP32_MERGED_ADDRESS = 0x0;
+export const STOCK_ESP32_APP_ADDRESS = 0x10000;
+
+// `design`. Stock bytes cross an origin, so they come through our relay (§9.2) rather
+// than from upstream directly. The manifest does not: CI mirrors it same-origin.
+export const STOCK_RELAY_BASE = 'https://fw.mobmesh.workers.dev/fw/';
