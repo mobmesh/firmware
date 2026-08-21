@@ -1,0 +1,100 @@
+# Daily mirror of MeshCore's stock device manifest.
+#
+# flasher.meshcore.io serves config.json with no CORS header, so the browser cannot
+# fetch it live. Mirroring rather than proxying it also turns upstream device and role
+# additions into a reviewable diff instead of a silent change under the flasher's feet.
+#
+# The file carries no version tag and moves fast -- 57 devices to 62 in 48 hours, with a
+# role appearing and another vanishing. So this validates shape, never counts: a parse
+# failure or a sharp drop in device count is the early warning for an upstream format
+# change, and fails the job loudly rather than committing the damage.
+#
+# Commits only. Publishing to Pages stays manual (publish-pages), so a human sees the
+# diff before it reaches tools.mobmesh.org.
+name: mirror-mc-config
+
+on:
+  schedule:
+    - cron: "20 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  UPSTREAM_URL: https://flasher.meshcore.io/config.json
+  DEST: pages/mc-config.json
+  # Upstream grew 57 -> 62 in two days; shrinking by a fifth is not normal churn.
+  MAX_SHRINK_PCT: 20
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+
+      - name: Fetch upstream manifest
+        run: |
+          curl -sSfL --max-time 60 --retry 3 --retry-delay 5 \
+            -o fetched.json "$UPSTREAM_URL"
+
+      - name: Validate shape against the committed mirror
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          def fail(msg):
+              print(f"::error::{msg}")
+              sys.exit(1)
+
+          try:
+              new = json.load(open("fetched.json"))
+          except json.JSONDecodeError as e:
+              fail(f"upstream config.json does not parse: {e}")
+
+          for key in ("staticPath", "device"):
+              if key not in new:
+                  fail(f"upstream config.json lost top-level key '{key}'")
+          if not isinstance(new["device"], list):
+              fail("upstream 'device' is no longer a list -- the manifest shape changed")
+
+          count = len(new["device"])
+          if count == 0:
+              fail("upstream config.json lists no devices")
+          for i, dev in enumerate(new["device"]):
+              for key in ("name", "type", "firmware"):
+                  if key not in dev:
+                      fail(f"device[{i}] ({dev.get('name', '?')}) has no '{key}'")
+
+          dest = os.environ["DEST"]
+          if os.path.exists(dest):
+              old = len(json.load(open(dest))["device"])
+              floor = old * (100 - int(os.environ["MAX_SHRINK_PCT"])) / 100
+              if count < floor:
+                  fail(f"device count fell {old} -> {count}, past the "
+                       f"{os.environ['MAX_SHRINK_PCT']}% floor of {floor:.0f}")
+              print(f"device count {old} -> {count}")
+          else:
+              print(f"first mirror, {count} devices")
+          PY
+
+      - name: Commit the mirror if changed
+        run: |
+          mkdir -p "$(dirname "$DEST")"
+          mv fetched.json "$DEST"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4 5; do
+            git add "$DEST"
+            git diff --staged --quiet && { echo "no change upstream"; break; }
+            git commit -m "docs: mirror MeshCore stock device manifest"
+            git push && break
+            if [ "$i" -eq 5 ]; then
+              echo "::error::failed to push the mirrored manifest after 5 attempts"
+              exit 1
+            fi
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+            curl -sSfL --max-time 60 -o "$DEST" "$UPSTREAM_URL"
+          done
