@@ -5,10 +5,14 @@
 
 import {
   ENTRY_CONNECT_ATTEMPTS,
+  FLASH_READ_ATTEMPTS_PER_CHUNK,
+  FLASH_READ_CHUNK_BYTES,
+  FLASH_READ_MAX_PORT_REOPENS,
   ESP_ROM_BAUD_RATE,
   ESPTOOL_BAUD_RATE,
   FLASH_IMAGE_PARAMETER_KEEP,
   FLASH_WRITE_COMPRESSED,
+  PORT_REOPEN_SETTLE_MS,
   SERIAL_READ_BUFFER_BYTES,
   SYNC_PROBE_ATTEMPTS,
   SYNC_PROBE_TIMEOUT_MS,
@@ -32,6 +36,10 @@ const silentTerminal = {
   },
   write() {},
 };
+
+function sleep(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
 
 function timeout(milliseconds, message) {
   return new Promise((_, reject) => {
@@ -196,6 +204,80 @@ export async function readFlashRegion(session, offset, size, onProgress) {
   return session.loader.readFlash(offset, size, (_packet, read, total) => {
     onProgress?.(total > 0 ? read / total : 1);
   });
+}
+
+/**
+ * Reopen the port under a live session, leaving the stub running so a read can
+ * resume mid-partition rather than starting over. The caller must re-issue whatever
+ * was in flight — the transport is new, the loader's state is not.
+ */
+async function reopenEsptoolTransport(session) {
+  const { loader, transport } = session;
+  await transport.disconnect().catch(() => {});
+  await sleep(PORT_REOPEN_SETTLE_MS);
+  await transport.connect(loader.baudrate, loader.serialOptions ?? {});
+  transport.flushInput?.();
+}
+
+/**
+ * Read a region of flash back, in chunks, with retries and a port reopen behind
+ * them. Used for the filesystem partition (§10.5 input 3, §10.6 backup), which is
+ * megabytes long — a single lost packet there otherwise costs the whole read.
+ *
+ * Recovery resumes at the failed chunk rather than restarting, and a reopen is only
+ * reached once a chunk's own retries are spent. Exhausting the reopens rethrows the
+ * last failure: a partial read must never be handed back as if it were complete,
+ * because §10.5 reads its result as evidence about what is on the device.
+ *
+ * `onNotice` surfaces retries, which otherwise look like a hang.
+ *
+ * @returns {Promise<Uint8Array>}
+ */
+export async function readFlashChunked(session, offset, size, { onProgress, onNotice } = {}) {
+  const out = new Uint8Array(size);
+  let done = 0;
+  let reopens = 0;
+
+  while (done < size) {
+    const want = Math.min(FLASH_READ_CHUNK_BYTES, size - done);
+    const base = done;
+    let chunk = null;
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= FLASH_READ_ATTEMPTS_PER_CHUNK && chunk === null; attempt += 1) {
+      try {
+        // A failed attempt's leftovers would head this one's reply.
+        if (attempt > 1) session.transport.flushInput?.();
+        chunk = await session.loader.readFlash(offset + base, want, (_packet, read, total) => {
+          onProgress?.((base + (total > 0 ? read / total : 1) * want) / size);
+        });
+      } catch (error) {
+        lastError = error;
+        console.warn(
+          `[esptool] Read of ${want}B at 0x${(offset + base).toString(16)} failed ` +
+            `(attempt ${attempt}/${FLASH_READ_ATTEMPTS_PER_CHUNK})`,
+          error
+        );
+        if (attempt < FLASH_READ_ATTEMPTS_PER_CHUNK) {
+          onNotice?.(`Read interrupted, retrying (${attempt + 1} of ${FLASH_READ_ATTEMPTS_PER_CHUNK})…`);
+        }
+      }
+    }
+
+    if (chunk === null) {
+      if (reopens >= FLASH_READ_MAX_PORT_REOPENS) throw lastError;
+      reopens += 1;
+      onNotice?.(`Reconnecting to the device (${reopens} of ${FLASH_READ_MAX_PORT_REOPENS})…`);
+      await reopenEsptoolTransport(session);
+      continue; // same chunk, fresh link — resume rather than restart
+    }
+
+    out.set(chunk.subarray(0, want), base);
+    done += want;
+  }
+
+  onProgress?.(1);
+  return out;
 }
 
 /**

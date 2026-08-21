@@ -30,6 +30,7 @@ import {
   hardResetDevice,
   openEsptoolSession,
   probeEsptoolSync,
+  readFlashChunked,
   readFlashRegion,
   resetIntoDownloadMode,
   writeEsptoolRegister,
@@ -38,8 +39,11 @@ import {
 import {
   PARTITION_TABLE_MAX_BYTES,
   PARTITION_TABLE_OFFSET,
+  findFilesystemPartition,
   parsePartitionTable,
+  partitionTablesMatch,
 } from './partitions.js';
+import { readSpiffsFiles } from './spiffs.js';
 import { closeSerialPortQuietly, listGrantedSerialPorts } from './serial-port.js';
 
 
@@ -422,4 +426,126 @@ export async function readPartitionTable(session) {
     );
   }
   return parsePartitionTable(raw);
+}
+
+/**
+ * Names that identify a MeshCore filesystem, and the release each arrived in.
+ *
+ * Only the first two go back to v1.0.0c; `/com_prefs` came in v1.4.1,
+ * `/s_contacts` v1.9.0, `/regions2` v1.10.0 and `/prefs.json` v1.17.0. Dropping
+ * the older names would stop recognising older devices — which is precisely the
+ * case where the user has the most to lose. Any one of them is enough: a v1.17
+ * device flashed fresh may carry only `/identity/_main.id` and `/prefs.json`,
+ * while an upgraded one still has the legacy files alongside.
+ */
+const MESHCORE_FILE_MARKERS = [
+  '/identity/_main.id',
+  '/node_prefs',
+  '/com_prefs',
+  '/prefs.json',
+  '/regions2',
+  '/s_contacts',
+];
+
+/**
+ * §10.5 input 3: is this filesystem MeshCore's?
+ *
+ * The filesystem's *contents* are what say "there is something here worth
+ * keeping" — not how the device enumerated, which is the derivation C1 forbids.
+ * An empty or unparsable filesystem answers no, which is correct either way: there
+ * is nothing to preserve. Leading slashes are normalised because the firmware is
+ * not consistent about writing them.
+ */
+export function looksLikeMeshCore(files) {
+  const bare = (name) => name.replace(/^\/+/, '');
+  const present = new Set(files.map((file) => bare(file.name)));
+  return MESHCORE_FILE_MARKERS.some((marker) => present.has(bare(marker)));
+}
+
+/**
+ * §10.5, the reading half: gather every input the erase decision needs, before
+ * anything is written or erased.
+ *
+ * Read first, decide second, write third — `decideWriteScope` is the second step
+ * and is deliberately separate, because the workflow allows an explicit user
+ * declaration to take precedence over the evidence entirely.
+ *
+ * Both reads are fatal on failure. "Could not read" and "there is nothing there"
+ * license opposite actions, and a read error that degrades into the second answer
+ * is exactly how a live device gets erased.
+ *
+ * @param {object} session          live esptool session, device in download mode
+ * @param {import('./partitions.js').Partition[]} plannedPartitions  the table about to be written
+ */
+export async function readFlashEvidence(session, plannedPartitions, { onProgress, onStatus, onNotice } = {}) {
+  onStatus?.('Checking what is on the device…');
+  const partitions = await readPartitionTable(session);
+  const partition = findFilesystemPartition(partitions);
+
+  // No filesystem partition is a legitimate reading, not a failure: a blank chip
+  // has nothing to find. It is only reachable because the table read succeeded.
+  if (!partition) {
+    return {
+      partitions,
+      filesystem: { status: 'absent', partition: null, files: [], isMeshCore: false },
+      layoutMatches: partitionTablesMatch(partitions, plannedPartitions),
+    };
+  }
+
+  onStatus?.('Reading existing data…');
+  let image;
+  try {
+    image = await readFlashChunked(session, partition.offset, partition.size, { onProgress, onNotice });
+  } catch (error) {
+    throw new FlashReadFailedError(
+      `This device has existing data that could not be read back (${error.message}). Nothing ` +
+        `has been written or erased, so nothing has been lost — try again, and if it keeps ` +
+        `failing try a different USB cable or port.`,
+      { cause: error }
+    );
+  }
+
+  let files = [];
+  try {
+    files = readSpiffsFiles(image);
+  } catch (error) {
+    // Unparsable is not unreadable. The bytes came back fine; they are simply not a
+    // filesystem this understands, which answers "nothing of ours here" — the same
+    // answer as another project's install, and it is handled the same way.
+    console.warn('[esp32] Could not parse the filesystem that was read back:', error);
+  }
+
+  return {
+    partitions,
+    filesystem: { status: 'ok', partition, image, files, isMeshCore: looksLikeMeshCore(files) },
+    layoutMatches: partitionTablesMatch(partitions, plannedPartitions),
+  };
+}
+
+/** @typedef {'app-slots-only'|'full-layout'} WriteScope */
+
+/**
+ * §10.5, the deciding half: how much of the flash this write has to cover.
+ *
+ * App slots only on *positive* evidence and nothing less — a MeshCore filesystem
+ * that was read successfully, on a table still matching the one being written.
+ * Everything else writes the full layout with a full erase: a blank chip, a
+ * changed layout, or a filesystem that is not ours and so is not being kept.
+ *
+ * This is not the same question as whether the user's data survives. That is
+ * §10.6's restore, which works from the backup regardless of what is written here.
+ *
+ * @returns {{ scope: WriteScope, reason: string }}
+ */
+export function decideWriteScope(evidence) {
+  if (evidence.filesystem.status !== 'ok') {
+    return { scope: 'full-layout', reason: 'no filesystem was found on this device' };
+  }
+  if (!evidence.filesystem.isMeshCore) {
+    return { scope: 'full-layout', reason: 'the filesystem on this device is not MeshCore\u2019s' };
+  }
+  if (!evidence.layoutMatches) {
+    return { scope: 'full-layout', reason: 'the partition layout differs from the one being written' };
+  }
+  return { scope: 'app-slots-only', reason: 'a MeshCore filesystem on a matching layout' };
 }

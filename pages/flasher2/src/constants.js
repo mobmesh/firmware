@@ -167,3 +167,20 @@ export const FORCE_DOWNLOAD_BOOT_MASK = 1;
 
 // `measured`. For the reset to take effect before anything else touches the bus.
 export const POST_WATCHDOG_RESET_WAIT_MS = 500;
+
+// --- Reading flash back (§7.1, §10.5/§10.6) ---
+// One dropped packet mid-read otherwise costs the whole partition, which on a
+// marginal cable is close to a coin flip over a multi-megabyte filesystem.
+
+// `matched`. Matches esptool's own read chunk. Larger chunks mean one dropped
+// packet costs more work; smaller ones cost round trips.
+export const FLASH_READ_CHUNK_BYTES = 0x40000;
+
+// `measured`. Attempts at one chunk before reopening the port.
+export const FLASH_READ_ATTEMPTS_PER_CHUNK = 3;
+
+// `measured`. Port reopens across a whole read before giving up on it entirely.
+export const FLASH_READ_MAX_PORT_REOPENS = 4;
+
+// `measured`. Between disconnect and reconnect when recovering a read.
+export const PORT_REOPEN_SETTLE_MS = 100;
