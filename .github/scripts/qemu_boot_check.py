@@ -26,6 +26,8 @@ EXPECTED_RESET_REASONS = ("POWERON", "RTC_SW_CPU_RST")
 
 def merge_flash_image(board, variant, flasher_dir, out_path):
     offsets = {k: int(v, 16) for k, v in board["offsets"].items()}
+    # 16MB regardless of the board's real flash size -- both machine models expect it,
+    # and a correctly-sized image fails esp_flash_init() during IDF startup.
     flash_size = 16 * 1024 * 1024
     img = bytearray([0xFF] * flash_size)
 
@@ -40,12 +42,14 @@ def merge_flash_image(board, variant, flasher_dir, out_path):
     out_path.write_bytes(img)
 
 
-def boot_and_capture(qemu_bin, rom_dir, flash_image):
+def boot_and_capture(qemu_bin, machine, mem, rom_dir, flash_image):
     cmd = [
-        str(qemu_bin), "-nographic", "-machine", "esp32s3", "-m", "8M",
+        str(qemu_bin), "-nographic", "-machine", machine,
         "-drive", f"file={flash_image},if=mtd,format=raw",
         "-L", str(rom_dir),
     ]
+    if mem:
+        cmd += ["-m", mem]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     buf = b""
     start = time.time()
@@ -90,6 +94,9 @@ def main():
     parser.add_argument("--flasher-dir", type=Path, required=True)
     parser.add_argument("--qemu-bin", type=Path, required=True)
     parser.add_argument("--rom-dir", type=Path, required=True)
+    parser.add_argument("--machine", required=True)
+    # Only the S3 machine takes one; the C3 has no PSRAM.
+    parser.add_argument("--mem", default="")
     parser.add_argument("--workdir", type=Path, required=True)
     args = parser.parse_args()
 
@@ -100,7 +107,8 @@ def main():
     flash_image = args.workdir / "flash_image.bin"
     merge_flash_image(board, variant, args.flasher_dir, flash_image)
 
-    output = boot_and_capture(args.qemu_bin, args.rom_dir, flash_image)
+    output = boot_and_capture(args.qemu_bin, args.machine, args.mem,
+                              args.rom_dir, flash_image)
     log_path = args.workdir / "serial_capture.log"
     log_path.write_text(output)
     print(output)
