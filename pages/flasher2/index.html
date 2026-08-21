@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobMesh flasher — dev harness</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 44rem; padding: 0 1rem; }
+    button { font: inherit; padding: .4rem .8rem; margin-right: .5rem; }
+    #status { font-family: ui-monospace, monospace; margin: 1rem 0; }
+    #log { font-family: ui-monospace, monospace; font-size: 13px; margin-top: 1rem;
+           border-top: 1px solid #ccc; padding-top: .5rem; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Flasher core — dev harness</h1>
+  <p>Exercises the capability check (§5.1) and the port ladder (§5.3). Not the product UI.</p>
+  <div id="status"></div>
+  <button id="list">List granted ports</button>
+  <button id="pick">Pick port</button>
+  <button id="acquire">Acquire usable port</button>
+  <button id="cli">Probe CLI (ver)</button>
+  <button id="mode">Resolve mode (§10.2)</button>
+  <div id="log"></div>
+  <script type="module" src="src/dev-harness.js"></script>
+</body>
+</html>
