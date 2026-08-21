@@ -38,7 +38,7 @@ export function createFlashPlan(fields) {
 }
 
 // --- §8: the custom manifest -------------------------------------------------------
-// `boards.json` normalises here and is never written back to (C6). It is generated from
+// `auto_boards.json` normalises here and is never written back to (C6). It is generated from
 // each build's real `partitions.bin`, so it is ESP32-only; the stock resolver (§9) is the
 // peer that feeds the nRF52 engine.
 
@@ -123,14 +123,14 @@ function normaliseBoard(key, raw) {
 
 // Top level is board keys plus `_generated`/`_version` metadata.
 export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}) {
-  const res = await fetch(assetUrl(baseUrl, 'boards.json'), { cache: 'no-store' });
-  if (!res.ok) throw new ManifestError(`Could not load boards.json: HTTP ${res.status}.`);
+  const res = await fetch(assetUrl(baseUrl, 'auto_boards.json'), { cache: 'no-store' });
+  if (!res.ok) throw new ManifestError(`Could not load auto_boards.json: HTTP ${res.status}.`);
 
   let raw;
   try {
     raw = await res.json();
   } catch (error) {
-    throw new ManifestError(`boards.json is not valid JSON (${error.message}).`, { cause: error });
+    throw new ManifestError(`auto_boards.json is not valid JSON (${error.message}).`, { cause: error });
   }
 
   const boards = {};
@@ -138,7 +138,7 @@ export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}
     if (key.startsWith('_')) continue;
     boards[key] = normaliseBoard(key, board);
   }
-  if (Object.keys(boards).length === 0) throw new ManifestError('boards.json lists no boards.');
+  if (Object.keys(boards).length === 0) throw new ManifestError('auto_boards.json lists no boards.');
 
   return { baseUrl, version: raw._version ?? null, boards };
 }
@@ -168,7 +168,7 @@ async function verifyAgainstSidecar(baseUrl, bytes, path) {
 // answer is what selects the file list — so the table has to come first.
 export async function loadCustomFirmwareSource(manifest, boardKey, variantKey, { onStatus } = {}) {
   const board = manifest.boards[boardKey];
-  if (!board) throw new ManifestError(`boards.json has no board '${boardKey}'.`);
+  if (!board) throw new ManifestError(`auto_boards.json has no board '${boardKey}'.`);
   const variant = board.variants[variantKey];
   if (!variant) throw new ManifestError(`Board '${boardKey}' has no variant '${variantKey}'.`);
 
@@ -232,27 +232,53 @@ export function buildCustomFlashPlan(source, scope) {
 }
 
 // --- §9: the stock manifest ---------------------------------------------------------
-// `mc-config.json` is mirrored same-origin by CI, so only the firmware bytes cross an
+// `mc_config.json` is mirrored same-origin by CI, so only the firmware bytes cross an
 // origin and need the relay. It normalises here and is never written back to (C6).
 // Upstream is volatile — device and role counts have moved 57 → 64 in a fortnight — so
 // nothing here validates against a count or a fixed set; unusable entries are dropped.
 
-export const STOCK_MANIFEST_FILE = 'mc-config.json';
+export const STOCK_MANIFEST_FILE = 'mc_config.json';
+export const STOCK_RELEASES_FILE = 'mc_releases.json';
 
-// A firmware entry carries either a `version` map (files we can relay) or a `github`
-// block (a release elsewhere, with no relay route). Only the first is flashable here.
-function normaliseStockFirmware(raw) {
-  const versions = raw?.version;
-  if (!versions || typeof versions !== 'object' || Array.isArray(versions)) return null;
-
+// A firmware entry names its files one of two ways, and both end up here as the same
+// version map. Either it carries `version` directly, or it carries a release stream plus
+// filename patterns — the versions, build hashes and real names for those live only in
+// the releases manifest, so neither file resolves a URL without the other.
+function releaseVersions(github, releases) {
   const byVersion = {};
-  for (const [version, entry] of Object.entries(versions)) {
-    const files = (entry?.files ?? [])
-      .filter((file) => typeof file?.name === 'string' && typeof file?.type === 'string')
-      .map((file) => ({ type: file.type, name: file.name, title: file.title ?? null }));
-    if (files.length > 0) byVersion[version] = { files, notes: entry.notes ?? null };
+  for (const [fileType, pattern] of Object.entries(github.files ?? {})) {
+    let match;
+    try {
+      match = new RegExp(pattern);
+    } catch {
+      continue; // an unparsable upstream pattern drops its files, never the entry
+    }
+    for (const stream of releases) {
+      if (stream?.type !== github.type) continue;
+      for (const file of stream.files ?? []) {
+        if (typeof file?.name !== 'string' || !match.test(file.name)) continue;
+        const entry = (byVersion[stream.version] ??= { files: [], notes: stream.notes ?? null });
+        // `path` is what the relay is asked for; `name` stays the display filename.
+        entry.files.push({ type: fileType, name: file.name, path: String(file.url).replace(/^\/+/, '') });
+      }
+    }
   }
-  if (Object.keys(byVersion).length === 0) return null;
+  return byVersion;
+}
+
+function normaliseStockFirmware(raw, releases) {
+  const byVersion = {};
+  const declared = raw?.version;
+  if (declared && typeof declared === 'object' && !Array.isArray(declared)) {
+    for (const [version, entry] of Object.entries(declared)) {
+      const files = (entry?.files ?? [])
+        .filter((file) => typeof file?.name === 'string' && typeof file?.type === 'string')
+        // These are served from upstream's flat firmware directory, so the name is the path.
+        .map((file) => ({ type: file.type, name: file.name, path: file.name, title: file.title ?? null }));
+      if (files.length > 0) byVersion[version] = { files, notes: entry.notes ?? null };
+    }
+  }
+  if (raw?.github?.files) Object.assign(byVersion, releaseVersions(raw.github, releases));
 
   return {
     class: raw.class ?? null,
@@ -260,26 +286,36 @@ function normaliseStockFirmware(raw) {
     title: raw.title ?? null,
     notice: raw.notice ?? null,
     // Upstream's own order, newest first; the keys are version strings, not a list.
-    versionOrder: Object.keys(byVersion).filter((v) => byVersion[v]),
+    // A version with no files is one this board had no build in — it is left out of the
+    // order so nothing offers it, but the entry itself is always kept.
+    versionOrder: Object.keys(byVersion).filter((v) => byVersion[v].files.length > 0),
     versions: byVersion,
   };
 }
 
-export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}) {
-  const res = await fetch(assetUrl(baseUrl, STOCK_MANIFEST_FILE), { cache: 'no-store' });
-  if (!res.ok) throw new ManifestError(`Could not load ${STOCK_MANIFEST_FILE}: HTTP ${res.status}.`);
-
-  let raw;
+async function loadJson(baseUrl, file) {
+  const res = await fetch(assetUrl(baseUrl, file), { cache: 'no-store' });
+  if (!res.ok) throw new ManifestError(`Could not load ${file}: HTTP ${res.status}.`);
   try {
-    raw = await res.json();
+    return await res.json();
   } catch (error) {
-    throw new ManifestError(`${STOCK_MANIFEST_FILE} is not valid JSON (${error.message}).`, { cause: error });
+    throw new ManifestError(`${file} is not valid JSON (${error.message}).`, { cause: error });
+  }
+}
+
+export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}) {
+  const [raw, releases] = await Promise.all([
+    loadJson(baseUrl, STOCK_MANIFEST_FILE),
+    loadJson(baseUrl, STOCK_RELEASES_FILE),
+  ]);
+  if (!Array.isArray(releases)) {
+    throw new ManifestError(`${STOCK_RELEASES_FILE} is not a list of release streams.`);
   }
 
   const devices = [];
   for (const device of raw.device ?? []) {
     if (typeof device?.name !== 'string') continue;
-    const firmware = (device.firmware ?? []).map(normaliseStockFirmware).filter(Boolean);
+    const firmware = (device.firmware ?? []).map((f) => normaliseStockFirmware(f, releases));
     devices.push({
       name: device.name,
       maker: device.maker ?? null,
@@ -341,7 +377,7 @@ export async function loadStockFirmwareSource(
   const file = selectStockFile(device, entry, version, wipe);
 
   onStatus?.('Downloading firmware…');
-  const res = await fetch(new URL(file.name, relayBase), { cache: 'no-store' });
+  const res = await fetch(new URL(file.path, relayBase), { cache: 'no-store' });
   if (!res.ok) {
     throw new ManifestError(`Could not download ${file.name} from the relay: HTTP ${res.status}.`);
   }
@@ -375,7 +411,7 @@ export function buildStockFlashPlan(source) {
     preserveFs: false,
     verify: null,
     // §10.7 applies here too, but the role → command-set table does not exist yet and
-    // `boards.json`'s commands are ours, not upstream's. Nothing is invented.
+    // `auto_boards.json`'s commands are ours, not upstream's. Nothing is invented.
     postFlash: null,
   });
 }

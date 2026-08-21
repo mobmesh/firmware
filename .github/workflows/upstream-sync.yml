@@ -1,7 +1,9 @@
 # Daily pull of the mirrored upstream files. Never builds, never publishes; Pages
 # deployment stays manual, so every change here is reviewed before it goes live.
 #
-# mc-config has no version tag and moves fast, so the job validates shape, never counts.
+# mc_config has no version tag and moves fast, so the job validates shape, never counts. It
+# names firmware by stream and pattern, so /releases is mirrored with it or the pair goes
+# out of step.
 # cli-docs takes upstream's cli_commands.md from the tag the repeater ships from.
 name: upstream-sync
 
@@ -25,6 +27,8 @@ jobs:
     env:
       UPSTREAM_URL: https://flasher.meshcore.io/config.json
       DEST: pages/flasher/mc_config.json
+      RELEASES_URL: https://flasher.meshcore.io/releases
+      RELEASES_DEST: pages/flasher/mc_releases.json
       MAX_SHRINK_PCT: 20
     steps:
       - name: Checkout this repo
@@ -34,6 +38,8 @@ jobs:
         run: |
           curl -sSfL --max-time 60 --retry 3 --retry-delay 5 \
             -o fetched.json "$UPSTREAM_URL"
+          curl -sSfL --max-time 60 --retry 3 --retry-delay 5 \
+            -o fetched-releases.json "$RELEASES_URL"
 
       - name: Validate shape against the committed mirror
         run: |
@@ -63,6 +69,26 @@ jobs:
                   if key not in dev:
                       fail(f"device[{i}] ({dev.get('name', '?')}) has no '{key}'")
 
+          try:
+              rel = json.load(open("fetched-releases.json"))
+          except json.JSONDecodeError as e:
+              fail(f"upstream /releases does not parse: {e}")
+          if not isinstance(rel, list) or not rel:
+              fail("upstream /releases is not a non-empty list -- the manifest shape changed")
+          for i, stream in enumerate(rel):
+              for key in ("type", "version", "files"):
+                  if key not in stream:
+                      fail(f"/releases[{i}] has no '{key}'")
+
+          streams = {s["type"] for s in rel}
+          wanted = {f["github"]["type"]
+                    for d in new["device"] for f in d.get("firmware", [])
+                    if isinstance(f.get("github"), dict) and "type" in f["github"]}
+          missing = wanted - streams
+          if missing:
+              fail(f"/releases is missing stream(s) config.json refers to: {sorted(missing)}")
+          print(f"/releases: {len(rel)} streams, {sum(len(s['files']) for s in rel)} files")
+
           dest = os.environ["DEST"]
           if os.path.exists(dest):
               old = len(json.load(open(dest))["device"])
@@ -79,12 +105,13 @@ jobs:
         run: |
           mkdir -p "$(dirname "$DEST")"
           mv fetched.json "$DEST"
+          mv fetched-releases.json "$RELEASES_DEST"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for i in 1 2 3 4 5; do
-            git add "$DEST"
+            git add "$DEST" "$RELEASES_DEST"
             git diff --staged --quiet && { echo "no change upstream"; break; }
-            git commit -m "docs: mirror MeshCore stock device manifest"
+            git commit -m "docs: mirror MeshCore stock manifests"
             git push && break
             if [ "$i" -eq 5 ]; then
               echo "::error::failed to push the mirrored manifest after 5 attempts"
@@ -93,6 +120,7 @@ jobs:
             git fetch origin "${{ github.ref_name }}"
             git reset --hard "origin/${{ github.ref_name }}"
             curl -sSfL --max-time 60 -o "$DEST" "$UPSTREAM_URL"
+            curl -sSfL --max-time 60 -o "$RELEASES_DEST" "$RELEASES_URL"
           done
 
   cli_docs:
