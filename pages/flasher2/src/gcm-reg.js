@@ -32,7 +32,7 @@ const ED25519_GROUP_ORDER = 2n ** 252n + 27742317777372353535851937790883648493n
 // 30 KB of curve arithmetic that only the mining loop needs; the flash path never loads it.
 let loadedCurve = null;
 async function loadCurve() {
-  if (!loadedCurve) loadedCurve = await import('../vendor/noble-ed25519/index.js');
+  if (!loadedCurve) loadedCurve = await import('../../shared/vendor/noble-ed25519/index.js');
   return loadedCurve;
 }
 
