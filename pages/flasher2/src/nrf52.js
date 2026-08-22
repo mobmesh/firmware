@@ -71,6 +71,20 @@ async function newlyGrantedPort(before) {
   return granted.find((port) => !before.includes(port)) ?? null;
 }
 
+// Re-acquire after any transition, rather than predicting what the device will do.
+// Whether a board changes USB identity — on entering DFU, after an erase package, on
+// booting the application — is device-specific, so ask the bus instead of assuming.
+// A device that re-enumerated comes back as a new entry and is preferred; one that kept
+// its identity leaves the held port as the best candidate.
+async function reacquireAfterTransition(before, heldPort, { prompt, onStatus, reenter } = {}) {
+  return acquireUsableSerialPort({
+    preferredPort: (await newlyGrantedPort(before)) ?? heldPort,
+    prompt: prompt ?? 'Select the port to continue.',
+    onStatus,
+    reenterProgrammingMode: reenter ?? null,
+  });
+}
+
 /**
  * §11.2 + §11.3. Takes the running application's port, returns the DFU port.
  * Raises PortSelectionRequiredError when the DFU identity was never granted — the UI
@@ -81,14 +95,10 @@ export async function enterDfuMode(appPort, { prompt, onStatus } = {}) {
   const before = await listGrantedSerialPorts();
   await touchIntoDfuMode(appPort);
 
-  // Entering DFU re-enumerates the board as a different USB device, so the ladder is
-  // given the new port when one appeared and the old one otherwise — a touch that did
-  // nothing (already in DFU) leaves the handed-in port as the best candidate.
-  return acquireUsableSerialPort({
-    preferredPort: (await newlyGrantedPort(before)) ?? appPort,
+  return reacquireAfterTransition(before, appPort, {
     prompt: prompt ?? 'Select the DFU port to continue.',
     onStatus,
-    reenterProgrammingMode: () => retouchQuietly(appPort),
+    reenter: () => retouchQuietly(appPort),
   });
 }
 
@@ -115,8 +125,19 @@ export async function executeDfuPlan(port, plan, { onProgress, onStatus } = {}) 
   const totalBytes = stages.reduce((sum, stage) => sum + stage.package.size, 0);
   let doneBytes = 0;
 
+  // Baseline for spotting a re-enumeration: taken before a write, compared after it.
+  // Sampling it afterwards would already include the new port and find nothing "new".
+  let before = await listGrantedSerialPorts();
+
   for (const [index, stage] of stages.entries()) {
-    if (index > 0) await sleep(DFU_POST_ERASE_SETTLE_MS);
+    if (index > 0) {
+      // Measured on the T1: the erase package re-enumerates the board, so the port held
+      // from the previous stage is dead. Re-acquire rather than discovering it by failing.
+      await sleep(DFU_POST_ERASE_SETTLE_MS);
+      onStatus?.('Reconnecting to the DFU port…');
+      target = await reacquireAfterTransition(before, target, { onStatus });
+    }
+    before = await listGrantedSerialPorts();
     const weight = stage.package.size / totalBytes;
     const base = doneBytes / totalBytes;
 
@@ -185,29 +206,33 @@ async function toggleDtrReset(port) {
 }
 
 /**
- * §11.7. Returns `{ port, method }` — `self` when the bootloader booted the application
- * on its own, `dtr` after the gesture, and a null port when neither worked. Confirming
- * the application is the caller's: only it knows whether the role serves the CLI.
+ * §11.7. Returns `{ port, method }` — `self` when the bootloader booted the application on
+ * its own, `dtr` after the gesture, `unconfirmed` when a usable port is there but nothing
+ * distinguishes it from the DFU port we started on, and a null port when nothing came back.
+ * Confirming *which* firmware runs is the caller's: only it knows if the role answers.
  */
 export async function returnToApplication(dfuPort, { appPort = null, onStatus } = {}) {
   onStatus?.('Restarting the device…');
+  const before = await listGrantedSerialPorts();
 
-  // Measured on the T1: a successful transfer re-enumerates under the application identity
-  // with no gesture at all. Look for that before reaching for the reset.
-  if (appPort) {
-    const back = await tryApplicationPort(appPort, onStatus);
-    if (back) return { port: back, method: 'self' };
-  }
+  // Ask the bus before reaching for the reset. Whether a bootloader boots the application
+  // by itself is device-specific — the T1 does — and re-acquiring costs nothing when it has.
+  const returned = await tryReacquire(before, appPort ?? dfuPort, onStatus);
+  if (returned && returned !== dfuPort) return { port: returned, method: 'self' };
 
   await toggleDtrReset(dfuPort);
-  const back = appPort ? await tryApplicationPort(appPort, onStatus) : null;
-  return { port: back, method: back ? 'dtr' : null };
+  const afterReset = await tryReacquire(before, appPort ?? dfuPort, onStatus);
+  if (afterReset && afterReset !== dfuPort) return { port: afterReset, method: 'dtr' };
+
+  // A device that never re-enumerates hands back the same object in both modes, so
+  // "still in DFU" and "back in the application" are indistinguishable from here.
+  return { port: afterReset, method: afterReset ? 'unconfirmed' : null };
 }
 
 // Absence is an answer here, not a failure — §11.5's manual route is what follows it.
-async function tryApplicationPort(appPort, onStatus) {
+async function tryReacquire(before, heldPort, onStatus) {
   try {
-    return await waitForUsableSerialPort(appPort, { onStatus });
+    return await reacquireAfterTransition(before, heldPort, { onStatus });
   } catch (error) {
     if (error instanceof PortSelectionRequiredError) return null;
     throw error;
