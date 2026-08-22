@@ -6,7 +6,7 @@
 // and is not yet written up there.
 
 import { compatibilityCopy, detectBrowserKind, detectSerialSupport } from './capability.js';
-import { acquireUsableSerialPort, deviceFamily } from './serial-port.js';
+import { acquireUsableSerialPort, closeSerialPortQuietly, deviceFamily } from './serial-port.js';
 import * as esp32 from './esp32.js';
 import * as esptool from './esptool.js';
 import * as nrf52 from './nrf52.js';
@@ -458,6 +458,20 @@ export const STEPS = [
     applies: () => true,
   },
 ];
+
+/**
+ * Hand back everything a flow owns. Abandoning one without this leaves the esptool session
+ * holding a reader on the port, and the next run's `connect` fails as selection-required
+ * with the grant intact — the device looks unrecognised while sitting in DFU. Measured.
+ */
+export async function disposeFlow(flow) {
+  if (!flow) return;
+  const { session, port } = flow.state;
+  flow.state.session = null;
+  flow.state.port = null;
+  if (session) await esptool.closeEsptoolSession(session).catch(() => {});
+  if (port) await closeSerialPortQuietly(port);
+}
 
 // --- navigation -------------------------------------------------------------------------
 

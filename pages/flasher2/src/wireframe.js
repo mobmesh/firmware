@@ -274,7 +274,10 @@ async function renderStep() {
 
 // --- entry ------------------------------------------------------------------------------
 
-function start({ dryRun, family = null }) {
+async function start({ dryRun, family = null }) {
+  // Restarting while the old flow still holds the port is what made a device in DFU read
+  // as unrecognised: its session keeps a reader locked and `connect` never gets to probe.
+  await flowApi.disposeFlow(flow);
   // The manifests live under the shipped tool until cutover (§8's baseUrl note), and the
   // deployed relay rejects a localhost origin — hence the override.
   const relayBase = new URLSearchParams(location.search).get('relay') ?? undefined;
