@@ -11,6 +11,7 @@ import * as esp32 from './esp32.js';
 import * as esptool from './esptool.js';
 import * as nrf52 from './nrf52.js';
 import * as plans from './flash-plan.js';
+import { partitionTablesMatch } from './partitions.js';
 import { STOCK_RELAY_BASE } from './constants.js';
 
 export const SOURCE = { ENHANCED: 'enhanced', STOCK: 'stock', MANUAL: 'manual' };
@@ -328,13 +329,17 @@ export const STEPS = [
         let reason = 'you chose New, so the whole layout is written';
         if (!wipe) {
           if (flow.dryRun) {
-            // Update's scope comes from reading the device, so a dry run cannot reach it.
-            reason = 'dry run — the real scope needs §10.5\u2019s device read';
+            reason = 'dry run — the real scope needs Step 1\u2019s table read';
+          } else if (partitionTablesMatch(s.devicePartitions, source.plannedPartitions)) {
+            // Step 2: the fork is the table comparison alone. A matching layout never
+            // touches the filesystem, so there is nothing to read back and nothing to
+            // restore — the content check would only risk erasing what was asked to be kept.
+            scope = 'app-slots-only';
+            reason = 'the partition layout already matches, so your settings are left alone';
           } else {
-            // Where §10.5 actually lands: it needs the firmware's partition table, which
-            // only exists once the source above has been fetched.
+            // The one branch that erases the filesystem, and so the only one that backs it up.
             s.evidence = await esp32.readFlashEvidence(s.session, source.plannedPartitions, { onStatus });
-            ({ scope, reason } = esp32.decideWriteScope(s.evidence));
+            reason = 'the partition layout differs — settings are backed up and rebuilt';
           }
         }
         s.planNotes.push(`write scope: ${scope} — ${reason}`);
