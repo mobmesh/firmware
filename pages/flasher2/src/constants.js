@@ -133,6 +133,10 @@ export const ROM_PORT_SETTLE_MS = 2000;
 // strategy, which is worth repeating here precisely because a reset *is* issued.
 export const ENTRY_CONNECT_ATTEMPTS = 7;
 
+// `measured`. Companion-protocol reply window. Companion builds answer immediately or not at
+// all — a build that does not speak it never will, so this is a liveness bound, not patience.
+export const COMPANION_REPLY_TIMEOUT_MS = 3000;
+
 // --- Flash writing (§7.1, §10.1) ---
 
 // `protocol`. How much of the spare app slot is blanked to stop the bootloader booting it.
