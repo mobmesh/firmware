@@ -34,6 +34,10 @@ export const PORT_OPEN_RETRY_DELAY_MS = 750;
 // at probe time rather than mid-flash.
 export const PORT_PROBE_BAUD_RATE = 115200;
 
+// `measured`. DFU write attempts before escalating to the user. `dfu.js` opens the port
+// itself, so an attempt that never moved a byte is the retryable one.
+export const DFU_FLASH_ATTEMPTS = 3;
+
 // `matched`. Interval between rescans of the granted-port list while waiting for a
 // device to come back after a reset. Matches the existing flasher's bootloader poll
 // interval (§7.1), which is hardware-verified against these boards.
