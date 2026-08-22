@@ -4,13 +4,17 @@
 // §11.7's exit back to the application is not written into the spec yet and is
 // deliberately absent here.
 
-import { DFU_FLASH_ATTEMPTS } from './constants.js';
+import { DFU_FLASH_ATTEMPTS, DFU_POST_ERASE_SETTLE_MS } from './constants.js';
 import {
   acquireUsableSerialPort,
   closeSerialPortQuietly,
   listGrantedSerialPorts,
   waitForUsableSerialPort,
 } from './serial-port.js';
+
+function sleep(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
 
 const DFU_JS_URL = '../vendor/dfu/dfu.js';
 
@@ -83,7 +87,7 @@ export async function enterDfuMode(appPort, { prompt, onStatus } = {}) {
 /**
  * §11.1. The DFU executor, peer of `executeFlashPlan`. Takes a closed port — `dfuUpdate`
  * opens it itself and closes it again on the way out — and returns the port it finished
- * on, which a retry may have replaced. `onProgress` is one 0-1 fraction.
+ * on, which a retry may have replaced. `onProgress` is one 0-1 fraction across both stages.
  */
 export async function executeDfuPlan(port, plan, { onProgress, onStatus } = {}) {
   if (plan.engine !== 'dfu') {
@@ -92,21 +96,49 @@ export async function executeDfuPlan(port, plan, { onProgress, onStatus } = {}) 
   const { Dfu } = await loadDfuApi();
   let target = port;
 
+  // `eraseBeforeUpdate` erases the application region only — not the filesystem. A wipe is
+  // the erase package, its own DFU update on the same port, ahead of the firmware (§11.3).
+  const stages = plan.erasePackage
+    ? [
+        { package: plan.erasePackage, label: 'Erasing the device…' },
+        { package: plan.package, label: 'Writing firmware…' },
+      ]
+    : [{ package: plan.package, label: 'Writing firmware…' }];
+  const totalBytes = stages.reduce((sum, stage) => sum + stage.package.size, 0);
+  let doneBytes = 0;
+
+  for (const [index, stage] of stages.entries()) {
+    if (index > 0) await sleep(DFU_POST_ERASE_SETTLE_MS);
+    const weight = stage.package.size / totalBytes;
+    const base = doneBytes / totalBytes;
+
+    target = await writeDfuPackage(Dfu, target, stage, plan.eraseAll, {
+      onStatus,
+      onProgress: onProgress && ((fraction) => onProgress(base + fraction * weight)),
+    });
+    doneBytes += stage.package.size;
+  }
+
+  onProgress?.(1);
+  return { port: target, bytesWritten: totalBytes };
+}
+
+// One stage. Returns the port it succeeded on — a retry may have replaced it.
+async function writeDfuPackage(Dfu, port, stage, eraseAll, { onProgress, onStatus }) {
+  let target = port;
+
   for (let attempt = 1; attempt <= DFU_FLASH_ATTEMPTS; attempt += 1) {
     await closeSerialPortQuietly(target);
-    onStatus?.('Writing firmware…');
+    onStatus?.(stage.label);
 
-    // `eraseBeforeUpdate` erases the application region only, not the filesystem; a
-    // filesystem wipe is upstream's separate erase package, which nothing resolves yet.
-    const dfu = new Dfu(target, plan.eraseAll);
+    const dfu = new Dfu(target, eraseAll);
     let started = false;
     try {
-      await dfu.dfuUpdate(plan.package, (percent) => {
+      await dfu.dfuUpdate(stage.package, (percent) => {
         started = true;
         onProgress?.(percent / 100);
       });
-      onProgress?.(1);
-      return { port: target, bytesWritten: plan.package.size };
+      return target;
     } catch (error) {
       // `dfu.js` owns the open, so a port that would not open arrives as an untyped
       // DOMException. Retry on "no byte has moved yet" rather than matching Chrome's

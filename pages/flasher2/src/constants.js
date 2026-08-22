@@ -38,6 +38,11 @@ export const PORT_PROBE_BAUD_RATE = 115200;
 // itself, so an attempt that never moved a byte is the retryable one.
 export const DFU_FLASH_ATTEMPTS = 3;
 
+// `matched`. Between the erase package and the firmware package on nRF52. GulfCoastMesh
+// measured 3000 ms, and 5000 ms for two RAK boards it names by its own device ids; those
+// ids do not map onto upstream's device names, which change weekly. One value, the slower.
+export const DFU_POST_ERASE_SETTLE_MS = 5000;
+
 // `matched`. Interval between rescans of the granted-port list while waiting for a
 // device to come back after a reset. Matches the existing flasher's bootloader poll
 // interval (§7.1), which is hardware-verified against these boards.

@@ -16,6 +16,7 @@ import {
  * @property {'esptool'|'dfu'} engine
  * @property {FlashFile[]} files        esptool only; empty for dfu
  * @property {Blob|null} package        dfu only
+ * @property {Blob|null} erasePackage   dfu only; flashed first when present
  * @property {boolean} eraseAll
  * @property {boolean} preserveFs       esp32 custom only
  * @property {{ sha256: string }|null} verify
@@ -27,6 +28,9 @@ export function createFlashPlan(fields) {
     engine: fields.engine,
     files: fields.files ?? [],
     package: fields.package ?? null,
+    // Deviation from §4.1's shape. nRF52 has no merged image: upstream wipes the
+    // filesystem with a separate erase package flashed ahead of the firmware.
+    erasePackage: fields.erasePackage ?? null,
     eraseAll: fields.eraseAll ?? false,
     preserveFs: fields.preserveFs ?? false,
     // Null means "no checksum was supplied", which the UI must state rather than
@@ -383,7 +387,21 @@ export async function loadStockFirmwareSource(
   }
   const bytes = new Uint8Array(await res.arrayBuffer());
 
-  return { device, entry, version, wipe, file, bytes };
+  // Still stage one: a fetch that failed after the erase package was written would leave
+  // the device wiped with nothing to boot.
+  let eraseBytes = null;
+  if (device.type === 'nrf52' && wipe && device.erase) {
+    onStatus?.('Downloading the erase package…');
+    const eraseRes = await fetch(new URL(device.erase, relayBase), { cache: 'no-store' });
+    if (!eraseRes.ok) {
+      throw new ManifestError(
+        `Could not download ${device.erase} from the relay: HTTP ${eraseRes.status}.`
+      );
+    }
+    eraseBytes = new Uint8Array(await eraseRes.arrayBuffer());
+  }
+
+  return { device, entry, version, wipe, file, bytes, eraseBytes };
 }
 
 // Stage two. One file, always: upstream's merged image already carries the bootloader and
@@ -391,12 +409,15 @@ export async function loadStockFirmwareSource(
 // file that was chosen — the donor keeps it in mutable page state, where a wipe followed
 // by an update writes the app image to 0x0 (§12.3-class defect; do not reproduce).
 export function buildStockFlashPlan(source) {
-  const { device, bytes, wipe } = source;
+  const { device, bytes, eraseBytes, wipe } = source;
 
   if (device.type === 'nrf52') {
     return createFlashPlan({
       engine: 'dfu',
       package: new Blob([bytes]),
+      // The wipe. `Dfu`'s own `eraseBeforeUpdate` clears the application region the write
+      // is about to overwrite anyway, so `eraseAll` stays false and this carries it.
+      erasePackage: eraseBytes ? new Blob([eraseBytes]) : null,
       // §10.6 is custom-path-only (C5), and DFU cannot read flash back regardless.
       preserveFs: false,
       verify: null,
