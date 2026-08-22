@@ -139,6 +139,14 @@ function normaliseBoard(key, raw) {
 }
 
 // Top level is board keys plus `_generated`/`_version` metadata.
+const CUSTOM_DISPLAY_FILE = 'board-display.json';
+
+// Same two the shipped flasher ships; a variant with no icon renders without one.
+const CUSTOM_VARIANT_ICONS = {
+  repeater: 'icons/repeater_variant.png',
+  room_server: 'icons/room_variant.png',
+};
+
 export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}) {
   const res = await fetch(assetUrl(baseUrl, 'auto_boards.json'), { cache: 'no-store' });
   if (!res.ok) throw new ManifestError(`Could not load auto_boards.json: HTTP ${res.status}.`);
@@ -157,7 +165,33 @@ export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}
   }
   if (Object.keys(boards).length === 0) throw new ManifestError('auto_boards.json lists no boards.');
 
-  return { baseUrl, version: raw._version ?? null, boards };
+  // Display list is optional and falls back to one tile per board, matching the shipped
+  // flasher. Tiles may share a board -- `grumpy_board` and `xiao_c3` are one image apiece
+  // over the same firmware -- so the display id is not the board key.
+  let displays;
+  try {
+    const shown = await fetch(assetUrl(baseUrl, CUSTOM_DISPLAY_FILE), { cache: 'no-store' });
+    if (!shown.ok) throw new ManifestError('no display list');
+    displays = Object.entries(await shown.json()).map(([id, entry]) => ({
+      id,
+      label: entry.label,
+      board: entry.board ?? id,
+      icon: entry.icon ? assetUrl(baseUrl, entry.icon) : null,
+      // Post-flash icon; falls back to `icon` when left blank, as the donor does.
+      icon2: assetUrl(baseUrl, entry.icon2 || entry.icon || '') || null,
+    }));
+  } catch {
+    displays = Object.entries(boards).map(([id, board]) => ({
+      id, label: board.label, board: id, icon: null, icon2: null,
+    }));
+  }
+
+  // Keyed by variant id, which is stable across boards, never by label.
+  const variantIcons = Object.fromEntries(
+    Object.entries(CUSTOM_VARIANT_ICONS).map(([id, path]) => [id, assetUrl(baseUrl, path)])
+  );
+
+  return { baseUrl, version: raw._version ?? null, boards, displays, variantIcons };
 }
 
 // Sidecar body is `<hash>` or `<hash>:<offset>`; the offset is not this tool's to use.
@@ -367,12 +401,23 @@ export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {})
   // warning text a firmware entry names, `role` and `maker` carry upstream's own display
   // names, and `staticPath` is where its web pages link bootloader files (not our path —
   // the relay serves them from the same flat directory as everything else).
+  // Five maker keys (uniteng, gat-iot, Ikoka, keepteen, muziworks) are absent from the
+  // catalogue and would render as the raw key. Capitalise the first letter and nothing
+  // else — title case would turn the catalogue's own `LilyGo` into `Lilygo`.
+  const makers = { ...(raw.maker ?? {}) };
+  for (const device of devices) {
+    const key = device.maker;
+    if (!key) continue;
+    makers[key] = { ...(makers[key] ?? {}) };
+    makers[key].name ||= key.charAt(0).toUpperCase() + key.slice(1);
+  }
+
   return {
     baseUrl,
     devices,
     notices: raw.notice ?? {},
     roles: raw.role ?? {},
-    makers: raw.maker ?? {},
+    makers,
     staticPath: raw.staticPath ?? null,
   };
 }
