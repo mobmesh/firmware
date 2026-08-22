@@ -352,7 +352,7 @@ export const STEPS = [
           { onStatus, relayBase: flow.relayBase }
         );
         s.planNotes.push(`file: ${source.file.name} (${source.bytes.length} bytes)`);
-        s.plan = plans.buildStockFlashPlan(source);
+        s.plan = plans.buildStockFlashPlan(source, { partitions: s.devicePartitions ?? [] });
       } else {
         s.plan = plans.buildManualFlashPlan(s.file, { family: s.family, wipe });
         s.planNotes.push(`file: ${s.file.name} (${s.file.bytes.length} bytes)`);

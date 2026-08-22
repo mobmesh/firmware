@@ -5,6 +5,7 @@
 import {
   PARTITION_TABLE_MAX_BYTES,
   PARTITION_TABLE_OFFSET,
+  findSecondAppSlot,
   parsePartitionTable,
 } from './partitions.js';
 import {
@@ -412,7 +413,7 @@ export async function loadStockFirmwareSource(
 // partition table, and its update image is the app alone. The address follows from the
 // file that was chosen — the donor keeps it in mutable page state, where a wipe followed
 // by an update writes the app image to 0x0 (§12.3-class defect; do not reproduce).
-export function buildStockFlashPlan(source) {
+export function buildStockFlashPlan(source, { partitions = [] } = {}) {
   const { device, bytes, eraseBytes, wipe } = source;
 
   if (device.type === 'nrf52') {
@@ -429,9 +430,16 @@ export function buildStockFlashPlan(source) {
     });
   }
 
+  // An update writes app0 only, so otadata may still prefer the slot it did not touch and
+  // boot the firmware that was just replaced. Blanking that slot leaves the bootloader one
+  // valid image. A wipe erases everything and needs none of this.
+  const files = [{ data: bytes, address: wipe ? STOCK_ESP32_MERGED_ADDRESS : STOCK_ESP32_APP_ADDRESS }];
+  const slotB = wipe ? null : findSecondAppSlot(partitions);
+  if (slotB) files.push({ data: new Uint8Array(slotB.size).fill(0xff), address: slotB.offset });
+
   return createFlashPlan({
     engine: 'esptool',
-    files: [{ data: bytes, address: wipe ? STOCK_ESP32_MERGED_ADDRESS : STOCK_ESP32_APP_ADDRESS }],
+    files,
     eraseAll: wipe,
     preserveFs: false,
     verify: null,

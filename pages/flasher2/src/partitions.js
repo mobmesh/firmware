@@ -23,6 +23,8 @@ const ENTRY_MAGIC = 0x50aa;
 const LABEL_OFFSET = 12;
 const LABEL_BYTES = 16;
 
+const APP_TYPE = 0x00;
+const SUBTYPE_OTA_1 = 0x11;
 const DATA_TYPE = 0x01;
 const SUBTYPE_SPIFFS = 0x82;
 const SUBTYPE_LITTLEFS = 0x83;
@@ -70,6 +72,12 @@ export function findFilesystemPartition(partitions) {
       partition.type === DATA_TYPE &&
       (partition.subtype === SUBTYPE_SPIFFS || partition.subtype === SUBTYPE_LITTLEFS)
   );
+}
+
+// The second OTA app slot. Blanking it is what stops otadata booting the image that was
+// just replaced; matched on subtype because labels vary between builds.
+export function findSecondAppSlot(partitions) {
+  return partitions.find((p) => p.type === APP_TYPE && p.subtype === SUBTYPE_OTA_1);
 }
 
 /** Whether a filesystem partition is SPIFFS, which alone can be rebuilt at a new size (§10.6). */
