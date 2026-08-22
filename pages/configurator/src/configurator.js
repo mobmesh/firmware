@@ -5892,7 +5892,7 @@
     });
   }
 
-  // Vanity public key generation (Ed25519 via tweetnacl).
+  // Vanity public key generation (Ed25519).
   function bytesToHex(bytes) {
     let s = "";
     for (let i = 0; i < bytes.length; i++) {
@@ -5901,9 +5901,11 @@
     return s;
   }
 
-  function generateVanityKey() {
-    const nacl = window.nacl;
-    if (!nacl || !nacl.sign || !nacl.sign.keyPair) {
+  async function generateVanityKey() {
+    let Point;
+    try {
+      ({ Point } = await import("../../shared/vendor/noble-ed25519/index.js"));
+    } catch (err) {
       appendSerialLog("Key generation library not loaded.", "is-err");
       return;
     }
@@ -5932,18 +5934,15 @@
     function batch() {
       for (let i = 0; i < 400; i++) {
         attempts++;
-        const seed = nacl.randomBytes(32);
-        const kp = nacl.sign.keyPair.fromSeed(seed);
-        const pubHex = bytesToHex(kp.publicKey);
+        // `set prv.key` wants the expanded key: clamped scalar, then signing component.
+        const scalar = crypto.getRandomValues(new Uint8Array(32));
+        scalar[0] &= 248;
+        scalar[31] &= 63;
+        scalar[31] |= 64;
+        const pubHex = bytesToHex(Point.BASE.multiply(scalarLE(scalar)).toBytes());
         if (pubHex.startsWith(prefix)) {
-          // `set prv.key` wants the expanded key — clamped scalar then signing component.
-          // keyPair().secretKey is seed+pubkey instead, which the device rejects as bad.
-          const h = nacl.hash(seed);
-          const scalar = h.slice(0, 32);
-          scalar[0] &= 248;
-          scalar[31] &= 63;
-          scalar[31] |= 64;
-          const prvHex = bytesToHex(scalar) + bytesToHex(h.slice(32, 64));
+          const prvHex =
+            bytesToHex(scalar) + bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
           const secs = ((Date.now() - start) / 1000).toFixed(1);
           appendSerialLog(
             "Found after " + attempts + " tries in " + secs + "s.",
