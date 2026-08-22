@@ -198,6 +198,12 @@ export const FLASH_READ_MAX_PORT_REOPENS = 4;
 // `measured`. Between disconnect and reconnect when recovering a read.
 export const PORT_REOPEN_SETTLE_MS = 100;
 
+// --- GulfCoastMesh node registry (gcm-reg.js) ---
+
+// `design`. Deliberately short. Registration is optional enrichment on top of a flash that
+// has already succeeded, so a slow or absent registry must never hold up the wizard.
+export const GCM_REGISTRY_TIMEOUT_MS = 3000;
+
 // --- Stock firmware (§9) ---
 
 // `matched`. Upstream ships one merged image (app + partitions + bootloader) for a wipe
