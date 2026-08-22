@@ -5932,10 +5932,18 @@
     function batch() {
       for (let i = 0; i < 400; i++) {
         attempts++;
-        const kp = nacl.sign.keyPair();
+        const seed = nacl.randomBytes(32);
+        const kp = nacl.sign.keyPair.fromSeed(seed);
         const pubHex = bytesToHex(kp.publicKey);
         if (pubHex.startsWith(prefix)) {
-          const prvHex = bytesToHex(kp.secretKey);
+          // `set prv.key` wants the expanded key — clamped scalar then signing component.
+          // keyPair().secretKey is seed+pubkey instead, which the device rejects as bad.
+          const h = nacl.hash(seed);
+          const scalar = h.slice(0, 32);
+          scalar[0] &= 248;
+          scalar[31] &= 63;
+          scalar[31] |= 64;
+          const prvHex = bytesToHex(scalar) + bytesToHex(h.slice(32, 64));
           const secs = ((Date.now() - start) / 1000).toFixed(1);
           appendSerialLog(
             "Found after " + attempts + " tries in " + secs + "s.",
