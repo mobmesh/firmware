@@ -5,6 +5,9 @@
 //
 // The registry claims a 2-byte prefix of a node's *public* key so two nodes on the mesh
 // do not collide. No private key is ever sent — see `reservePrefix`'s payload.
+//
+// Key generation lives here rather than in a module of its own: nothing else in the tool
+// needs a MeshCore identity, and it exists only to feed the mining loop below.
 
 import { GCM_REGISTRY_TIMEOUT_MS } from './constants.js';
 
@@ -14,6 +17,68 @@ export const GCM_REGISTRY_BASE = 'https://meshbuddy.gulfcoastmesh.org';
 
 // Their format: 4 hex characters, taken from the front of the public key.
 export const GCM_PREFIX_LENGTH = 4;
+
+// MeshCore's key is the *expanded* 64-byte layout — a clamped scalar followed by a signing
+// component — which is why WebCrypto's Ed25519 cannot produce one and the scalar is drawn
+// directly rather than hashed from a seed.
+const MESHCORE_SCALAR_BYTES = 32;
+const MESHCORE_PRIVATE_KEY_BYTES = 64;
+
+// `protocol`. The Ed25519 group order L from RFC 8032. The base point has this order, so
+// reducing before multiplying changes no public key — but a clamped scalar exceeds L and
+// the curve rejects it unreduced.
+const ED25519_GROUP_ORDER = 2n ** 252n + 27742317777372353535851937790883648493n;
+
+// 30 KB of curve arithmetic that only the mining loop needs; the flash path never loads it.
+let loadedCurve = null;
+async function loadCurve() {
+  if (!loadedCurve) loadedCurve = await import('../vendor/noble-ed25519/index.js');
+  return loadedCurve;
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// RFC 8032 clamping: clear the low three bits, clear bit 255, set bit 254.
+function clampScalar(scalar) {
+  const clamped = new Uint8Array(scalar);
+  clamped[0] &= 248;
+  clamped[31] &= 63;
+  clamped[31] |= 64;
+  return clamped;
+}
+
+function scalarToBigIntLE(bytes) {
+  let value = 0n;
+  for (let i = bytes.length - 1; i >= 0; i -= 1) value = (value << 8n) | BigInt(bytes[i]);
+  return value;
+}
+
+/**
+ * A fresh MeshCore identity, generated here and never transmitted. Returns
+ * `{ privateKeyHex, publicKeyHex, prefix }`; only `prefix` is ever sent anywhere.
+ */
+export async function generateIdentityKeypair() {
+  const { Point } = await loadCurve();
+  const scalar = clampScalar(crypto.getRandomValues(new Uint8Array(MESHCORE_SCALAR_BYTES)));
+  const signingComponent = crypto.getRandomValues(new Uint8Array(MESHCORE_SCALAR_BYTES));
+
+  const expanded = new Uint8Array(MESHCORE_PRIVATE_KEY_BYTES);
+  expanded.set(scalar, 0);
+  expanded.set(signingComponent, MESHCORE_SCALAR_BYTES);
+
+  const publicKey = Point.BASE.multiply(scalarToBigIntLE(scalar) % ED25519_GROUP_ORDER).toBytes();
+  const publicKeyHex = bytesToHex(publicKey).toUpperCase();
+
+  return { privateKeyHex: bytesToHex(expanded), publicKeyHex, prefix: extractPrefix(publicKeyHex) };
+}
+
+/** The device echoes its own public key after `set prv.key`; it must match what we generated. */
+export function publicKeysMatch(expected, actual) {
+  const clean = (hex) => String(hex).replace(/[^0-9a-f]/gi, '').toUpperCase();
+  return clean(expected).length > 0 && clean(expected) === clean(actual);
+}
 
 /** @typedef {{ prefix: string, available: boolean|null, reason: string, message: string, reachable: boolean }} PrefixStatus */
 
@@ -102,15 +167,12 @@ export async function checkPublicKey(publicKeyHex, options) {
 }
 
 /**
- * Find a keypair whose prefix the registry will accept. `generateKeypair` is injected —
- * it must return `{ publicKeyHex, … }` — because MeshCore's expanded 64-byte key layout is
- * not something WebCrypto's Ed25519 can produce, so generating one locally means vendoring
- * a curve implementation. That dependency is not decided, and this module does not need it.
- *
- * Returns the first accepted keypair, or null when none was accepted or the registry never
- * answered — the caller flashes anyway and skips registration.
+ * Mine a keypair whose prefix the registry will accept. Each attempt is one scalar multiply,
+ * so the loop costs microseconds — the device is never involved. Returns the first accepted
+ * keypair, or null when none was accepted or the registry never answered; the caller flashes
+ * anyway and skips registration.
  */
-export async function findAvailablePrefix(generateKeypair, { attempts = 15, onProgress, ...options } = {}) {
+export async function findAvailablePrefix(generateKeypair = generateIdentityKeypair, { attempts = 15, onProgress, ...options } = {}) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     onProgress?.(attempt, attempts);
     const keypair = await generateKeypair();
