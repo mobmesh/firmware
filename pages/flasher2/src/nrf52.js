@@ -4,8 +4,16 @@
 // §11.7's exit back to the application is not written into the spec yet and is
 // deliberately absent here.
 
-import { DFU_FLASH_ATTEMPTS, DFU_POST_ERASE_SETTLE_MS } from './constants.js';
 import {
+  DFU_FLASH_ATTEMPTS,
+  DFU_POST_ERASE_SETTLE_MS,
+  DFU_RESET_DTR_HIGH_MS,
+  DFU_RESET_DTR_LOW_MS,
+  DFU_RESET_SETTLE_MS,
+  PORT_PROBE_BAUD_RATE,
+} from './constants.js';
+import {
+  PortSelectionRequiredError,
   acquireUsableSerialPort,
   closeSerialPortQuietly,
   listGrantedSerialPorts,
@@ -155,5 +163,53 @@ async function writeDfuPackage(Dfu, port, stage, eraseAll, { onProgress, onStatu
       onStatus?.('Waiting for the DFU port to become ready…');
       target = await waitForUsableSerialPort(target, { onStatus });
     }
+  }
+}
+
+// §11.7. Best-effort: a failure to open or signal is not an error, because unplugging does
+// the same thing and the write has already succeeded.
+async function toggleDtrReset(port) {
+  await closeSerialPortQuietly(port);
+  try {
+    await port.open({ baudRate: PORT_PROBE_BAUD_RATE });
+    await port.setSignals({ dataTerminalReady: false });
+    await sleep(DFU_RESET_DTR_LOW_MS);
+    await port.setSignals({ dataTerminalReady: true });
+    await sleep(DFU_RESET_DTR_HIGH_MS);
+    await sleep(DFU_RESET_SETTLE_MS);
+  } catch (error) {
+    console.warn('[nrf52] DFU reset gesture failed:', error);
+  } finally {
+    await closeSerialPortQuietly(port);
+  }
+}
+
+/**
+ * §11.7. Returns `{ port, method }` — `self` when the bootloader booted the application
+ * on its own, `dtr` after the gesture, and a null port when neither worked. Confirming
+ * the application is the caller's: only it knows whether the role serves the CLI.
+ */
+export async function returnToApplication(dfuPort, { appPort = null, onStatus } = {}) {
+  onStatus?.('Restarting the device…');
+
+  // Measured on the T1: a successful transfer re-enumerates under the application identity
+  // with no gesture at all. Look for that before reaching for the reset.
+  if (appPort) {
+    const back = await tryApplicationPort(appPort, onStatus);
+    if (back) return { port: back, method: 'self' };
+  }
+
+  await toggleDtrReset(dfuPort);
+  const back = appPort ? await tryApplicationPort(appPort, onStatus) : null;
+  return { port: back, method: back ? 'dtr' : null };
+}
+
+// Absence is an answer here, not a failure — §11.5's manual route is what follows it.
+async function tryApplicationPort(appPort, onStatus) {
+  try {
+    return await waitForUsableSerialPort(appPort, { onStatus });
+  } catch (error) {
+    if (error instanceof PortSelectionRequiredError) return null;
+    throw error;
   }
 }

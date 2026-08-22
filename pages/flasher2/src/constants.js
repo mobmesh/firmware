@@ -43,6 +43,12 @@ export const DFU_FLASH_ATTEMPTS = 3;
 // ids do not map onto upstream's device names, which change weekly. One value, the slower.
 export const DFU_POST_ERASE_SETTLE_MS = 5000;
 
+// `matched`. The §11.7 exit gesture, from GulfCoastMesh's `resetDeviceAfterDfu` — the
+// bootloader watches for the DTR transition. Not our own hardware measurement.
+export const DFU_RESET_DTR_LOW_MS = 50;
+export const DFU_RESET_DTR_HIGH_MS = 100;
+export const DFU_RESET_SETTLE_MS = 300;
+
 // `matched`. Interval between rescans of the granted-port list while waiting for a
 // device to come back after a reset. Matches the existing flasher's bootloader poll
 // interval (§7.1), which is hardware-verified against these boards.
