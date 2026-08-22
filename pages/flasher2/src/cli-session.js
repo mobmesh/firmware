@@ -161,10 +161,14 @@ export function startCliSession(port) {
 
 // §10.2 state 1. Affirmative only: silence is also what a device stuck in init looks like,
 // so a null means "did not answer", never "is a bootloader".
-export async function probeCliVersion(port) {
+//
+// The default is a liveness probe — a fast no is the point. After a flash the device is
+// still booting and needs `CLI_FIRST_COMMAND_TIMEOUT_MS` instead; measured, a freshly
+// written node answers nothing at 1.5 s and answers normally once it has come up.
+export async function probeCliVersion(port, { timeoutMs = CLI_PROBE_TIMEOUT_MS } = {}) {
   const session = startCliSession(port);
   try {
-    return await session.runCommand('ver', { timeoutMs: CLI_PROBE_TIMEOUT_MS });
+    return await session.runCommand('ver', { timeoutMs });
   } catch (error) {
     if (error instanceof CliTimeoutError || error instanceof CliConnectionLostError) return null;
     throw error;

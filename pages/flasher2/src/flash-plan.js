@@ -2,7 +2,11 @@
 // Resolvers produce it, engines consume it: the boundary that keeps the custom and stock
 // ESP32 paths on one executor (C3) and the two manifests on one resolver (C6).
 
-import { parsePartitionTable } from './partitions.js';
+import {
+  PARTITION_TABLE_MAX_BYTES,
+  PARTITION_TABLE_OFFSET,
+  parsePartitionTable,
+} from './partitions.js';
 import {
   STOCK_ESP32_APP_ADDRESS,
   STOCK_ESP32_MERGED_ADDRESS,
@@ -435,4 +439,95 @@ export function buildStockFlashPlan(source) {
     // `auto_boards.json`'s commands are ours, not upstream's. Nothing is invented.
     postFlash: null,
   });
+}
+
+// --- §9A: manual upload ------------------------------------------------------------
+// The third resolver, beside the other two (C6). No manifest, so there is only one
+// stage: the bytes are already in hand and nothing is fetched.
+
+export class UnsupportedFirmwareFileError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'UnsupportedFirmwareFileError';
+  }
+}
+
+// `protocol`. ESP-IDF image header magic, first byte of any ESP32 image.
+const ESP_IMAGE_MAGIC = 0xe9;
+
+// A merged image carries a partition table at 0x8000 and an application image does not.
+// Both start with 0xE9 and size does not separate them — an upstream merged image measured
+// smaller than the application image for the same board.
+function looksMerged(bytes) {
+  if (bytes.length < PARTITION_TABLE_OFFSET + 32) return false;
+  try {
+    const table = parsePartitionTable(
+      bytes.subarray(PARTITION_TABLE_OFFSET, PARTITION_TABLE_OFFSET + PARTITION_TABLE_MAX_BYTES)
+    );
+    return table.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * §9A. Builds a plan from a user-supplied file. `family` comes from the connected device
+ * (§10.2), never from the file — the file is only checked against it.
+ * @param {{ name: string, bytes: Uint8Array, blob: Blob }} file
+ */
+export function buildManualFlashPlan(file, { family, wipe = false }) {
+  if (family === 'nrf52') {
+    if (/\.uf2$/i.test(file.name)) {
+      throw new UnsupportedFirmwareFileError(
+        `${file.name} is a UF2 file. Double-tap reset and copy it to the drive the board ` +
+          `presents — it is not flashed over serial.`
+      );
+    }
+    if (!/\.zip$/i.test(file.name)) {
+      throw new UnsupportedFirmwareFileError(`${file.name} is not a DFU package (.zip).`);
+    }
+    return createFlashPlan({ engine: 'dfu', package: file.blob, verify: null, postFlash: null });
+  }
+
+  if (file.bytes[0] !== ESP_IMAGE_MAGIC) {
+    throw new UnsupportedFirmwareFileError(
+      `${file.name} is not an ESP32 firmware image (expected magic 0xE9).`
+    );
+  }
+  const merged = looksMerged(file.bytes);
+  return createFlashPlan({
+    engine: 'esptool',
+    files: [{ data: file.bytes, address: merged ? STOCK_ESP32_MERGED_ADDRESS : STOCK_ESP32_APP_ADDRESS }],
+    eraseAll: wipe,
+    // No sidecar and no manifest digest: the UI must say the firmware is unverified (C7).
+    verify: null,
+    postFlash: null,
+  });
+}
+
+/** Reads a picked file into the shape `buildManualFlashPlan` takes. */
+export async function readUploadedFirmware(file) {
+  return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()), blob: file };
+}
+
+/** The nRF52 package must parse before hardware is touched, not mid-transfer (§9A). */
+export async function validateDfuPackage(blob) {
+  const zip = await import('../vendor/dfu/zip.min.js');
+  const reader = new zip.ZipReader(new zip.BlobReader(blob));
+  try {
+    const entries = await reader.getEntries();
+    const names = entries.map((e) => new TextDecoder().decode(e.rawFilename));
+    const manifestEntry = entries[names.indexOf('manifest.json')];
+    if (!manifestEntry) throw new UnsupportedFirmwareFileError('The package has no manifest.json.');
+    const app = JSON.parse(await manifestEntry.getData(new zip.TextWriter()))?.manifest?.application;
+    if (!names.includes(app?.bin_file) || !names.includes(app?.dat_file)) {
+      throw new UnsupportedFirmwareFileError('The package is missing the files its manifest names.');
+    }
+    return { binFile: app.bin_file, datFile: app.dat_file };
+  } catch (error) {
+    if (error instanceof UnsupportedFirmwareFileError) throw error;
+    throw new UnsupportedFirmwareFileError(`The package could not be read (${error.message}).`);
+  } finally {
+    await reader.close().catch(() => {});
+  }
 }
