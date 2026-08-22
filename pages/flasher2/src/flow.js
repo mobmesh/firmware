@@ -28,13 +28,11 @@ export class FlowBlockedError extends Error {
 export function createFlow({
   dryRun = false,
   family = null,
-  verifyWrite = true,
   manifestBase = plans.CUSTOM_MANIFEST_BASE,
   relayBase = STOCK_RELAY_BASE,
 } = {}) {
   return {
     dryRun,
-    verifyWrite,
     manifestBase,
     relayBase,
     stepIndex: 0,
@@ -414,13 +412,8 @@ export const STEPS = [
 
       if (s.plan.engine === 'esptool') {
         const startedAt = performance.now();
-        const written = await esp32.executeFlashPlan(s.session, s.plan, {
-          onProgress,
-          onStatus,
-          verifyWrite: flow.verifyWrite,
-        });
-        const seconds = ((performance.now() - startedAt) / 1000).toFixed(1);
-        onStatus(`write took ${seconds}s (verify ${flow.verifyWrite ? 'on' : 'OFF'})`);
+        const written = await esp32.executeFlashPlan(s.session, s.plan, { onProgress, onStatus });
+        onStatus(`write took ${((performance.now() - startedAt) / 1000).toFixed(1)}s`);
         if (s.plan.preserveFs && s.evidence) {
           const restored = await esp32.restoreFilesystem(
             s.session,

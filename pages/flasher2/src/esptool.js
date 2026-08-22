@@ -132,10 +132,7 @@ export async function closeEsptoolSession(session) {
 
 // `onProgress(fileIndex, written, total)` is esptool's own per-file signal, unweighted —
 // the caller knows what the files mean.
-// TEMPORARY (2026-08-22, David): `verifyWrite: false` stubs esptool's MD5 hook to "",
-// which makes its `if (a)` fall through and skips both the local hash and the device
-// round-trip. For measuring what verification costs. REMOVE THIS OPTION AFTER MEASURING.
-export async function writeFlashFiles(session, { files, eraseAll, onProgress, verifyWrite = true }) {
+export async function writeFlashFiles(session, { files, eraseAll, onProgress }) {
   await session.loader.writeFlash({
     fileArray: files,
     flashMode: FLASH_IMAGE_PARAMETER_KEEP,
@@ -147,7 +144,7 @@ export async function writeFlashFiles(session, { files, eraseAll, onProgress, ve
     // compares the result against the device's own `flashMd5sum` of the same
     // region. Omitting it — or stubbing it to "" as the GulfCoastMesh donor does
     // (§12.3) — means firmware is written and nothing checks it landed.
-    calculateMD5Hash: verifyWrite ? md5Hex : () => '',
+    calculateMD5Hash: md5Hex,
     reportProgress: onProgress,
   });
 }
