@@ -12,6 +12,7 @@ import {
   APP_SLOT_INVALIDATE_BYTES,
   STOCK_ESP32_APP_ADDRESS,
   STOCK_ESP32_MERGED_ADDRESS,
+  STOCK_IMAGE_BASE,
   STOCK_RELAY_BASE,
 } from './constants.js';
 
@@ -319,6 +320,19 @@ async function loadJson(baseUrl, file) {
   }
 }
 
+const TOOLTIP_IMG_SRC = /<img\b[^>]*\bsrc=['"]([^'"]+)['"]/i;
+
+/** The `src` of the image upstream hides in a device's tooltip HTML, or null. */
+function tooltipImageSrc(tooltip) {
+  return typeof tooltip === 'string' ? (TOOLTIP_IMG_SRC.exec(tooltip)?.[1] ?? null) : null;
+}
+
+// Manifest asset paths are root-relative and resolve only against upstream's origin. A
+// missing file cannot be detected by status — this SPA host answers 200 with index.html.
+function absoluteStockAsset(path) {
+  return typeof path === 'string' && path ? new URL(path, STOCK_IMAGE_BASE).href : null;
+}
+
 export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}) {
   const [raw, releases] = await Promise.all([
     loadJson(baseUrl, STOCK_MANIFEST_FILE),
@@ -327,7 +341,6 @@ export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {})
   if (!Array.isArray(releases)) {
     throw new ManifestError(`${STOCK_RELEASES_FILE} is not a list of release streams.`);
   }
-
   const devices = [];
   for (const device of raw.device ?? []) {
     if (typeof device?.name !== 'string') continue;
@@ -338,8 +351,11 @@ export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {})
       // 'esp32' | 'nrf52' | 'noflash' — kept as-is so a UI can say why a device is not
       // offered, rather than having it silently vanish from the list.
       type: device.type ?? null,
-      icon: device.icon ?? null,
+      icon: absoluteStockAsset(device.icon),
       tooltip: device.tooltip ?? null,
+      // The device picture is only ever an <img> buried in `tooltip`; pull the src out so
+      // no caller has to inject a third party's HTML to show it.
+      image: absoluteStockAsset(tooltipImageSrc(device.tooltip)),
       erase: device.erase ?? null,
       bootloader: device.bootloader ?? null,
       firmware,

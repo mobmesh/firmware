@@ -232,3 +232,7 @@ export const STOCK_ESP32_APP_ADDRESS = 0x10000;
 // `design`. Stock bytes cross an origin, so they come through our relay (§9.2) rather
 // than from upstream directly. The manifest does not: CI mirrors it same-origin.
 export const STOCK_RELAY_BASE = 'https://fw.mobmesh.workers.dev/fw/';
+
+// `matched`. Device artwork is root-relative in the manifest (`/img/…`), so it only
+// resolves against upstream's own origin — not `staticPath`, which addresses firmware.
+export const STOCK_IMAGE_BASE = 'https://flasher.meshcore.io/';

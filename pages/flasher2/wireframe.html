@@ -24,6 +24,8 @@
       text-align: left; color: var(--ink); background: var(--panel);
       border: 1px solid var(--edge); border-radius: 5px; cursor: pointer;
     }
+    button:has(img) { display: flex; align-items: center; gap: .7rem; }
+    button img { width: 2.6rem; height: 2.6rem; object-fit: contain; flex: none; }
     button:hover:not(:disabled) { border-color: var(--hot); color: var(--hot); }
     button:disabled { opacity: .4; cursor: default; }
     input[type=file] { color: var(--dim); margin: .4rem 0; }

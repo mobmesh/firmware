@@ -226,7 +226,9 @@ export const STEPS = [
       const manifest = await stockManifest(flow);
       return manifest.devices
         .filter((d) => d.type === flow.state.family && (d.maker ?? 'Other') === flow.state.maker)
-        .map((d) => ({ value: d.name, label: d.name, note: d.tooltip ?? null }));
+        // `tooltip` is upstream's picture as raw HTML and nothing else — the normaliser has
+        // already pulled the src out, so a renderer never injects a third party's markup.
+        .map((d) => ({ value: d.name, label: d.name, image: d.image }));
     },
     apply: (flow, value) => {
       if (flow.state.source === SOURCE.ENHANCED) flow.state.boardKey = value;

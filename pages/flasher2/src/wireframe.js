@@ -78,9 +78,21 @@ function clear(node) {
   node.replaceChildren();
 }
 
-function button(label, onClick) {
+function button(label, onClick, { image = null } = {}) {
   const element = document.createElement('button');
-  element.textContent = label;
+  if (image) {
+    const picture = document.createElement('img');
+    picture.src = image;
+    picture.alt = '';
+    picture.loading = 'lazy';
+    // Upstream's SPA host answers 200 with index.html for a missing file, so a failed
+    // decode is the only signal there is no artwork; drop it, don't show a broken glyph.
+    picture.addEventListener('error', () => picture.remove());
+    element.append(picture);
+  }
+  const text = document.createElement('span');
+  text.textContent = label;
+  element.append(text);
   element.addEventListener('click', onClick);
   return element;
 }
@@ -205,7 +217,7 @@ async function renderStep() {
         await step.apply(flow, option.value);
         log(`${step.id} = ${JSON.stringify(option.value)}`);
         next();
-      }));
+      }, { image: option.image ?? null }));
     }
     withBack(elements.panel);
     return;
