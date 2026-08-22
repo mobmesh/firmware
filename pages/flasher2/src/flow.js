@@ -28,11 +28,13 @@ export class FlowBlockedError extends Error {
 export function createFlow({
   dryRun = false,
   family = null,
+  verifyWrite = true,
   manifestBase = plans.CUSTOM_MANIFEST_BASE,
   relayBase = STOCK_RELAY_BASE,
 } = {}) {
   return {
     dryRun,
+    verifyWrite,
     manifestBase,
     relayBase,
     stepIndex: 0,
@@ -201,7 +203,9 @@ export const STEPS = [
       for (const device of manifest.devices) {
         if (device.type === flow.state.family) makers.add(device.maker ?? 'Other');
       }
-      return [...makers].sort().map((maker) => ({ value: maker, label: maker }));
+      return [...makers]
+        .sort()
+        .map((maker) => ({ value: maker, label: manifest.makers[maker]?.name ?? maker }));
     },
     apply: (flow, value) => {
       flow.state.maker = value;
@@ -247,16 +251,22 @@ export const STEPS = [
         }));
       }
       const device = selectedStockDevice(flow);
+      const catalogue = flow.state.stockManifest.roles;
       // A role is not unique within a device, so the value is the index into its own
       // firmware list — never the role name.
       return device.firmware
         .map((entry, index) => ({ entry, index }))
         .filter(({ entry }) => entry.versionOrder.length > 0)
-        .map(({ entry, index }) => ({
-          value: index,
-          label: entry.title ?? entry.role ?? `firmware ${index}`,
-          note: entry.class && entry.class !== entry.role ? entry.class : null,
-        }));
+        .map(({ entry, index }) => {
+          const known = catalogue[entry.role];
+          // The entry's own title wins: it is what distinguishes two entries sharing a role.
+          const name = entry.title ?? known?.title ?? entry.role ?? `firmware ${index}`;
+          return {
+            value: index,
+            label: known?.subTitle && !entry.title ? `${name} — ${known.subTitle}` : name,
+            note: known?.tooltip ?? null,
+          };
+        });
     },
     apply: (flow, value) => {
       if (flow.state.source === SOURCE.ENHANCED) flow.state.variantKey = value;
@@ -358,6 +368,18 @@ export const STEPS = [
         s.planNotes.push(`file: ${s.file.name} (${s.file.bytes.length} bytes)`);
       }
 
+      if (s.plan.bootloaderPackage) {
+        const because =
+          s.plan.bootloaderReason === 'otafixNeeded'
+            ? 'its factory bootloader cannot update over Bluetooth at all'
+            : 'its factory bootloader updates over Bluetooth unreliably';
+        s.planNotes.push(
+          `This device also gets the OTAFIX bootloader (${s.plan.bootloaderPackage.size} bytes), ` +
+            `because ${because}. It is written first and erases the application, which the ` +
+            `firmware below then replaces.`
+        );
+      }
+
       // C7 — the page states the integrity position rather than letting verify no-op.
       s.planNotes.push(
         s.plan.verify
@@ -391,7 +413,14 @@ export const STEPS = [
       }
 
       if (s.plan.engine === 'esptool') {
-        const written = await esp32.executeFlashPlan(s.session, s.plan, { onProgress, onStatus });
+        const startedAt = performance.now();
+        const written = await esp32.executeFlashPlan(s.session, s.plan, {
+          onProgress,
+          onStatus,
+          verifyWrite: flow.verifyWrite,
+        });
+        const seconds = ((performance.now() - startedAt) / 1000).toFixed(1);
+        onStatus(`write took ${seconds}s (verify ${flow.verifyWrite ? 'on' : 'OFF'})`);
         if (s.plan.preserveFs && s.evidence) {
           const restored = await esp32.restoreFilesystem(
             s.session,

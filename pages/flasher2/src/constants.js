@@ -135,6 +135,14 @@ export const ENTRY_CONNECT_ATTEMPTS = 7;
 
 // --- Flash writing (§7.1, §10.1) ---
 
+// `protocol`. How much of the spare app slot is blanked to stop the bootloader booting it.
+// The image header carrying the 0xE9 magic sits at the slot's first byte, so one sector is
+// all it takes to make the slot invalid. Blanking the whole partition has the same effect
+// and costs the device 18.6 s to program a 6.5 MB slot — measured on the v4, compressed
+// transfer is free but every byte is still written.
+export const APP_SLOT_INVALIDATE_BYTES = 0x1000;
+
+
 // `matched`. Not a clock constraint — esptool renegotiates once the stub is up. Lower
 // values cost real time on a 1.3 MB image.
 export const ESPTOOL_BAUD_RATE = 2000000;

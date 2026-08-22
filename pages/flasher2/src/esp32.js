@@ -247,7 +247,7 @@ export async function returnToApplication(session, { onStatus } = {}) {
 // the exit, so the caller owns the session and the reset out. `plan.verify.sha256` is the
 // resolver's business (§4.2) — what is verified here is the write, via esptool's MD5
 // against the device's own `flashMd5sum`. `onProgress` is one 0-1 fraction across all files.
-export async function executeFlashPlan(session, plan, { onProgress, onStatus } = {}) {
+export async function executeFlashPlan(session, plan, { onProgress, onStatus, verifyWrite = true } = {}) {
   if (plan.engine !== 'esptool') {
     throw new Error(`executeFlashPlan received a '${plan.engine}' plan; esptool only.`);
   }
@@ -278,6 +278,7 @@ export async function executeFlashPlan(session, plan, { onProgress, onStatus } =
     await writeFlashFiles(session, {
       files,
       eraseAll: plan.eraseAll,
+      verifyWrite,
       onProgress: (fileIndex, written, total) => {
         if (erasing) {
           erasing = false;

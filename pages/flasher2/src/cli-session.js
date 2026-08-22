@@ -129,6 +129,7 @@ export function startCliSession(port) {
       await writer.write(encoder.encode(CLI_LINE_TERMINATOR));
     }
 
+    console.log(`[cli] > ${command}`);
     await writer.write(encoder.encode(`${command}${CLI_LINE_TERMINATOR}`));
 
     const answer = await new Promise((resolve, reject) => {
@@ -145,6 +146,7 @@ export function startCliSession(port) {
       deliverIfComplete();
     });
 
+    console.log(`[cli] < ${answer}`);
     if (CLI_INTER_COMMAND_DELAY_MS) await sleep(CLI_INTER_COMMAND_DELAY_MS);
     return answer;
   }

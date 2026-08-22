@@ -9,6 +9,7 @@ import {
   parsePartitionTable,
 } from './partitions.js';
 import {
+  APP_SLOT_INVALIDATE_BYTES,
   STOCK_ESP32_APP_ADDRESS,
   STOCK_ESP32_MERGED_ADDRESS,
   STOCK_RELAY_BASE,
@@ -21,7 +22,9 @@ import {
  * @property {'esptool'|'dfu'} engine
  * @property {FlashFile[]} files        esptool only; empty for dfu
  * @property {Blob|null} package        dfu only
- * @property {Blob|null} erasePackage   dfu only; flashed first when present
+ * @property {Blob|null} erasePackage   dfu only; flashed after the bootloader when present
+ * @property {Blob|null} bootloaderPackage  dfu only; §9.4 OTAFIX, flashed before everything
+ * @property {string|null} bootloaderReason which upstream notice triggered it
  * @property {boolean} eraseAll
  * @property {boolean} preserveFs       esp32 custom only
  * @property {{ sha256: string }|null} verify
@@ -36,6 +39,10 @@ export function createFlashPlan(fields) {
     // Deviation from §4.1's shape. nRF52 has no merged image: upstream wipes the
     // filesystem with a separate erase package flashed ahead of the firmware.
     erasePackage: fields.erasePackage ?? null,
+    // dfu only; §9.4's OTAFIX bootloader, flashed ahead of everything else when upstream
+    // flags the device. Null on every other path.
+    bootloaderPackage: fields.bootloaderPackage ?? null,
+    bootloaderReason: fields.bootloaderReason ?? null,
     eraseAll: fields.eraseAll ?? false,
     preserveFs: fields.preserveFs ?? false,
     // Null means "no checksum was supplied", which the UI must state rather than
@@ -204,12 +211,12 @@ export async function loadCustomFirmwareSource(manifest, boardKey, variantKey, {
 }
 
 // Stage two: pure, so no failure is possible once the device is in download mode.
-// Slot B always takes the uniform 0xFF buffer, leaving the bootloader exactly one valid
-// image without otadata being touched (§10.5).
+// Slot B's first sector is blanked, which invalidates its image header and leaves the
+// bootloader exactly one valid image without otadata being touched (§10.5).
 export function buildCustomFlashPlan(source, scope) {
   const { board, variant, assets, sha256 } = source;
   const { offsets } = board;
-  const blankSlotB = new Uint8Array(offsets.appMaxSize).fill(0xff);
+  const blankSlotB = new Uint8Array(APP_SLOT_INVALIDATE_BYTES).fill(0xff);
 
   let files;
   if (scope === 'full-layout') {
@@ -340,7 +347,33 @@ export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {})
   }
   if (devices.length === 0) throw new ManifestError(`${STOCK_MANIFEST_FILE} lists no devices.`);
 
-  return { baseUrl, devices };
+  // Four catalogues sit beside `device` and were previously dropped: `notice` keys the
+  // warning text a firmware entry names, `role` and `maker` carry upstream's own display
+  // names, and `staticPath` is where its web pages link bootloader files (not our path —
+  // the relay serves them from the same flat directory as everything else).
+  return {
+    baseUrl,
+    devices,
+    notices: raw.notice ?? {},
+    roles: raw.role ?? {},
+    makers: raw.maker ?? {},
+    staticPath: raw.staticPath ?? null,
+  };
+}
+
+// --- OTAFIX bootloader (§9.4) -------------------------------------------------------
+// 16 nRF52 devices ship a factory bootloader whose OTA DFU is broken or unreliable, and
+// upstream flags the affected entries by notice. Both tiers are treated the same: they
+// carry identical roles (repeater/roomServer only) on non-overlapping devices, and
+// upstream renders both in the same container, so the distinction is invisible anyway.
+const OTAFIX_NOTICES = new Set(['otafixNeeded', 'otafixRecommended']);
+
+/** The bootloader DFU package for a device, or null when upstream does not flag one. */
+export function resolveBootloaderUpdate(device, entry) {
+  if (!OTAFIX_NOTICES.has(entry?.notice)) return null;
+  // `.uf2` is §11.5's drag-and-drop route and cannot be written over serial.
+  const file = (device.bootloader ?? []).find((name) => name.endsWith('.zip'));
+  return file ? { file, reason: entry.notice } : null;
 }
 
 // Upstream device names are unique, but a role is not unique within a device — eight
@@ -406,7 +439,22 @@ export async function loadStockFirmwareSource(
     eraseBytes = new Uint8Array(await eraseRes.arrayBuffer());
   }
 
-  return { device, entry, version, wipe, file, bytes, eraseBytes };
+  // Fetched here for the same reason as the erase package: failing after the bootloader
+  // was written would leave a device with no application and nothing to write back.
+  let bootloader = null;
+  const wanted = resolveBootloaderUpdate(device, entry);
+  if (wanted) {
+    onStatus?.('Downloading the bootloader update…');
+    const blRes = await fetch(new URL(wanted.file, relayBase), { cache: 'no-store' });
+    if (!blRes.ok) {
+      throw new ManifestError(
+        `Could not download ${wanted.file} from the relay: HTTP ${blRes.status}.`
+      );
+    }
+    bootloader = { ...wanted, bytes: new Uint8Array(await blRes.arrayBuffer()) };
+  }
+
+  return { device, entry, version, wipe, file, bytes, eraseBytes, bootloader };
 }
 
 // Stage two. One file, always: upstream's merged image already carries the bootloader and
@@ -414,12 +462,16 @@ export async function loadStockFirmwareSource(
 // file that was chosen — the donor keeps it in mutable page state, where a wipe followed
 // by an update writes the app image to 0x0 (§12.3-class defect; do not reproduce).
 export function buildStockFlashPlan(source, { partitions = [] } = {}) {
-  const { device, bytes, eraseBytes, wipe } = source;
+  const { device, bytes, eraseBytes, wipe, bootloader } = source;
 
   if (device.type === 'nrf52') {
     return createFlashPlan({
       engine: 'dfu',
       package: new Blob([bytes]),
+      // Written first: it erases the application and leaves the device in DFU, which is
+      // where the stages after it need to start. A failure there has cost nothing yet.
+      bootloaderPackage: bootloader ? new Blob([bootloader.bytes]) : null,
+      bootloaderReason: bootloader?.reason ?? null,
       // The wipe. `Dfu`'s own `eraseBeforeUpdate` clears the application region the write
       // is about to overwrite anyway, so `eraseAll` stays false and this carries it.
       erasePackage: eraseBytes ? new Blob([eraseBytes]) : null,
@@ -435,7 +487,9 @@ export function buildStockFlashPlan(source, { partitions = [] } = {}) {
   // valid image. A wipe erases everything and needs none of this.
   const files = [{ data: bytes, address: wipe ? STOCK_ESP32_MERGED_ADDRESS : STOCK_ESP32_APP_ADDRESS }];
   const slotB = wipe ? null : findSecondAppSlot(partitions);
-  if (slotB) files.push({ data: new Uint8Array(slotB.size).fill(0xff), address: slotB.offset });
+  if (slotB) {
+    files.push({ data: new Uint8Array(APP_SLOT_INVALIDATE_BYTES).fill(0xff), address: slotB.offset });
+  }
 
   return createFlashPlan({
     engine: 'esptool',
@@ -519,7 +573,31 @@ export async function readUploadedFirmware(file) {
 }
 
 /** The nRF52 package must parse before hardware is touched, not mid-transfer (§9A). */
-export async function validateDfuPackage(blob) {
+/**
+ * Nordic legacy DFU update modes. `dfu.js` defines only the application one, because its
+ * own zip reader only ever produces application packages — the transport underneath takes
+ * all four. Sourced from the protocol, `protocol`-tagged, and unverified on hardware for
+ * anything but `application`.
+ */
+export const DFU_UPDATE_MODES = {
+  softdevice: 1,
+  bootloader: 2,
+  softdevice_bootloader: 3,
+  application: 4,
+};
+
+// Ordered so a combined package is recognised before either half of it.
+const DFU_SECTION_ORDER = ['softdevice_bootloader', 'application', 'bootloader', 'softdevice'];
+
+/**
+ * Reads a DFU package and returns the one section it carries, whichever kind that is.
+ * Bootloader packages name `softdevice_bootloader`, which `dfu.js` cannot read — this is
+ * why the tool parses the zip itself rather than calling `dfuUpdate`.
+ *
+ * `withBytes` also extracts the payloads, which the executor needs and a validity check
+ * does not.
+ */
+export async function validateDfuPackage(blob, { withBytes = false } = {}) {
   const zip = await import('../vendor/dfu/zip.min.js');
   const reader = new zip.ZipReader(new zip.BlobReader(blob));
   try {
@@ -527,11 +605,38 @@ export async function validateDfuPackage(blob) {
     const names = entries.map((e) => new TextDecoder().decode(e.rawFilename));
     const manifestEntry = entries[names.indexOf('manifest.json')];
     if (!manifestEntry) throw new UnsupportedFirmwareFileError('The package has no manifest.json.');
-    const app = JSON.parse(await manifestEntry.getData(new zip.TextWriter()))?.manifest?.application;
-    if (!names.includes(app?.bin_file) || !names.includes(app?.dat_file)) {
+
+    const manifest = JSON.parse(await manifestEntry.getData(new zip.TextWriter()))?.manifest ?? {};
+    const kind = DFU_SECTION_ORDER.find((name) => manifest[name]);
+    if (!kind) {
+      throw new UnsupportedFirmwareFileError(
+        `The package names no update this tool understands (${Object.keys(manifest).join(', ')}).`
+      );
+    }
+
+    const section = manifest[kind];
+    if (!names.includes(section?.bin_file) || !names.includes(section?.dat_file)) {
       throw new UnsupportedFirmwareFileError('The package is missing the files its manifest names.');
     }
-    return { binFile: app.bin_file, datFile: app.dat_file };
+
+    // Sizes come from the manifest, not the payload: a combined package is one binary
+    // whose halves are only distinguishable by the counts declared here.
+    const result = {
+      kind,
+      mode: DFU_UPDATE_MODES[kind],
+      binFile: section.bin_file,
+      datFile: section.dat_file,
+      softdeviceSize: section.sd_size ?? 0,
+      bootloaderSize: section.bl_size ?? 0,
+      applicationSize: kind === 'application' ? null : 0,
+    };
+    if (!withBytes) return result;
+
+    result.bin = await entries[names.indexOf(section.bin_file)].getData(new zip.Uint8ArrayWriter());
+    result.dat = await entries[names.indexOf(section.dat_file)].getData(new zip.Uint8ArrayWriter());
+    // An application package declares no size; the payload is the whole of it.
+    if (kind === 'application') result.applicationSize = result.bin.length;
+    return result;
   } catch (error) {
     if (error instanceof UnsupportedFirmwareFileError) throw error;
     throw new UnsupportedFirmwareFileError(`The package could not be read (${error.message}).`);

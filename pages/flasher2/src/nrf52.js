@@ -19,6 +19,7 @@ import {
   listGrantedSerialPorts,
   waitForUsableSerialPort,
 } from './serial-port.js';
+import { validateDfuPackage } from './flash-plan.js';
 
 function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -116,12 +117,16 @@ export async function executeDfuPlan(port, plan, { onProgress, onStatus } = {}) 
 
   // `eraseBeforeUpdate` erases the application region only — not the filesystem. A wipe is
   // the erase package, its own DFU update on the same port, ahead of the firmware (§11.3).
-  const stages = plan.erasePackage
-    ? [
-        { package: plan.erasePackage, label: 'Erasing the device…' },
-        { package: plan.package, label: 'Writing firmware…' },
-      ]
-    : [{ package: plan.package, label: 'Writing firmware…' }];
+  // Order is load-bearing (§9.4). The bootloader package erases the application and leaves
+  // the device in DFU, which is where the stages after it start — and if it fails, nothing
+  // has been destroyed yet. The erase package then clears the filesystem, and the firmware
+  // puts an application back.
+  const stages = [];
+  if (plan.bootloaderPackage) {
+    stages.push({ package: plan.bootloaderPackage, label: 'Updating the bootloader…' });
+  }
+  if (plan.erasePackage) stages.push({ package: plan.erasePackage, label: 'Erasing the device…' });
+  stages.push({ package: plan.package, label: 'Writing firmware…' });
   const totalBytes = stages.reduce((sum, stage) => sum + stage.package.size, 0);
   let doneBytes = 0;
 
@@ -156,17 +161,27 @@ export async function executeDfuPlan(port, plan, { onProgress, onStatus } = {}) 
 async function writeDfuPackage(Dfu, port, stage, eraseAll, { onProgress, onStatus }) {
   let target = port;
 
+  // `dfu.js` reads an application package for itself; anything else it cannot read at all,
+  // so the manifest is parsed here and handed to the transport directly (§9.4).
+  const parsed = await validateDfuPackage(stage.package, { withBytes: true });
+  const readableByDonor = parsed.kind === 'application';
+
   for (let attempt = 1; attempt <= DFU_FLASH_ATTEMPTS; attempt += 1) {
     await closeSerialPortQuietly(target);
     onStatus?.(stage.label);
 
     const dfu = new Dfu(target, eraseAll);
     let started = false;
+    const report = (fraction) => {
+      started = true;
+      onProgress?.(fraction);
+    };
     try {
-      await dfu.dfuUpdate(stage.package, (percent) => {
-        started = true;
-        onProgress?.(percent / 100);
-      });
+      if (readableByDonor) {
+        await dfu.dfuUpdate(stage.package, (percent) => report(percent / 100));
+      } else {
+        await sendParsedPackage(dfu, parsed, report);
+      }
       return target;
     } catch (error) {
       // `dfu.js` owns the open, so a port that would not open arrives as an untyped
@@ -184,6 +199,49 @@ async function writeDfuPackage(Dfu, port, stage, eraseAll, { onProgress, onStatu
       onStatus?.('Waiting for the DFU port to become ready…');
       target = await waitForUsableSerialPort(target, { onStatus });
     }
+  }
+}
+
+/**
+ * §9.4. Sends a package `dfu.js` cannot read for itself.
+ *
+ * Its `dfuUpdate` parses the zip and hardcodes `manifest.application` and update mode 4,
+ * so a bootloader package — `softdevice_bootloader`, mode 3 — never reaches the transport
+ * underneath, which takes all four modes. The parse happens in `flash-plan.js`; this drives
+ * the same public methods `dfuUpdate` does, with the mode and sizes the manifest declared.
+ * Written rather than patching the vendored file, which stays verbatim (§2.1).
+ *
+ * Unverified on hardware for anything but mode 4. A failure here can leave a device with
+ * no working bootloader, so nothing calls it speculatively.
+ */
+async function sendParsedPackage(dfu, parsed, onProgress) {
+  await dfu.port.open({ baudRate: PORT_PROBE_BAUD_RATE });
+  try {
+    // `eraseFlash` walks pages from address 0 — the application region. Correct for an
+    // application update and actively wrong for anything that writes the bootloader.
+    if (dfu.eraseBeforeUpdate && parsed.kind === 'application') {
+      await dfu.eraseFlash(parsed.applicationSize);
+    }
+    await dfu.sendStartDfu(
+      parsed.mode,
+      parsed.softdeviceSize,
+      parsed.bootloaderSize,
+      parsed.applicationSize ?? 0
+    );
+    await dfu.sendInitPacket(parsed.dat);
+    await dfu.sendFirmware(parsed.bin, (percent) => onProgress?.(percent / 100));
+  } finally {
+    // Mirrors `dfuUpdate`'s own teardown: the reader holds a lock the next open would fail on.
+    if (dfu.port?.readable) {
+      try {
+        const reader = dfu.port.readable.getReader();
+        await reader.cancel();
+        reader.releaseLock();
+      } catch {
+        // A reader we cannot reach is one the close below discards anyway.
+      }
+    }
+    await closeSerialPortQuietly(dfu.port);
   }
 }
 

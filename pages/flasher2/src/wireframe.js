@@ -3,14 +3,67 @@
 // UI is built — flow.js is the part that stays.
 
 import * as flowApi from './flow.js';
-import { PortSelectionRequiredError, promptForSerialPort } from './serial-port.js';
+import {
+  PortSelectionRequiredError,
+  closeSerialPortQuietly,
+  promptForSerialPort,
+} from './serial-port.js';
+import { closeEsptoolSession } from './esptool.js';
 
 const elements = {
   steps: document.querySelector('#steps'),
   panel: document.querySelector('#panel'),
   state: document.querySelector('#state'),
   log: document.querySelector('#log'),
+  serial: document.querySelector('#serial-log'),
+  serialPanel: document.querySelector('#serial-panel'),
 };
+
+// --- serial log ---------------------------------------------------------------------------
+// Everything, in arrival order, for the whole session: status lines, esptool's own wire
+// chatter, CLI traffic, and any warning a module raises. Capped so a long flash cannot grow
+// the DOM without bound.
+const SERIAL_LOG_MAX_LINES = 4000;
+
+function serialLine(tag, text) {
+  if (!elements.serial) return;
+  const atBottom =
+    elements.serial.scrollHeight - elements.serial.scrollTop - elements.serial.clientHeight < 40;
+  const row = document.createElement('div');
+  row.className = `s-${tag}`;
+  row.textContent = `${new Date().toLocaleTimeString('en-GB', { hour12: false })}.${String(
+    Date.now() % 1000
+  ).padStart(3, '0')}  ${text}`;
+  elements.serial.append(row);
+  while (elements.serial.childElementCount > SERIAL_LOG_MAX_LINES) {
+    elements.serial.firstElementChild.remove();
+  }
+  if (atBottom) elements.serial.scrollTop = elements.serial.scrollHeight;
+}
+
+function describeArg(value) {
+  if (typeof value === 'string') return value;
+  if (value instanceof Error) return `${value.name}: ${value.message}`;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+// Patched at module load, before any engine is imported, so nothing a lazily loaded bundle
+// prints can arrive before the capture is in place.
+for (const level of ['log', 'info', 'warn', 'error']) {
+  const original = console[level].bind(console);
+  console[level] = (...args) => {
+    original(...args);
+    serialLine(level, args.map(describeArg).join(' '));
+  };
+}
+
+window.addEventListener('unhandledrejection', (event) =>
+  serialLine('error', `unhandled rejection: ${describeArg(event.reason)}`)
+);
 
 let flow = null;
 
@@ -18,6 +71,7 @@ function log(message) {
   const line = document.createElement('div');
   line.textContent = `${new Date().toLocaleTimeString()}  ${message}`;
   elements.log.prepend(line);
+  serialLine('status', message);
 }
 
 function clear(node) {
@@ -121,17 +175,15 @@ async function renderStep() {
   elements.panel.append(line(step.title, 'title'));
 
   if (step.kind === 'action') {
-    // Click-to-run, uniformly: the port picker needs a user gesture, and any step may
-    // escalate to one via §11.4's checkpoint.
-    elements.panel.append(button(`Run — ${step.title}`, async (event) => {
-      event.target.disabled = true;
-      try {
-        await step.run(flow, progress);
-        next();
-      } catch (error) {
-        fail(error, () => renderStep());
-      }
-    }));
+    // Runs on entry. Nothing here needs a gesture — the picker is reached through §11.4's
+    // checkpoint, not from run() — so the flow stops only at decisions and failures.
+    elements.panel.append(line('Running…'));
+    try {
+      await step.run(flow, progress);
+      next();
+    } catch (error) {
+      fail(error, () => renderStep());
+    }
     return;
   }
 
@@ -213,8 +265,11 @@ async function renderStep() {
 function start({ dryRun, family = null }) {
   // The manifests live under the shipped tool until cutover (§8's baseUrl note), and the
   // deployed relay rejects a localhost origin — hence the override.
-  const relayBase = new URLSearchParams(location.search).get('relay') ?? undefined;
-  flow = flowApi.createFlow({ dryRun, family, manifestBase: '/pages/flasher/', relayBase });
+  const query = new URLSearchParams(location.search);
+  const relayBase = query.get('relay') ?? undefined;
+  const verifyWrite = query.get('verify') !== 'off';
+  flow = flowApi.createFlow({ dryRun, family, verifyWrite, manifestBase: '/pages/flasher/', relayBase });
+  if (!verifyWrite) log('WRITE VERIFICATION IS OFF — measurement only');
   log(dryRun ? `--- dry run (${family}): no hardware is touched ---` : '--- live run ---');
   renderStep();
 }
@@ -223,6 +278,39 @@ function start({ dryRun, family = null }) {
 document.querySelector('#dry-esp32').addEventListener('click', () => start({ dryRun: true, family: 'esp32' }));
 document.querySelector('#dry-nrf52').addEventListener('click', () => start({ dryRun: true, family: 'nrf52' }));
 document.querySelector('#live').addEventListener('click', () => start({ dryRun: false }));
+
+// Hands the port back to the OS so another tool can open it. The esptool transport keeps a
+// reader locked, so it has to go first or the close does nothing.
+async function releasePort() {
+  const held = flow?.state;
+  if (!held?.port && !held?.session) {
+    log('nothing to release — no port is held');
+    return;
+  }
+  if (held.session) {
+    await closeEsptoolSession(held.session);
+    held.session = null;
+    log('esptool session closed');
+  }
+  if (held.port) {
+    await closeSerialPortQuietly(held.port);
+    log(`port released (${describePort(held.port)}) — the grant is unaffected`);
+  }
+  redraw();
+}
+
+document.querySelector('#release').addEventListener('click', releasePort);
+
+const serialPanel = elements.serialPanel;
+document.querySelector('#serial-toggle').addEventListener('click', () => {
+  serialPanel.hidden = !serialPanel.hidden;
+  if (!serialPanel.hidden) elements.serial.scrollTop = elements.serial.scrollHeight;
+});
+document.querySelector('#serial-close').addEventListener('click', () => { serialPanel.hidden = true; });
+document.querySelector('#serial-clear').addEventListener('click', () => clear(elements.serial));
+document.querySelector('#serial-copy').addEventListener('click', () => {
+  navigator.clipboard?.writeText(elements.serial.innerText).catch(() => {});
+});
 
 // Exposed so a rig script can drive the flow without clicking.
 window.__flow = { get flow() { return flow; }, api: flowApi, start, renderStep };
