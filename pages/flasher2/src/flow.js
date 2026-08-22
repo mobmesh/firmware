@@ -14,6 +14,29 @@ import * as plans from './flash-plan.js';
 import { partitionTablesMatch } from './partitions.js';
 import { STOCK_RELAY_BASE } from './constants.js';
 
+/** Which half of the mesh a node is for. Chosen early so the role list stays short. */
+export const USAGE = { INFRASTRUCTURE: 'infrastructure', CLIENT: 'client' };
+
+// Every role upstream ships, and the enhanced path's own variant keys, bucketed. Roles
+// are few (7) and near-universal across devices, so this split is stable: it is about
+// what the node is for, not about what any one board can run.
+const ROLE_USAGE = {
+  repeater: USAGE.INFRASTRUCTURE,
+  roomServer: USAGE.INFRASTRUCTURE,
+  room_server: USAGE.INFRASTRUCTURE,
+  kissRadio: USAGE.INFRASTRUCTURE,
+  companionBle: USAGE.CLIENT,
+  companionUsb: USAGE.CLIENT,
+  gui: USAGE.CLIENT,
+  guiSD: USAGE.CLIENT,
+};
+
+/** Unknown roles are shown rather than hidden — a vanished option is a worse failure. */
+function matchesUsage(role, usage) {
+  const bucket = ROLE_USAGE[role];
+  return !usage || !bucket || bucket === usage;
+}
+
 export const SOURCE = { ENHANCED: 'enhanced', STOCK: 'stock', MANUAL: 'manual' };
 export const INSTALL = { NEW: 'new', UPDATE: 'update' };
 
@@ -46,10 +69,15 @@ export function createFlow({
       plannedPartitions: null,
       evidence: null,
       install: null,
+      usage: null,
       source: null,
       maker: null,
       deviceName: null,
       boardKey: null,
+      boardDisplayKey: null,
+      // Board artwork for the writing screen; icon2 is the post-flash reset image.
+      deviceIcon: null,
+      deviceIcon2: null,
       variantKey: null,
       firmwareIndex: null,
       version: null,
@@ -81,6 +109,14 @@ function selectedStockDevice(flow) {
   return manifest?.devices.find((device) => device.name === deviceName) ?? null;
 }
 
+// Steps 1 and 2 share one heading on purpose. The device is being armed while the
+// user is still reading the screen they were already on, and swapping the words there
+// registers as a flicker rather than as progress.
+const CONNECT_HEAD = {
+  title: 'Plug in your device',
+  desc: 'Connect your device to this computer via USB to get started.',
+};
+
 // --- step 1: connect and arm ----------------------------------------------------------
 
 async function armEsp32(flow, onStatus) {
@@ -108,12 +144,87 @@ async function armEsp32(flow, onStatus) {
   onStatus(`partition table: ${s.devicePartitions.length} entries`);
 }
 
+// Was the `review` step's prepare(). The review screen is gone; the plan is still
+// built from the same inputs, immediately before the write.
+async function buildPlan(flow, onStatus) {
+  const s = flow.state;
+  const wipe = s.install === INSTALL.NEW;
+  s.planNotes = [];
+
+  if (s.source === SOURCE.ENHANCED) {
+    const manifest = await customManifest(flow);
+    const source = await plans.loadCustomFirmwareSource(manifest, s.boardKey, s.variantKey, { onStatus });
+    // §10.6 sizes the restore against the layout being *written*, not the one read
+    // off the device — those differ exactly when the restore has to rebuild.
+    s.plannedPartitions = source.plannedPartitions;
+    let scope = 'full-layout';
+    let reason = 'you chose New, so the whole layout is written';
+    if (!wipe) {
+      if (flow.dryRun) {
+        reason = 'dry run — the real scope needs Step 1\u2019s table read';
+      } else if (partitionTablesMatch(s.devicePartitions, source.plannedPartitions)) {
+        // Step 2: the fork is the table comparison alone. A matching layout never
+        // touches the filesystem, so there is nothing to read back and nothing to
+        // restore — the content check would only risk erasing what was asked to be kept.
+        scope = 'app-slots-only';
+        reason = 'the partition layout already matches, so your settings are left alone';
+      } else {
+        // The one branch that erases the filesystem, and so the only one that backs it up.
+        s.evidence = await esp32.readFlashEvidence(s.session, source.plannedPartitions, { onStatus });
+        reason = 'the partition layout differs — settings are backed up and rebuilt';
+      }
+    }
+    s.planNotes.push(`write scope: ${scope} — ${reason}`);
+    s.plan = plans.buildCustomFlashPlan(source, scope);
+  } else if (s.source === SOURCE.STOCK) {
+    const manifest = await stockManifest(flow);
+    const source = await plans.loadStockFirmwareSource(
+      manifest,
+      { deviceName: s.deviceName, firmwareIndex: s.firmwareIndex, version: s.version, wipe },
+      { onStatus, relayBase: flow.relayBase }
+    );
+    s.planNotes.push(`file: ${source.file.name} (${source.bytes.length} bytes)`);
+    s.plan = plans.buildStockFlashPlan(source, { partitions: s.devicePartitions ?? [] });
+  } else {
+    s.plan = plans.buildManualFlashPlan(s.file, { family: s.family, wipe });
+    s.planNotes.push(`file: ${s.file.name} (${s.file.bytes.length} bytes)`);
+  }
+
+  if (s.plan.bootloaderPackage) {
+    const because =
+      s.plan.bootloaderReason === 'otafixNeeded'
+        ? 'its factory bootloader cannot update over Bluetooth at all'
+        : 'its factory bootloader updates over Bluetooth unreliably';
+    s.planNotes.push(
+      `This device also gets the OTAFIX bootloader (${s.plan.bootloaderPackage.size} bytes), ` +
+        `because ${because}. It is written first and erases the application, which the ` +
+        `firmware below then replaces.`
+    );
+  }
+
+  // C7 — the page states the integrity position rather than letting verify no-op.
+  s.planNotes.push(
+    s.plan.verify
+      ? `checksum verified: ${s.plan.verify.sha256.slice(0, 16)}…`
+      : 'UNVERIFIED — no checksum accompanies this firmware'
+  );
+  // Say what the plan does, not what was asked for: on nRF52 the wipe is a separate
+  // erase package, and a manifest entry without one cannot honour the declaration.
+  if (wipe) {
+    s.planNotes.push(
+      s.plan.eraseAll || s.plan.erasePackage
+        ? 'This erases the identity and settings on the device.'
+        : 'You chose New, but this firmware carries no erase step — existing data stays.'
+    );
+  }
+}
+
 // --- steps -----------------------------------------------------------------------------
 
 export const STEPS = [
   {
     id: 'connect',
-    title: 'Connect the device',
+    ...CONNECT_HEAD,
     kind: 'action',
     applies: (flow) => !flow.dryRun,
     async run(flow, { onStatus }) {
@@ -134,7 +245,7 @@ export const STEPS = [
 
   {
     id: 'arm',
-    title: 'Enter programming mode',
+    ...CONNECT_HEAD,
     kind: 'action',
     applies: (flow) => !flow.dryRun,
     async run(flow, { onStatus }) {
@@ -157,12 +268,26 @@ export const STEPS = [
 
   {
     id: 'install',
-    title: 'Is this a new device or an existing one?',
+    title: 'What are you setting up?',
+    // Optional helper line under any step's title. Every step may carry one; the
+    // renderer reserves the space either way so the card's body never shifts.
+    desc: 'Choose below between a fresh new install or performing an upgrade.',
     kind: 'choice',
     applies: () => true,
+    // `icon` is a name, not markup — this module stays DOM-free.
     options: () => [
-      { value: INSTALL.NEW, label: 'New — erase everything', note: 'Identity and settings are lost.' },
-      { value: INSTALL.UPDATE, label: 'Update — keep settings where possible' },
+      {
+        value: INSTALL.NEW,
+        label: 'New Device',
+        note: 'Set up a fresh device with a clean configuration.',
+        icon: 'new-device',
+      },
+      {
+        value: INSTALL.UPDATE,
+        label: 'Upgrade Existing',
+        note: 'Install the latest firmware and keep your existing data where possible.',
+        icon: 'upgrade',
+      },
     ],
     apply: (flow, value) => {
       flow.state.install = value;
@@ -170,19 +295,61 @@ export const STEPS = [
   },
 
   {
+    id: 'usage',
+    title: 'What is this node for?',
+    desc: 'Pick what you are building today.',
+    kind: 'choice',
+    applies: () => true,
+    options: () => [
+      {
+        value: USAGE.INFRASTRUCTURE,
+        label: 'Set up Infrastructure',
+        note: 'Backbone node that extends the mesh from a rooftop, tower, or high attic.',
+        icon: 'infrastructure',
+      },
+      {
+        value: USAGE.CLIENT,
+        label: 'Set up a Client',
+        note: 'Daily-carry node paired with your phone over Bluetooth or USB.',
+        icon: 'client',
+      },
+    ],
+    apply: (flow, value) => {
+      flow.state.usage = value;
+    },
+  },
+
+  {
     id: 'source',
-    title: 'Where does the firmware come from?',
+    title: 'Choose a source for your firmware image.',
+    desc: "MobMesh's firmware flasher can use firmware from multiple sources",
     kind: 'choice',
     applies: () => true,
     options: (flow) => {
       const choices = [];
       // boards.json is generated from a built partitions.bin, so the custom path is
-      // structurally ESP32-only — it is absent here, not disabled.
-      if (flow.state.family === 'esp32') {
-        choices.push({ value: SOURCE.ENHANCED, label: 'Enhanced — MobMesh' });
+      // structurally ESP32-only — it is absent here, not disabled. MobMesh also builds
+      // repeaters and room servers only, so it has nothing to offer a client.
+      if (flow.state.family === 'esp32' && flow.state.usage !== USAGE.CLIENT) {
+        choices.push({
+          value: SOURCE.ENHANCED,
+          label: 'MeshCore Enhanced',
+          note: 'Remote updates, bug fixes and more, from MobMesh.',
+          icon: 'enhanced',
+        });
       }
-      choices.push({ value: SOURCE.STOCK, label: 'Stock — upstream MeshCore' });
-      choices.push({ value: SOURCE.MANUAL, label: 'Manual upload — your own file' });
+      choices.push({
+        value: SOURCE.STOCK,
+        label: 'MeshCore Standard',
+        note: 'Generic MeshCore, with no added features.',
+        icon: 'stock',
+      });
+      choices.push({
+        value: SOURCE.MANUAL,
+        label: 'Upload Your Own',
+        note: 'Choose your own firmware from your system.',
+        icon: 'upload',
+      });
       return choices;
     },
     apply: (flow, value) => {
@@ -193,6 +360,9 @@ export const STEPS = [
   {
     id: 'maker',
     title: 'Who makes it?',
+    // Same square picture tiles as the device step. Upstream ships no maker artwork, so
+    // the icon slot renders empty until the placeholder lands.
+    layout: 'board',
     kind: 'choice',
     applies: (flow) => flow.state.source === SOURCE.STOCK,
     async options(flow) {
@@ -203,7 +373,11 @@ export const STEPS = [
       }
       return [...makers]
         .sort()
-        .map((maker) => ({ value: maker, label: manifest.makers[maker]?.name ?? maker }));
+        .map((maker) => ({
+          value: maker,
+          label: manifest.makers[maker]?.name ?? maker,
+          image: null,
+        }));
     },
     apply: (flow, value) => {
       flow.state.maker = value;
@@ -213,14 +387,18 @@ export const STEPS = [
   {
     id: 'device',
     title: 'Which device?',
+    // Square picture tiles, the shape the shipped flasher uses for boards.
+    layout: 'board',
     kind: 'choice',
     applies: (flow) => flow.state.source !== SOURCE.MANUAL,
     async options(flow) {
       if (flow.state.source === SOURCE.ENHANCED) {
         const manifest = await customManifest(flow);
-        return Object.entries(manifest.boards).map(([key, board]) => ({
-          value: key,
-          label: board.label,
+        // Value is the display id, not the board: two tiles can share one board.
+        return manifest.displays.map((entry) => ({
+          value: entry.id,
+          label: entry.label,
+          image: entry.icon,
         }));
       }
       const manifest = await stockManifest(flow);
@@ -228,27 +406,44 @@ export const STEPS = [
         .filter((d) => d.type === flow.state.family && (d.maker ?? 'Other') === flow.state.maker)
         // `tooltip` is upstream's picture as raw HTML and nothing else — the normaliser has
         // already pulled the src out, so a renderer never injects a third party's markup.
-        .map((d) => ({ value: d.name, label: d.name, image: d.image }));
+        .map((d) => ({ value: d.name, label: d.name, image: d.image }))
+        // Manifest order is upstream's own and shuffles between releases. `numeric` keeps
+        // T3 ahead of T10 rather than sorting them as strings.
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
     },
     apply: (flow, value) => {
-      if (flow.state.source === SOURCE.ENHANCED) flow.state.boardKey = value;
-      else flow.state.deviceName = value;
+      if (flow.state.source !== SOURCE.ENHANCED) {
+        flow.state.deviceName = value;
+        flow.state.deviceIcon = selectedStockDevice(flow)?.image ?? null;
+        flow.state.deviceIcon2 = null;
+        return;
+      }
+      const entry = flow.state.customManifest.displays.find((d) => d.id === value);
+      flow.state.boardDisplayKey = value;
+      flow.state.boardKey = entry?.board ?? value;
+      flow.state.deviceIcon = entry?.icon ?? null;
+      flow.state.deviceIcon2 = entry?.icon2 ?? null;
     },
   },
 
   {
     id: 'role',
     title: 'What is it for?',
+    // Full-width rows with a small icon, the shipped flasher's variant shape.
+    layout: 'row',
     kind: 'choice',
     applies: (flow) => flow.state.source !== SOURCE.MANUAL,
     async options(flow) {
       if (flow.state.source === SOURCE.ENHANCED) {
         const manifest = await customManifest(flow);
         const board = manifest.boards[flow.state.boardKey];
-        return Object.entries(board.variants).map(([key, variant]) => ({
-          value: key,
-          label: variant.label ?? key,
-        }));
+        return Object.entries(board.variants)
+          .filter(([key]) => matchesUsage(key, flow.state.usage))
+          .map(([key, variant]) => ({
+            value: key,
+            label: variant.label ?? key,
+            image: manifest.variantIcons[key] ?? null,
+          }));
       }
       const device = selectedStockDevice(flow);
       const catalogue = flow.state.stockManifest.roles;
@@ -257,6 +452,7 @@ export const STEPS = [
       return device.firmware
         .map((entry, index) => ({ entry, index }))
         .filter(({ entry }) => entry.versionOrder.length > 0)
+        .filter(({ entry }) => matchesUsage(entry.role, flow.state.usage))
         .map(({ entry, index }) => {
           const known = catalogue[entry.role];
           // The entry's own title wins: it is what distinguishes two entries sharing a role.
@@ -320,92 +516,13 @@ export const STEPS = [
   },
 
   {
-    id: 'review',
-    title: 'Review before writing',
-    kind: 'confirm',
-    applies: () => true,
-    async prepare(flow, { onStatus }) {
-      const s = flow.state;
-      const wipe = s.install === INSTALL.NEW;
-      s.planNotes = [];
-
-      if (s.source === SOURCE.ENHANCED) {
-        const manifest = await customManifest(flow);
-        const source = await plans.loadCustomFirmwareSource(manifest, s.boardKey, s.variantKey, { onStatus });
-        // §10.6 sizes the restore against the layout being *written*, not the one read
-        // off the device — those differ exactly when the restore has to rebuild.
-        s.plannedPartitions = source.plannedPartitions;
-        let scope = 'full-layout';
-        let reason = 'you chose New, so the whole layout is written';
-        if (!wipe) {
-          if (flow.dryRun) {
-            reason = 'dry run — the real scope needs Step 1\u2019s table read';
-          } else if (partitionTablesMatch(s.devicePartitions, source.plannedPartitions)) {
-            // Step 2: the fork is the table comparison alone. A matching layout never
-            // touches the filesystem, so there is nothing to read back and nothing to
-            // restore — the content check would only risk erasing what was asked to be kept.
-            scope = 'app-slots-only';
-            reason = 'the partition layout already matches, so your settings are left alone';
-          } else {
-            // The one branch that erases the filesystem, and so the only one that backs it up.
-            s.evidence = await esp32.readFlashEvidence(s.session, source.plannedPartitions, { onStatus });
-            reason = 'the partition layout differs — settings are backed up and rebuilt';
-          }
-        }
-        s.planNotes.push(`write scope: ${scope} — ${reason}`);
-        s.plan = plans.buildCustomFlashPlan(source, scope);
-      } else if (s.source === SOURCE.STOCK) {
-        const manifest = await stockManifest(flow);
-        const source = await plans.loadStockFirmwareSource(
-          manifest,
-          { deviceName: s.deviceName, firmwareIndex: s.firmwareIndex, version: s.version, wipe },
-          { onStatus, relayBase: flow.relayBase }
-        );
-        s.planNotes.push(`file: ${source.file.name} (${source.bytes.length} bytes)`);
-        s.plan = plans.buildStockFlashPlan(source, { partitions: s.devicePartitions ?? [] });
-      } else {
-        s.plan = plans.buildManualFlashPlan(s.file, { family: s.family, wipe });
-        s.planNotes.push(`file: ${s.file.name} (${s.file.bytes.length} bytes)`);
-      }
-
-      if (s.plan.bootloaderPackage) {
-        const because =
-          s.plan.bootloaderReason === 'otafixNeeded'
-            ? 'its factory bootloader cannot update over Bluetooth at all'
-            : 'its factory bootloader updates over Bluetooth unreliably';
-        s.planNotes.push(
-          `This device also gets the OTAFIX bootloader (${s.plan.bootloaderPackage.size} bytes), ` +
-            `because ${because}. It is written first and erases the application, which the ` +
-            `firmware below then replaces.`
-        );
-      }
-
-      // C7 — the page states the integrity position rather than letting verify no-op.
-      s.planNotes.push(
-        s.plan.verify
-          ? `checksum verified: ${s.plan.verify.sha256.slice(0, 16)}…`
-          : 'UNVERIFIED — no checksum accompanies this firmware'
-      );
-      // Say what the plan does, not what was asked for: on nRF52 the wipe is a separate
-      // erase package, and a manifest entry without one cannot honour the declaration.
-      if (wipe) {
-        s.planNotes.push(
-          s.plan.eraseAll || s.plan.erasePackage
-            ? 'This erases the identity and settings on the device.'
-            : 'You chose New, but this firmware carries no erase step — existing data stays.'
-        );
-      }
-    },
-    confirmLabel: 'Write it',
-  },
-
-  {
     id: 'flash',
     title: 'Writing',
     kind: 'action',
     applies: () => true,
     async run(flow, { onStatus, onProgress }) {
       const s = flow.state;
+      await buildPlan(flow, onStatus);
       if (flow.dryRun) {
         onStatus(`dry run — would write a ${s.plan.engine} plan, eraseAll=${s.plan.eraseAll}`);
         s.result = { dryRun: true };
@@ -489,7 +606,11 @@ export function advance(flow) {
 
 // Only the selection steps go back. Once the device is in programming mode or bytes are
 // moving, "back" is a hardware operation, not a UI one.
-const REVERSIBLE = new Set(['install', 'source', 'maker', 'device', 'role', 'version', 'file', 'region', 'review']);
+// Every selection step. Adding a step without listing it here silently breaks Back on
+// both that step and the one after it, which is how `usage` lost it.
+const REVERSIBLE = new Set([
+  'install', 'usage', 'source', 'maker', 'device', 'role', 'version', 'file', 'region',
+]);
 
 export function canGoBack(flow) {
   const steps = applicableSteps(flow);

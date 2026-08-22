@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobMesh Firmware Flasher</title>
+  <link rel="icon" type="image/svg+xml" href="../flasher/favicon.svg" />
+  <link rel="icon" type="image/x-icon" href="../flasher/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="../flasher/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/style.css" />
+  <link rel="stylesheet" href="flasher2.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="page-header">
+      <span class="badge-pill">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+        </svg>
+        DEVICE SETUP
+      </span>
+      <h1 class="page-title">
+        <span class="title-lead">MobMesh</span>
+        <span> Firmware Flasher</span>
+      </h1>
+      <p class="subtitle">Setup your MeshCore devices right from your browser.</p>
+    </header>
+
+    <!-- Rigid by design: the card never changes size between steps, so a long
+         option list scrolls inside .step-body rather than growing the cell. -->
+    <main id="wizard" class="card cell" aria-live="polite"></main>
+
+    <!-- Outside the card so it holds one position across every step and cannot
+         push the card's own contents around. -->
+    <nav class="cell-nav">
+      <button type="button" id="back" class="back-link" hidden>&larr; Back</button>
+    </nav>
+
+    <footer class="page-footer">
+      <p>
+        Requires a Chromium-based browser (Chrome, Edge, Opera) with Web Serial support.
+      </p>
+    </footer>
+  </div>
+
+  <script type="module" src="src/ui.js"></script>
+</body>
+</html>
