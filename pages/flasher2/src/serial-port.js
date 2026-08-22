@@ -12,6 +12,8 @@ import {
   PORT_PROBE_BAUD_RATE,
   PORT_RESCAN_INTERVAL_MS,
   PORT_SETTLE_AFTER_CONNECT_MS,
+  ESPRESSIF_VENDOR_ID,
+  NORDIC_UF2_VENDOR_ID,
 } from './constants.js';
 // Typed errors. A failure the user must act on carries its payload as data —
 // never as message text for a caller to pattern-match (§5.3, §12.3). Errors
@@ -126,6 +128,19 @@ async function probeSerialPortUsable(port) {
     throw error;
   } finally {
     await closeSerialPortQuietly(port);
+  }
+}
+
+/**
+ * Workflow Step 1's family determination. Returns 'unknown' rather than guessing: only
+ * these two vendors identify the MCU, and a legacy ESP32 behind a CP210x or CH340 bridge
+ * reports the bridge. An unknown family is the caller's to resolve, never to default.
+ */
+export function deviceFamily(port) {
+  switch (port.getInfo().usbVendorId) {
+    case ESPRESSIF_VENDOR_ID: return 'esp32';
+    case NORDIC_UF2_VENDOR_ID: return 'nrf52';
+    default: return 'unknown';
   }
 }
 

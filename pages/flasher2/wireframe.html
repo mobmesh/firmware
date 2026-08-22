@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobMesh flasher — flow wireframe</title>
+  <style>
+    :root {
+      --bg: #1b1e22;  --panel: #23272c;  --edge: #343a41;
+      --ink: #d6d2ca;  --dim: #8b929b;  --hot: #e0b080;  --bad: #e08a7a;  --ok: #8fbf9f;
+    }
+    html { color-scheme: dark; }
+    body {
+      font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: var(--bg); color: var(--ink); margin: 0; padding: 1.5rem 1.75rem 3rem;
+    }
+    h1 { font-size: 1.1rem; font-weight: 600; margin: 0 0 .25rem; letter-spacing: .02em; }
+    h2 { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
+         color: var(--dim); margin: 0 0 .6rem; }
+    p  { color: var(--dim); margin: 0 0 1.25rem; max-width: 60ch; }
+    code { color: var(--hot); }
+    button {
+      font: inherit; display: block; width: 100%; margin: .3rem 0; padding: .45rem .7rem;
+      text-align: left; color: var(--ink); background: var(--panel);
+      border: 1px solid var(--edge); border-radius: 5px; cursor: pointer;
+    }
+    button:hover:not(:disabled) { border-color: var(--hot); color: var(--hot); }
+    button:disabled { opacity: .4; cursor: default; }
+    input[type=file] { color: var(--dim); margin: .4rem 0; }
+    .start { display: flex; gap: .6rem; max-width: 34rem; margin-bottom: 1.5rem; }
+    .cols { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
+    .col { flex: 1 1 21rem; min-width: 19rem; }
+    .box { background: var(--panel); border: 1px solid var(--edge); border-radius: 6px;
+           padding: .75rem .9rem; }
+    .title { color: var(--hot); font-weight: 600; margin-bottom: .6rem; }
+    .err  { color: var(--bad); }
+    .done { color: var(--ok); }
+    .now  { color: var(--hot); }
+    .past { color: var(--dim); }
+    #state, #log { white-space: pre-wrap; max-height: 22rem; overflow: auto; }
+    #log { margin-top: .6rem; }
+    #steps div { padding: .05rem 0; }
+    ::-webkit-scrollbar { width: 9px; height: 9px; }
+    ::-webkit-scrollbar-thumb { background: var(--edge); border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Flow wireframe</h1>
+  <p>No design here on purpose — this exercises the step order in <code>src/flow.js</code>.
+     Dry run skips every hardware call; the chip buttons stand in for the PID Step 1 would read. Add <code>?relay=http://localhost:8787/fw/</code>
+     to use the local relay.</p>
+  <div class="start">
+    <button id="dry-esp32">Dry run — ESP32</button>
+    <button id="dry-nrf52">Dry run — nRF52</button>
+    <button id="live">Start — live device</button>
+  </div>
+  <div class="cols">
+    <div class="col"><h2>Steps</h2><div class="box" id="steps"></div></div>
+    <div class="col"><h2>Current</h2><div class="box" id="panel"></div></div>
+    <div class="col"><h2>State</h2><div class="box" id="state"></div></div>
+  </div>
+  <div style="margin-top:1.5rem"><h2>Log</h2><div class="box" id="log"></div></div>
+  <script type="module" src="src/wireframe.js"></script>
+</body>
+</html>

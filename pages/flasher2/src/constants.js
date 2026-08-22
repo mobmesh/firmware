@@ -113,6 +113,11 @@ export const ESPRESSIF_VENDOR_ID = 0x303a;
 export const ROM_BOOTLOADER_PRODUCT_ID = 0x1001;
 export const LEGACY_CDC_PRODUCT_ID = 0x0002;
 
+// `measured`. Nordic UF2 bootloader vendor, shared by the application and DFU identities
+// (T1: 239a:8029 running, 239a:0071 in DFU). Family detection has no other signal — a
+// legacy ESP32 behind a USB-UART bridge shows the bridge's vendor, never the MCU's.
+export const NORDIC_UF2_VENDOR_ID = 0x239a;
+
 // `measured`. Between signal transitions in the TinyUSB entry gesture. Both
 // transitions are required.
 export const LEGACY_ENTRY_STEP_GAP_MS = 100;
