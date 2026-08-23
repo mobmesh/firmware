@@ -676,6 +676,12 @@
 
 .back-link:hover { opacity: 1; }
 
+.empty-note {
+  margin: 0;
+  color: var(--fg-muted);
+  text-align: center;
+}
+
 /* ---- Connect step ---- */
 
 .connect-art {

@@ -67,6 +67,14 @@ function matchesUsage(role, usage) {
   return !usage || !bucket || bucket === usage;
 }
 
+// A device the role step would offer nothing for: same two conditions that step filters
+// on, so listing a device here guarantees it has at least one role to pick.
+function servesUsage(device, usage) {
+  return device.firmware.some(
+    (entry) => entry.versionOrder.length > 0 && matchesUsage(entry.role, usage)
+  );
+}
+
 export const SOURCE = { ENHANCED: 'enhanced', STOCK: 'stock', MANUAL: 'manual' };
 export const INSTALL = { NEW: 'new', UPDATE: 'update' };
 
@@ -391,7 +399,9 @@ export const STEPS = [
       const manifest = await stockManifest(flow);
       const makers = new Set();
       for (const device of manifest.devices) {
-        if (device.type === flow.state.family) makers.add(device.maker ?? 'Other');
+        if (device.type === flow.state.family && servesUsage(device, flow.state.usage)) {
+          makers.add(device.maker ?? 'Other');
+        }
       }
       return [...makers]
         .map((maker) => ({
@@ -439,6 +449,9 @@ export const STEPS = [
       const manifest = await stockManifest(flow);
       return manifest.devices
         .filter((d) => d.type === flow.state.family && (d.maker ?? 'Other') === flow.state.maker)
+        // A screen-first board ships only a `gui` build, so under Infrastructure it would
+        // reach the role step with nothing to offer.
+        .filter((d) => servesUsage(d, flow.state.usage))
         // `tooltip` is upstream's picture as raw HTML and nothing else — the normaliser has
         // already pulled the src out, so a renderer never injects a third party's markup.
         .map((d) => ({ value: d.name, label: d.name, image: d.image }))

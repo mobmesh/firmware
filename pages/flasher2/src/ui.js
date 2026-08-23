@@ -165,6 +165,16 @@ function tileArt(image) {
   return picture;
 }
 
+/** Nothing to choose from. Back is the only move, and the nav already offers it. */
+function renderEmptyChoice(step) {
+  const { body } = frame({ title: text(step.title), desc: null, centred: true });
+  const note = document.createElement('p');
+  note.className = 'empty-note';
+  note.textContent =
+    step.emptyNote ?? 'Nothing here matches what you picked earlier. Go back and change it.';
+  body.append(note);
+}
+
 /**
  * Caps a tile row so its rows come out even: 6 tiles in a 4-wide card become 3 + 3, not
  * 4 + 2. Measures the real tile and gap rather than assuming the stylesheet's numbers.
@@ -187,6 +197,9 @@ function balanceTileRows(list, body) {
 }
 
 function renderChoice(step, options) {
+  // The catalogue is upstream's and changes between releases; a step that filtered down
+  // to nothing must say so rather than paint an empty card with no way on.
+  if (!options.length) return renderEmptyChoice(step);
   // `layout` is the step's own declaration; `choice` is the default card pair.
   const layout = step.layout ?? 'choice';
   const centred = layout === 'choice';
