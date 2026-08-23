@@ -121,6 +121,14 @@ function degrees(value) {
  */
 export function buildProvisionCommands(state) {
   const steps = [];
+
+  // Board defaults first, so a location setting overrides one -- the order the shipped
+  // flasher uses. These come from the manifest variant (`set ota.fw.url`, `set tx`), so
+  // only the custom path carries any.
+  for (const command of state.plan?.postFlash?.commands ?? []) {
+    steps.push({ command, label: 'Applying board defaults' });
+  }
+
   const name = trimmed(state.nodeName);
   const lat = degrees(state.latitude);
   const lon = degrees(state.longitude);
@@ -181,12 +189,12 @@ export async function acquireCliPort({ preferredPort = null, onStatus } = {}) {
  *
  * @returns {{ command: string, answer: string|null, ok: boolean }[]}
  */
-export async function sendProvisionCommands(port, commands, { onStatus } = {}) {
+export async function sendProvisionCommands(port, commands, { onStatus, onProgress } = {}) {
   const session = startCliSession(port);
   const results = [];
   try {
     for (const [index, step] of commands.entries()) {
-      onStatus?.(step.label);
+      onStatus?.(`${step.label} (${index + 1} of ${commands.length})…`);
       const answer = await session.runCommand(step.command, {
         awaitReply: step.awaitReply !== false,
         ...(index === 0 ? { timeoutMs: CLI_FIRST_COMMAND_TIMEOUT_MS } : {}),
@@ -194,6 +202,7 @@ export async function sendProvisionCommands(port, commands, { onStatus } = {}) {
       const ok = answer === null || !FAILED_ANSWER.test(answer);
       if (!ok) onStatus?.(`${step.command} → ${answer}`);
       results.push({ command: step.command, answer, ok });
+      onProgress?.((index + 1) / commands.length);
     }
   } finally {
     await session.close();
@@ -205,7 +214,7 @@ export async function sendProvisionCommands(port, commands, { onStatus } = {}) {
  * The whole post-flash pass: reacquire, probe, send. Returns null when the role has
  * nothing to configure, so the caller can say so rather than reporting a no-op as work.
  */
-export async function provisionDevice(state, { preferredPort = null, onStatus } = {}) {
+export async function provisionDevice(state, { preferredPort = null, onStatus, onProgress } = {}) {
   const commands = buildProvisionCommands(state);
   if (!commands.length) return null;
 
@@ -213,7 +222,11 @@ export async function provisionDevice(state, { preferredPort = null, onStatus } 
   try {
     const announced = await waitForBootAnnouncement(port, { onStatus });
     if (announced) onStatus?.(`Device is up — node ${announced.slice(0, 4)}`);
-    return { port, announced, results: await sendProvisionCommands(port, commands, { onStatus }) };
+    return {
+      port,
+      announced,
+      results: await sendProvisionCommands(port, commands, { onStatus, onProgress }),
+    };
   } catch (error) {
     await closeSerialPortQuietly(port);
     throw error;

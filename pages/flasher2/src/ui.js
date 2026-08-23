@@ -214,7 +214,13 @@ function renderChoice(step, options) {
 async function renderAction(step) {
   // The write gets the shipped flasher's screen: a real progress bar, the board's own
   // picture floating above the status line. Everything else is a spinner.
-  const writing = step.id === 'flash';
+  //
+  // The settings pass earns the same screen when it has commands to send -- it is a
+  // countable sequence, so a bar says more than a spinner. A role with nothing to send
+  // keeps the spinner rather than flashing an empty bar on its way past.
+  const writing =
+    step.id === 'flash' ||
+    (step.id === 'provision' && flowApi.plannedProvisionCommands(flow).length > 0);
   const { body } = frame({ title: text(step.title), desc: text(step.desc), centred: !writing });
   const status = document.createElement('p');
   status.className = 'status-text';
@@ -237,7 +243,7 @@ async function renderAction(step) {
       picture.addEventListener('error', () => picture.remove());
       body.append(picture);
     }
-    status.textContent = 'Starting…';
+    status.textContent = step.id === 'provision' ? 'Waiting for device to reboot…' : 'Starting…';
   } else {
     status.innerHTML = '<span class="spinner"></span>Working…';
   }
@@ -481,6 +487,79 @@ function renderLocation(step) {
   }
 }
 
+
+// The shipped flasher's closing screen: the board's own picture with the checkmark laid
+// over it. Both images and every box style already live in the shared sheet.
+function renderDone(step) {
+  const s = flow.state;
+  const { body, foot } = frame({ title: text(step.title), desc: null, centred: true });
+
+  const success = document.createElement('div');
+  success.className = 'success-box';
+  success.textContent = s.result?.dryRun
+    ? 'Dry run complete — nothing was written.'
+    : 'Firmware written successfully.';
+  body.append(success);
+
+  const art = s.deviceIcon;
+  if (art) {
+    const stack = document.createElement('div');
+    stack.className = 'done-icon-stack';
+
+    const board = document.createElement('img');
+    board.className = 'flashing-icon';
+    board.src = art;
+    board.alt = '';
+    // A missing board image would leave the checkmark floating on its own.
+    board.addEventListener('error', () => stack.remove());
+
+    const tick = document.createElement('img');
+    tick.className = 'done-icon-checkmark';
+    tick.src = `${flow.manifestBase}icons/checkmark.png`;
+    tick.alt = '';
+    tick.addEventListener('error', () => tick.remove());
+
+    stack.append(board, tick);
+    body.append(stack);
+  }
+
+  // The write succeeded either way -- this says only that the settings pass did not, which
+  // is the one thing the user has to finish by hand.
+  const rejected = s.provision?.results?.filter((result) => !result.ok) ?? [];
+  const warning = s.provision?.error
+    ? `The firmware is written, but the settings could not be applied (${s.provision.error}). ` +
+      'Connect over serial to finish setting the device up.'
+    : rejected.length
+      ? `The firmware is written, but ${rejected.length} setting(s) were rejected by the device.`
+      : null;
+  if (warning) {
+    const box = document.createElement('div');
+    box.className = 'warning-box';
+    box.textContent = warning;
+    body.append(box);
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'actions is-centred';
+  const again = document.createElement('button');
+  again.type = 'button';
+  again.className = 'btn btn-primary';
+  again.textContent = 'Flash another device';
+  again.addEventListener('click', async () => {
+    again.disabled = true;
+    // Hand the port back before starting over, or the next run's connect fails as
+    // selection-required with the grant still intact.
+    await flowApi.disposeFlow(flow);
+    flow = flowApi.createFlow({
+      manifestBase: flow.manifestBase,
+      relayBase: params.get('relay') ?? undefined,
+    });
+    render();
+  });
+  actions.append(again);
+  foot.append(actions);
+}
+
 // --- driver -----------------------------------------------------------------------------
 
 async function render() {
@@ -501,6 +580,8 @@ async function render() {
     }
     return renderChoice(step, options);
   }
+
+  if (step.kind === 'terminal') return renderDone(step);
 
   // Everything past the binary choice is still the wireframe's job.
   frame({ title: text(step.title), desc: `This step has no interface yet (${step.kind}).`, centred: true });

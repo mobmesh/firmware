@@ -620,7 +620,7 @@ export const STEPS = [
     // Runs for every role; `buildProvisionCommands` decides whether there is anything to
     // send. Never fails the flash — the bytes are already on the device, and a settings
     // pass that could not reach it is a warning the user can act on by hand.
-    async run(flow, { onStatus }) {
+    async run(flow, { onStatus, onProgress }) {
       const s = flow.state;
       const commands = buildProvisionCommands(s);
       if (!commands.length) {
@@ -643,7 +643,7 @@ export const STEPS = [
       await closeSerialPortQuietly(s.port);
 
       try {
-        const done = await provisionDevice(s, { preferredPort: s.port, onStatus });
+        const done = await provisionDevice(s, { preferredPort: s.port, onStatus, onProgress });
         s.port = done.port;
         s.provision = { results: done.results };
         const failed = done.results.filter((result) => !result.ok);
@@ -667,6 +667,14 @@ export const STEPS = [
     applies: () => true,
   },
 ];
+
+/**
+ * What the provision step will send, for a renderer deciding whether to show a progress
+ * bar. Empty until the flash step has built the plan, which is the only caller's order.
+ */
+export function plannedProvisionCommands(flow) {
+  return buildProvisionCommands(flow.state);
+}
 
 /**
  * Hand back everything a flow owns. Abandoning one without this leaves the esptool session

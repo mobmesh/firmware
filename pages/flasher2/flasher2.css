@@ -403,6 +403,9 @@
   stroke-width: 2;
 }
 
+/* The shared sheet right-aligns .actions; the closing screen centres its one button. */
+.actions.is-centred { justify-content: center; }
+
 /* Leaflet paints its own light chrome; pull it back to the sheet's palette. */
 .map-frame .leaflet-container { background: var(--bg-1); }
 .map-frame .leaflet-control-attribution {
