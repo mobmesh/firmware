@@ -403,6 +403,57 @@
   stroke-width: 2;
 }
 
+/* The upload escape hatch. Deliberately not a button: it sits beside two real choices
+   and must not compete with them. */
+.aside-link {
+  align-self: flex-start;
+  margin-top: 1.25rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-muted);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.aside-link:hover { color: var(--accent); }
+
+/* §9A's file picker. */
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 15rem;
+  padding: 2rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated-glass);
+  color: var(--fg);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.drop-zone:hover,
+.drop-zone.is-over {
+  border-color: var(--hover-edge);
+  background: var(--bg-elevated);
+}
+
+.drop-zone.is-busy { opacity: 0.6; pointer-events: none; }
+.drop-zone small { color: var(--fg-muted); }
+.drop-icon { color: var(--accent); }
+
+.field-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.82rem;
+}
+
 /* The shared sheet right-aligns .actions; the closing screen centres its one button. */
 .actions.is-centred { justify-content: center; }
 

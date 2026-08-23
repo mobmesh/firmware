@@ -347,6 +347,9 @@ export const STEPS = [
     desc: 'Pick what you are building today.',
     kind: 'choice',
     applies: () => true,
+    // The escape hatch, named but not given equal weight to the two real choices. The
+    // renderer decides what a "link" looks like; this only says one belongs here.
+    aside: { label: 'Upload your own firmware', run: (flow) => chooseUploadYourOwn(flow) },
     options: () => [
       {
         value: USAGE.INFRASTRUCTURE,
@@ -363,6 +366,9 @@ export const STEPS = [
     ],
     apply: (flow, value) => {
       flow.state.usage = value;
+      // Both inputs to the source list are known now, so resolve it here rather than
+      // leaving a skipped step to be inferred later. Re-runs on a back-and-change.
+      flow.state.source = defaultSource(flow);
     },
   },
 
@@ -371,34 +377,11 @@ export const STEPS = [
     title: 'Choose a source for your firmware image.',
     desc: "MobMesh's firmware flasher can use firmware from multiple sources",
     kind: 'choice',
-    applies: () => true,
-    options: (flow) => {
-      const choices = [];
-      // boards.json is generated from a built partitions.bin, so the custom path is
-      // structurally ESP32-only — it is absent here, not disabled. MobMesh also builds
-      // repeaters and room servers only, so it has nothing to offer a client.
-      if (flow.state.family === 'esp32' && flow.state.usage !== USAGE.CLIENT) {
-        choices.push({
-          value: SOURCE.ENHANCED,
-          label: 'MeshCore Enhanced',
-          note: 'Remote updates, bug fixes and more, from MobMesh.',
-          icon: 'enhanced',
-        });
-      }
-      choices.push({
-        value: SOURCE.STOCK,
-        label: 'MeshCore Standard',
-        note: 'Generic MeshCore, with no added features.',
-        icon: 'stock',
-      });
-      choices.push({
-        value: SOURCE.MANUAL,
-        label: 'Upload Your Own',
-        note: 'Choose your own firmware from your system.',
-        icon: 'upload',
-      });
-      return choices;
-    },
+    // A step with one answer is not a question. On a client, and on nRF52, the enhanced
+    // build does not exist and standard is all that is left — `usage.apply` has already
+    // set it. Upload is reached by its own link, which skips this step outright.
+    applies: (flow) => flow.state.source !== SOURCE.MANUAL && sourceChoices(flow).length > 1,
+    options: sourceChoices,
     apply: (flow, value) => {
       flow.state.source = value;
     },
@@ -543,11 +526,22 @@ export const STEPS = [
   {
     id: 'file',
     title: 'Choose a firmware file',
+    // C7: nothing accompanies a user's own file, so it is written unverified and the page
+    // has to say so rather than let the absent check pass silently.
+    desc: 'Your own image, written as supplied. Nothing checks it against a manifest.',
     kind: 'file',
     applies: (flow) => flow.state.source === SOURCE.MANUAL,
     accept: (flow) => (flow.state.family === 'nrf52' ? '.zip' : '.bin'),
     async apply(flow, picked) {
-      flow.state.file = await plans.readUploadedFirmware(picked);
+      const file = await plans.readUploadedFirmware(picked);
+      // Build the plan and throw it away: the point is the checks inside it. A file the
+      // device cannot take should be refused while the picker is still on screen, not
+      // several steps later with the device already in programming mode.
+      plans.buildManualFlashPlan(file, {
+        family: flow.state.family,
+        wipe: flow.state.install === INSTALL.NEW,
+      });
+      flow.state.file = file;
     },
   },
 
@@ -688,6 +682,53 @@ export async function disposeFlow(flow) {
   flow.state.port = null;
   if (session) await esptool.closeEsptoolSession(session).catch(() => {});
   if (port) await closeSerialPortQuietly(port);
+}
+
+/**
+ * Where firmware can come from, for this device and this usage.
+ *
+ * `boards.json` is generated from a built `partitions.bin`, so the enhanced build is
+ * structurally ESP32-only — absent here, not disabled. MobMesh also builds repeaters and
+ * room servers only, so it has nothing to offer a client.
+ *
+ * Upload is deliberately not in this list. Supplying your own image means already knowing
+ * the board, the role and the layout, so it is an escape hatch reached from a link rather
+ * than a peer of the two curated sources — and leaving it out is what lets the whole step
+ * disappear when standard is the only answer left.
+ */
+function sourceChoices(flow) {
+  const choices = [];
+  if (flow.state.family === 'esp32' && flow.state.usage !== USAGE.CLIENT) {
+    choices.push({
+      value: SOURCE.ENHANCED,
+      label: 'MeshCore Enhanced',
+      note: 'Remote updates, bug fixes and more, from MobMesh.',
+      icon: 'enhanced',
+    });
+  }
+  choices.push({
+    value: SOURCE.STOCK,
+    label: 'MeshCore Standard',
+    note: 'Generic MeshCore, with no added features.',
+    icon: 'stock',
+  });
+  return choices;
+}
+
+/** The source when the step will not be shown, or null when it is a real choice. */
+export function defaultSource(flow) {
+  const choices = sourceChoices(flow);
+  return choices.length === 1 ? choices[0].value : null;
+}
+
+/**
+ * Take the upload escape hatch. Sets the source and jumps to the picker, so neither the
+ * source step nor anything that resolves a manifest is walked through on the way.
+ */
+export function chooseUploadYourOwn(flow) {
+  flow.state.source = SOURCE.MANUAL;
+  const index = applicableSteps(flow).findIndex((step) => step.id === 'file');
+  if (index >= 0) flow.stepIndex = index;
 }
 
 // --- navigation -------------------------------------------------------------------------

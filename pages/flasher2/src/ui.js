@@ -159,7 +159,7 @@ function renderChoice(step, options) {
   // `layout` is the step's own declaration; `choice` is the default card pair.
   const layout = step.layout ?? 'choice';
   const centred = layout === 'choice';
-  const { body } = frame({ title: text(step.title), desc: text(step.desc), centred });
+  const { body, foot } = frame({ title: text(step.title), desc: text(step.desc), centred });
   const list = document.createElement('div');
 
   if (layout === 'board') {
@@ -208,6 +208,18 @@ function renderChoice(step, options) {
     list.append(cell);
   }
   body.append(list);
+
+  if (step.aside) {
+    const link = document.createElement('button');
+    link.type = 'button';
+    link.className = 'aside-link';
+    link.textContent = step.aside.label;
+    link.addEventListener('click', () => {
+      step.aside.run(flow);
+      render();
+    });
+    foot.append(link);
+  }
 }
 
 /** Runs on entry and moves on by itself; the user only sees it if it is slow or fails. */
@@ -560,6 +572,62 @@ function renderDone(step) {
   foot.append(actions);
 }
 
+// §9A. `step.apply` validates a picked file, so a wrong image is refused here rather than
+// several steps later with the device already in programming mode.
+function renderFile(step) {
+  const { body, foot } = frame({ title: text(step.title), desc: text(step.desc) });
+  const accept = step.accept(flow);
+
+  const zone = document.createElement('div');
+  zone.className = 'drop-zone';
+  zone.innerHTML =
+    `<span class="drop-icon">${icon('upload', 26)}</span>` +
+    '<strong>Drag a file here</strong>' +
+    `<small>or click to browse — ${accept} for this device.</small>`;
+
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = accept;
+  input.hidden = true;
+
+  const problem = document.createElement('p');
+  problem.className = 'field-error';
+  problem.hidden = true;
+
+  async function take(picked) {
+    if (!picked) return;
+    problem.hidden = true;
+    zone.classList.add('is-busy');
+    try {
+      await step.apply(flow, picked);
+      advance();
+    } catch (error) {
+      // A rejected file is the user's to fix, not a failure of the tool — stay put and
+      // say why, rather than routing to the error screen.
+      zone.classList.remove('is-busy');
+      problem.textContent = error.message;
+      problem.hidden = false;
+      input.value = '';
+    }
+  }
+
+  zone.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => take(input.files?.[0]));
+  zone.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    zone.classList.add('is-over');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('is-over'));
+  zone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    zone.classList.remove('is-over');
+    take(event.dataTransfer?.files?.[0]);
+  });
+
+  body.append(zone, input);
+  foot.append(problem);
+}
+
 // --- driver -----------------------------------------------------------------------------
 
 async function render() {
@@ -570,6 +638,7 @@ async function render() {
 
   if (step.kind === 'action') return renderAction(step);
   if (step.kind === 'location') return renderLocation(step);
+  if (step.kind === 'file') return renderFile(step);
 
   if (step.kind === 'choice') {
     let options;
@@ -615,7 +684,7 @@ function applyStepShortcut() {
   s.family = params.get('family') ?? 'esp32';
   s.install = params.get('install') ?? flowApi.INSTALL.NEW;
   s.usage = params.get('usage') ?? flowApi.USAGE.INFRASTRUCTURE;
-  s.source = params.get('source') ?? flowApi.SOURCE.ENHANCED;
+  s.source = params.get('source') ?? flowApi.defaultSource(flow) ?? flowApi.SOURCE.ENHANCED;
   // The node-config step only applies to a repeater or room server, so the shortcut has
   // to carry a role or that target would not be in the step list at all.
   s.variantKey = params.get('variant') ?? 'repeater';
