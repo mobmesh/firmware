@@ -317,13 +317,13 @@ export const STEPS = [
     options: () => [
       {
         value: INSTALL.NEW,
-        label: 'New Device',
+        label: 'New device',
         note: 'Set up a fresh device with a clean configuration.',
         icon: 'new-device',
       },
       {
         value: INSTALL.UPDATE,
-        label: 'Upgrade Existing',
+        label: 'Upgrade existing',
         note: 'Install the latest firmware and keep your existing data where possible.',
         icon: 'upgrade',
       },
@@ -335,8 +335,8 @@ export const STEPS = [
 
   {
     id: 'usage',
-    title: 'What is this node for?',
-    desc: 'Pick what you are building today.',
+    title: 'What type of node are you setting up?',
+    desc: 'Pick the appropriate role for your deployment.',
     kind: 'choice',
     applies: () => true,
     // The escape hatch, named but not given equal weight to the two real choices. The
@@ -345,14 +345,14 @@ export const STEPS = [
     options: () => [
       {
         value: USAGE.INFRASTRUCTURE,
-        label: 'Set up Infrastructure',
-        note: 'Backbone node that extends the mesh from a rooftop, tower, or high attic.',
+        label: 'Set up infrastructure',
+        note: 'Fixed location device that extends the mesh from a high roof, tower, etc.',
         icon: 'infrastructure',
       },
       {
         value: USAGE.CLIENT,
-        label: 'Set up a Client',
-        note: 'Daily-carry node paired with your phone over Bluetooth or USB.',
+        label: 'Set up a client',
+        note: 'Portable device paired with your phone or PC over Bluetooth or USB.',
         icon: 'client',
       },
     ],
@@ -380,7 +380,8 @@ export const STEPS = [
 
   {
     id: 'maker',
-    title: 'Who makes it?',
+    title: 'Who makes your device?',
+    desc: "Choose your device's manufacturer from the choices below.",
     // Same square picture tiles as the device step. Upstream ships no maker artwork, so
     // the icon slot renders empty until the placeholder lands.
     layout: 'board',
@@ -409,11 +410,22 @@ export const STEPS = [
 
   {
     id: 'device',
-    title: 'Which device?',
+    title: 'Which device do you have?',
+    desc: "The following devices are supported.",
     // Square picture tiles, the shape the shipped flasher uses for boards.
     layout: 'board',
     kind: 'choice',
     applies: (flow) => flow.state.source !== SOURCE.MANUAL,
+    // Only the curated list can come up short; the stock catalogue is already everything.
+    aside: (flow) =>
+      flow.state.source === SOURCE.ENHANCED
+        ? {
+            label: "Use MeshCore Standard",
+            variant: 'pill',
+            icon: null,
+            run: (f) => chooseStockCatalogue(f),
+          }
+        : null,
     async options(flow) {
       if (flow.state.source === SOURCE.ENHANCED) {
         const manifest = await customManifest(flow);
@@ -451,7 +463,8 @@ export const STEPS = [
 
   {
     id: 'role',
-    title: 'What is it for?',
+    title: 'Which role do you want to set up?',
+    desc: "MeshCore supports the following roles for your device.",
     // Full-width rows with a small icon, the shipped flasher's variant shape.
     layout: 'row',
     kind: 'choice',
@@ -490,7 +503,12 @@ export const STEPS = [
     },
     apply: (flow, value) => {
       if (flow.state.source === SOURCE.ENHANCED) flow.state.variantKey = value;
-      else flow.state.firmwareIndex = value;
+      else {
+        flow.state.firmwareIndex = value;
+        // Version selection is skipped, so pin the newest here: versionOrder is
+        // sorted newest first.
+        flow.state.version = selectedStockDevice(flow).firmware[value].versionOrder[0];
+      }
     },
   },
 
@@ -498,9 +516,9 @@ export const STEPS = [
     id: 'version',
     title: 'Which version?',
     kind: 'choice',
-    // Undecided: list them all vs pin to latest. They are listed so the
-    // real count is visible rather than assumed.
-    applies: (flow) => flow.state.source === SOURCE.STOCK,
+    // Skipped: everyone gets the newest build, pinned when the role is chosen. Kept
+    // whole so restoring the choice is a one-line change to this predicate.
+    applies: () => false,
     options(flow) {
       const entry = selectedStockDevice(flow).firmware[flow.state.firmwareIndex];
       return entry.versionOrder.map((version, index) => ({
@@ -701,15 +719,15 @@ function sourceChoices(flow) {
   if (flow.state.family === 'esp32' && flow.state.usage !== USAGE.CLIENT) {
     choices.push({
       value: SOURCE.ENHANCED,
-      label: 'MeshCore Enhanced',
-      note: 'Remote updates, bug fixes and more, from MobMesh.',
+      label: 'MeshCore Enhanced+',
+      note: 'Adds advanced features like fully remote firmware updates, added reliability and more. The one you want if your device is supported.',
       icon: 'enhanced',
     });
   }
   choices.push({
     value: SOURCE.STOCK,
     label: 'MeshCore Standard',
-    note: 'Generic MeshCore, with no added features.',
+    note: 'Upstream MeshCore, with no added features. Choose this one if your device is missing from the enhanced device list.',
     icon: 'stock',
   });
   return choices;
@@ -728,6 +746,26 @@ export function defaultSource(flow) {
 export function chooseUploadYourOwn(flow) {
   flow.state.source = SOURCE.MANUAL;
   const index = applicableSteps(flow).findIndex((step) => step.id === 'file');
+  if (index >= 0) flow.stepIndex = index;
+}
+
+/**
+ * Leave the curated list for the full MeshCore catalogue. Every enhanced-only pick is
+ * cleared: the two paths key their device off different manifests.
+ */
+export function chooseStockCatalogue(flow) {
+  const s = flow.state;
+  s.source = SOURCE.STOCK;
+  s.maker = null;
+  s.deviceName = null;
+  s.deviceIcon = null;
+  s.deviceIcon2 = null;
+  s.boardKey = null;
+  s.boardDisplayKey = null;
+  s.variantKey = null;
+  s.firmwareIndex = null;
+  s.version = null;
+  const index = applicableSteps(flow).findIndex((step) => step.id === 'maker');
   if (index >= 0) flow.stepIndex = index;
 }
 

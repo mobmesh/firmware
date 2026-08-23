@@ -71,6 +71,13 @@ const ICONS = {
   device:
     '<rect x="4" y="4" width="16" height="16" rx="2.5"/><rect x="9" y="9" width="6" height="6" rx="1"/>' +
     '<path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>',
+  // The USB trident, so "plug it in" reads as the connector rather than the board.
+  usb:
+    '<circle cx="10" cy="7" r="1"/><circle cx="4" cy="20" r="1"/><path d="M4.7 19.3 19 5"/>' +
+    '<path d="m21 3-3 1 2 2Z"/><path d="M9.26 7.68 5 12l2 5"/><path d="m10 14 5 2 3.5-3.5"/>' +
+    '<path d="m18 12 1-1 1 1-1 1Z"/>',
+  upload:
+    '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M12 15V3"/><path d="m7.5 7.5 4.5-4.5 4.5 4.5"/>',
 };
 
 function icon(name, size = 24) {
@@ -158,6 +165,27 @@ function tileArt(image) {
   return picture;
 }
 
+/**
+ * Caps a tile row so its rows come out even: 6 tiles in a 4-wide card become 3 + 3, not
+ * 4 + 2. Measures the real tile and gap rather than assuming the stylesheet's numbers.
+ */
+function balanceTileRows(list, body) {
+  const tile = list.firstElementChild;
+  if (!tile) return;
+  const bodyStyle = getComputedStyle(body);
+  const available = body.clientWidth
+    - parseFloat(bodyStyle.paddingLeft) - parseFloat(bodyStyle.paddingRight);
+  const gap = parseFloat(getComputedStyle(list).columnGap) || 0;
+  const width = tile.getBoundingClientRect().width;
+  if (!available || !width) return;
+
+  const perRow = Math.max(1, Math.floor((available + gap) / (width + gap)));
+  const count = list.childElementCount;
+  if (count <= perRow) return;
+  const columns = Math.ceil(count / Math.ceil(count / perRow));
+  list.style.maxWidth = `${columns * width + (columns - 1) * gap}px`;
+}
+
 function renderChoice(step, options) {
   // `layout` is the step's own declaration; `choice` is the default card pair.
   const layout = step.layout ?? 'choice';
@@ -211,14 +239,18 @@ function renderChoice(step, options) {
     list.append(cell);
   }
   body.append(list);
+  if (layout === 'board') balanceTileRows(list, body);
 
-  if (step.aside) {
+  // A function lets a step offer its escape hatch on some branches and not others.
+  const aside = typeof step.aside === 'function' ? step.aside(flow) : step.aside;
+  if (aside) {
     const link = document.createElement('button');
     link.type = 'button';
-    link.className = 'aside-link';
-    link.textContent = step.aside.label;
+    link.className = aside.variant === 'pill' ? 'aside-pill' : 'aside-link';
+    link.innerHTML = aside.icon === null ? '<span></span>' : `${icon(aside.icon ?? 'upload', 13)}<span></span>`;
+    link.querySelector('span').textContent = aside.label;
     link.addEventListener('click', () => {
-      step.aside.run(flow);
+      aside.run(flow);
       render();
     });
     foot.append(link);
@@ -293,7 +325,7 @@ function renderCheckpoint(error, step) {
   const { body } = frame({ title: text(step.title), desc: text(step.desc), centred: true });
   const art = document.createElement('div');
   art.className = 'connect-art';
-  art.innerHTML = icon('device', 56);
+  art.innerHTML = icon('usb', 56);
   body.append(art);
 
   const actions = document.createElement('div');
@@ -645,6 +677,15 @@ function renderLocation(step) {
   actions.append(next);
   foot.append(actions);
 
+  // Tab order is name -> map -> height -> email -> password -> Continue, which the DOM
+  // already gives; everything Leaflet adds inside the map is taken back out of it.
+  for (const skipped of form.querySelectorAll(
+    '.leaflet-control a, .leaflet-control button, #map-expand, #lat, #lon'
+  )) {
+    skipped.tabIndex = -1;
+  }
+  nameField.focus();
+
   if (draft.identity) {
     showIdentity(draft.identity.prefix, draft.identityStatus);
   } else {
@@ -828,32 +869,6 @@ flow = flowApi.createFlow({
   relayBase: params.get('relay') ?? undefined,
 });
 
-/**
- * Development shortcut: `?step=device&family=nrf52&source=stock&maker=heltec` jumps
- * straight to a step. Leaves `state.port` null, so gate or remove it at cutover.
- */
-function applyStepShortcut() {
-  const wanted = params.get('step');
-  if (!wanted) return false;
-
-  const s = flow.state;
-  s.family = params.get('family') ?? 'esp32';
-  s.install = params.get('install') ?? flowApi.INSTALL.NEW;
-  s.usage = params.get('usage') ?? flowApi.USAGE.INFRASTRUCTURE;
-  s.source = params.get('source') ?? flowApi.defaultSource(flow) ?? flowApi.SOURCE.ENHANCED;
-  // The node-config step only applies to a repeater or room server, so the shortcut has
-  // to carry a role or that target would not be in the step list at all.
-  s.variantKey = params.get('variant') ?? 'repeater';
-  if (params.get('maker')) s.maker = params.get('maker');
-  if (params.get('device')) s.deviceName = params.get('device');
-
-  const index = flowApi.applicableSteps(flow).findIndex((step) => step.id === wanted);
-  if (index < 0) return false;
-  flow.stepIndex = index;
-  return true;
-}
-
-applyStepShortcut();
 render();
 
 // Exposed so a rig script can render a step without clicking, as wireframe.js does.

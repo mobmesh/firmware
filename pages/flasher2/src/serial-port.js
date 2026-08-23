@@ -10,6 +10,7 @@ import {
   PORT_SETTLE_AFTER_CONNECT_MS,
   ESPRESSIF_VENDOR_ID,
   NORDIC_UF2_VENDOR_ID,
+  SERIAL_PORT_FILTERS,
 } from './constants.js';
 // Typed errors: a failure the user must act on carries its payload as data, never as
 // message text for a caller to pattern-match.
@@ -66,7 +67,7 @@ export async function listGrantedSerialPorts() {
  * UI calls this from the resulting click.
  */
 export async function promptForSerialPort() {
-  return serialApi().requestPort();
+  return serialApi().requestPort({ filters: SERIAL_PORT_FILTERS });
 }
 
 // Matches on `getInfo()`, not object identity: `getPorts()` returning the same instances

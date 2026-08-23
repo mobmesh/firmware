@@ -7,7 +7,7 @@
   /* A floor, not a ceiling -- GCM's own `min-h-[600px]`. Short steps are padded out to
      it so the panel never shrinks; long ones grow past it rather than scrolling. */
   /* GCM's max-w-2xl is 672px on the panel itself; .wrap's 20px sides sit outside it. */
-  --cell-w: 712px;
+  --cell-w: 784px;
   --cell-min-h: 600px;
 
   /* GCM sets headings in Space Grotesk (`font-display`) and body in Inter. The
@@ -61,6 +61,7 @@
 }
 
 .step {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -106,6 +107,15 @@
   padding-top: 1rem;
 }
 
+/* Out of flow: in the footer the link's height re-centres the body and lifts the
+   choice cards ~27px above where they sit on every other step. */
+.step-foot:has(.aside-link) {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding-top: 0;
+}
+
 /* Vertically centres a short step (connect, the binary choice) without letting a
    long one lose its scroll. */
 .step-body.is-centred {
@@ -141,6 +151,7 @@
 }
 
 .choice {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -153,6 +164,33 @@
   cursor: pointer;
   font: inherit;
   transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+/* 1px ring that only lights at the top-left and bottom-right corners, so the card
+   reads as catching light from one direction. Masked to the border, not the fill.
+   The tile rules live in the shared sheet, so the ring is added here to leave
+   the shipped flasher alone. */
+.tile,
+.board-tile {
+  position: relative;
+}
+
+.choice::before,
+.tile::before,
+.board-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 22%,
+    rgba(255, 255, 255, 0) 78%, rgba(255, 255, 255, 0.21) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 .choice:hover {
@@ -221,6 +259,40 @@
   align-items: center;
   justify-content: center;
   color: var(--accent);
+}
+
+/* Icon in its own column, label stacked over its note. As a flex row in the shared
+   sheet the note ran inline, so labels wrapped and no two descriptions lined up. */
+.tile-with-icon {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.9rem;
+  row-gap: 0.15rem;
+  padding: 1rem 1.1rem;
+}
+
+.tile-with-icon .tile-icon {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.tile-with-icon strong {
+  grid-column: 2;
+  margin-bottom: 0;
+}
+
+.tile-with-icon small {
+  grid-column: 2;
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* balanceTileRows() sets a max-width to keep rows even; without this the capped
+   list would sit left instead of centred. */
+.board-tiles {
+  margin-inline: auto;
 }
 
 .board-tiles[data-source="stock"] img.board-tile-icon {
@@ -415,18 +487,51 @@
    and must not compete with them. */
 .aside-link {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   margin-top: 1.25rem;
   padding: 0;
   border: 0;
   background: none;
   color: var(--fg-muted);
   font-size: 0.82rem;
-  text-decoration: underline;
-  text-underline-offset: 3px;
   cursor: pointer;
 }
 
+/* Underline the words only -- a glyph inside the underline reads as a broken rule. */
+.aside-link span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.aside-link svg { flex: none; }
+
 .aside-link:hover { color: var(--accent); }
+
+/* The curated list's escape hatch. A pill, not a link: it is an alternative route
+   rather than a footnote to the tiles above it. */
+.aside-pill {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0.25rem auto 0;
+  padding: 0.45rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.aside-pill:hover {
+  border-color: var(--hover-edge);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--fg);
+}
 
 /* The file picker. */
 .drop-zone {
@@ -563,7 +668,9 @@
   color: var(--accent);
   opacity: 0.65;
   cursor: pointer;
-  padding: 0.5rem 0.75rem;
+  /* Tight to the label: generous padding fires the hover well before the pointer
+     reaches the text, and edge crossings in that dead space flash the fade. */
+  padding: 0.2rem 0.35rem;
   transition: opacity 0.15s ease;
 }
 

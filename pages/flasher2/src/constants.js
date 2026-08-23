@@ -112,6 +112,13 @@ export const LEGACY_CDC_PRODUCT_ID = 0x0002;
 // 239a:8029 running, 239a:0071 in DFU). Family detection has no other signal.
 export const NORDIC_UF2_VENDOR_ID = 0x239a;
 
+// The picker only offers these two vendors. A board behind a CP210x or CH340 bridge is
+// rejected at the arm step anyway, so filtering says so before the user picks.
+export const SERIAL_PORT_FILTERS = [
+  { usbVendorId: ESPRESSIF_VENDOR_ID },
+  { usbVendorId: NORDIC_UF2_VENDOR_ID },
+];
+
 // `measured`. Between signal transitions in the TinyUSB entry gesture. Both
 // transitions are required.
 export const LEGACY_ENTRY_STEP_GAP_MS = 100;
