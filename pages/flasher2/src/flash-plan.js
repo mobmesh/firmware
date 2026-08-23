@@ -281,6 +281,7 @@ export function buildCustomFlashPlan(source, scope) {
 
 export const STOCK_MANIFEST_FILE = 'mc-config.json';
 export const STOCK_RELEASES_FILE = 'mc-releases.json';
+export const CATALOGUE_OVERRIDES_FILE = 'catalogue-overrides.json';
 
 // An entry either carries `version` directly or a release stream plus filename patterns.
 // Both normalise to one version map, and neither manifest resolves a URL without the other.
@@ -355,10 +356,38 @@ function absoluteStockAsset(path) {
   return typeof path === 'string' && path ? new URL(path, STOCK_IMAGE_BASE).href : null;
 }
 
+/**
+ * Corrections we maintain over upstream's catalogue: maker display names and logos,
+ * device artwork, and `hidden`. Absent or unreadable applies nothing — an override file
+ * is a nicety and must never cost a user their flash.
+ */
+async function loadCatalogueOverrides() {
+  try {
+    const res = await fetch(new URL(`../data/${CATALOGUE_OVERRIDES_FILE}`, import.meta.url),
+                            { cache: 'no-store' });
+    if (!res.ok) return { base: null, makers: {}, devices: {} };
+    const doc = await res.json();
+    return {
+      // Art is addressed relative to the override file, not to the upstream manifest.
+      base: new URL(`../data/${CATALOGUE_OVERRIDES_FILE}`, import.meta.url),
+      makers: doc.makers ?? {},
+      devices: doc.devices ?? {},
+    };
+  } catch {
+    return { base: null, makers: {}, devices: {} };
+  }
+}
+
+/** An override's own asset, or null. Left null when there is no file to resolve against. */
+function overrideAsset(base, path) {
+  return base && path ? new URL(path, base).href : null;
+}
+
 export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}) {
-  const [raw, releases] = await Promise.all([
+  const [raw, releases, overrides] = await Promise.all([
     loadJson(baseUrl, STOCK_MANIFEST_FILE),
     loadJson(baseUrl, STOCK_RELEASES_FILE),
+    loadCatalogueOverrides(),
   ]);
   if (!Array.isArray(releases)) {
     throw new ManifestError(`${STOCK_RELEASES_FILE} is not a list of release streams.`);
@@ -366,9 +395,14 @@ export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {})
   const devices = [];
   for (const device of raw.device ?? []) {
     if (typeof device?.name !== 'string') continue;
+    // Keyed on the name, the only identity upstream gives a device. A rename upstream
+    // drops the override silently; scripts/check-catalogue-overrides.py reports those.
+    const override = overrides.devices[device.name] ?? {};
+    if (override.hidden) continue;
     const firmware = (device.firmware ?? []).map((f) => normaliseStockFirmware(f, releases));
     devices.push({
       name: device.name,
+      label: override.label ?? device.name,
       maker: device.maker ?? null,
       // 'esp32' | 'nrf52' | 'noflash' — kept as-is so a UI can say why a device is not
       // offered, rather than having it silently vanish from the list.
@@ -377,7 +411,8 @@ export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {})
       tooltip: device.tooltip ?? null,
       // The device picture is only ever an <img> buried in `tooltip`; pull the src out so
       // no caller has to inject a third party's HTML to show it.
-      image: absoluteStockAsset(tooltipImageSrc(device.tooltip)),
+      image: overrideAsset(overrides.base, override.image)
+        ?? absoluteStockAsset(tooltipImageSrc(device.tooltip)),
       erase: device.erase ?? null,
       bootloader: device.bootloader ?? null,
       firmware,
@@ -391,8 +426,12 @@ export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {})
   for (const device of devices) {
     const key = device.maker;
     if (!key) continue;
+    const override = overrides.makers[key] ?? {};
     makers[key] = { ...(makers[key] ?? {}) };
+    // Ours wins outright: upstream's name is what the override exists to correct.
+    if (override.name) makers[key].name = override.name;
     makers[key].name ||= key.charAt(0).toUpperCase() + key.slice(1);
+    makers[key].icon = overrideAsset(overrides.base, override.icon) ?? null;
   }
 
   return {

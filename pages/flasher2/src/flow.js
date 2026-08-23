@@ -407,7 +407,7 @@ export const STEPS = [
         .map((maker) => ({
           value: maker,
           label: manifest.makers[maker]?.name ?? maker,
-          image: null,
+          image: manifest.makers[maker]?.icon ?? null,
         }))
         // By display name, not key: sorting keys put the one capitalised key, `Ikoka`,
         // ahead of every lowercase one.
@@ -454,7 +454,9 @@ export const STEPS = [
         .filter((d) => servesUsage(d, flow.state.usage))
         // `tooltip` is upstream's picture as raw HTML and nothing else — the normaliser has
         // already pulled the src out, so a renderer never injects a third party's markup.
-        .map((d) => ({ value: d.name, label: d.name, image: d.image }))
+        // Value stays the upstream name — it keys the manifest — while the label is the
+        // override's when one renames a device.
+        .map((d) => ({ value: d.name, label: d.label ?? d.name, image: d.image }))
         // Manifest order is upstream's own and shuffles between releases. `numeric` keeps
         // T3 ahead of T10 rather than sorting them as strings.
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));

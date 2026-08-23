@@ -1,0 +1,15 @@
+{
+  "_note": "Corrections layered over upstream's mc-config.json. Every field is optional; absent means keep upstream. Makers key on the maker slug, devices on the exact device name. Icon and image paths resolve against this file.",
+
+  "makers": {
+    "gat-iot": { "name": "GAT-IoT" },
+    "Ikoka": { "name": "Ikoka" },
+    "keepteen": { "name": "Keepteen" },
+    "muziworks": { "name": "MuziWorks" },
+    "uniteng": { "name": "Uniteng" }
+  },
+
+  "devices": {
+    "Elecrow ThinkNode M9": { "image": "icons/thinknode_m9.svg" }
+  }
+}
