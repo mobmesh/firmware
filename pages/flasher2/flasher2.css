@@ -420,7 +420,7 @@
 
 .aside-link:hover { color: var(--accent); }
 
-/* §9A's file picker. */
+/* The file picker. */
 .drop-zone {
   display: flex;
   flex-direction: column;

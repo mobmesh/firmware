@@ -1,7 +1,5 @@
-// The product renderer. Drives flow.js, which owns sequencing and stays DOM-free —
-// this file owns everything visual, including the icons the steps only name.
-//
-// wireframe.js is kept beside it as the workflow test reference and shares nothing.
+// The product renderer. flow.js owns sequencing and stays DOM-free; this file owns
+// everything visual, including the icons the steps only name.
 
 import * as flowApi from './flow.js';
 import { findAvailablePrefix, generateIdentityKeypair, extractPrefix } from './gcm-reg.js';
@@ -81,10 +79,8 @@ function icon(name, size = 24) {
 // --- shell ------------------------------------------------------------------------------
 
 /**
- * Every step renders into the same three bands, so nothing below the card can shift.
- * The head is written in place and only when the words actually differ — rebuilding it
- * each step repaints identical text, which reads as a flicker between steps that share
- * a heading.
+ * Every step renders into the same three bands, so nothing below the card shifts. The
+ * head is rewritten only when the words differ, or shared headings flicker.
  */
 function frame({ title, desc, centred = false }) {
   let step = elements.wizard.querySelector('.step');
@@ -225,12 +221,8 @@ function renderChoice(step, options) {
 
 /** Runs on entry and moves on by itself; the user only sees it if it is slow or fails. */
 async function renderAction(step) {
-  // The write gets the shipped flasher's screen: a real progress bar, the board's own
-  // picture floating above the status line. Everything else is a spinner.
-  //
-  // The settings pass earns the same screen when it has commands to send -- it is a
-  // countable sequence, so a bar says more than a spinner. A role with nothing to send
-  // keeps the spinner rather than flashing an empty bar on its way past.
+  // Progress bar and board picture for the countable steps — the write, and the settings
+  // pass when it has commands. Everything else, including an empty pass, gets a spinner.
   const writing =
     step.id === 'flash' ||
     (step.id === 'provision' && flowApi.plannedProvisionCommands(flow).length > 0);
@@ -288,9 +280,8 @@ async function renderAction(step) {
   }
 }
 
-// §11.4. Only a click may call requestPort(), so the port module raises and the
-// escalation has to become a button here. Reuses the step's own title and helper
-// text: the checkpoint is the same screen waiting on a click, not a new one.
+// Only a click may call requestPort(), so the escalation becomes a button here. Reuses
+// the step's own text: this is the same screen waiting on a click, not a new one.
 function renderCheckpoint(error, step) {
   checkpoints += 1;
   const { body } = frame({ title: text(step.title), desc: text(step.desc), centred: true });
@@ -349,9 +340,8 @@ const MAP_HOME = [30.2, -89.0];
 const MAP_HOME_ZOOM = 6;
 
 /**
- * Mines a keypair the registry will accept, then reports it. Read-only against the
- * registry: `reservePrefix` creates a real public record and is never called from here.
- * A registry that does not answer is not an error — the node is flashed unregistered.
+ * Mines a keypair the registry will accept. Read-only: `reservePrefix` creates a real
+ * public record and is never called here, and a silent registry is not an error.
  */
 async function resolveIdentity(onStatus) {
   onStatus('Generating a node identity…');
@@ -640,7 +630,7 @@ function renderDone(step) {
   foot.append(actions);
 }
 
-// §9A. `step.apply` validates a picked file, so a wrong image is refused here rather than
+// `step.apply` validates a picked file, so a wrong image is refused here rather than
 // several steps later with the device already in programming mode.
 function renderFile(step) {
   const { body, foot } = frame({ title: text(step.title), desc: text(step.desc) });
@@ -737,12 +727,8 @@ flow = flowApi.createFlow({
 });
 
 /**
- * `?step=location` jumps straight to a step for design work, skipping connect and arm.
- * Any selection the target needs can be overridden alongside it, e.g.
- * `?step=device&family=nrf52&source=stock&maker=heltec`.
- *
- * A development shortcut: it leaves `state.port` null, so anything past the last
- * selection step cannot run. Gate or remove it at cutover.
+ * Development shortcut: `?step=device&family=nrf52&source=stock&maker=heltec` jumps
+ * straight to a step. Leaves `state.port` null, so gate or remove it at cutover.
  */
 function applyStepShortcut() {
   const wanted = params.get('step');

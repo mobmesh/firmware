@@ -1,7 +1,5 @@
-// MeshCore CLI over serial — §7.1 constants, §10.2 state 1, §10.7 / §11.6 provisioning.
-//
-// Universal: the CLI is the same firmware regardless of MCU family, so this serves
-// both ESP32 and nRF52 (§5.4). Nothing here knows which chip it is talking to.
+// MeshCore CLI over serial: the liveness probe and post-flash provisioning. The same
+// firmware on both families, so nothing here knows which chip it is talking to.
 
 import {
   CLI_COMMAND_TIMEOUT_MS,
@@ -34,7 +32,7 @@ export class CliConnectionLostError extends Error {
 }
 
 // One command in flight at a time. The caller owns the port: sessions never reopen one —
-// that is the ladder's job (§5.3), and mixing the two hides which layer lost the device.
+// that is the ladder's job, and mixing the two hides which layer lost the device.
 export function startCliSession(port) {
   const decoderStream = new TextDecoderStream();
   const readableClosed = port.readable.pipeTo(decoderStream.writable);
@@ -49,18 +47,8 @@ export function startCliSession(port) {
   function deliverIfComplete() {
     if (!pending) return;
 
-    // Anchor on the device's echo of this command before looking for an answer.
-    // Residue that was queued in the stream *before* this session opened the port
-    // is delivered a task later — after `runCommand`'s clear, which can only reach
-    // what the drain loop has already pulled in — and would otherwise be paired
-    // with this command. Measured: straight after a flash, a `ver` probe returned
-    // the "Unknown command" a running node had emitted in reply to an earlier SYNC
-    // probe, reporting a confident wrong version. Stream order guarantees residue
-    // precedes the echo, so discarding through the echo discards all of it.
-    //
-    // Unverified on nRF52, which runs the same firmware and is assumed to echo the
-    // same way. A device that does not echo times out instead of answering — the
-    // conservative direction, and what §10.2 already treats as "did not answer".
+    // Anchor on the echo: residue always precedes it, so discarding through it discards
+    // all of it. Measured — without this a `ver` probe reports a confident wrong version.
     if (!pending.echoSeen) {
       const echo = `${pending.command}${CLI_LINE_ENDING}`;
       const echoAt = buffer.indexOf(echo);
@@ -103,32 +91,19 @@ export function startCliSession(port) {
     }
   })();
 
-  // `awaitReply: false` is for the handful of commands the firmware answers nothing to
-  // (`reboot`, `poweroff`). Waiting on those costs a full timeout and reports a failure
-  // for a command that worked.
+  // `awaitReply: false` is for commands the firmware answers nothing to (`reboot`,
+  // `poweroff`); waiting reports a failure for a command that worked.
   async function runCommand(command, { timeoutMs = CLI_COMMAND_TIMEOUT_MS, awaitReply = true } = {}) {
     if (pending) throw new Error('runCommand called while a command is still in flight');
 
-    // Discard anything already buffered. A response cannot precede its command, so
-    // whatever is sitting there is residue — device boot chatter, or the
-    // "Unknown command" a running node emits after something else wrote to the
-    // port (the §10.2 SYNC probe does exactly that). The echo anchor in
-    // `deliverIfComplete` covers residue still in flight; this covers what has
-    // already landed, and keeps a stale echo of the *same* command out of the way.
+    // A response cannot precede its command, so anything buffered is residue. The echo
+    // anchor covers what is still in flight; this covers what has already landed.
     buffer = '';
 
     if (!primed) {
       primed = true;
-      // A bare terminator ends any partial line the *device* is holding. Measured:
-      // the §10.2 SYNC probe leaves un-terminated SLIP bytes in a running node's
-      // line buffer, and the next command is appended to them — `<junk>ver` parses
-      // as "Unknown command", so the tool reports a confident wrong version for a
-      // device that is perfectly healthy. Recovery is device-side and nothing the
-      // host can read tells us it is needed, so it is always sent.
-      //
-      // Not waited on. Its reply arrives before this command's echo, and the echo
-      // anchor discards everything up to that — which is what makes sending it
-      // free rather than costing another round trip on a silent device.
+      // Ends any partial line the device is holding: a SYNC probe leaves un-terminated
+      // bytes that the next command appends to. Always sent, never waited on.
       await writer.write(encoder.encode(CLI_LINE_TERMINATOR));
     }
 
@@ -143,9 +118,8 @@ export function startCliSession(port) {
     const answer = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         pending = null;
-        // Drop whatever is buffered. A late answer left in place would be paired
-        // with the *next* command, silently shifting every response in a
-        // provisioning sequence by one. Losing a late answer is the cheaper error.
+        // A late answer left in place pairs with the *next* command and shifts every
+        // response by one. Losing it is the cheaper error.
         buffer = '';
         reject(new CliTimeoutError(command, timeoutMs));
       }, timeoutMs);
@@ -169,12 +143,8 @@ export function startCliSession(port) {
   return { runCommand, close };
 }
 
-// §10.2 state 1. Affirmative only: silence is also what a device stuck in init looks like,
-// so a null means "did not answer", never "is a bootloader".
-//
-// The default is a liveness probe — a fast no is the point. After a flash the device is
-// still booting and needs `CLI_FIRST_COMMAND_TIMEOUT_MS` instead; measured, a freshly
-// written node answers nothing at 1.5 s and answers normally once it has come up.
+// Affirmative only: a null means "did not answer", never "is a bootloader". The default
+// is a liveness probe; after a flash the caller must pass the longer first-command timeout.
 export async function probeCliVersion(port, { timeoutMs = CLI_PROBE_TIMEOUT_MS } = {}) {
   const session = startCliSession(port);
   try {

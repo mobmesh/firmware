@@ -1,9 +1,5 @@
-// workflow.md's step order, made executable — rewrite_code.md §8/§9/§9A/§11 sequenced into
-// the decisions a user actually makes. Deliberately DOM-free: what is under test here is the
-// order of those decisions and what each one needs, which must outlive whatever renders it.
-//
-// Steps 1-3 are the workflow doc. `review` onward is what the flow turned out to still need
-// and is not yet written up there.
+// The step order, made executable: every delivery path sequenced into the decisions a user
+// actually makes. DOM-free, so the order outlives whatever renders it.
 
 import { compatibilityCopy, detectBrowserKind, detectSerialSupport } from './capability.js';
 import { acquireUsableSerialPort, closeSerialPortQuietly, deviceFamily } from './serial-port.js';
@@ -18,9 +14,8 @@ import { STOCK_RELAY_BASE } from './constants.js';
 /** Which half of the mesh a node is for. Chosen early so the role list stays short. */
 export const USAGE = { INFRASTRUCTURE: 'infrastructure', CLIENT: 'client' };
 
-// Every role upstream ships, and the enhanced path's own variant keys, bucketed. Roles
-// are few (7) and near-universal across devices, so this split is stable: it is about
-// what the node is for, not about what any one board can run.
+// Every role upstream ships, bucketed by what the node is for rather than what a board can
+// run — only 7 exist and they are near-universal, so the split is stable.
 const ROLE_USAGE = {
   repeater: USAGE.INFRASTRUCTURE,
   roomServer: USAGE.INFRASTRUCTURE,
@@ -121,9 +116,8 @@ export function createFlow({
       nodeName: '',
       latitude: null,
       longitude: null,
-      // Collected on the node-config step. Nothing sends them yet: height and email feed
-      // the MeshBuddy reservation, which is deliberately never called, and the admin
-      // password is baseline config (§10.7), still unscripted.
+      // Collected on the node-config step. Height and email feed the registry reservation,
+      // which is never called; the password is baseline config, still unscripted.
       heightFt: '',
       email: '',
       adminPassword: '',
@@ -156,9 +150,8 @@ function selectedStockDevice(flow) {
   return manifest?.devices.find((device) => device.name === deviceName) ?? null;
 }
 
-// Steps 1 and 2 share one heading on purpose. The device is being armed while the
-// user is still reading the screen they were already on, and swapping the words there
-// registers as a flicker rather than as progress.
+// Connect and arm share one heading on purpose: the device is armed while the user is
+// still reading the same screen, and swapping words there reads as a flicker.
 const CONNECT_HEAD = {
   title: 'Plug in your device',
   desc: 'Connect your device to this computer via USB to get started.',
@@ -173,7 +166,7 @@ async function armEsp32(flow, onStatus) {
   onStatus(`found in ${mode}${version ? ` — ${version}` : ''}`);
 
   // State 3 included: both probes are passive, so "unknown" is also what a boot loop looks
-  // like. Entry is not destructive; C1's erase guard still runs downstream on §10.5.
+  // like. Entry is not destructive; the erase decision still runs on evidence downstream.
   if (mode !== esp32.ESP32_MODE.BOOTLOADER) {
     s.port = await esp32.enterDownloadMode(s.port, {
       manualInstruction:
@@ -185,7 +178,7 @@ async function armEsp32(flow, onStatus) {
   }
 
   s.session = await esptool.openEsptoolSession(s.port);
-  // Only the cheap table read belongs here. §10.5's evidence chain compares against the
+  // Only the cheap table read belongs here. The evidence chain compares against the
   // firmware's own partition table, which is not known until the source step has run.
   s.devicePartitions = await esp32.readPartitionTable(s.session);
   onStatus(`partition table: ${s.devicePartitions.length} entries`);
@@ -201,7 +194,7 @@ async function buildPlan(flow, onStatus) {
   if (s.source === SOURCE.ENHANCED) {
     const manifest = await customManifest(flow);
     const source = await plans.loadCustomFirmwareSource(manifest, s.boardKey, s.variantKey, { onStatus });
-    // §10.6 sizes the restore against the layout being *written*, not the one read
+    // The restore is sized against the layout being *written*, not the one read
     // off the device — those differ exactly when the restore has to rebuild.
     s.plannedPartitions = source.plannedPartitions;
     let scope = 'full-layout';
@@ -210,9 +203,8 @@ async function buildPlan(flow, onStatus) {
       if (flow.dryRun) {
         reason = 'dry run — the real scope needs Step 1\u2019s table read';
       } else if (partitionTablesMatch(s.devicePartitions, source.plannedPartitions)) {
-        // Step 2: the fork is the table comparison alone. A matching layout never
-        // touches the filesystem, so there is nothing to read back and nothing to
-        // restore — the content check would only risk erasing what was asked to be kept.
+        // The fork is the table comparison alone: a matching layout never touches the
+        // filesystem, so a content check could only risk what was asked to be kept.
         scope = 'app-slots-only';
         reason = 'the partition layout already matches, so your settings are left alone';
       } else {
@@ -249,7 +241,7 @@ async function buildPlan(flow, onStatus) {
     );
   }
 
-  // C7 — the page states the integrity position rather than letting verify no-op.
+  // The page states the integrity position rather than letting verify no-op.
   s.planNotes.push(
     s.plan.verify
       ? `checksum verified: ${s.plan.verify.sha256.slice(0, 16)}…`
@@ -308,7 +300,7 @@ export const STEPS = [
       if (s.family === 'esp32') return armEsp32(flow, onStatus);
       s.port = await nrf52.enterDfuMode(s.port, { onStatus });
       s.mode = 'dfu';
-      // No recon on this side: DFU cannot read flash back (C5), so nothing device-side
+      // No recon on this side: DFU cannot read flash back, so nothing device-side
       // feeds the erase decision and the declaration in the next step is the only input.
     },
   },
@@ -377,9 +369,8 @@ export const STEPS = [
     title: 'Choose a source for your firmware image.',
     desc: "MobMesh's firmware flasher can use firmware from multiple sources",
     kind: 'choice',
-    // A step with one answer is not a question. On a client, and on nRF52, the enhanced
-    // build does not exist and standard is all that is left — `usage.apply` has already
-    // set it. Upload is reached by its own link, which skips this step outright.
+    // A step with one answer is not a question: where the enhanced build does not exist,
+    // `usage.apply` has already set standard. Upload arrives by its own link.
     applies: (flow) => flow.state.source !== SOURCE.MANUAL && sourceChoices(flow).length > 1,
     options: sourceChoices,
     apply: (flow, value) => {
@@ -507,7 +498,7 @@ export const STEPS = [
     id: 'version',
     title: 'Which version?',
     kind: 'choice',
-    // §13.3 is undecided (list them all vs pin to latest); the wireframe lists them so the
+    // Undecided: list them all vs pin to latest. They are listed so the
     // real count is visible rather than assumed.
     applies: (flow) => flow.state.source === SOURCE.STOCK,
     options(flow) {
@@ -526,7 +517,7 @@ export const STEPS = [
   {
     id: 'file',
     title: 'Choose a firmware file',
-    // C7: nothing accompanies a user's own file, so it is written unverified and the page
+    // Nothing accompanies a user's own file, so it is written unverified and the page
     // has to say so rather than let the absent check pass silently.
     desc: 'Your own image, written as supplied. Nothing checks it against a manifest.',
     kind: 'file',
@@ -536,21 +527,17 @@ export const STEPS = [
       const file = await plans.readUploadedFirmware(picked);
       const wipe = flow.state.install === INSTALL.NEW;
 
-      // Build the plan and throw it away: the point is the checks inside it. A file the
-      // device cannot take should be refused while the picker is still on screen, not
-      // several steps later with the device already in programming mode.
+      // Build the plan and throw it away; the checks inside it are the point. Refuse while
+      // the picker is on screen, not once the device is in programming mode.
       plans.buildManualFlashPlan(file, { family: flow.state.family, wipe });
 
       if (flow.state.family === 'nrf52') {
-        // §9A: the package must parse before hardware is touched. `executeDfuPlan` parses
-        // it too, but by then the board is already in DFU mode — a bad zip would strand it
-        // there. The extension check above says nothing about the contents.
+        // Must parse before hardware is touched: `executeDfuPlan` parses it too, but by
+        // then a bad zip strands the board in DFU.
         await plans.validateDfuPackage(file.blob);
 
-        // A wipe on this family is upstream's separate erase package (§11), which a
-        // user-supplied zip does not carry. Refused for the same reason as the ESP32 rule
-        // above: the New declaration is the user's, so say it cannot be honoured rather
-        // than writing an update while it says New.
+        // A wipe here is upstream's separate erase package, which a user's zip lacks.
+        // Refused rather than writing an update while the UI says New.
         if (wipe) {
           throw new plans.UnsupportedFirmwareFileError(
             `${file.name} carries no erase step, so New Device cannot be honoured — the ` +
@@ -584,9 +571,8 @@ export const STEPS = [
       s.adminPassword = adminPassword ?? '';
       s.identity = identity ?? null;
       s.identityStatus = identityStatus ?? null;
-      // The subscription zone the pin fell in (data/zones.geojson), and the settings that
-      // go with it. Fetched here rather than at send time so the provision step can stay
-      // synchronous about what it is going to send.
+      // The zone the pin fell in, and its settings. Fetched here so the provision step
+      // stays synchronous about what it will send.
       s.zone = zone ?? null;
       s.zoneCommands = await loadZoneCommands(s.zone);
     },
@@ -635,9 +621,8 @@ export const STEPS = [
     title: 'Post-flash setup',
     kind: 'action',
     applies: () => true,
-    // Runs for every role; `buildProvisionCommands` decides whether there is anything to
-    // send. Never fails the flash — the bytes are already on the device, and a settings
-    // pass that could not reach it is a warning the user can act on by hand.
+    // Never fails the flash: the bytes are already on the device, so an unreachable
+    // settings pass is a warning the user can act on by hand.
     async run(flow, { onStatus, onProgress }) {
       const s = flow.state;
       const commands = buildProvisionCommands(s);
@@ -687,17 +672,16 @@ export const STEPS = [
 ];
 
 /**
- * What the provision step will send, for a renderer deciding whether to show a progress
- * bar. Empty until the flash step has built the plan, which is the only caller's order.
+ * What the provision step will send, for a renderer choosing a progress bar. Empty until
+ * the flash step has built the plan.
  */
 export function plannedProvisionCommands(flow) {
   return buildProvisionCommands(flow.state);
 }
 
 /**
- * Hand back everything a flow owns. Abandoning one without this leaves the esptool session
- * holding a reader on the port, and the next run's `connect` fails as selection-required
- * with the grant intact — the device looks unrecognised while sitting in DFU. Measured.
+ * Hand back everything a flow owns. Without it the esptool session keeps a reader on the
+ * port and the next `connect` fails with the grant intact. Measured.
  */
 export async function disposeFlow(flow) {
   if (!flow) return;
@@ -709,16 +693,8 @@ export async function disposeFlow(flow) {
 }
 
 /**
- * Where firmware can come from, for this device and this usage.
- *
- * `boards.json` is generated from a built `partitions.bin`, so the enhanced build is
- * structurally ESP32-only — absent here, not disabled. MobMesh also builds repeaters and
- * room servers only, so it has nothing to offer a client.
- *
- * Upload is deliberately not in this list. Supplying your own image means already knowing
- * the board, the role and the layout, so it is an escape hatch reached from a link rather
- * than a peer of the two curated sources — and leaving it out is what lets the whole step
- * disappear when standard is the only answer left.
+ * Where firmware can come from. The enhanced build is ESP32-and-infrastructure-only, so it
+ * is absent rather than disabled; upload is an escape hatch, so the step can vanish.
  */
 function sourceChoices(flow) {
   const choices = [];
@@ -746,8 +722,8 @@ export function defaultSource(flow) {
 }
 
 /**
- * Take the upload escape hatch. Sets the source and jumps to the picker, so neither the
- * source step nor anything that resolves a manifest is walked through on the way.
+ * Take the upload escape hatch: sets the source and jumps to the picker, walking through
+ * neither the source step nor any manifest.
  */
 export function chooseUploadYourOwn(flow) {
   flow.state.source = SOURCE.MANUAL;
@@ -756,14 +732,8 @@ export function chooseUploadYourOwn(flow) {
 }
 
 /**
- * The regional settings for a zone, from `data/<code>-settings.json`.
- *
- * Absent or unreadable means no settings are applied — the same rule the shipped flasher
- * uses for a location with no entry. A zone the group has not written a file for yet must
- * not fail a flash.
- *
- * Array entries are commands in order; a leading underscore parks one without deleting it,
- * matching the convention inside the file.
+ * Regional settings from `data/<code>-settings.json`; absent or unreadable applies nothing,
+ * since a zone with no file yet must never fail a flash. A leading underscore parks a line.
  */
 async function loadZoneCommands(zone) {
   if (!zone) return [];
@@ -806,10 +776,8 @@ export function advance(flow) {
   flow.stepIndex = Math.min(flow.stepIndex + 1, applicableSteps(flow).length - 1);
 }
 
-// Only the selection steps go back. Once the device is in programming mode or bytes are
-// moving, "back" is a hardware operation, not a UI one.
-// Every selection step. Adding a step without listing it here silently breaks Back on
-// both that step and the one after it, which is how `usage` lost it.
+// Only selection steps go back; past that, "back" is a hardware operation. Adding a step
+// without listing it here silently breaks Back on it and the one after — `usage` lost it.
 const REVERSIBLE = new Set([
   'install', 'usage', 'source', 'maker', 'device', 'role', 'version', 'file', 'location',
 ]);

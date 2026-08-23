@@ -1,8 +1,5 @@
-// nRF52 device transitions and DFU execution — §11.1-§11.3. Peer of `esp32.js`:
-// same shape, different MCU family. Entry, port re-acquisition, write.
-//
-// §11.7's exit back to the application is not written into the spec yet and is
-// deliberately absent here.
+// nRF52 transitions and DFU execution: entry, port re-acquisition, write. Peer of
+// `esp32.js`, same shape and a different MCU family.
 
 import {
   DFU_FLASH_ATTEMPTS,
@@ -45,9 +42,8 @@ export class DfuWriteFailedError extends Error {
   }
 }
 
-// §11.2. `forceDfuMode` opens the port at 1200 baud, holds, closes and waits 1.5 s
-// internally — do not add a settle on top. It returns nothing and the port it was
-// handed is dead afterwards.
+// `forceDfuMode` holds at 1200 baud, closes and waits 1.5 s internally — do not add a
+// settle. It returns nothing and the port it was handed is dead afterwards.
 async function touchIntoDfuMode(port) {
   const { Dfu } = await loadDfuApi();
   await closeSerialPortQuietly(port);
@@ -64,19 +60,15 @@ async function retouchQuietly(port) {
   }
 }
 
-// Only a port that appeared *after* the touch can be the device we just rebooted — the
-// same rule as `waitForRomPort` on ESP32. Returns null when the DFU identity has never
-// been granted to this origin, which is the common case (§11.3).
+// Only a port that appeared *after* the touch can be the device we just rebooted. Null
+// when the DFU identity was never granted here, which is the common case.
 async function newlyGrantedPort(before) {
   const granted = await listGrantedSerialPorts();
   return granted.find((port) => !before.includes(port)) ?? null;
 }
 
-// Re-acquire after any transition, rather than predicting what the device will do.
-// Whether a board changes USB identity — on entering DFU, after an erase package, on
-// booting the application — is device-specific, so ask the bus instead of assuming.
-// A device that re-enumerated comes back as a new entry and is preferred; one that kept
-// its identity leaves the held port as the best candidate.
+// Re-acquire after any transition rather than predicting it: whether a board changes USB
+// identity is device-specific, so ask the bus. A new entry wins over the held port.
 async function reacquireAfterTransition(before, heldPort, { prompt, onStatus, reenter } = {}) {
   return acquireUsableSerialPort({
     preferredPort: (await newlyGrantedPort(before)) ?? heldPort,
@@ -87,9 +79,8 @@ async function reacquireAfterTransition(before, heldPort, { prompt, onStatus, re
 }
 
 /**
- * §11.2 + §11.3. Takes the running application's port, returns the DFU port.
- * Raises PortSelectionRequiredError when the DFU identity was never granted — the UI
- * answers that with a picker button (§11.4), never this module.
+ * Takes the running application's port, returns the DFU port. Raises selection-required
+ * when the DFU identity was never granted; the UI answers that, never this module.
  */
 export async function enterDfuMode(appPort, { prompt, onStatus } = {}) {
   onStatus?.('Asking the device to enter DFU mode…');
@@ -104,9 +95,8 @@ export async function enterDfuMode(appPort, { prompt, onStatus } = {}) {
 }
 
 /**
- * §11.1. The DFU executor, peer of `executeFlashPlan`. Takes a closed port — `dfuUpdate`
- * opens it itself and closes it again on the way out — and returns the port it finished
- * on, which a retry may have replaced. `onProgress` is one 0-1 fraction across both stages.
+ * The DFU executor, peer of `executeFlashPlan`. Takes a closed port and returns the one it
+ * finished on, which a retry may have replaced.
  */
 export async function executeDfuPlan(port, plan, { onProgress, onStatus } = {}) {
   if (plan.engine !== 'dfu') {
@@ -115,12 +105,8 @@ export async function executeDfuPlan(port, plan, { onProgress, onStatus } = {}) 
   const { Dfu } = await loadDfuApi();
   let target = port;
 
-  // `eraseBeforeUpdate` erases the application region only — not the filesystem. A wipe is
-  // the erase package, its own DFU update on the same port, ahead of the firmware (§11.3).
-  // Order is load-bearing (§9.4). The bootloader package erases the application and leaves
-  // the device in DFU, which is where the stages after it start — and if it fails, nothing
-  // has been destroyed yet. The erase package then clears the filesystem, and the firmware
-  // puts an application back.
+  // Order is load-bearing: the bootloader package erases the application and leaves the
+  // device in DFU, the erase package clears the filesystem, then the firmware goes back.
   const stages = [];
   if (plan.bootloaderPackage) {
     stages.push({ package: plan.bootloaderPackage, label: 'Updating the bootloader…' });
@@ -162,7 +148,7 @@ async function writeDfuPackage(Dfu, port, stage, eraseAll, { onProgress, onStatu
   let target = port;
 
   // `dfu.js` reads an application package for itself; anything else it cannot read at all,
-  // so the manifest is parsed here and handed to the transport directly (§9.4).
+  // so the manifest is parsed here and handed to the transport directly.
   const parsed = await validateDfuPackage(stage.package, { withBytes: true });
   const readableByDonor = parsed.kind === 'application';
 
@@ -184,9 +170,8 @@ async function writeDfuPackage(Dfu, port, stage, eraseAll, { onProgress, onStatu
       }
       return target;
     } catch (error) {
-      // `dfu.js` owns the open, so a port that would not open arrives as an untyped
-      // DOMException. Retry on "no byte has moved yet" rather than matching Chrome's
-      // message text (§12.3); a part-written device is never retried silently.
+      // `dfu.js` owns the open, so a refused port arrives untyped. Retry on "no byte has
+      // moved yet"; a part-written device is never retried silently.
       if (started || attempt === DFU_FLASH_ATTEMPTS) {
         throw new DfuWriteFailedError(
           started
@@ -203,16 +188,8 @@ async function writeDfuPackage(Dfu, port, stage, eraseAll, { onProgress, onStatu
 }
 
 /**
- * §9.4. Sends a package `dfu.js` cannot read for itself.
- *
- * Its `dfuUpdate` parses the zip and hardcodes `manifest.application` and update mode 4,
- * so a bootloader package — `softdevice_bootloader`, mode 3 — never reaches the transport
- * underneath, which takes all four modes. The parse happens in `flash-plan.js`; this drives
- * the same public methods `dfuUpdate` does, with the mode and sizes the manifest declared.
- * Written rather than patching the vendored file, which stays verbatim (§2.1).
- *
- * Unverified on hardware for anything but mode 4. A failure here can leave a device with
- * no working bootloader, so nothing calls it speculatively.
+ * Sends a package `dfu.js` cannot read itself: `dfuUpdate` hardcodes mode 4, so a bootloader
+ * package never reaches the transport. Unverified beyond mode 4; never call it speculatively.
  */
 async function sendParsedPackage(dfu, parsed, onProgress) {
   await dfu.port.open({ baudRate: PORT_PROBE_BAUD_RATE });
@@ -245,7 +222,7 @@ async function sendParsedPackage(dfu, parsed, onProgress) {
   }
 }
 
-// §11.7. Best-effort: a failure to open or signal is not an error, because unplugging does
+// Best-effort: a failure to open or signal is not an error, because unplugging does
 // the same thing and the write has already succeeded.
 async function toggleDtrReset(port) {
   await closeSerialPortQuietly(port);
@@ -264,10 +241,8 @@ async function toggleDtrReset(port) {
 }
 
 /**
- * §11.7. Returns `{ port, method }` — `self` when the bootloader booted the application on
- * its own, `dtr` after the gesture, `unconfirmed` when a usable port is there but nothing
- * distinguishes it from the DFU port we started on, and a null port when nothing came back.
- * Confirming *which* firmware runs is the caller's: only it knows if the role answers.
+ * Returns `{ port, method }`: `self`, `dtr`, `unconfirmed` when a port is there but
+ * indistinguishable from the DFU one, or a null port. Confirming firmware is the caller's.
  */
 export async function returnToApplication(dfuPort, { appPort = null, onStatus } = {}) {
   onStatus?.('Restarting the device…');
@@ -287,7 +262,7 @@ export async function returnToApplication(dfuPort, { appPort = null, onStatus } 
   return { port: afterReset, method: afterReset ? 'unconfirmed' : null };
 }
 
-// Absence is an answer here, not a failure — §11.5's manual route is what follows it.
+// Absence is an answer here, not a failure — the manual UF2 route is what follows it.
 async function tryReacquire(before, heldPort, onStatus) {
   try {
     return await reacquireAfterTransition(before, heldPort, { onStatus });

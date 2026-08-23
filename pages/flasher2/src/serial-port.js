@@ -1,9 +1,5 @@
-// Port module — rewrite_code.md §5.3. One implementation, three consumers (C4).
-//
-// The ladder is layered rather than branched: each function adds exactly one
-// fallback over the one below it, so the escalation order reads as a stack.
-// Ordering here is load-bearing (C0) — close-before-open, then
-// connect-event-then-settle-then-probe.
+// Port acquisition, one implementation shared by every consumer. Each function adds one
+// fallback over the one below it; the ordering is load-bearing.
 
 import {
   PORT_CONNECT_TIMEOUT_MS,
@@ -15,13 +11,11 @@ import {
   ESPRESSIF_VENDOR_ID,
   NORDIC_UF2_VENDOR_ID,
 } from './constants.js';
-// Typed errors. A failure the user must act on carries its payload as data —
-// never as message text for a caller to pattern-match (§5.3, §12.3). Errors
-// live with the module whose contract they are part of.
+// Typed errors: a failure the user must act on carries its payload as data, never as
+// message text for a caller to pattern-match.
 
 /**
- * The only failure that escalates to a user gesture. Carries the prompt the UI
- * shows next to the port picker, so the caller never composes one.
+ * The only failure that escalates to a user gesture; carries the picker's prompt.
  */
 export class PortSelectionRequiredError extends Error {
   constructor(prompt) {
@@ -32,7 +26,7 @@ export class PortSelectionRequiredError extends Error {
 }
 
 // Typed at the `port.open()` boundary — the donor message-matches Chrome's DOMException
-// wording, which is neither stable API nor locale-independent (§12.3).
+// wording, which is neither stable API nor locale-independent.
 export class PortOpenFailedError extends Error {
   constructor(cause) {
     super('Could not open the serial port.');
@@ -61,34 +55,28 @@ function serialApi() {
 }
 
 /**
- * Ports granted to this origin. Repeat visitors resolve from here rather than
- * through the picker (§5.2).
+ * Ports granted to this origin, so repeat visitors skip the picker.
  */
 export async function listGrantedSerialPorts() {
   return serialApi().getPorts();
 }
 
 /**
- * The picker. Requires a user gesture, so it is never called from inside the
- * acquisition ladder — the ladder raises PortSelectionRequiredError and the UI
- * calls this from the resulting click.
+ * The picker. Needs a user gesture, so the ladder raises instead of calling it and the
+ * UI calls this from the resulting click.
  */
 export async function promptForSerialPort() {
   return serialApi().requestPort();
 }
 
 // Matches on `getInfo()`, not object identity: `getPorts()` returning the same instances
-// is true in practice and false across a re-enumeration (§12.3).
+// is true in practice and false across a re-enumeration.
 function isSamePort(a, b) {
   return a === b;
 }
 
-// Deviation from §5.3's donor reading: raise rather than infer. See handoff.md.
-// Chrome has exposed SerialPort.connected since 117 and reports it correctly for a
-// closed-but-present port. There is no safe fallback: readable/writable are both
-// null whenever the port is closed, so guessing from them reads a present device
-// as absent and sends the caller into a connect wait that can never resolve.
-// Fail fast instead (§12.3, "fail fast when the capability is missing").
+// Raise rather than infer. readable/writable are both null on any closed port, so
+// guessing from them reads a present device as absent and waits forever.
 function isPortConnected(port) {
   if (typeof port.connected !== 'boolean') {
     throw new SerialUnavailableError('This browser does not report serial port connection state.');
@@ -107,7 +95,7 @@ export async function closeSerialPortQuietly(port) {
   }
 }
 
-/** Every open in the tool goes through here, so failures arrive typed (§5.3). */
+/** Every open in the tool goes through here, so failures arrive typed. */
 async function openSerialPort(port, options) {
   try {
     await port.open(options);
@@ -132,9 +120,8 @@ async function probeSerialPortUsable(port) {
 }
 
 /**
- * Workflow Step 1's family determination. Returns 'unknown' rather than guessing: only
- * these two vendors identify the MCU, and a legacy ESP32 behind a CP210x or CH340 bridge
- * reports the bridge. An unknown family is the caller's to resolve, never to default.
+ * Firmware family from the USB vendor. 'unknown' rather than a guess: a legacy ESP32
+ * behind a CP210x or CH340 bridge reports the bridge, and defaulting would be wrong.
  */
 export function deviceFamily(port) {
   switch (port.getInfo().usbVendorId) {
@@ -148,11 +135,8 @@ function sameUsbIdentity(a, b) {
   return a.usbVendorId === b.usbVendorId && a.usbProductId === b.usbProductId;
 }
 
-// Race a `navigator.serial` connect listener against a poll of the granted list, listener
-// attached *before* the first scan. Each covers the other's blind spot: the event is deaf to
-// a reset that finished before we listened — the common case, since we trigger it — and the
-// poll only wakes at its interval. Never waits on the handed-in port: a re-enumerated device
-// is a new SerialPort, and the old one can never fire `connect` again (8506 ms vs 505 ms).
+// Listener plus poll, each covering the other's blind spot. Never waits on the handed-in
+// port: a re-enumerated device is a new SerialPort and the old one never fires again.
 async function waitForDeviceOnBus(port, timeoutMs) {
   if (isPortConnected(port)) return port;
 
@@ -190,8 +174,7 @@ async function waitForDeviceOnBus(port, timeoutMs) {
 }
 
 /**
- * Capability: wait for a port to become usable (§5.3).
- * Returns the port once it opens cleanly, or raises selection-required.
+ * Wait for a port to become usable, or raise selection-required.
  */
 export async function waitForUsableSerialPort(port, { prompt, onStatus } = {}) {
   const selectionPrompt = prompt ?? 'Select the serial port to continue.';
@@ -230,9 +213,8 @@ function orderPortsPreferredFirst(ports, preferredPort) {
     : ports;
 }
 
-// The preferred port is re-tried here even when the caller already tried it:
-// a reset can move the device between the two attempts, and the granted list is
-// re-read each time. Ordering is per §5.3 — do not skip the repeat.
+// The preferred port is re-tried even if the caller already did: a reset can move the
+// device between attempts. Do not skip the repeat.
 async function firstUsableGrantedPort(preferredPort, options) {
   const granted = await listGrantedSerialPorts();
   for (const port of orderPortsPreferredFirst(granted, preferredPort)) {
@@ -242,9 +224,8 @@ async function firstUsableGrantedPort(preferredPort, options) {
   return null;
 }
 
-// §5.3. Escalates strictly: held port, then every granted port with the held one first, then
-// — only if the caller supplies a gesture — one re-entry into programming mode and retry.
-// `reenterProgrammingMode` is injected so this stays MCU-agnostic; only nRF52 supplies one.
+// Escalates strictly: held port, then every grant, then one re-entry into programming
+// mode if the caller supplied one. Injected so this stays MCU-agnostic.
 export async function acquireUsableSerialPort({
   preferredPort = null,
   prompt = 'Select the serial port to continue.',

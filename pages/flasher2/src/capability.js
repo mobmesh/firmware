@@ -1,8 +1,5 @@
-// Capability check — rewrite_code.md §5.1.
-//
-// Two questions, answered in the order the spec sets: does this browser expose
-// Web Serial at all, and if not, is an insecure context the reason. Browser kind
-// is best-effort and used only to tailor the failure copy.
+// Capability check: is Web Serial usable, and if not, why. Browser kind is
+// best-effort and only tailors the failure copy.
 
 /** @typedef {'supported'|'insecure'|'unsupported'} SerialSupport */
 /** @typedef {'ios'|'firefox'|'safari'|'chromium'|'unknown'} BrowserKind */
@@ -18,10 +15,8 @@ export function detectSerialSupport() {
 export function detectBrowserKind() {
   const ua = navigator.userAgent || '';
 
-  // iOS first. Every browser on iOS is WebKit underneath and none can ship Web
-  // Serial, including Chrome / Edge / Brave / Firefox for iOS — so a UA that
-  // says "Chrome" there must not fall through to the chromium bucket. iPadOS
-  // reports MacIntel, hence the touch-point test.
+  // Every iOS browser is WebKit underneath, so a UA saying "Chrome" must not reach
+  // the chromium bucket. iPadOS reports MacIntel, hence the touch-point test.
   const isIOS =
     /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   if (isIOS) return 'ios';
@@ -52,10 +47,8 @@ const UNSUPPORTED_COPY = {
       'Chrome, Edge and Brave for iOS. Flashing needs a desktop computer.',
     suggestion: 'Open this URL on a Mac, Windows, or Linux machine in Chrome, Edge, or Brave.',
   },
-  // The bucket that earns its keep: a browser that is Chromium and still has no
-  // serial access is in an embedded webview, an IDE preview, a cross-origin
-  // iframe, or a stripped Linux build. Telling this user to "use Chrome" tells
-  // them to do what they are already doing.
+  // Chromium with no serial access means a webview, IDE preview, iframe or stripped
+  // build. Telling this user to "use Chrome" tells them to do what they already are.
   chromium: {
     title: 'This window can’t reach Web Serial',
     body:

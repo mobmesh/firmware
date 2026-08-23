@@ -1,6 +1,5 @@
-// Local development harness. Not the wizard shell — it exists so the common
-// core (§5.1, §5.3) can be exercised against real hardware before any engine is
-// written. Replaced by the real UI; nothing else should import it.
+// Local development harness: exercises the capability check and port ladder against
+// real hardware. Replaced by the real UI; nothing else should import it.
 
 import { compatibilityCopy, detectBrowserKind, detectSerialSupport } from './capability.js';
 import { CLI_BAUD_RATE } from './constants.js';
@@ -80,7 +79,7 @@ document.querySelector('#cli').addEventListener('click', async () => {
     await heldPort.open({ baudRate: CLI_BAUD_RATE });
     try {
       const version = await probeCliVersion(heldPort);
-      log(version ? `CLI answered: ${version}` : 'CLI silent — app mode not confirmed (§10.2 state 2 or 3)');
+      log(version ? `CLI answered: ${version}` : 'CLI silent — app mode not confirmed');
     } finally {
       await heldPort.close().catch(() => {});
     }

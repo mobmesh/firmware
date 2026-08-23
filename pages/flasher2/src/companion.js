@@ -1,13 +1,5 @@
-// Companion protocol — the minimum needed to set a device's regional radio parameters.
-//
-// Companion builds serve this binary protocol on the USB port instead of the MeshCore CLI,
-// which is why `probeCliVersion` gets nothing from them. `workflow.md` requires frequency,
-// spreading factor and coding rate to be set on *every* path, so this exists to reach the one
-// family of builds the CLI cannot.
-//
-// Deliberately not a companion client. Contacts, messaging, identity and the rest of the
-// settings surface stay with the external app — this sends one command and reads one reply.
-// Specified from `@liamcottle/meshcore.js` (MIT), reimplemented rather than depended on (§2.1).
+// Companion protocol: the minimum to set radio parameters on builds that serve this
+// instead of the CLI. Not a companion client — the settings surface stays in the app.
 
 import { COMPANION_REPLY_TIMEOUT_MS, PORT_PROBE_BAUD_RATE } from './constants.js';
 import { closeSerialPortQuietly } from './serial-port.js';
@@ -117,8 +109,8 @@ function takeFrame(buffer) {
 }
 
 /**
- * Opens the port and starts a session. Returns the device's own SelfInfo, which carries the
- * radio parameters it is running now — the caller can read them before deciding to write.
+ * Opens the port and returns the device's SelfInfo, carrying the radio parameters it is
+ * running now, so the caller can read before deciding to write.
  */
 export async function openCompanionSession(port, { timeoutMs = COMPANION_REPLY_TIMEOUT_MS } = {}) {
   await closeSerialPortQuietly(port);
@@ -211,8 +203,8 @@ function parseSelfInfo(payload) {
 }
 
 /**
- * Sets the four regional radio parameters. Units are the device's own — read them from
- * `session.selfInfo` and write back in the same scale rather than converting.
+ * Sets the four regional radio parameters. Units are the device's own: read from
+ * `session.selfInfo` and write back in the same scale.
  */
 export async function setRadioParams(
   session,
@@ -235,9 +227,8 @@ export async function setRadioParams(
 }
 
 /**
- * `DeviceQuery`. The only way to read firmware version and path hash mode — neither appears
- * in `SelfInfo`. Trailing fields were added by firmware version, so each is read only if the
- * frame is long enough to carry it rather than assumed present.
+ * `DeviceQuery`: the only way to read firmware version and path hash mode. Trailing fields
+ * arrived by version, so each is read only if the frame is long enough to carry it.
  */
 export async function queryDeviceInfo(session, { timeoutMs = COMPANION_REPLY_TIMEOUT_MS } = {}) {
   const payload = new Uint8Array([CMD_DEVICE_QUERY, APP_VERSION]);
@@ -262,9 +253,8 @@ export async function queryDeviceInfo(session, { timeoutMs = COMPANION_REPLY_TIM
 }
 
 /**
- * Path hash size used in adverts: 0 = 1-byte, 1 = 2-byte, 2 = 3-byte. Firmware rejects
- * anything above 2. Mesh-wide — a node on a larger hash is dropped by any node below
- * firmware 1.14, so this is a flag day rather than a per-device preference.
+ * Path hash size in adverts: 0 = 1-byte, 1 = 2-byte, 2 = 3-byte. Mesh-wide — older nodes
+ * drop anyone on a larger hash, so it is a flag day, not a per-device preference.
  */
 export async function setPathHashMode(session, mode, { timeoutMs = COMPANION_REPLY_TIMEOUT_MS } = {}) {
   if (!Number.isInteger(mode) || mode < 0 || mode > 2) {
@@ -393,8 +383,8 @@ export async function setDeviceTime(session, epochSeconds, options) {
 // --- behaviour ------------------------------------------------------------------------------
 
 /**
- * Trailing fields were added by firmware version and are only sent when supplied, because a
- * short frame is how the firmware detects an older client.
+ * Trailing fields are sent only when supplied: a short frame is how the firmware detects
+ * an older client.
  */
 export async function setOtherParams(session, { manualAddContacts, telemetryMode, advertLocationPolicy, multiAcks }, options) {
   const parts = [CMD_SET_OTHER_PARAMS, manualAddContacts ? 1 : 0];
@@ -490,8 +480,8 @@ export async function reboot(session) {
 }
 
 /**
- * Erases the filesystem — identity, settings and contacts — then reboots. The firmware
- * disables its serial interface before answering, so treat a timeout here as success.
+ * Erases identity, settings and contacts, then reboots. The firmware drops serial before
+ * answering, so a timeout here is success.
  */
 export async function factoryReset(session, options) {
   try {

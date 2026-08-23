@@ -1,17 +1,5 @@
-// SPIFFS image reader — the on-flash format only.
-//
-// Its own module for the same reason as `partitions.js`: a fixed on-flash format
-// with no device, I/O or policy knowledge. C5 also requires that this be
-// structurally unreachable from the DFU path — nRF52 cannot read flash back, so a
-// stray call would fail confusingly mid-flash. Nothing here imports anything.
-//
-// Reads an image, and builds one. A rebuild is always from a parsed file set, never
-// in place, which is what lets the partition change size (§10.6): every block's
-// lookup magic derives from the image's block count, so a raw copy into a
-// differently sized partition produces something SPIFFS refuses to mount.
-//
-// Geometry and field layout follow ESP-IDF's `spiffsgen.py`. Fixed to 2-byte ids
-// and little-endian, which is what every board here uses.
+// SPIFFS images, read and built. A rebuild is always from a parsed file set: block magic
+// derives from the block count, so a raw copy into a resized partition will not mount.
 
 const OBJ_ID_BYTES = 2;
 const SPAN_INDEX_BYTES = 2;
@@ -39,9 +27,8 @@ export function spiffsGeometry({ pageSize = 256, blockSize = 4096, nameBytes = 3
   const pagesPerBlock = Math.floor(blockSize / pageSize);
   const lookupPagesPerBlock = Math.ceil((pagesPerBlock * OBJ_ID_BYTES) / pageSize);
 
-  // Common page header: object id + span index + flags. Index pages pad this out
-  // to a 4-byte boundary before their own fields; data pages do not, so the
-  // payload split uses the *unaligned* length.
+  // Index pages pad the header to 4 bytes before their own fields and data pages do not,
+  // so the payload split uses the *unaligned* length.
   const headerBytes = OBJ_ID_BYTES + SPAN_INDEX_BYTES + FLAG_BYTES;
   const headerPadding = 4 - (headerBytes % 4 === 0 ? 4 : headerBytes % 4);
 
@@ -70,15 +57,12 @@ export function spiffsGeometry({ pageSize = 256, blockSize = 4096, nameBytes = 3
 }
 
 /**
- * The geometry every supported board actually uses — ESP-IDF / Arduino-ESP32
- * defaults, which this firmware's `SPIFFS.begin()` does not override.
+ * ESP-IDF / Arduino-ESP32 defaults, which this firmware does not override.
  */
 export const DEFAULT_SPIFFS_GEOMETRY = spiffsGeometry();
 
-// Two passes per block: a span-0 index page carries the name and size, the bytes live in
-// numbered data pages that may sit in any block. Tolerant — it is pointed at whatever was on
-// the device. Anything that does not decode is skipped, so callers must not read a short list
-// as "nothing here"; that distinction comes from a read that either succeeded or raised.
+// Two passes per block: a span-0 index page names the file, data pages hold the bytes.
+// Undecodable entries are skipped, so a short list does not mean "nothing here".
 export function readSpiffsFiles(image, geometry = DEFAULT_SPIFFS_GEOMETRY) {
   const files = new Map(); // realObjId -> { name, size, pages: [spanIndex, bytes][] }
   const decoder = new TextDecoder();
@@ -197,9 +181,8 @@ function blockMagic(blockIndex, blockCount, geometry) {
   return magic & 0xffff;
 }
 
-// Always a full rebuild, never an edit — that is what allows a resized partition (§10.6).
-// The whole image is produced because the magic in the *unused* blocks marks the rest of the
-// partition formatted; without it SPIFFS reformats on first mount. Object ids start at 1.
+// Always a full rebuild. The magic in the *unused* blocks is what marks the rest of the
+// partition formatted; without it SPIFFS reformats on first mount.
 export function buildSpiffsImage(files, imageBytes, geometry = DEFAULT_SPIFFS_GEOMETRY) {
   if (imageBytes % geometry.blockSize !== 0) {
     throw new Error('SPIFFS image size must be a whole number of blocks');
@@ -276,9 +259,8 @@ function addFile(state, name, data) {
 
   let offset = 0;
   while (offset < data.length) {
-    // An index page's table is finite. When it fills, the object continues under a
-    // further index span rather than the file being split — later spans carry no
-    // name or size and so hold more entries.
+    // When an index page fills, the object continues under a further index span; later
+    // spans carry no name or size and so hold more entries.
     if (indexPage.dataPageIndexes.length >= indexPage.capacity) {
       indexPage = beginObject(state, blockWithSpace(state), objId, data.length, name, indexSpan++);
     }

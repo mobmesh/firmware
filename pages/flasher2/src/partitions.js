@@ -1,14 +1,5 @@
-// ESP-IDF partition table — the on-flash format only.
-//
-// Pure decoding: no device, no I/O, no policy. The format is Espressif's and
-// changes on their schedule, not ours, which is why it is not folded into the
-// ESP32 device module. §10.5 reads it as evidence and §10.6 takes the restore
-// geometry from it.
-//
-// Format constants live here rather than in the §7 register: §7 exists to stop a
-// reimplementer normalising values that look arbitrary, and a struct layout read
-// straight from the entries it parses is self-evident. Timing and retry values
-// around the *read* are a different matter and stay in `constants.js`.
+// ESP-IDF partition table, decoding only: no device, no I/O, no policy. Espressif owns
+// the format, which is why it is not folded into the ESP32 module.
 
 /** `protocol`. Espressif fixes the table at this offset on every ESP32 part. */
 export const PARTITION_TABLE_OFFSET = 0x8000;
@@ -38,9 +29,8 @@ const SUBTYPE_LITTLEFS = 0x83;
  * @property {string} label
  */
 
-// Decodes until the first entry without the magic; trailing bytes are the MD5 entry and
-// padding. Absent or unreadable decodes to an empty list — "no partitions" is a legitimate
-// answer for a blank chip, and a *failed read* is the caller's to catch at the read.
+// Decodes to the first entry without the magic. An empty list is a legitimate answer for
+// a blank chip; a failed *read* is the caller's to catch.
 export function parsePartitionTable(bytes) {
   const partitions = [];
   const decoder = new TextDecoder();
@@ -80,12 +70,12 @@ export function findSecondAppSlot(partitions) {
   return partitions.find((p) => p.type === APP_TYPE && p.subtype === SUBTYPE_OTA_1);
 }
 
-/** Whether a filesystem partition is SPIFFS, which alone can be rebuilt at a new size (§10.6). */
+/** Whether a filesystem partition is SPIFFS, which alone can be rebuilt at a new size. */
 export function isSpiffsPartition(partition) {
   return partition?.subtype === SUBTYPE_SPIFFS;
 }
 
-// §10.5 input 4. Entry by entry, never raw bytes — the image carries an MD5 entry and padding
+// Entry by entry, never raw bytes — the image carries an MD5 entry and padding
 // that differ between builds without the layout differing.
 export function partitionTablesMatch(a, b) {
   if (a.length !== b.length) return false;

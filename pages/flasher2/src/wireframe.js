@@ -1,6 +1,5 @@
-// Deliberately ugly renderer for flow.js. Plain buttons and a text log: the point is to
-// read the sequence of decisions, not to look at anything. Throw this away when the real
-// UI is built — flow.js is the part that stays.
+// Deliberately ugly renderer for flow.js: read the sequence of decisions, not the looks.
+// Throw away once the real UI exists — flow.js is the part that stays.
 
 import * as flowApi from './flow.js';
 import {
@@ -20,9 +19,8 @@ const elements = {
 };
 
 // --- serial log ---------------------------------------------------------------------------
-// Everything, in arrival order, for the whole session: status lines, esptool's own wire
-// chatter, CLI traffic, and any warning a module raises. Capped so a long flash cannot grow
-// the DOM without bound.
+// Everything in arrival order for the whole session. Capped so a long flash cannot
+// grow the DOM without bound.
 const SERIAL_LOG_MAX_LINES = 4000;
 
 function serialLine(tag, text) {
@@ -147,7 +145,7 @@ function describePort(port) {
   return `${hex(vid)}:${hex(pid)}`;
 }
 
-// §11.4. The port module raises rather than prompting; only a click can call requestPort(),
+// The port module raises rather than prompting; only a click can call requestPort(),
 // so the escalation has to surface here as a button.
 function checkpoint(error, retry) {
   clear(elements.panel);
@@ -187,7 +185,7 @@ async function renderStep() {
   elements.panel.append(line(step.title, 'title'));
 
   if (step.kind === 'action') {
-    // Runs on entry. Nothing here needs a gesture — the picker is reached through §11.4's
+    // Runs on entry. Nothing here needs a gesture — the picker is reached through the checkpoint's
     // checkpoint, not from run() — so the flow stops only at decisions and failures.
     elements.panel.append(line('Running…'));
     try {
@@ -278,7 +276,7 @@ async function start({ dryRun, family = null }) {
   // Restarting while the old flow still holds the port is what made a device in DFU read
   // as unrecognised: its session keeps a reader locked and `connect` never gets to probe.
   await flowApi.disposeFlow(flow);
-  // The manifests live under the shipped tool until cutover (§8's baseUrl note), and the
+  // The manifests live under the shipped tool until cutover, and the
   // deployed relay rejects a localhost origin — hence the override.
   const relayBase = new URLSearchParams(location.search).get('relay') ?? undefined;
   flow = flowApi.createFlow({ dryRun, family, manifestBase: '/pages/flasher/', relayBase });

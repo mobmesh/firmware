@@ -1,6 +1,5 @@
-// The flash plan — §4.1. Every path resolves to one of these before hardware is touched.
-// Resolvers produce it, engines consume it: the boundary that keeps the custom and stock
-// ESP32 paths on one executor (C3) and the two manifests on one resolver (C6).
+// The flash plan. Resolvers produce it, engines consume it — the boundary that keeps both
+// ESP32 paths on one executor and both manifests on one resolver.
 
 import {
   PARTITION_TABLE_MAX_BYTES,
@@ -24,7 +23,7 @@ import {
  * @property {FlashFile[]} files        esptool only; empty for dfu
  * @property {Blob|null} package        dfu only
  * @property {Blob|null} erasePackage   dfu only; flashed after the bootloader when present
- * @property {Blob|null} bootloaderPackage  dfu only; §9.4 OTAFIX, flashed before everything
+ * @property {Blob|null} bootloaderPackage  dfu only; the OTAFIX bootloader, flashed before everything
  * @property {string|null} bootloaderReason which upstream notice triggered it
  * @property {boolean} eraseAll
  * @property {boolean} preserveFs       esp32 custom only
@@ -37,27 +36,25 @@ export function createFlashPlan(fields) {
     engine: fields.engine,
     files: fields.files ?? [],
     package: fields.package ?? null,
-    // Deviation from §4.1's shape. nRF52 has no merged image: upstream wipes the
+    // nRF52 has no merged image: upstream wipes the
     // filesystem with a separate erase package flashed ahead of the firmware.
     erasePackage: fields.erasePackage ?? null,
-    // dfu only; §9.4's OTAFIX bootloader, flashed ahead of everything else when upstream
+    // dfu only; the OTAFIX bootloader, flashed ahead of everything else when upstream
     // flags the device. Null on every other path.
     bootloaderPackage: fields.bootloaderPackage ?? null,
     bootloaderReason: fields.bootloaderReason ?? null,
     eraseAll: fields.eraseAll ?? false,
     preserveFs: fields.preserveFs ?? false,
-    // Null means "no checksum was supplied", which the UI must state rather than
-    // silently skip: stock firmware arrives through the relay without one unless
-    // the manifest carries it, custom firmware always has its sidecar (C7).
+    // Null means no checksum was supplied, which the UI must state rather than skip.
+    // Stock firmware often has none; custom firmware always has its sidecar.
     verify: fields.verify ?? null,
     postFlash: fields.postFlash ?? null,
   };
 }
 
-// --- §8: the custom manifest -------------------------------------------------------
-// `auto_boards.json` normalises here and is never written back to (C6). It is generated from
-// each build's real `partitions.bin`, so it is ESP32-only; the stock resolver (§9) is the
-// peer that feeds the nRF52 engine.
+// --- the custom manifest ------------------------------------------------------------
+// `boards.json` normalises here and is never written back to. Generated from each build's
+// real `partitions.bin`, so ESP32-only.
 
 // The tool's own directory, where the build pipeline commits the vendored builds. The dev
 // rig overrides it: until cutover those still live under `/pages/flasher/`.
@@ -118,7 +115,7 @@ function normaliseBoard(key, raw) {
       version: variant.version ?? null,
       firmwareFile: requirePath(variant.firmwareFile, key, `variants.${variantKey}.firmwareFile`),
       firmwareShaFile: variant.firmwareShaFile ?? null,
-      // Chosen by role, not by path (§10.7) — the variant key is the role.
+      // Chosen by role, not by path — the variant key is the role.
       postFlashCommands: Array.isArray(variant.postFlashCommands)
         ? variant.postFlashCommands.slice()
         : null,
@@ -148,14 +145,14 @@ const CUSTOM_VARIANT_ICONS = {
 };
 
 export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}) {
-  const res = await fetch(assetUrl(baseUrl, 'auto_boards.json'), { cache: 'no-store' });
-  if (!res.ok) throw new ManifestError(`Could not load auto_boards.json: HTTP ${res.status}.`);
+  const res = await fetch(assetUrl(baseUrl, 'boards.json'), { cache: 'no-store' });
+  if (!res.ok) throw new ManifestError(`Could not load boards.json: HTTP ${res.status}.`);
 
   let raw;
   try {
     raw = await res.json();
   } catch (error) {
-    throw new ManifestError(`auto_boards.json is not valid JSON (${error.message}).`, { cause: error });
+    throw new ManifestError(`boards.json is not valid JSON (${error.message}).`, { cause: error });
   }
 
   const boards = {};
@@ -163,11 +160,10 @@ export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}
     if (key.startsWith('_')) continue;
     boards[key] = normaliseBoard(key, board);
   }
-  if (Object.keys(boards).length === 0) throw new ManifestError('auto_boards.json lists no boards.');
+  if (Object.keys(boards).length === 0) throw new ManifestError('boards.json lists no boards.');
 
-  // Display list is optional and falls back to one tile per board, matching the shipped
-  // flasher. Tiles may share a board -- `grumpy_board` and `xiao_c3` are one image apiece
-  // over the same firmware -- so the display id is not the board key.
+  // Optional, falling back to one tile per board. Tiles may share a board, so the display
+  // id is not the board key.
   let displays;
   try {
     const shown = await fetch(assetUrl(baseUrl, CUSTOM_DISPLAY_FILE), { cache: 'no-store' });
@@ -194,9 +190,8 @@ export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}
   return { baseUrl, version: raw._version ?? null, boards, displays, variantIcons };
 }
 
-// Sidecar body is `<hash>` or `<hash>:<offset>`; the offset is not this tool's to use.
-// An absent sidecar returns null so the UI states the firmware is unverified (C7); a
-// mismatch raises, because bad bytes must never reach the device.
+// Body is `<hash>` or `<hash>:<offset>`; the offset is not ours to use. Absent returns
+// null so the UI says unverified; a mismatch raises, since bad bytes must never be written.
 async function verifyAgainstSidecar(baseUrl, bytes, path) {
   if (!path) return null;
   const res = await fetch(assetUrl(baseUrl, path), { cache: 'no-store' });
@@ -214,12 +209,11 @@ async function verifyAgainstSidecar(baseUrl, bytes, path) {
   return actual;
 }
 
-// Stage one of two: everything the network can supply, before the device is touched.
-// `plannedPartitions` is what §10.5's evidence read compares against, and its scope
-// answer is what selects the file list — so the table has to come first.
+// Stage one: everything the network can supply, before the device is touched. The planned
+// table has to come first, since the scope answer selects the file list.
 export async function loadCustomFirmwareSource(manifest, boardKey, variantKey, { onStatus } = {}) {
   const board = manifest.boards[boardKey];
-  if (!board) throw new ManifestError(`auto_boards.json has no board '${boardKey}'.`);
+  if (!board) throw new ManifestError(`boards.json has no board '${boardKey}'.`);
   const variant = board.variants[variantKey];
   if (!variant) throw new ManifestError(`Board '${boardKey}' has no variant '${variantKey}'.`);
 
@@ -245,9 +239,8 @@ export async function loadCustomFirmwareSource(manifest, boardKey, variantKey, {
   };
 }
 
-// Stage two: pure, so no failure is possible once the device is in download mode.
-// Slot B's first sector is blanked, which invalidates its image header and leaves the
-// bootloader exactly one valid image without otadata being touched (§10.5).
+// Stage two: pure, so nothing can fail once the device is in download mode. Blanking slot
+// B's first sector leaves the bootloader exactly one valid image, untouched otadata.
 export function buildCustomFlashPlan(source, scope) {
   const { board, variant, assets, sha256 } = source;
   const { offsets } = board;
@@ -282,19 +275,15 @@ export function buildCustomFlashPlan(source, scope) {
   });
 }
 
-// --- §9: the stock manifest ---------------------------------------------------------
-// `mc_config.json` is mirrored same-origin by CI, so only the firmware bytes cross an
-// origin and need the relay. It normalises here and is never written back to (C6).
-// Upstream is volatile — device and role counts have moved 57 → 64 in a fortnight — so
-// nothing here validates against a count or a fixed set; unusable entries are dropped.
+// --- the stock manifest -------------------------------------------------------------
+// Mirrored same-origin by CI, so only firmware bytes need the relay. Upstream is volatile,
+// so nothing validates against a count or fixed set; unusable entries are dropped.
 
-export const STOCK_MANIFEST_FILE = 'mc_config.json';
-export const STOCK_RELEASES_FILE = 'mc_releases.json';
+export const STOCK_MANIFEST_FILE = 'mc-config.json';
+export const STOCK_RELEASES_FILE = 'mc-releases.json';
 
-// A firmware entry names its files one of two ways, and both end up here as the same
-// version map. Either it carries `version` directly, or it carries a release stream plus
-// filename patterns — the versions, build hashes and real names for those live only in
-// the releases manifest, so neither file resolves a URL without the other.
+// An entry either carries `version` directly or a release stream plus filename patterns.
+// Both normalise to one version map, and neither manifest resolves a URL without the other.
 function releaseVersions(github, releases) {
   const byVersion = {};
   for (const [fileType, pattern] of Object.entries(github.files ?? {})) {
@@ -336,9 +325,8 @@ function normaliseStockFirmware(raw, releases) {
     role: raw.role ?? null,
     title: raw.title ?? null,
     notice: raw.notice ?? null,
-    // Upstream's own order, newest first; the keys are version strings, not a list.
-    // A version with no files is one this board had no build in — it is left out of the
-    // order so nothing offers it, but the entry itself is always kept.
+    // Upstream's own order, newest first. A version with no files is left out of the
+    // order so nothing offers it, but the entry itself is kept.
     versionOrder: Object.keys(byVersion).filter((v) => byVersion[v].files.length > 0),
     versions: byVersion,
   };
@@ -397,13 +385,8 @@ export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {})
   }
   if (devices.length === 0) throw new ManifestError(`${STOCK_MANIFEST_FILE} lists no devices.`);
 
-  // Four catalogues sit beside `device` and were previously dropped: `notice` keys the
-  // warning text a firmware entry names, `role` and `maker` carry upstream's own display
-  // names, and `staticPath` is where its web pages link bootloader files (not our path —
-  // the relay serves them from the same flat directory as everything else).
-  // Five maker keys (uniteng, gat-iot, Ikoka, keepteen, muziworks) are absent from the
-  // catalogue and would render as the raw key. Capitalise the first letter and nothing
-  // else — title case would turn the catalogue's own `LilyGo` into `Lilygo`.
+  // Five maker keys are absent from upstream's catalogue and would render as the raw key.
+  // Capitalise the first letter only — title case would turn `LilyGo` into `Lilygo`.
   const makers = { ...(raw.maker ?? {}) };
   for (const device of devices) {
     const key = device.maker;
@@ -422,31 +405,27 @@ export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {})
   };
 }
 
-// --- OTAFIX bootloader (§9.4) -------------------------------------------------------
-// 16 nRF52 devices ship a factory bootloader whose OTA DFU is broken or unreliable, and
-// upstream flags the affected entries by notice. Both tiers are treated the same: they
-// carry identical roles (repeater/roomServer only) on non-overlapping devices, and
-// upstream renders both in the same container, so the distinction is invisible anyway.
+// --- OTAFIX bootloader ---------------------------------------------------------------
+// 16 nRF52 devices ship a factory bootloader whose OTA DFU is broken or unreliable. Both
+// upstream tiers are treated the same: identical roles on non-overlapping devices.
 const OTAFIX_NOTICES = new Set(['otafixNeeded', 'otafixRecommended']);
 
 /** The bootloader DFU package for a device, or null when upstream does not flag one. */
 export function resolveBootloaderUpdate(device, entry) {
   if (!OTAFIX_NOTICES.has(entry?.notice)) return null;
-  // `.uf2` is §11.5's drag-and-drop route and cannot be written over serial.
+  // `.uf2` is the drag-and-drop route and cannot be written over serial.
   const file = (device.bootloader ?? []).find((name) => name.endsWith('.zip'));
   return file ? { file, reason: entry.notice } : null;
 }
 
-// Upstream device names are unique, but a role is not unique within a device — eight
-// devices carry the same role twice under different classes — so the entry is picked by
-// index into the device's own relay-backed list, not by role.
+// A role is not unique within a device — eight carry the same role twice — so the entry
+// is picked by index into the device's own list, never by role.
 function selectStockFile(device, entry, version, wipe) {
   const files = entry.versions[version]?.files;
   if (!files) throw new ManifestError(`'${device.name}' has no version '${version}'.`);
 
-  // ESP32: the merged image for a wipe, the bare app image for an update. Which one is
-  // the user's New/Update declaration, never the device's state (workflow Step 2).
-  // nRF52: the DFU package. `download` is the manual UF2 route and is never flashed here.
+  // ESP32 takes the merged image for a wipe and the bare app for an update, chosen by the
+  // user's declaration. nRF52 takes the DFU package; `download` is the manual UF2 route.
   const wanted =
     device.type === 'esp32'
       ? [wipe ? 'flash-wipe' : 'flash-update']
@@ -463,7 +442,7 @@ function selectStockFile(device, entry, version, wipe) {
 }
 
 // Stage one, the peer of `loadCustomFirmwareSource`. Bytes come through the relay; there
-// is no sidecar, so `verify` stays null and the UI must say the firmware is unverified (C7).
+// is no sidecar, so `verify` stays null and the UI must say the firmware is unverified.
 export async function loadStockFirmwareSource(
   manifest,
   { deviceName, firmwareIndex = 0, version, wipe = false },
@@ -518,10 +497,8 @@ export async function loadStockFirmwareSource(
   return { device, entry, version, wipe, file, bytes, eraseBytes, bootloader };
 }
 
-// Stage two. One file, always: upstream's merged image already carries the bootloader and
-// partition table, and its update image is the app alone. The address follows from the
-// file that was chosen — the donor keeps it in mutable page state, where a wipe followed
-// by an update writes the app image to 0x0 (§12.3-class defect; do not reproduce).
+// Stage two. Always one file, and the address follows from which was chosen: the donor
+// keeps it in mutable page state, where a wipe then an update writes the app to 0x0.
 export function buildStockFlashPlan(source, { partitions = [] } = {}) {
   const { device, bytes, eraseBytes, wipe, bootloader } = source;
 
@@ -536,16 +513,15 @@ export function buildStockFlashPlan(source, { partitions = [] } = {}) {
       // The wipe. `Dfu`'s own `eraseBeforeUpdate` clears the application region the write
       // is about to overwrite anyway, so `eraseAll` stays false and this carries it.
       erasePackage: eraseBytes ? new Blob([eraseBytes]) : null,
-      // §10.6 is custom-path-only (C5), and DFU cannot read flash back regardless.
+      // Filesystem preservation is custom-path-only, and DFU cannot read flash back regardless.
       preserveFs: false,
       verify: null,
       postFlash: null,
     });
   }
 
-  // An update writes app0 only, so otadata may still prefer the slot it did not touch and
-  // boot the firmware that was just replaced. Blanking that slot leaves the bootloader one
-  // valid image. A wipe erases everything and needs none of this.
+  // An update writes app0 only, so otadata may still boot the slot it did not touch.
+  // Blanking that slot leaves one valid image; a wipe needs none of this.
   const files = [{ data: bytes, address: wipe ? STOCK_ESP32_MERGED_ADDRESS : STOCK_ESP32_APP_ADDRESS }];
   const slotB = wipe ? null : findSecondAppSlot(partitions);
   if (slotB) {
@@ -558,15 +534,14 @@ export function buildStockFlashPlan(source, { partitions = [] } = {}) {
     eraseAll: wipe,
     preserveFs: false,
     verify: null,
-    // §10.7 applies here too, but the role → command-set table does not exist yet and
-    // `auto_boards.json`'s commands are ours, not upstream's. Nothing is invented.
+    // Post-flash provisioning applies here too, but the role → command-set table does not exist yet and
+    // `boards.json`'s commands are ours, not upstream's. Nothing is invented.
     postFlash: null,
   });
 }
 
-// --- §9A: manual upload ------------------------------------------------------------
-// The third resolver, beside the other two (C6). No manifest, so there is only one
-// stage: the bytes are already in hand and nothing is fetched.
+// --- manual upload -------------------------------------------------------------------
+// The third resolver. No manifest, so one stage only: the bytes are already in hand.
 
 export class UnsupportedFirmwareFileError extends Error {
   constructor(message) {
@@ -578,9 +553,8 @@ export class UnsupportedFirmwareFileError extends Error {
 // `protocol`. ESP-IDF image header magic, first byte of any ESP32 image.
 const ESP_IMAGE_MAGIC = 0xe9;
 
-// A merged image carries a partition table at 0x8000 and an application image does not.
-// Both start with 0xE9 and size does not separate them — an upstream merged image measured
-// smaller than the application image for the same board.
+// A merged image carries a partition table at 0x8000 and an app image does not. Both start
+// with 0xE9, and size does not separate them — merged has measured *smaller*.
 function looksMerged(bytes) {
   if (bytes.length < PARTITION_TABLE_OFFSET + 32) return false;
   try {
@@ -594,8 +568,8 @@ function looksMerged(bytes) {
 }
 
 /**
- * §9A. Builds a plan from a user-supplied file. `family` comes from the connected device
- * (§10.2), never from the file — the file is only checked against it.
+ * Builds a plan from a user-supplied file. `family` comes from the connected device,
+ * never from the file — the file is only checked against it.
  * @param {{ name: string, bytes: Uint8Array, blob: Blob }} file
  */
 export function buildManualFlashPlan(file, { family, wipe = false }) {
@@ -618,14 +592,8 @@ export function buildManualFlashPlan(file, { family, wipe = false }) {
     );
   }
   const merged = looksMerged(file.bytes);
-  // A full erase takes the bootloader and partition table with it, and an application
-  // image supplies neither — the combination can only ever produce a device that does not
-  // boot. Measured on a Heltec v4: it also lands in §10.2 state 3, which correctly refuses
-  // to erase an unknown device, so the tool cannot undo it either.
-  //
-  // Refused rather than quietly downgraded to an update: the New/Update declaration is the
-  // user's and is authoritative (see decisions.md), so the answer is to say the
-  // combination is impossible, not to silently substitute a different write.
+  // A full erase takes the bootloader and an app image supplies none, so the pair can only
+  // produce a device that will not boot. Refused, not downgraded: the declaration is theirs.
   if (wipe && !merged) {
     throw new UnsupportedFirmwareFileError(
       `${file.name} is an application image, not a full one. Erasing first would remove the ` +
@@ -637,7 +605,7 @@ export function buildManualFlashPlan(file, { family, wipe = false }) {
     engine: 'esptool',
     files: [{ data: file.bytes, address: merged ? STOCK_ESP32_MERGED_ADDRESS : STOCK_ESP32_APP_ADDRESS }],
     eraseAll: wipe,
-    // No sidecar and no manifest digest: the UI must say the firmware is unverified (C7).
+    // No sidecar and no manifest digest: the UI must say the firmware is unverified.
     verify: null,
     postFlash: null,
   });
@@ -648,12 +616,10 @@ export async function readUploadedFirmware(file) {
   return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()), blob: file };
 }
 
-/** The nRF52 package must parse before hardware is touched, not mid-transfer (§9A). */
+/** The nRF52 package must parse before hardware is touched, not mid-transfer. */
 /**
- * Nordic legacy DFU update modes. `dfu.js` defines only the application one, because its
- * own zip reader only ever produces application packages — the transport underneath takes
- * all four. Sourced from the protocol, `protocol`-tagged, and unverified on hardware for
- * anything but `application`.
+ * Nordic legacy DFU update modes. `dfu.js` defines only `application`; the transport
+ * underneath takes all four. Unverified on hardware beyond `application`.
  */
 export const DFU_UPDATE_MODES = {
   softdevice: 1,
@@ -666,12 +632,8 @@ export const DFU_UPDATE_MODES = {
 const DFU_SECTION_ORDER = ['softdevice_bootloader', 'application', 'bootloader', 'softdevice'];
 
 /**
- * Reads a DFU package and returns the one section it carries, whichever kind that is.
- * Bootloader packages name `softdevice_bootloader`, which `dfu.js` cannot read — this is
- * why the tool parses the zip itself rather than calling `dfuUpdate`.
- *
- * `withBytes` also extracts the payloads, which the executor needs and a validity check
- * does not.
+ * Reads a DFU package and returns its one section. Parsed here because `dfuUpdate` cannot
+ * read a `softdevice_bootloader` package; `withBytes` adds the payloads the executor needs.
  */
 export async function validateDfuPackage(blob, { withBytes = false } = {}) {
   const zip = await import('../vendor/dfu/zip.min.js');

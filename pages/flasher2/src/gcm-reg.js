@@ -1,32 +1,22 @@
-// GulfCoastMesh node registry (MeshBuddy) — optional, and never load-bearing.
-//
-// Its own module because it is a third-party HTTP API: it changes independently of
-// anything else here, and nothing in the flash path may depend on it.
-//
-// The registry claims a 2-byte prefix of a node's *public* key so two nodes on the mesh
-// do not collide. No private key is ever sent — see `reservePrefix`'s payload.
-//
-// Key generation lives here rather than in a module of its own: nothing else in the tool
-// needs a MeshCore identity, and it exists only to feed the mining loop below.
+// GulfCoastMesh node registry (MeshBuddy): optional, never load-bearing. Claims a prefix
+// of a node's *public* key so two nodes cannot collide; no private key is ever sent.
 
 import { GCM_REGISTRY_TIMEOUT_MS } from './constants.js';
 
 // Their public service, called directly: it echoes any Origin (and answers `*` with none),
-// so unlike stock firmware (§9.2) this needs no relay.
+// so unlike stock firmware this needs no relay.
 export const GCM_REGISTRY_BASE = 'https://meshbuddy.gulfcoastmesh.org';
 
 // Their format: 4 hex characters, taken from the front of the public key.
 export const GCM_PREFIX_LENGTH = 4;
 
-// MeshCore's key is the *expanded* 64-byte layout — a clamped scalar followed by a signing
-// component — which is why WebCrypto's Ed25519 cannot produce one and the scalar is drawn
-// directly rather than hashed from a seed.
+// The *expanded* 64-byte layout, which is why WebCrypto's Ed25519 cannot produce one and
+// the scalar is drawn directly rather than hashed from a seed.
 const MESHCORE_SCALAR_BYTES = 32;
 const MESHCORE_PRIVATE_KEY_BYTES = 64;
 
-// `protocol`. The Ed25519 group order L from RFC 8032. The base point has this order, so
-// reducing before multiplying changes no public key — but a clamped scalar exceeds L and
-// the curve rejects it unreduced.
+// `protocol`. Ed25519's group order L. Reducing changes no public key, but a clamped
+// scalar exceeds L and the curve rejects it unreduced.
 const ED25519_GROUP_ORDER = 2n ** 252n + 27742317777372353535851937790883648493n;
 
 // 30 KB of curve arithmetic that only the mining loop needs; the flash path never loads it.
@@ -56,8 +46,7 @@ function scalarToBigIntLE(bytes) {
 }
 
 /**
- * A fresh MeshCore identity, generated here and never transmitted. Returns
- * `{ privateKeyHex, publicKeyHex, prefix }`; only `prefix` is ever sent anywhere.
+ * A fresh identity, never transmitted. Only `prefix` is ever sent anywhere.
  */
 export async function generateIdentityKeypair() {
   const { Point } = await loadCurve();
@@ -120,9 +109,8 @@ async function getJson(url, timeoutMs, init = {}) {
 }
 
 /**
- * Is this prefix free? Never throws for an unreachable registry — a down, slow or
- * CORS-blocked service returns `reachable: false` and the caller carries on unregistered.
- * An invalid prefix is a programmer error and does throw.
+ * Is this prefix free? An unreachable registry returns `reachable: false` rather than
+ * throwing; an invalid prefix is a programmer error and does throw.
  */
 export async function checkPrefixAvailable(
   prefix,
@@ -167,10 +155,8 @@ export async function checkPublicKey(publicKeyHex, options) {
 }
 
 /**
- * Mine a keypair whose prefix the registry will accept. Each attempt is one scalar multiply,
- * so the loop costs microseconds — the device is never involved. Returns the first accepted
- * keypair, or null when none was accepted or the registry never answered; the caller flashes
- * anyway and skips registration.
+ * Mine a keypair the registry will accept; the device is never involved. Null means none
+ * was accepted or the registry never answered, and the caller flashes anyway.
  */
 export async function findAvailablePrefix(generateKeypair = generateIdentityKeypair, { attempts = 15, onProgress, ...options } = {}) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -185,9 +171,8 @@ export async function findAvailablePrefix(generateKeypair = generateIdentityKeyp
 }
 
 /**
- * Claim a prefix. **Creates a real, public record against the supplied email** — call it
- * only from a deliberate user action, never speculatively. Nothing in this tool calls it.
- * Untested against the live service: the read path above is verified, this is not.
+ * Claim a prefix. **Creates a real, public record against the supplied email**, so never
+ * call it speculatively. Nothing calls it, and it is untested against the live service.
  */
 export async function reservePrefix(
   { prefix, name, email, lat, lon, altitude = 0 },

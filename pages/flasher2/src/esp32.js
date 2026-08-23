@@ -1,12 +1,5 @@
-// ESP32 device state and transitions — §10.2 discrimination, §10.3 entry,
-// §10.1 flash execution, §10.4 exit.
-//
-// One module because it is one state machine: work out what state the device is
-// in, move it to the state we need, write to it, and put it back. The steps share
-// constants, imports and call order; splitting them would follow the
-// specification's headings rather than anything that changes independently.
-//
-// ESP32 only. The nRF52 equivalents are §11.2-§11.4.
+// ESP32 state and transitions: work out what state the device is in, move it to the one
+// we need, write, and put it back. One module because it is one state machine.
 
 import {
   CLI_BAUD_RATE,
@@ -70,9 +63,8 @@ async function fireLegacyEntryGesture(port) {
     await port.setSignals({ dataTerminalReady: true });
     await port.setSignals({ requestToSend: false });
   } finally {
-    // The device is about to disconnect and re-enumerate under the ROM's identity
-    // — this port object is finished either way, and the poll below needs it
-    // closed rather than still held open.
+    // The device is about to re-enumerate under the ROM identity, so this handle is
+    // finished either way and the poll below needs it closed.
     await closeSerialPortQuietly(port);
   }
 }
@@ -95,11 +87,8 @@ async function waitForRomPort(timeoutMs, alreadyPresent = []) {
   const deadline = Date.now() + timeoutMs;
   do {
     const granted = await listGrantedSerialPorts();
-    // Only a ROM port that appeared *after* the gesture can be the device we just
-    // rebooted. Verified on the bench: with two boards attached, a permanently
-    // stuck xiao_c3 sits on the ROM identity forever, and `getInfo()` exposes no
-    // serial to tell the two apart. Matching any ROM port hands back the wrong
-    // board — and if that board were itself in download mode, it would be flashed.
+    // Only a ROM port that appeared *after* the gesture is the board we rebooted. With
+    // two attached, matching any ROM port hands back the wrong one — and flashes it.
     const rom = granted.find((port) => isRomIdentity(port) && !alreadyPresent.includes(port));
     if (rom) {
       // Settle before use: opening and closing once lets the interface finish
@@ -115,7 +104,7 @@ async function waitForRomPort(timeoutMs, alreadyPresent = []) {
   return null;
 }
 
-// §10.3. Mechanism chosen by observed product id, the other tried on failure, then the
+// Mechanism chosen by observed product id, the other tried on failure, then the
 // manual instruction. Returns the port now in download mode, often not the one passed in.
 export async function enterDownloadMode(port, { manualInstruction, onStatus } = {}) {
   const observedProductId = port.getInfo().usbProductId;
@@ -130,17 +119,14 @@ export async function enterDownloadMode(port, { manualInstruction, onStatus } = 
   async function attemptUsbJtagReset() {
     onStatus?.('Resetting the device into flash mode…');
     const before = await romPortsPresent();
-    // A USB Serial/JTAG device keeps its identity across this reset — measured: the
-    // control-line reset produces no re-enumeration at all — so success means this
-    // same port is now in download mode.
+    // A USB Serial/JTAG device keeps its identity across this reset, so success means
+    // this same port is now in download mode.
     if (await resetIntoDownloadMode(port)) return port;
     return waitForRomPort(ROM_APPEAR_TIMEOUT_MS, before);
   }
 
-  // Observed, not assumed: §10.2 establishes state, and the PID selects only how
-  // to talk to what is there. The app-cooperative gesture does nothing on a
-  // USB Serial/JTAG device, and esptool's reset has no app to cooperate with on
-  // legacy firmware — so each is tried first where it is known to work.
+  // The PID selects only *how* to talk to what is there. Each mechanism is tried first
+  // where it is known to work, since neither works on the other's hardware.
   const mechanisms =
     observedProductId === LEGACY_CDC_PRODUCT_ID
       ? [attemptLegacyGesture, attemptUsbJtagReset]
@@ -150,7 +136,7 @@ export async function enterDownloadMode(port, { manualInstruction, onStatus } = 
     const romPort = await attempt();
     if (!romPort) continue;
 
-    // Affirmative confirmation before handoff — the whole point of §10.3.
+    // Affirmative confirmation before handoff — the whole point of the entry sequence.
     if (await probeEsptoolSync(romPort)) return romPort;
   }
 
@@ -165,10 +151,8 @@ export const ESP32_MODE = {
   UNKNOWN: 'unknown',
 };
 
-// §10.2. Affirmative signals only. CLI first: a running application is the state that must
-// never be misread, and only its silence licenses asking the ROM. Silence from both is a
-// real, verified state — calling it "bootloader" is what erases a live device.
-// Takes a closed port and returns it closed.
+// Affirmative signals only, CLI first: silence from both is a real state, and calling it
+// "bootloader" is what erases a live device. Takes a closed port and returns it closed.
 export async function resolveEsp32Mode(port) {
   await port.open({ baudRate: CLI_BAUD_RATE });
   let version = null;
@@ -204,10 +188,8 @@ export class FlashReadFailedError extends Error {
   }
 }
 
-// §10.4. `hard_reset` does not re-sample the boot strapping pins on these parts, and
-// leaving FORCE_DOWNLOAD_BOOT set — as esptool's `--after watchdog-reset` does — strands
-// the part in download mode. Needs a live session: nothing may re-sync the ROM between
-// the unlock and the re-lock. Never throws; the write it follows already succeeded.
+// Leaving FORCE_DOWNLOAD_BOOT set strands the part in download mode. Needs a live session
+// — nothing may re-sync the ROM between unlock and re-lock — and never throws.
 export async function returnToApplication(session, { onStatus } = {}) {
   onStatus?.('Restarting the device…');
   const registers = WATCHDOG_RESET_REGISTERS[session.chipName];
@@ -224,9 +206,8 @@ export async function returnToApplication(session, { onStatus } = {}) {
       await sleep(POST_WATCHDOG_RESET_WAIT_MS);
       return 'watchdog';
     } catch (error) {
-      // Expected on the way out: the chip can reset mid-sequence and take the bus
-      // with it. Fall through to the weaker reset rather than reporting a failure
-      // that may not be one.
+      // Expected: the chip can reset mid-sequence and take the bus with it. Fall through
+      // rather than report a failure that may not be one.
       console.warn('[esp32] Watchdog chip-reset sequence failed:', error);
     }
   }
@@ -242,17 +223,14 @@ export async function returnToApplication(session, { onStatus } = {}) {
   }
 }
 
-// §10.1. One executor for both ESP32 paths (C3). Takes an open session, like the evidence
-// read and the restore: the restore has to write in the same download-mode session, before
-// the exit, so the caller owns the session and the reset out. `plan.verify.sha256` is the
-// resolver's business (§4.2) — what is verified here is the write, via esptool's MD5
-// against the device's own `flashMd5sum`. `onProgress` is one 0-1 fraction across all files.
+// One executor for both ESP32 paths. The caller owns the session and the reset out, since
+// the restore must write in that same session. What is verified here is the write.
 export async function executeFlashPlan(session, plan, { onProgress, onStatus } = {}) {
   if (plan.engine !== 'esptool') {
     throw new Error(`executeFlashPlan received a '${plan.engine}' plan; esptool only.`);
   }
 
-  // §4.1 names the payload `data` without fixing its type, and esptool needs a
+  // The plan names the payload `data` without fixing its type, and esptool needs a
   // Uint8Array — it reads `.length` and slices. Normalise once, here.
   const files = plan.files.map(({ data, address }) => ({
     data: data instanceof Uint8Array ? data : new Uint8Array(data),
@@ -268,9 +246,8 @@ export async function executeFlashPlan(session, plan, { onProgress, onStatus } =
     running += file.data.length;
   }
 
-  // The full-chip erase runs before esptool's first progress callback and can take
-    // most of a minute, so it is announced up front and the label flips once bytes
-    // start moving.
+  // The full-chip erase runs before esptool's first progress callback and can take most
+  // of a minute, so it is announced up front.
   let erasing = plan.eraseAll;
   onStatus?.(erasing ? 'Erasing the device (this can take up to a minute)…' : 'Writing firmware…');
 
@@ -305,7 +282,7 @@ export async function executeFlashPlan(session, plan, { onProgress, onStatus } =
   };
 }
 
-// §10.5 input 1. A failed read raises: "could not read" and "there is nothing there"
+// A failed read raises: "could not read" and "there is nothing there"
 // license opposite actions. An empty list is the blank-chip answer.
 export async function readPartitionTable(session) {
   let raw;
@@ -322,14 +299,8 @@ export async function readPartitionTable(session) {
 }
 
 /**
- * Names that identify a MeshCore filesystem, and the release each arrived in.
- *
- * Only the first two go back to v1.0.0c; `/com_prefs` came in v1.4.1,
- * `/s_contacts` v1.9.0, `/regions2` v1.10.0 and `/prefs.json` v1.17.0. Dropping
- * the older names would stop recognising older devices — which is precisely the
- * case where the user has the most to lose. Any one of them is enough: a v1.17
- * device flashed fresh may carry only `/identity/_main.id` and `/prefs.json`,
- * while an upgraded one still has the legacy files alongside.
+ * Names that identify a MeshCore filesystem; any one is enough. Only the first two go
+ * back to v1.0.0c, so dropping the old names would stop recognising the oldest devices.
  */
 const MESHCORE_FILE_MARKERS = [
   '/identity/_main.id',
@@ -340,18 +311,16 @@ const MESHCORE_FILE_MARKERS = [
   '/s_contacts',
 ];
 
-// §10.5 input 3. Contents are the evidence, never enumeration (C1). Only the first two
-// markers go back to v1.0.0c, so dropping the older names would stop recognising exactly
-// the devices with most to lose. Empty or unparsable answers no, which is correct.
+// Contents are the evidence, never enumeration. Empty or unparsable answers no, which is
+// correct.
 export function looksLikeMeshCore(files) {
   const bare = (name) => name.replace(/^\/+/, '');
   const present = new Set(files.map((file) => bare(file.name)));
   return MESHCORE_FILE_MARKERS.some((marker) => present.has(bare(marker)));
 }
 
-// §10.5, reading half. Deciding is separate because an explicit user declaration may
-// override the evidence entirely. Both reads are fatal on failure; an *unparsable*
-// filesystem is a different answer and means nothing of ours is here.
+// The reading half; deciding is separate because a user declaration may override it.
+// A failed read is fatal, but an *unparsable* filesystem just means nothing of ours.
 export async function readFlashEvidence(session, plannedPartitions, { onProgress, onStatus, onNotice } = {}) {
   onStatus?.('Checking what is on the device…');
   const partitions = await readPartitionTable(session);
@@ -384,9 +353,8 @@ export async function readFlashEvidence(session, plannedPartitions, { onProgress
   try {
     files = readSpiffsFiles(image);
   } catch (error) {
-    // Unparsable is not unreadable. The bytes came back fine; they are simply not a
-    // filesystem this understands, which answers "nothing of ours here" — the same
-    // answer as another project's install, and it is handled the same way.
+    // Unparsable is not unreadable: the bytes came back fine and simply are not ours,
+    // the same answer as another project's install.
     console.warn('[esp32] Could not parse the filesystem that was read back:', error);
   }
 
@@ -399,8 +367,8 @@ export async function readFlashEvidence(session, plannedPartitions, { onProgress
 
 /** @typedef {'app-slots-only'|'full-layout'} WriteScope */
 
-// §10.5, deciding half. App slots only on positive evidence and nothing less. Not the
-// same question as whether the user's data survives — that is §10.6's restore.
+// The deciding half. App slots only on positive evidence and nothing less. Not the
+// same question as whether the user's data survives — that is the restore.
 export function decideWriteScope(evidence) {
   if (evidence.filesystem.status !== 'ok') {
     return { scope: 'full-layout', reason: 'no filesystem was found on this device' };
@@ -414,10 +382,8 @@ export function decideWriteScope(evidence) {
   return { scope: 'app-slots-only', reason: 'a MeshCore filesystem on a matching layout' };
 }
 
-// §10.6. A raw copy works only if the partition kept its size: every block's lookup magic
-// derives from the image's block count, so the same bytes in a resized partition mount as
-// unformatted and get reformatted away. Never throws — the firmware is already written,
-// and failing the flash over a lost setting would leave an unusable device. ESP32 only (C5).
+// A raw copy works only if the partition kept its size, since block magic derives from
+// the block count. Never throws: the firmware is already written.
 export async function restoreFilesystem(
   session,
   { evidence, plannedPartitions, eraseAll },
@@ -468,9 +434,8 @@ export async function restoreFilesystem(
       return { action: 'skipped', reason: 'the filesystem partition was never disturbed' };
     }
 
-    // The whole partition, never just the used part: after an erase the remaining blocks
-    // carry no lookup magic, so SPIFFS mounts the image as unformatted and reformats it
-    // away. Measured — a 16K prefix cost the bench node its identity.
+    // The whole partition, never just the used part: without magic in the remaining
+    // blocks SPIFFS reformats. Measured — a 16K prefix cost the bench node its identity.
     await writeFilesystemImage(session, target.offset, backup.image, onProgress);
     return { action: 'raw-copy', reason: `copied back ${Math.round(usedBytes / 1024)}K of data` };
   } catch (error) {

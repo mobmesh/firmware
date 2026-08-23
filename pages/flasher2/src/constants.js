@@ -1,20 +1,8 @@
-// The constants register. This file is the list — rewrite_code.md §7 is where most
-// of these came from, not a second copy kept in step with it.
-//
-// §7 exists because a reimplementation reads unexplained numbers as arbitrary and
-// normalises them away. That protection needs one auditable list, and a list that
-// lives beside the code cannot drift from it. Values established during
-// implementation and absent from §7 are tagged here the same way and carry the
-// same weight.
-//
-// Every value carries its provenance at the point of declaration. Values tagged
-// `measured`, `protocol` or `datasheet` are hardware facts and may not be changed
-// without a hardware retest (C0); `matched` needs a stated reason; `design` is a
-// judgement call and is safe to revisit.
+// Every number the tool relies on, each tagged with where it came from. `measured`,
+// `protocol` and `datasheet` are hardware facts and need a retest; `design` is revisitable.
 
-// --- Port lifecycle (§7.2) ---
-// Written into the nRF52 section of the register because that is where they were
-// established, but the port module is shared by all three paths (C4).
+// --- Port lifecycle ---
+// Established on nRF52, but the port module is shared by all three paths.
 
 // `measured`. Waiting for a re-enumerated port to reappear after a reset. nRF52
 // changes USB identity on entering DFU, so this covers a full disconnect cycle.
@@ -38,25 +26,22 @@ export const PORT_PROBE_BAUD_RATE = 115200;
 // itself, so an attempt that never moved a byte is the retryable one.
 export const DFU_FLASH_ATTEMPTS = 3;
 
-// `matched`. Between the erase package and the firmware package on nRF52. GulfCoastMesh
-// measured 3000 ms, and 5000 ms for two RAK boards it names by its own device ids; those
-// ids do not map onto upstream's device names, which change weekly. One value, the slower.
+// `matched`. Between the erase and firmware packages on nRF52. GulfCoastMesh uses 3000 ms,
+// and 5000 ms for two RAK boards it names unmappably — so one value, the slower.
 export const DFU_POST_ERASE_SETTLE_MS = 5000;
 
-// `matched`. The §11.7 exit gesture, from GulfCoastMesh's `resetDeviceAfterDfu` — the
+// `matched`. The nRF52 exit gesture, from GulfCoastMesh's `resetDeviceAfterDfu` — the
 // bootloader watches for the DTR transition. Not our own hardware measurement.
 export const DFU_RESET_DTR_LOW_MS = 50;
 export const DFU_RESET_DTR_HIGH_MS = 100;
 export const DFU_RESET_SETTLE_MS = 300;
 
-// `matched`. Interval between rescans of the granted-port list while waiting for a
-// device to come back after a reset. Matches the existing flasher's bootloader poll
-// interval (§7.1), which is hardware-verified against these boards.
+// `matched`. Rescan interval while waiting for a device to come back after a reset.
+// Matches the shipped flasher's poll, which is hardware-verified against these boards.
 export const PORT_RESCAN_INTERVAL_MS = 500;
 
-// --- MeshCore CLI (§7.1) ---
-// The CLI is the same firmware on both MCU families, so these serve ESP32 and
-// nRF52 alike (§5.4, bootApp's confirmation step).
+// --- MeshCore CLI ---
+// The same firmware on both families, so these serve ESP32 and nRF52 alike.
 
 // `matched`. The CLI's line rate, from the shipped flasher.
 export const CLI_BAUD_RATE = 115200;
@@ -73,13 +58,8 @@ export const CLI_LINE_TERMINATOR = '\r';
 // both its echo of a command and the end of a response line carry this pair.
 export const CLI_LINE_ENDING = '\r\n';
 
-// `measured`. The first command can land while the device is still generating its identity
-// keypair; CLI traffic during that is suspected of corrupting it.
-// Measured on a Heltec v4: a full-erase install answers `ver` 37.4 s after the reset, so
-// 30 s — the shipped flasher's value — lands just inside the keypair generation and times
-// out on a device that is perfectly healthy. This is a single long window on purpose:
-// polling would put CLI traffic on the wire during keygen, which is suspected of
-// corrupting the key.
+// `measured`. A full-erase Heltec v4 answers `ver` 37.4 s after reset, so the shipped
+// flasher's 30 s times out on healthy hardware. One long window, never a poll.
 export const CLI_FIRST_COMMAND_TIMEOUT_MS = 60000;
 
 // `design`. Once the CLI is confirmed up and answering.
@@ -88,26 +68,23 @@ export const CLI_COMMAND_TIMEOUT_MS = 5000;
 // `measured`. Between commands in a sequence.
 export const CLI_INTER_COMMAND_DELAY_MS = 100;
 
-// `design`. Liveness probe only (§10.2 state 1) — a fast no is the point. No measured
+// `design`. Liveness probe only — a fast no is the point. No measured
 // value exists; revisit against hardware.
 export const CLI_PROBE_TIMEOUT_MS = 1500;
 
-// Post-flash reconnect (§10.7). Wait for the device to actually drop off the bus before
-// looking for it again — the handle from the write stays openable for a moment after the
-// reset and reconnecting to it lands on a port that never speaks.
+// Post-flash reconnect. The handle from the write stays openable for a moment after the
+// reset, so wait for the real drop or reconnect lands on a port that never speaks.
 export const PORT_DROP_TIMEOUT_MS = 10000;
 
-// A freshly written node announces its public key once it has finished generating its
-// identity — measured at +33.3 s on a Heltec v4 after a full-erase install, against
-// +0.5 s for the SPIFFS mount error that precedes it. Listening for that costs nothing
-// and puts no CLI traffic on the wire during keygen; the ceiling is only a fallback.
+// A freshly written node announces its public key when its identity is ready — measured
+// at +33.3 s on a Heltec v4. Listening puts nothing on the wire; the ceiling is a fallback.
 export const BOOT_ANNOUNCE_TIMEOUT_MS = 60000;
 export const POST_FLASH_RECONNECT_ATTEMPTS = 20;
 export const POST_FLASH_RECONNECT_DELAY_MS = 500;
 
-// --- esptool / ROM (§7.1) ---
+// --- esptool / ROM ---
 
-// `protocol`. The ROM loader's default line rate. The 2 Mbaud in §7.1 applies
+// `protocol`. The ROM loader's default line rate. The 2 Mbaud figure applies
 // after the stub is up; a passive probe never gets that far.
 export const ESP_ROM_BAUD_RATE = 115200;
 
@@ -123,17 +100,16 @@ export const SYNC_PROBE_TIMEOUT_MS = 3000;
 // them a second attempt asks the same question again.
 export const SYNC_PROBE_ATTEMPTS = 1;
 
-// --- Download-mode entry (§7.1, §10.3) ---
+// --- Download-mode entry ---
 
 // `protocol`. On ≥1.17 a running node shares the ROM's vid:pid, which is why this selects
-// a reset path and never an install decision (C1).
+// a reset path and never an install decision.
 export const ESPRESSIF_VENDOR_ID = 0x303a;
 export const ROM_BOOTLOADER_PRODUCT_ID = 0x1001;
 export const LEGACY_CDC_PRODUCT_ID = 0x0002;
 
-// `measured`. Nordic UF2 bootloader vendor, shared by the application and DFU identities
-// (T1: 239a:8029 running, 239a:0071 in DFU). Family detection has no other signal — a
-// legacy ESP32 behind a USB-UART bridge shows the bridge's vendor, never the MCU's.
+// `measured`. Nordic UF2 vendor, shared by the application and DFU identities (T1:
+// 239a:8029 running, 239a:0071 in DFU). Family detection has no other signal.
 export const NORDIC_UF2_VENDOR_ID = 0x239a;
 
 // `measured`. Between signal transitions in the TinyUSB entry gesture. Both
@@ -155,13 +131,10 @@ export const ENTRY_CONNECT_ATTEMPTS = 7;
 // all — a build that does not speak it never will, so this is a liveness bound, not patience.
 export const COMPANION_REPLY_TIMEOUT_MS = 3000;
 
-// --- Flash writing (§7.1, §10.1) ---
+// --- Flash writing ---
 
-// `protocol`. How much of the spare app slot is blanked to stop the bootloader booting it.
-// The image header carrying the 0xE9 magic sits at the slot's first byte, so one sector is
-// all it takes to make the slot invalid. Blanking the whole partition has the same effect
-// and costs the device 18.6 s to program a 6.5 MB slot — measured on the v4, compressed
-// transfer is free but every byte is still written.
+// `protocol`. The 0xE9 magic sits at the slot's first byte, so one sector invalidates it.
+// Blanking the whole partition achieves the same and cost 18.6 s on a 6.5 MB slot.
 export const APP_SLOT_INVALIDATE_BYTES = 0x1000;
 
 
@@ -177,11 +150,9 @@ export const FLASH_IMAGE_PARAMETER_KEEP = 'keep';
 // 0xFF slot-B buffer costs almost nothing on the wire.
 export const FLASH_WRITE_COMPRESSED = true;
 
-// --- Exit to application (§7.1, §10.4) ---
-// `hard_reset` does not re-sample the boot strapping pins on these parts, so the
-// watchdog path is required rather than preferred. Register addresses are per-chip
-// and `matched` — taken from esptool's own `targets/esp32s3.py` and `esp32c3.py`;
-// the S3 set is undocumented in the TRM. Keyed by esptool's `CHIP_NAME`.
+// --- Exit to application ---
+// `hard_reset` does not re-sample the strapping pins here, so the watchdog path is required.
+// Addresses are `matched`, from esptool's own targets; the S3 set is undocumented in the TRM.
 export const WATCHDOG_RESET_REGISTERS = {
   'ESP32-S3': {
     WDTCONFIG0: 0x60008098,
@@ -198,7 +169,7 @@ export const WATCHDOG_RESET_REGISTERS = {
 };
 
 // `matched`. RTC_CNTL_WDT_WKEY — unlocks WDTCONFIG*, and writing anything else
-// re-locks them. From esptool; §7.1 carries no entry for it.
+// re-locks them. From esptool.
 export const WATCHDOG_WRITE_PROTECT_KEY = 0x50d83aa1;
 
 // `matched`. WDT stage-0 timeout, from esptool's chip targets.
@@ -208,17 +179,15 @@ export const WATCHDOG_TIMEOUT = 2000;
 // + enable. Undocumented in the S3 TRM; from esptool's chip targets.
 export const WATCHDOG_CHIP_RESET_VALUE = 0xd0000102;
 
-// `protocol`. OPTION1 bit 0 is FORCE_DOWNLOAD_BOOT. Measured: leaving it set —
-// which esptool's own `--after watchdog-reset` does — strands an S3 in download
-// mode indefinitely rather than booting the application.
+// `protocol`. OPTION1 bit 0 is FORCE_DOWNLOAD_BOOT. Leaving it set — which esptool's own
+// `--after watchdog-reset` does — strands an S3 in download mode indefinitely.
 export const FORCE_DOWNLOAD_BOOT_MASK = 1;
 
 // `measured`. For the reset to take effect before anything else touches the bus.
 export const POST_WATCHDOG_RESET_WAIT_MS = 500;
 
-// --- Reading flash back (§7.1, §10.5/§10.6) ---
-// One dropped packet mid-read otherwise costs the whole partition, which on a
-// marginal cable is close to a coin flip over a multi-megabyte filesystem.
+// --- Reading flash back ---
+// One dropped packet otherwise costs the whole partition, near a coin flip on a bad cable.
 
 // `matched`. Matches esptool's own read chunk. Larger chunks mean one dropped
 // packet costs more work; smaller ones cost round trips.
@@ -239,15 +208,14 @@ export const PORT_REOPEN_SETTLE_MS = 100;
 // has already succeeded, so a slow or absent registry must never hold up the wizard.
 export const GCM_REGISTRY_TIMEOUT_MS = 3000;
 
-// --- Stock firmware (§9) ---
+// --- Stock firmware ---
 
-// `matched`. Upstream ships one merged image (app + partitions + bootloader) for a wipe
-// and a bare app image for an update; the two go to different addresses. Sourced from
-// flasher.meshcore.io's own flasher, which is what these files are built for.
+// `matched`. Upstream ships a merged image for a wipe and a bare app for an update, at
+// different addresses. From flasher.meshcore.io, which these files are built for.
 export const STOCK_ESP32_MERGED_ADDRESS = 0x0;
 export const STOCK_ESP32_APP_ADDRESS = 0x10000;
 
-// `design`. Stock bytes cross an origin, so they come through our relay (§9.2) rather
+// `design`. Stock bytes cross an origin, so they come through our relay rather
 // than from upstream directly. The manifest does not: CI mirrors it same-origin.
 export const STOCK_RELAY_BASE = 'https://fw.mobmesh.workers.dev/fw/';
 

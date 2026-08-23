@@ -1,7 +1,5 @@
-// esptool-js boundary — §10.1, §10.2 state 2, §10.4.
-//
-// Everything that touches the vendored bundle goes through here, so the rest of
-// the tool never imports it directly and its option-bag shapes stay in one file.
+// esptool-js boundary: the SYNC probe, the flash session, and the exit reset. Everything
+// touching the vendored bundle goes through here, so its option shapes stay in one file.
 
 import {
   ENTRY_CONNECT_ATTEMPTS,
@@ -65,21 +63,13 @@ async function createLoader(port, baudRate) {
   return { loader, transport };
 }
 
-// §10.2 state 2. Passive: `no_reset` makes `constructResetSequence` return an empty list, so
-// no reset is ever issued — a probe that resets the device destroys state 3, the state it
-// exists to identify. `connect` is what opens the port and starts the read loop; calling
-// `sync()` alone reads a stream nobody is pumping. Takes a closed port; a false is only
-// "did not answer".
+// Passive: `no_reset` issues no reset, because a probe that resets destroys the very
+// state it exists to identify. Takes a closed port; false only ever means "did not answer".
 export async function probeEsptoolSync(port) {
   const { loader, transport } = await createLoader(port, ESP_ROM_BAUD_RATE);
   try {
-    // `connect` opens the port and starts the transport's read loop — calling
-    // `sync()` without it reads from a stream nobody is pumping and fails as
-    // "Serial data stream stopped". Let esptool own that plumbing.
-    //
-    // One attempt is enough: each already performs five SYNC exchanges internally,
-    // and with no reset between them a second attempt asks the same question again.
-    // Chip detection is skipped; it belongs to the executor, not to a state probe.
+    // `connect` starts the read loop; `sync()` alone reads a stream nobody is pumping.
+    // One attempt: it already performs five SYNC exchanges, and no reset separates them.
     await Promise.race([
       loader.connect('no_reset', SYNC_PROBE_ATTEMPTS, false),
       timeout(SYNC_PROBE_TIMEOUT_MS, 'SYNC probe timed out'),
@@ -87,14 +77,14 @@ export async function probeEsptoolSync(port) {
     return true;
   } catch {
     // Any failure is a "no". The caller distinguishes states, not this function —
-    // and a silent device is never reported as a bootloader (§10.2).
+    // and a silent device is never reported as a bootloader.
     return false;
   } finally {
     await transport.disconnect().catch(() => {});
   }
 }
 
-// §10.3, `0x1001`. `default_reset` makes esptool pick `USBJTAGSerialReset` — hardware-driven,
+// `0x1001`. `default_reset` makes esptool pick `USBJTAGSerialReset` — hardware-driven,
 // needs no cooperating app, recovers a hung device. Resets by design, unlike the probe.
 export async function resetIntoDownloadMode(port) {
   const { loader, transport } = await createLoader(port, ESP_ROM_BAUD_RATE);
@@ -108,9 +98,8 @@ export async function resetIntoDownloadMode(port) {
   }
 }
 
-// §10.1. One session covers the flash and the §10.4 exit that follows: the exit's register
-// sequence fails if anything re-syncs the ROM partway. `default_reset` rather than `no_reset`
-// is the donor's proven path. Takes a closed port; always pair with `closeEsptoolSession`.
+// One session covers the flash and the exit reset: the exit's register sequence fails if
+// anything re-syncs the ROM partway. Always pair with `closeEsptoolSession`.
 export async function openEsptoolSession(port) {
   const { loader, transport } = await createLoader(port, ESPTOOL_BAUD_RATE);
   try {
@@ -140,10 +129,8 @@ export async function writeFlashFiles(session, { files, eraseAll, onProgress }) 
     flashSize: FLASH_IMAGE_PARAMETER_KEEP,
     compress: FLASH_WRITE_COMPRESSED,
     eraseAll,
-    // esptool only verifies what it wrote if the caller supplies this, and it
-    // compares the result against the device's own `flashMd5sum` of the same
-    // region. Omitting it — or stubbing it to "" as the GulfCoastMesh donor does
-    // (§12.3) — means firmware is written and nothing checks it landed.
+    // esptool verifies the write only if this is supplied, against the device's own
+    // `flashMd5sum`. Omitting it means firmware is written and nothing checks it landed.
     calculateMD5Hash: md5Hex,
     reportProgress: onProgress,
   });
@@ -166,9 +153,8 @@ async function reopenEsptoolTransport(session) {
   transport.flushInput?.();
 }
 
-// Retries a chunk, then reopens the port behind it; recovery resumes at the failed chunk.
-// Exhausting the reopens rethrows: a partial read must never pass as complete, because
-// §10.5 reads the result as evidence. `onNotice` surfaces retries, which look like a hang.
+// Retries a chunk, then reopens the port behind it. Exhausting the reopens rethrows: the
+// erase decision reads this as evidence, so a partial read must never pass as complete.
 export async function readFlashChunked(session, offset, size, { onProgress, onNotice } = {}) {
   const out = new Uint8Array(size);
   let done = 0;
@@ -216,23 +202,19 @@ export async function readFlashChunked(session, offset, size, { onProgress, onNo
   return out;
 }
 
-// Addresses and values are device knowledge and live in §10.4; only the call shape is here.
+// Addresses and values are device knowledge and live in the ESP32 module; only the call shape is here.
 export async function writeEsptoolRegister(session, address, value, mask = 0xffffffff) {
   await session.loader.writeReg(address, value, mask);
 }
 
-/** esptool's own RTS/DTR reset. The §10.4 fallback for a chip with no known WDT registers. */
+/** esptool's own RTS/DTR reset. The fallback for a chip with no known WDT registers. */
 export async function hardResetDevice(session) {
   await session.loader.after('hard_reset');
 }
 
 // --- MD5 ------------------------------------------------------------------
-//
-// Kept here rather than in its own module: it exists solely because esptool-js's
-// `writeFlash` takes a *synchronous* hash callback and verifies nothing without
-// one. Web Crypto offers no MD5 and is async either way, so there is nothing to
-// delegate to. RFC 1321; checked against a reference implementation over the empty
-// string, the RFC's own vectors, every padding boundary and 200 random buffers.
+// Here because `writeFlash` takes a *synchronous* hash callback and Web Crypto offers no
+// MD5. RFC 1321, checked against the RFC vectors, every padding boundary and 200 buffers.
 
 // prettier-ignore
 const MD5_SHIFTS = [
