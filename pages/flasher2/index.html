@@ -11,6 +11,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../shared/style.css" />
+  <!-- Vendored once, in region-map. The relative path survives cutover, which renames
+       flasher2 to flasher and leaves region-map where it is. -->
+  <link rel="stylesheet" href="../region-map/vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="flasher2.css" />
 </head>
 <body>
@@ -41,11 +44,18 @@
 
     <footer class="page-footer">
       <p>
+        This flasher is custom built for
+        <a href="https://github.com/mobmesh/firmware" target="_blank" rel="noopener">mobmesh/firmware</a>
+        flashing.<br />
         Requires a Chromium-based browser (Chrome, Edge, Opera) with Web Serial support.
       </p>
+      <!-- Filled by the staleness check against build-stamp.json, which CI writes into
+           pages/flasher. Stays empty until cutover puts this page at that path. -->
+      <p class="build-info" id="build-info"></p>
     </footer>
   </div>
 
+  <script src="../region-map/vendor/leaflet/leaflet.js"></script>
   <script type="module" src="src/ui.js"></script>
 </body>
 </html>

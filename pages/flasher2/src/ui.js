@@ -4,6 +4,7 @@
 // wireframe.js is kept beside it as the workflow test reference and shares nothing.
 
 import * as flowApi from './flow.js';
+import { findAvailablePrefix, generateIdentityKeypair, extractPrefix } from './gcm-reg.js';
 import { PortSelectionRequiredError, promptForSerialPort } from './serial-port.js';
 
 const elements = {
@@ -12,6 +13,9 @@ const elements = {
 };
 
 let flow = null;
+// An nRF52 needs a second grant: it re-enumerates into DFU under a different USB id, so
+// the picker legitimately reappears. Unlabelled, that reads as the first click failing.
+let checkpoints = 0;
 
 // Named by flow.js so the step definitions carry no markup. Stroke icons at 24px,
 // matching the header badge already in the shared sheet.
@@ -33,6 +37,23 @@ const ICONS = {
     '<path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
   upload:
     '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+  // Roles. Upstream ships no artwork for these, so they are drawn here.
+  repeater:
+    '<circle cx="12" cy="5.5" r="1.75"/><path d="M12 7.5V22"/><path d="m8.5 22 3.5-8 3.5 8"/>' +
+    '<path d="M7.9 2.4a7.5 7.5 0 0 0 0 9.2"/><path d="M16.1 2.4a7.5 7.5 0 0 1 0 9.2"/>',
+  roomServer:
+    '<path d="M21 14.5a2 2 0 0 1-2 2H8l-4 4V5.5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z"/>' +
+    '<path d="M8 8.5h8M8 12h5"/>',
+  // KISS is a bare packet-radio modem: no node identity, just framed data on the air.
+  kissRadio: '<path d="M2 12h3.2l2.4-7 3.9 14 2.9-10 2.3 3H22"/>',
+  companionBle: '<path d="m7.5 7.5 9 9-4.5 4.5V3l4.5 4.5-9 9"/>',
+  companionUsb:
+    '<path d="M12 22v-6"/><path d="M9.5 8V2M14.5 8V2"/><path d="M7 8h10v4.5a5 5 0 0 1-10 0Z"/>',
+  gui:
+    '<rect x="2.5" y="3.5" width="19" height="13" rx="2"/><path d="M9 20.5h6"/><path d="M12 16.5v4"/>',
+  guiSD:
+    '<path d="M16.5 2.5H8.5l-4 4v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-15a2 2 0 0 0-2-2Z"/>' +
+    '<path d="M9.5 6.5v2.5M12 5.5v4M14.5 5.5v4"/>',
   device:
     '<rect x="4" y="4" width="16" height="16" rx="2.5"/><rect x="9" y="9" width="6" height="6" rx="1"/>' +
     '<path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>',
@@ -76,7 +97,8 @@ function frame({ title, desc, centred = false }) {
   body.className = `step-body${centred ? ' is-centred' : ''}`;
   body.replaceChildren();
   foot.replaceChildren();
-  return { body, foot };
+  step.querySelector('.step-head').classList.remove('is-centred');
+  return { body, foot, head: step.querySelector('.step-head') };
 }
 
 // The shared sheet's .card::before reads this. Driving it from the step index beats
@@ -85,6 +107,11 @@ function setProgress() {
   const steps = flowApi.applicableSteps(flow);
   const pct = (flow.stepIndex / Math.max(steps.length - 1, 1)) * 100;
   elements.wizard.style.setProperty('--step-progress', `${Math.max(pct, 8)}%`);
+}
+
+/** A step's title or desc may be a function of the flow, for copy that names a choice. */
+function text(value) {
+  return typeof value === 'function' ? value(flow) : value;
 }
 
 function syncBack() {
@@ -123,7 +150,7 @@ function renderChoice(step, options) {
   // `layout` is the step's own declaration; `choice` is the default card pair.
   const layout = step.layout ?? 'choice';
   const centred = layout === 'choice';
-  const { body } = frame({ title: step.title, desc: step.desc, centred });
+  const { body } = frame({ title: text(step.title), desc: text(step.desc), centred });
   const list = document.createElement('div');
 
   if (layout === 'board') {
@@ -146,11 +173,15 @@ function renderChoice(step, options) {
       name.textContent = option.label;
       cell.append(tileArt(option.image), name);
     } else if (layout === 'row') {
-      cell.className = option.image ? 'tile tile-with-icon' : 'tile';
+      // Either a real picture (the custom path's PNGs) or a named glyph, never both.
+      const art = option.image
+        ? `<img class="tile-icon" src="${option.image}" alt="" />`
+        : option.icon
+          ? `<span class="tile-icon is-glyph">${icon(option.icon, 26)}</span>`
+          : '';
+      cell.className = art ? 'tile tile-with-icon' : 'tile';
       cell.innerHTML =
-        (option.image ? `<img class="tile-icon" src="${option.image}" alt="" />` : '') +
-        `<strong>${option.label}</strong>` +
-        (option.note ? `<small>${option.note}</small>` : '');
+        art + `<strong>${option.label}</strong>` + (option.note ? `<small>${option.note}</small>` : '');
     } else {
       cell.className = 'choice';
       cell.innerHTML =
@@ -175,7 +206,7 @@ async function renderAction(step) {
   // The write gets the shipped flasher's screen: a real progress bar, the board's own
   // picture floating above the status line. Everything else is a spinner.
   const writing = step.id === 'flash';
-  const { body } = frame({ title: step.title, desc: step.desc, centred: !writing });
+  const { body } = frame({ title: text(step.title), desc: text(step.desc), centred: !writing });
   const status = document.createElement('p');
   status.className = 'status-text';
   let fill = null;
@@ -226,7 +257,8 @@ async function renderAction(step) {
 // escalation has to become a button here. Reuses the step's own title and helper
 // text: the checkpoint is the same screen waiting on a click, not a new one.
 function renderCheckpoint(error, step) {
-  const { body } = frame({ title: step.title, desc: step.desc, centred: true });
+  checkpoints += 1;
+  const { body } = frame({ title: text(step.title), desc: text(step.desc), centred: true });
   const art = document.createElement('div');
   art.className = 'connect-art';
   art.innerHTML = icon('device', 56);
@@ -238,7 +270,7 @@ function renderCheckpoint(error, step) {
   const pick = document.createElement('button');
   pick.type = 'button';
   pick.className = 'btn btn-primary';
-  pick.textContent = 'Select device';
+  pick.textContent = checkpoints > 1 ? 'Reconnect' : 'Select device';
   pick.addEventListener('click', async () => {
     try {
       flow.state.port = await promptForSerialPort();
@@ -270,6 +302,169 @@ function renderError(error, retry) {
   foot.append(actions);
 }
 
+
+// --- location (GCM's node-config screen) --------------------------------------------
+
+// region-map's own basemap: already dark, already attributed, already vendored.
+const MAP_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const MAP_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
+  '&copy; <a href="https://carto.com/attributions">CARTO</a>';
+const MAP_HOME = [30.2, -89.0];
+const MAP_HOME_ZOOM = 6;
+
+/**
+ * Mines a keypair the registry will accept, then reports it. Read-only against the
+ * registry: `reservePrefix` creates a real public record and is never called from here.
+ * A registry that does not answer is not an error — the node is flashed unregistered.
+ */
+async function resolveIdentity(onStatus) {
+  onStatus('Generating a node identity…');
+  const found = await findAvailablePrefix(generateIdentityKeypair, {
+    onProgress: (attempt, total) =>
+      attempt > 1 && onStatus(`Prefix taken — trying another (${attempt} of ${total})…`),
+  });
+  if (found) return { identity: found.keypair, status: 'available' };
+
+  // Either every attempt collided or the registry is unreachable; keep the key either way.
+  const identity = await generateIdentityKeypair();
+  return { identity, status: 'unchecked' };
+}
+
+function renderLocation(step) {
+  const { body, foot, head } = frame({ title: text(step.title), desc: text(step.desc) });
+  head.classList.add('is-centred');
+  const s = flow.state;
+  const draft = {
+    name: s.nodeName || '',
+    latitude: s.latitude,
+    longitude: s.longitude,
+    heightFt: s.heightFt || '',
+    email: s.email || '',
+    adminPassword: s.adminPassword || '',
+    identity: s.identity,
+    identityStatus: s.identityStatus,
+  };
+
+  const roleName = flowApi.selectedRoleName(flow) ?? 'Repeater';
+  const noun = roleName.toLowerCase();
+  const form = document.createElement('div');
+  form.className = 'location-form';
+  form.innerHTML =
+    `<input type="text" class="field" id="node-name" placeholder="${roleName} name" maxlength="31" />` +
+    '<div class="map-wrap">' +
+    '<div class="map-frame" id="map"></div>' +
+    '<span class="map-hint">Drag to pan · scroll or +/\u2212 to zoom · click to place</span>' +
+    `<div class="map-empty" id="map-empty">Click map to pin ${noun} location</div>` +
+    '</div>' +
+    '<div class="coord-row" id="coords" hidden>' +
+    '<label class="coord">Latitude<input type="number" step="0.000001" class="field" id="lat" /></label>' +
+    '<label class="coord">Longitude<input type="number" step="0.000001" class="field" id="lon" /></label>' +
+    '</div>' +
+    '<div class="field-row">' +
+    '<input type="number" class="field" id="height" placeholder="Height (ft)" />' +
+    '<input type="email" class="field" id="email" placeholder="Contact email" required />' +
+    '</div>' +
+    // Deliberately not a password field: this is a value being *set* on a device, not a
+    // credential being recalled. A masked typo here is only discovered on the next login.
+    `<input type="text" class="field" id="admin-password" placeholder="Admin password" ` +
+    `autocomplete="off" spellcheck="false" />` +
+    `<p class="field-note">Set your ${noun}\u2019s admin password</p>`;
+  body.append(form);
+
+  const nameField = form.querySelector('#node-name');
+  const latField = form.querySelector('#lat');
+  const lonField = form.querySelector('#lon');
+  // A status, not a field: it lives in the footer so the map cannot push it below the fold.
+  for (const [id, key] of [['#height', 'heightFt'], ['#email', 'email'], ['#admin-password', 'adminPassword']]) {
+    const field = form.querySelector(id);
+    field.value = draft[key];
+    field.addEventListener('input', () => { draft[key] = field.value; });
+  }
+
+  const coordRow = form.querySelector('#coords');
+  const emptyNote = form.querySelector('#map-empty');
+  const identityLine = document.createElement('p');
+  identityLine.className = 'identity-line';
+  identityLine.textContent = 'Generating a node identity…';
+  foot.append(identityLine);
+  nameField.value = draft.name;
+
+  // 31 usable bytes, counted encoded — an emoji is four, so characters would overcount.
+  const encoder = new TextEncoder();
+  nameField.addEventListener('input', () => {
+    while (encoder.encode(nameField.value).length > 31) {
+      nameField.value = [...nameField.value].slice(0, -1).join('');
+    }
+    draft.name = nameField.value;
+  });
+
+  const map = L.map(form.querySelector('#map'), { zoomControl: true, attributionControl: true })
+    .setView(draft.latitude != null ? [draft.latitude, draft.longitude] : MAP_HOME,
+             draft.latitude != null ? 13 : MAP_HOME_ZOOM);
+  L.tileLayer(MAP_TILES, { maxZoom: 20, subdomains: 'abcd', attribution: MAP_ATTRIBUTION }).addTo(map);
+  let pin = null;
+
+  function setPoint(lat, lon, recentre) {
+    draft.latitude = Number(lat.toFixed(6));
+    draft.longitude = Number(lon.toFixed(6));
+    latField.value = draft.latitude;
+    lonField.value = draft.longitude;
+    if (pin) pin.setLatLng([draft.latitude, draft.longitude]);
+    else {
+      pin = L.marker([draft.latitude, draft.longitude], { draggable: true }).addTo(map);
+      pin.on('dragend', () => { const p = pin.getLatLng(); setPoint(p.lat, p.lng, false); });
+    }
+    if (recentre) map.setView([draft.latitude, draft.longitude], Math.max(map.getZoom(), 13));
+    // Coordinates appear only once there is something to show, as GCM's does.
+    coordRow.hidden = false;
+    emptyNote.hidden = true;
+  }
+
+  if (draft.latitude != null) setPoint(draft.latitude, draft.longitude, false);
+  map.on('click', (event) => setPoint(event.latlng.lat, event.latlng.lng, false));
+  // Leaflet measures the container on creation; inside a step that was just built it is
+  // still zero-height, so the tiles come back as a grey box without this.
+  setTimeout(() => map.invalidateSize(), 0);
+
+  const readCoords = () => {
+    const lat = Number.parseFloat(latField.value);
+    const lon = Number.parseFloat(lonField.value);
+    // ±90 / ±180; the firmware refuses anything outside and there is no reason to send it.
+    if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+      setPoint(lat, lon, true);
+    }
+  };
+  latField.addEventListener('change', readCoords);
+  lonField.addEventListener('change', readCoords);
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.className = 'btn btn-primary';
+  next.textContent = 'Continue';
+  next.addEventListener('click', async () => {
+    await step.apply(flow, draft);
+    advance();
+  });
+  actions.append(next);
+  foot.append(actions);
+
+  if (draft.identity) {
+    identityLine.textContent = `Node identity ${draft.identity.prefix} — ${draft.identityStatus}`;
+  } else {
+    resolveIdentity((message) => { identityLine.textContent = message; }).then((result) => {
+      draft.identity = result.identity;
+      draft.identityStatus = result.status;
+      identityLine.textContent =
+        result.status === 'available'
+          ? `Node identity ${result.identity.prefix} — available on the GulfCoastMesh registry`
+          : `Node identity ${extractPrefix(result.identity.publicKeyHex)} — registry not checked`;
+    });
+  }
+}
+
 // --- driver -----------------------------------------------------------------------------
 
 async function render() {
@@ -279,6 +474,7 @@ async function render() {
   if (!step) return;
 
   if (step.kind === 'action') return renderAction(step);
+  if (step.kind === 'location') return renderLocation(step);
 
   if (step.kind === 'choice') {
     let options;
@@ -291,7 +487,7 @@ async function render() {
   }
 
   // Everything past the binary choice is still the wireframe's job.
-  frame({ title: step.title, desc: `This step has no interface yet (${step.kind}).`, centred: true });
+  frame({ title: text(step.title), desc: `This step has no interface yet (${step.kind}).`, centred: true });
 }
 
 elements.back.addEventListener('click', () => {
@@ -299,10 +495,43 @@ elements.back.addEventListener('click', () => {
   render();
 });
 
+const params = new URLSearchParams(location.search);
+
 flow = flowApi.createFlow({
   manifestBase: '/pages/flasher/',
-  relayBase: new URLSearchParams(location.search).get('relay') ?? undefined,
+  relayBase: params.get('relay') ?? undefined,
 });
+
+/**
+ * `?step=location` jumps straight to a step for design work, skipping connect and arm.
+ * Any selection the target needs can be overridden alongside it, e.g.
+ * `?step=device&family=nrf52&source=stock&maker=heltec`.
+ *
+ * A development shortcut: it leaves `state.port` null, so anything past the last
+ * selection step cannot run. Gate or remove it at cutover.
+ */
+function applyStepShortcut() {
+  const wanted = params.get('step');
+  if (!wanted) return false;
+
+  const s = flow.state;
+  s.family = params.get('family') ?? 'esp32';
+  s.install = params.get('install') ?? flowApi.INSTALL.NEW;
+  s.usage = params.get('usage') ?? flowApi.USAGE.INFRASTRUCTURE;
+  s.source = params.get('source') ?? flowApi.SOURCE.ENHANCED;
+  // The node-config step only applies to a repeater or room server, so the shortcut has
+  // to carry a role or that target would not be in the step list at all.
+  s.variantKey = params.get('variant') ?? 'repeater';
+  if (params.get('maker')) s.maker = params.get('maker');
+  if (params.get('device')) s.deviceName = params.get('device');
+
+  const index = flowApi.applicableSteps(flow).findIndex((step) => step.id === wanted);
+  if (index < 0) return false;
+  flow.stepIndex = index;
+  return true;
+}
+
+applyStepShortcut();
 render();
 
 // Exposed so a rig script can render a step without clicking, as wireframe.js does.

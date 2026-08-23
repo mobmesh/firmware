@@ -31,6 +31,40 @@ const ROLE_USAGE = {
   guiSD: USAGE.CLIENT,
 };
 
+// Glyph names, resolved by the renderer. Upstream ships no role artwork, unlike the
+// custom path, which has its own PNGs.
+const ROLE_ICONS = {
+  repeater: 'repeater',
+  roomServer: 'roomServer',
+  kissRadio: 'kissRadio',
+  companionBle: 'companionBle',
+  companionUsb: 'companionUsb',
+  gui: 'gui',
+  guiSD: 'guiSD',
+};
+
+// Only these two carry a name, a position and a registry identity. A companion is
+// configured from the phone app, and a KISS modem has no node identity at all.
+const LOCATION_ROLES = new Set(['repeater', 'roomServer', 'room_server']);
+
+/** The role key chosen for either source, or null when none has been picked yet. */
+function selectedRole(flow) {
+  const s = flow.state;
+  if (s.source === SOURCE.ENHANCED) return s.variantKey ?? null;
+  if (s.source === SOURCE.STOCK && s.firmwareIndex != null) {
+    return selectedStockDevice(flow)?.firmware[s.firmwareIndex]?.role ?? null;
+  }
+  return null;
+}
+
+/** Display name for the chosen role, for copy that names it. Null when none applies. */
+export function selectedRoleName(flow) {
+  const role = selectedRole(flow);
+  if (role === 'repeater') return 'Repeater';
+  if (role === 'roomServer' || role === 'room_server') return 'Room Server';
+  return null;
+}
+
 /** Unknown roles are shown rather than hidden — a vanished option is a worse failure. */
 function matchesUsage(role, usage) {
   const bucket = ROLE_USAGE[role];
@@ -82,7 +116,19 @@ export function createFlow({
       firmwareIndex: null,
       version: null,
       file: null,
-      region: null,
+      // Baseline node settings gathered before the write; nothing sends them yet.
+      nodeName: '',
+      latitude: null,
+      longitude: null,
+      // Collected on the node-config step. Nothing sends them yet: height and email feed
+      // the MeshBuddy reservation, which is deliberately never called, and the admin
+      // password is baseline config (§10.7), still unscripted.
+      heightFt: '',
+      email: '',
+      adminPassword: '',
+      // { privateKeyHex, publicKeyHex, prefix } — generated here, never transmitted.
+      identity: null,
+      identityStatus: null,
       customManifest: null,
       stockManifest: null,
       plan: null,
@@ -372,12 +418,14 @@ export const STEPS = [
         if (device.type === flow.state.family) makers.add(device.maker ?? 'Other');
       }
       return [...makers]
-        .sort()
         .map((maker) => ({
           value: maker,
           label: manifest.makers[maker]?.name ?? maker,
           image: null,
-        }));
+        }))
+        // By display name, not key: sorting keys put the one capitalised key, `Ikoka`,
+        // ahead of every lowercase one.
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
     },
     apply: (flow, value) => {
       flow.state.maker = value;
@@ -461,6 +509,7 @@ export const STEPS = [
             value: index,
             label: known?.subTitle && !entry.title ? `${name} — ${known.subTitle}` : name,
             note: known?.tooltip ?? null,
+            icon: ROLE_ICONS[entry.role] ?? null,
           };
         });
     },
@@ -502,16 +551,25 @@ export const STEPS = [
   },
 
   {
-    id: 'region',
-    title: 'Operating region',
-    kind: 'choice',
-    applies: () => true,
-    // §10.7 has no role → command table and boards.json carries no region parameters, so
-    // there is nothing to offer yet. The step is here because the flow needs the slot.
-    unspecified: true,
-    options: () => [{ value: null, label: 'Not specified yet — §10.7 has no command table' }],
-    apply: (flow, value) => {
-      flow.state.region = value;
+    id: 'location',
+    // By this point the role is known, so the screen names it. Falls back to Repeater
+    // rather than a generic word: they are the overwhelming majority of this path.
+    title: (flow) => `${selectedRoleName(flow) ?? 'Repeater'} config`,
+    desc: (flow) =>
+      `These are basic settings for your ${(selectedRoleName(flow) ?? 'Repeater').toLowerCase()}.`,
+    // The renderer owns this one: a map and three fields are not a list of options.
+    kind: 'location',
+    applies: (flow) => LOCATION_ROLES.has(selectedRole(flow)),
+    apply: (flow, { name, latitude, longitude, heightFt, email, adminPassword, identity, identityStatus }) => {
+      const s = flow.state;
+      s.nodeName = name ?? '';
+      s.latitude = latitude ?? null;
+      s.longitude = longitude ?? null;
+      s.heightFt = heightFt ?? '';
+      s.email = email ?? '';
+      s.adminPassword = adminPassword ?? '';
+      s.identity = identity ?? null;
+      s.identityStatus = identityStatus ?? null;
     },
   },
 
@@ -609,7 +667,7 @@ export function advance(flow) {
 // Every selection step. Adding a step without listing it here silently breaks Back on
 // both that step and the one after it, which is how `usage` lost it.
 const REVERSIBLE = new Set([
-  'install', 'usage', 'source', 'maker', 'device', 'role', 'version', 'file', 'region',
+  'install', 'usage', 'source', 'maker', 'device', 'role', 'version', 'file', 'location',
 ]);
 
 export function canGoBack(flow) {

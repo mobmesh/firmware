@@ -4,10 +4,11 @@
    so nothing here may redefine a shared token. */
 
 :root {
-  /* One place to resize the cell. Height is set by the worst-case step, not by
-     the current one: 15 roles, 15 devices for one maker, 11 makers, 10 versions. */
-  --cell-w: 640px;
-  --cell-h: 600px;
+  /* A floor, not a ceiling -- GCM's own `min-h-[600px]`. Short steps are padded out to
+     it so the panel never shrinks; long ones grow past it rather than scrolling. */
+  /* GCM's max-w-2xl is 672px on the panel itself; .wrap's 20px sides sit outside it. */
+  --cell-w: 712px;
+  --cell-min-h: 600px;
 
   /* GCM sets headings in Space Grotesk (`font-display`) and body in Inter. The
      shared sheet only ever loaded Inter, so headings were the wrong face. */
@@ -53,18 +54,15 @@
   width: clamp(320px, 90%, var(--cell-w));
 }
 
-/* Fixed geometry. .card supplies the surface; this pins the size so no step can
-   move it, and hands the overflow to .step-body instead. */
+/* .card supplies the surface; this sets the floor. The panel grows with its content. */
 .cell {
-  height: var(--cell-h);
-  min-height: 0;
-  padding: 2rem;
+  min-height: var(--cell-min-h);
+  padding: 3rem;
 }
 
 .step {
   display: flex;
   flex-direction: column;
-  height: 100%;
   min-height: 0;
 }
 
@@ -88,20 +86,19 @@
   padding-top: 0;
 }
 
-/* The only scrolling region in the page. Long option lists live here. */
+/* .card is a flex column, so the step is a flex child. `height: 100%` resolved against
+   the old fixed height; with a min-height it collapses to auto and the body's `flex: 1`
+   has nothing to expand into, dropping every centred step to the top of the card. */
+.step {
+  flex: 1;
+}
+
+/* Grows with its content; the page scrolls, not the panel. */
 .step-body {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 0.25rem 0.25rem 0.5rem;
+  padding: 0.25rem;
   margin: 0 -0.25rem;
-}
-
-.step-body::-webkit-scrollbar { width: 8px; }
-.step-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-full);
 }
 
 .step-foot {
@@ -218,6 +215,14 @@
   margin-top: 0.2rem;
 }
 
+/* The shared .tile-icon is sized for an <img>; a glyph has to be centred in it. */
+.tile-icon.is-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
 .board-tiles[data-source="stock"] img.board-tile-icon {
   opacity: 0.5;
 }
@@ -231,6 +236,160 @@
   color: var(--accent);
   opacity: 0.5;
 }
+
+/* ---- Location step ---- */
+
+/* GCM centres this screen's heading; every other step stays left-aligned. */
+.step-head.is-centred {
+  text-align: center;
+}
+
+.map-wrap {
+  position: relative;
+}
+
+/* GCM's h-64. Leaflet needs a measured height or it renders a grey box. */
+.map-frame {
+  height: 256px;
+}
+
+/* Overlay chips, borrowed from GCM: the map explains itself rather than relying on a
+   caption underneath it. */
+.map-hint,
+.map-empty {
+  position: absolute;
+  pointer-events: none;
+  z-index: 500;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.map-hint {
+  right: 0.75rem;
+  bottom: 2rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: var(--radius-full);
+  background: rgba(6, 18, 31, 0.9);
+  color: var(--fg-muted);
+  font-size: 0.56rem;
+  letter-spacing: 0.16em;
+}
+
+.map-empty {
+  inset: 0;
+  transition: opacity 0.18s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-shadow: 0 1px 6px rgba(3, 8, 15, 0.9);
+}
+
+/* Uncovers the map the moment the pointer is over it — by then the instruction has
+   been read and it is only in the way of the place being aimed at. */
+.map-wrap:hover .map-empty {
+  opacity: 0;
+}
+
+.map-empty[hidden] { display: none; }
+
+.location-form {
+  display: flex;
+  flex-direction: column;
+  /* GCM's space-y-5. */
+  gap: 1.25rem;
+}
+
+/* The shared sheet gives .field a 24px bottom margin, which flex `gap` does not collapse
+   -- every field was separated by 37.6px. The gap owns spacing in this form. */
+.location-form .field {
+  margin-bottom: 0;
+}
+
+.map-frame {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-1);
+}
+
+/* `display: grid` outranks the UA's [hidden] rule, so it needs saying explicitly. */
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.coord-row[hidden] {
+  display: none;
+}
+
+.coord-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.coord {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.coord .field {
+  margin-top: 0.35rem;
+  font-family: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+  font-size: 0.9rem;
+}
+
+.step-foot:has(.identity-line) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.step-foot:has(.identity-line) .actions { margin-top: 0; }
+
+/* Sits directly under its field: the negative margin cancels .location-form's gap.
+   Same face and size as .identity-line -- at equal px, Inter reads larger than mono. */
+.field-note {
+  margin: -1rem 0 0;
+  color: var(--fg-muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.identity-line {
+  margin: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--fg-muted);
+}
+
+/* Leaflet paints its own light chrome; pull it back to the sheet's palette. */
+.map-frame .leaflet-container { background: var(--bg-1); }
+.map-frame .leaflet-control-attribution {
+  background: rgba(6, 18, 31, 0.7);
+  color: var(--fg-muted);
+  font-size: 0.62rem;
+}
+.map-frame .leaflet-control-attribution a { color: var(--accent); }
+.map-frame .leaflet-bar a {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border-color: var(--line);
+}
+.map-frame .leaflet-bar a:hover { background: var(--bg-1); color: var(--accent); }
 
 /* ---- Anchored back navigation ---- */
 
@@ -285,5 +444,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation: none; }
+  .map-empty { transition: none; }
   .choice { transition: none; }
 }
