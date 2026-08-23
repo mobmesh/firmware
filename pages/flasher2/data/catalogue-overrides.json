@@ -1,8 +1,25 @@
 {
-  "_note": "Corrections layered over upstream's mc-config.json. Every field is optional; absent means keep upstream. Makers key on the maker slug, devices on the exact device name. Icon and image paths resolve against this file.",
+  "_note": "Corrections layered over upstream's mc-config.json. Every field is optional; absent means keep upstream. Makers key on the maker slug, devices on the exact device name. Icon and image paths resolve against this file. Run scripts/check-catalogue-overrides.py after editing.",
+
+  "_fields": [
+    "field   | scope   | effect",
+    "--------|---------|-------------------------------------------------------------",
+    "name    | makers  | display name, overrides upstream's",
+    "icon    | makers  | logo; upstream ships none, so absent means the chip glyph",
+    "label   | devices | display name; the flow still keys on upstream's device name",
+    "image   | devices | artwork, overrides the picture upstream hides in its tooltip",
+    "filter  | both    | invert | white | black — works with or without our own image",
+    "dim     | both    | false exempts the art from the 0.5 dimming stock tiles get",
+    "plate   | both    | false drops the tile gradient and border behind the art",
+    "hidden  | devices | true drops the device from the catalogue entirely",
+    "",
+    "filter: white is brightness(0) invert(1), so it flattens the whole image —",
+    "good for a logo with transparency, wrong for a photo with a light backdrop."
+  ],
 
   "makers": {
     "gat-iot": { "name": "GAT-IoT" },
+    "heltec": { "icon": "icons/heltec.png", "filter": "white", "dim": false },
     "Ikoka": { "name": "Ikoka" },
     "keepteen": { "name": "Keepteen" },
     "muziworks": { "name": "MuziWorks" },

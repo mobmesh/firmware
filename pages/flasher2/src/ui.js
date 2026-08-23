@@ -154,15 +154,28 @@ function placeholderArt() {
 
 // Upstream's SPA host answers 200 with index.html for a file it does not have, so a
 // missing image only ever announces itself by failing to decode — never by status.
-function tileArt(image) {
+function tileArt(image, filter, dim = true, plate = true) {
   if (!image) return placeholderArt();
   const picture = document.createElement('img');
-  picture.className = 'board-tile-icon';
   picture.src = image;
   picture.alt = '';
   picture.loading = 'lazy';
-  picture.addEventListener('error', () => picture.replaceWith(placeholderArt()));
-  return picture;
+
+  // A filter applies to the whole element, background and border included, so filtered
+  // art hands the plate to a wrapper the filter cannot reach.
+  const slot = filter ? document.createElement('span') : picture;
+  if (filter) {
+    slot.className = 'board-tile-icon is-framed';
+    picture.style.filter = filter;
+    slot.append(picture);
+  } else {
+    slot.className = 'board-tile-icon';
+  }
+  if (!dim) slot.dataset.nodim = '';
+  if (!plate) slot.dataset.noplate = '';
+
+  picture.addEventListener('error', () => slot.replaceWith(placeholderArt()));
+  return slot;
 }
 
 /** Nothing to choose from. Back is the only move, and the nav already offers it. */
@@ -224,7 +237,8 @@ function renderChoice(step, options) {
       cell.className = 'board-tile';
       const name = document.createElement('strong');
       name.textContent = option.label;
-      cell.append(tileArt(option.image), name);
+      cell.append(
+        tileArt(option.image, option.imageFilter, option.imageDim, option.imagePlate), name);
     } else if (layout === 'row') {
       // Either a real picture (the custom path's PNGs) or a named glyph, never both.
       const art = option.image

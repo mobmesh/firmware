@@ -408,6 +408,9 @@ export const STEPS = [
           value: maker,
           label: manifest.makers[maker]?.name ?? maker,
           image: manifest.makers[maker]?.icon ?? null,
+          imageFilter: manifest.makers[maker]?.iconFilter ?? null,
+          imageDim: manifest.makers[maker]?.iconDim !== false,
+          imagePlate: manifest.makers[maker]?.iconPlate !== false,
         }))
         // By display name, not key: sorting keys put the one capitalised key, `Ikoka`,
         // ahead of every lowercase one.
@@ -456,7 +459,14 @@ export const STEPS = [
         // already pulled the src out, so a renderer never injects a third party's markup.
         // Value stays the upstream name — it keys the manifest — while the label is the
         // override's when one renames a device.
-        .map((d) => ({ value: d.name, label: d.label ?? d.name, image: d.image }))
+        .map((d) => ({
+          value: d.name,
+          label: d.label ?? d.name,
+          image: d.image,
+          imageFilter: d.imageFilter ?? null,
+          imageDim: d.imageDim !== false,
+          imagePlate: d.imagePlate !== false,
+        }))
         // Manifest order is upstream's own and shuffles between releases. `numeric` keeps
         // T3 ahead of T10 rather than sorting them as strings.
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));

@@ -383,6 +383,20 @@ function overrideAsset(base, path) {
   return base && path ? new URL(path, base).href : null;
 }
 
+// Named rather than free-form CSS: an override file should not be able to put arbitrary
+// filter syntax into a style attribute. `brightness(0)` flattens art of any colour to a
+// silhouette, which `invert(1)` then turns white.
+const IMAGE_FILTERS = {
+  invert: 'invert(1)',
+  white: 'brightness(0) invert(1)',
+  black: 'brightness(0)',
+};
+
+/** The CSS for a named filter. An unknown name applies none, as if it were absent. */
+function overrideFilter(name) {
+  return (typeof name === 'string' && IMAGE_FILTERS[name]) ?? null;
+}
+
 export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}) {
   const [raw, releases, overrides] = await Promise.all([
     loadJson(baseUrl, STOCK_MANIFEST_FILE),
@@ -413,6 +427,12 @@ export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {})
       // no caller has to inject a third party's HTML to show it.
       image: overrideAsset(overrides.base, override.image)
         ?? absoluteStockAsset(tooltipImageSrc(device.tooltip)),
+      imageFilter: overrideFilter(override.filter),
+      // Upstream art is dimmed to tame its light backgrounds; `"dim": false` opts art we
+      // have already corrected out of that.
+      imageDim: override.dim !== false,
+      // The tile's own gradient plate frames a board photo; a logo usually wants none.
+      imagePlate: override.plate !== false,
       erase: device.erase ?? null,
       bootloader: device.bootloader ?? null,
       firmware,
@@ -432,6 +452,9 @@ export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {})
     if (override.name) makers[key].name = override.name;
     makers[key].name ||= key.charAt(0).toUpperCase() + key.slice(1);
     makers[key].icon = overrideAsset(overrides.base, override.icon) ?? null;
+    makers[key].iconFilter = overrideFilter(override.filter);
+    makers[key].iconDim = override.dim !== false;
+    makers[key].iconPlate = override.plate !== false;
   }
 
   return {
