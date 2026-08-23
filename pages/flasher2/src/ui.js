@@ -36,6 +36,12 @@ const ICONS = {
     '<path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
   upload:
     '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+  expand:
+    '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>' +
+    '<path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+  collapse:
+    '<path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/>' +
+    '<path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/>',
   // The Gulf Coast Mesh mark, as it appears in mobmesh.org's own footer: five nodes
   // and the links between them.
   gcm:
@@ -371,6 +377,12 @@ function readZone(zones, lat, lon) {
   return { zone: hit?.id ?? null, zoneSettings: hit?.settings ?? null };
 }
 
+// Set while the map is expanded, so Escape has something to close and nothing leaks.
+let expandedMap = null;
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') expandedMap?.();
+});
+
 // Subscription zones (data/zones.geojson). Loaded once, on the step that shows them —
 // the flash path never touches this.
 let zonesPromise = null;
@@ -434,6 +446,8 @@ function renderLocation(step) {
     `<input type="text" class="field" id="node-name" placeholder="${roleName} name" maxlength="31" />` +
     '<div class="map-wrap">' +
     '<div class="map-frame" id="map"></div>' +
+    `<button type="button" class="map-expand" id="map-expand" title="Expand map"` +
+    ` aria-label="Expand map">${icon('expand', 16)}</button>` +
     '<span class="map-hint">Drag to pan · scroll or +/\u2212 to zoom · click to place</span>' +
     `<div class="map-empty" id="map-empty">Click map to pin ${noun} location</div>` +
     '</div>' +
@@ -555,8 +569,34 @@ function renderLocation(step) {
     emptyNote.hidden = true;
   }
 
+  // Expanding hides the fields and grows the frame; Leaflet has to be told the box moved.
+  const stepEl = body.closest('.step');
+  const toggle = form.querySelector('#map-expand');
+  const setExpanded = (on) => {
+    stepEl.classList.toggle('is-map-expanded', on);
+    toggle.innerHTML = icon(on ? 'collapse' : 'expand', 16);
+    const label = on ? 'Restore map size' : 'Expand map';
+    toggle.title = label;
+    toggle.setAttribute('aria-label', label);
+    expandedMap = on ? () => setExpanded(false) : null;
+    map.invalidateSize();
+  };
+  toggle.addEventListener('click', () => setExpanded(!stepEl.classList.contains('is-map-expanded')));
+  // A step left expanded is gone with its DOM; drop the stale closer.
+  expandedMap = null;
+
   if (draft.latitude != null) setPoint(draft.latitude, draft.longitude, false);
-  map.on('click', (event) => setPoint(event.latlng.lat, event.latlng.lng, false));
+  map.on('click', (event) => {
+    const { lat, lng } = event.latlng;
+    setPoint(lat, lng, false);
+    // Placing the pin is the point of expanding, so hand the form back. Recentre with it:
+    // Leaflet holds the centre while the container shrinks, which can strand an
+    // edge-of-map pin outside the small one.
+    if (stepEl.classList.contains('is-map-expanded')) {
+      setExpanded(false);
+      map.setView([lat, lng], map.getZoom());
+    }
+  });
   // Leaflet measures the container on creation; inside a step that was just built it is
   // still zero-height, so the tiles come back as a grey box without this.
   setTimeout(() => map.invalidateSize(), 0);

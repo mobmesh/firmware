@@ -457,6 +457,35 @@
 /* The shared sheet right-aligns .actions; the closing screen centres its one button. */
 .actions.is-centred { justify-content: center; }
 
+/* Maximise, within the card. The fields stand down rather than the map covering them, so
+   nothing is hidden behind anything and the card keeps one scroll position. */
+.map-expand {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(3, 8, 15, 0.75);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.map-expand:hover { color: var(--accent); border-color: var(--hover-edge); }
+
+.step.is-map-expanded .map-frame { height: min(70vh, 620px); }
+.step.is-map-expanded .field,
+.step.is-map-expanded .field-row,
+.step.is-map-expanded .field-note,
+.step.is-map-expanded .coord-row,
+.step.is-map-expanded .identity-line,
+.step.is-map-expanded .actions { display: none; }
+
 /* The label overlay is composited over labels the base already has, so its soft casing
    doubles too. Contrast drops the halo back while keeping the glyph solid. */
 .map-labels { filter: contrast(1.8); }
