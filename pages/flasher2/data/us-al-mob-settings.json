@@ -4,6 +4,7 @@
   "_units": "advert.interval: minutes (60-240). flood.advert.interval: hours (3-168). agc.reset.interval: seconds, rounded down to a multiple of 4. Both intervals take 0 to disable.",
   "_radio": "Sets freq/bw/sf/cr together, COMMA-separated -- spaces parse as one field and the command is rejected. Out-of-range is rejected, not clamped. Needs a reboot, which the flasher sends itself after the list.",
   "_regions": "def walks a cursor from the wildcard *: a bare token creates a child and moves onto it, 'name|jump' creates a child then jumps elsewhere. Cursor resets to * per command. 160 chars max per line.",
+  "_regions_tree": "The def line above builds: us > (us-gc, us-southeast, us-south, us-east, us-al, us-ms, us-fl); us-al > (us-al-mob, us-al-fhp, us-al-guf); us-fl > us-fl-pns. 139 chars of the 160 limit. Provisional -- the naming convention is not settled.",
   "_regions_notes": "def merges into the existing tree rather than replacing it; 'region remove' first for a clean slate. 'region save' persists it. 'region allowf *' is what carries unscoped floods -- they match no named region, so the wildcard's flag decides, and a preserved region file could have it denied.",
 
   "commands": [
@@ -13,7 +14,10 @@
     "set path.hash.mode 1",
     "set loop.detect minimal",
     "set agc.reset.interval 4",
-    "set multi.acks 1"
+    "set multi.acks 1",
 
+    "region def us us-gc|us us-southeast|us us-south|us us-east|us us-al us-al-mob|us-al us-al-fhp|us-al us-al-guf|us us-ms|us us-fl us-fl-pns|*",
+    "region allowf *",
+    "region save"
   ]
 }
