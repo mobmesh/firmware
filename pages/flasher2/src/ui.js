@@ -37,6 +37,15 @@ const ICONS = {
     '<path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
   upload:
     '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+  // The Gulf Coast Mesh mark, as it appears in mobmesh.org's own footer: five nodes
+  // and the links between them.
+  gcm:
+    '<circle cx="6" cy="6" r="1.6" fill="currentColor" stroke="none"/>' +
+    '<circle cx="18" cy="6" r="1.6" fill="currentColor" stroke="none"/>' +
+    '<circle cx="12" cy="13" r="1.6" fill="currentColor" stroke="none"/>' +
+    '<circle cx="6" cy="20" r="1.6" fill="currentColor" stroke="none"/>' +
+    '<circle cx="18" cy="20" r="1.6" fill="currentColor" stroke="none"/>' +
+    '<path d="M6 6 12 13M18 6 12 13M12 13 6 20M12 13 18 20"/>',
   // Roles. Upstream ships no artwork for these, so they are drawn here.
   repeater:
     '<circle cx="12" cy="5.5" r="1.75"/><path d="M12 7.5V22"/><path d="m8.5 22 3.5-8 3.5 8"/>' +
@@ -386,8 +395,18 @@ function renderLocation(step) {
   const emptyNote = form.querySelector('#map-empty');
   const identityLine = document.createElement('p');
   identityLine.className = 'identity-line';
-  identityLine.textContent = 'Generating a node identity…';
+  identityLine.textContent = 'Generating identity…';
   foot.append(identityLine);
+
+  // The site mark stands in for naming the registry; the prefix is the only part worth
+  // reading, so the line stays a mark plus four characters.
+  const showIdentity = (prefix, status) => {
+    identityLine.replaceChildren();
+    const mark = document.createElement('span');
+    mark.className = 'identity-mark';
+    mark.innerHTML = icon('gcm', 16);
+    identityLine.append(mark, `${prefix} ${status === 'available' ? 'Verified' : 'Unverified'}`);
+  };
   nameField.value = draft.name;
 
   // 31 usable bytes, counted encoded — an emoji is four, so characters would overcount.
@@ -452,15 +471,12 @@ function renderLocation(step) {
   foot.append(actions);
 
   if (draft.identity) {
-    identityLine.textContent = `Node identity ${draft.identity.prefix} — ${draft.identityStatus}`;
+    showIdentity(draft.identity.prefix, draft.identityStatus);
   } else {
     resolveIdentity((message) => { identityLine.textContent = message; }).then((result) => {
       draft.identity = result.identity;
       draft.identityStatus = result.status;
-      identityLine.textContent =
-        result.status === 'available'
-          ? `Node identity ${result.identity.prefix} — available on the GulfCoastMesh registry`
-          : `Node identity ${extractPrefix(result.identity.publicKeyHex)} — registry not checked`;
+      showIdentity(extractPrefix(result.identity.publicKeyHex), result.status);
     });
   }
 }

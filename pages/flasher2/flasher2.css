@@ -370,10 +370,37 @@
 }
 
 .identity-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   margin: 0;
+  /* Same treatment as .field-note: sentence case, no tracking, no extra weight. */
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 0.72rem;
+  line-height: 1.4;
   color: var(--fg-muted);
+}
+
+/* mobmesh.org's own .gcm-mark-badge, scaled down: the mark is knocked out of a
+   teal-to-amber chip, not drawn in line colour. Proportions kept -- their 40px badge
+   carries a 20px glyph and a 12px radius. */
+.identity-mark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 55%, var(--accent-warm) 100%);
+  color: var(--bg-0);
+  box-shadow: 0 0 0.6rem rgba(45, 209, 189, 0.28);
+  opacity: 0.5;
+  flex: none;
+}
+
+.identity-mark svg {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2;
 }
 
 /* Leaflet paints its own light chrome; pull it back to the sheet's palette. */
