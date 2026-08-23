@@ -561,7 +561,7 @@ export const STEPS = [
     // The renderer owns this one: a map and three fields are not a list of options.
     kind: 'location',
     applies: (flow) => LOCATION_ROLES.has(selectedRole(flow)),
-    async apply(flow, { name, latitude, longitude, heightFt, email, adminPassword, identity, identityStatus, zone }) {
+    async apply(flow, { name, latitude, longitude, heightFt, email, adminPassword, identity, identityStatus, zone, zoneSettings }) {
       const s = flow.state;
       s.nodeName = name ?? '';
       s.latitude = latitude ?? null;
@@ -574,7 +574,7 @@ export const STEPS = [
       // The zone the pin fell in, and its settings. Fetched here so the provision step
       // stays synchronous about what it will send.
       s.zone = zone ?? null;
-      s.zoneCommands = await loadZoneCommands(s.zone);
+      s.zoneCommands = await loadZoneCommands(zoneSettings);
     },
   },
 
@@ -732,22 +732,20 @@ export function chooseUploadYourOwn(flow) {
 }
 
 /**
- * Regional settings from `data/<code>-settings.json`; absent or unreadable applies nothing,
- * since a zone with no file yet must never fail a flash. A leading underscore parks a line.
+ * Regional settings from the file the zone names. Absent or unreadable applies nothing, since
+ * a zone with no file yet must never fail a flash. A leading underscore parks a line.
  */
-async function loadZoneCommands(zone) {
-  if (!zone) return [];
+async function loadZoneCommands(file) {
+  if (!file) return [];
   try {
-    const res = await fetch(new URL(`../data/${zone}-settings.json`, import.meta.url), {
-      cache: 'no-store',
-    });
+    const res = await fetch(new URL(`../data/${file}`, import.meta.url), { cache: 'no-store' });
     if (!res.ok) return [];
     const doc = await res.json();
     return (doc.commands ?? []).filter(
       (command) => typeof command === 'string' && !command.startsWith('_')
     );
   } catch (error) {
-    console.warn(`[flow] No regional settings for ${zone}:`, error);
+    console.warn(`[flow] No regional settings in ${file}:`, error);
     return [];
   }
 }

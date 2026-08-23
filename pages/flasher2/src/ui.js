@@ -333,6 +333,9 @@ function renderError(error, retry) {
 
 // region-map's own basemap: already dark, already attributed, already vendored.
 const MAP_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+// The same labels composited over the base, which compounds their alpha -- dark_all alone
+// renders them too dark to read. Contrast keeps the doubled halo from reading as a glow.
+const MAP_LABELS = 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png';
 const MAP_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
   '&copy; <a href="https://carto.com/attributions">CARTO</a>';
@@ -354,6 +357,18 @@ async function resolveIdentity(onStatus) {
   // Either every attempt collided or the registry is unreachable; keep the key either way.
   const identity = await generateIdentityKeypair();
   return { identity, status: 'unchecked' };
+}
+
+// Nested zones are drawn only under the pointer; states are always on.
+const STATE_STYLE = { color: '#2dd1bd', weight: 1, opacity: 0.6, fillColor: '#2dd1bd', fillOpacity: 0.04 };
+const ZONE_SHOWN = { color: '#f9a228', weight: 2, fillColor: '#f9a228', opacity: 1, fillOpacity: 0.04 };
+// Derived, because `setStyle` merges: anything omitted here would survive the change back.
+const ZONE_HIDDEN = { ...ZONE_SHOWN, opacity: 0, fillOpacity: 0 };
+
+/** `{ zone, zoneSettings }` for a point, in the shape the step's draft carries. */
+function readZone(zones, lat, lon) {
+  const hit = zoneAt(zones, lat, lon);
+  return { zone: hit?.id ?? null, zoneSettings: hit?.settings ?? null };
 }
 
 // Subscription zones (data/zones.geojson). Loaded once, on the step that shows them —
@@ -387,12 +402,13 @@ function featureContains(feature, lat, lon) {
   });
 }
 
-/** The most specific zone containing a point: a nested zone before the state around it. */
+/** The home area containing a point: a zone if one covers it, otherwise the state around it. */
 function zoneAt(zones, lat, lon) {
   if (!zones) return null;
   const hits = zones.features.filter((feature) => featureContains(feature, lat, lon));
   if (!hits.length) return null;
-  return (hits.find((feature) => feature.properties.parent) ?? hits[0]).properties.code;
+  const pick = hits.find((feature) => feature.properties.kind === 'zone') ?? hits[0];
+  return { id: pick.properties.id, settings: pick.properties.settings ?? null };
 }
 
 function renderLocation(step) {
@@ -476,7 +492,9 @@ function renderLocation(step) {
   const map = L.map(form.querySelector('#map'), { zoomControl: true, attributionControl: true })
     .setView(draft.latitude != null ? [draft.latitude, draft.longitude] : MAP_HOME,
              draft.latitude != null ? 13 : MAP_HOME_ZOOM);
-  L.tileLayer(MAP_TILES, { maxZoom: 20, subdomains: 'abcd', attribution: MAP_ATTRIBUTION }).addTo(map);
+  const tiles = { maxZoom: 20, subdomains: 'abcd' };
+  L.tileLayer(MAP_TILES, { ...tiles, attribution: MAP_ATTRIBUTION }).addTo(map);
+  L.tileLayer(MAP_LABELS, { ...tiles, className: 'map-labels' }).addTo(map);
   let pin = null;
   let zones = null;
 
@@ -485,15 +503,39 @@ function renderLocation(step) {
   loadZones().then((loaded) => {
     zones = loaded;
     if (!zones) return;
+    const zoneLayers = new Map();
     L.geoJSON(zones, {
+      // Hit-testing is done here against the same rings the pin uses, so the layers stay
+      // non-interactive and a click inside a zone still reaches the map and drops a pin.
       interactive: false,
-      style: (feature) =>
-        feature.properties.parent
-          ? { color: '#f9a228', weight: 2, fillColor: '#f9a228', fillOpacity: 0.04 }
-          : { color: '#2dd1bd', weight: 1, fillColor: '#2dd1bd', fillOpacity: 0.08 },
+      style: (feature) => (feature.properties.kind === 'zone' ? ZONE_HIDDEN : STATE_STYLE),
+      onEachFeature: (feature, layer) => {
+        if (feature.properties.kind === 'zone') zoneLayers.set(feature.properties.id, layer);
+      },
     }).addTo(map);
+
+    // Nested zones stay invisible until the pointer is inside one — the outlines are only
+    // useful while you are choosing, and drawn always they crowd a 256px map.
+    let lit = null;
+    const light = (code) => {
+      if (code === lit) return;
+      if (lit) zoneLayers.get(lit)?.setStyle(ZONE_HIDDEN);
+      if (code) zoneLayers.get(code)?.setStyle(ZONE_SHOWN);
+      lit = code;
+    };
+    map.on('mousemove', (event) => {
+      const hit = zones.features.find(
+        (feature) => feature.properties.kind === 'zone'
+          && featureContains(feature, event.latlng.lat, event.latlng.lng)
+      );
+      light(hit?.properties.id ?? null);
+    });
+    map.on('mouseout', () => light(null));
+
     // A pin restored from an earlier visit predates the fetch.
-    if (draft.latitude != null) draft.zone = zoneAt(zones, draft.latitude, draft.longitude);
+    if (draft.latitude != null) {
+      Object.assign(draft, readZone(zones, draft.latitude, draft.longitude));
+    }
   });
 
   function setPoint(lat, lon, recentre) {
@@ -506,7 +548,7 @@ function renderLocation(step) {
       pin = L.marker([draft.latitude, draft.longitude], { draggable: true }).addTo(map);
       pin.on('dragend', () => { const p = pin.getLatLng(); setPoint(p.lat, p.lng, false); });
     }
-    draft.zone = zoneAt(zones, draft.latitude, draft.longitude);
+    Object.assign(draft, readZone(zones, draft.latitude, draft.longitude));
     if (recentre) map.setView([draft.latitude, draft.longitude], Math.max(map.getZoom(), 13));
     // Coordinates appear only once there is something to show, as GCM's does.
     coordRow.hidden = false;

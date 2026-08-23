@@ -457,6 +457,10 @@
 /* The shared sheet right-aligns .actions; the closing screen centres its one button. */
 .actions.is-centred { justify-content: center; }
 
+/* The label overlay is composited over labels the base already has, so its soft casing
+   doubles too. Contrast drops the halo back while keeping the glyph solid. */
+.map-labels { filter: contrast(1.8); }
+
 /* Leaflet paints its own light chrome; pull it back to the sheet's palette. */
 .map-frame .leaflet-container { background: var(--bg-1); }
 .map-frame .leaflet-control-attribution {
