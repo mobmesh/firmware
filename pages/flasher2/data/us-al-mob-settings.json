@@ -1,6 +1,9 @@
 {
   "_comment": "Settings for the GulfCoastMesh Mobile option, sent to the device's CLI after a flash. Run in order; a leading underscore parks a note or a command without deleting it.",
 
+  "_name_prefix": "Prepended to the name the user types before it is written to the device: 'Bob's House' becomes 'al-Bob's House'. Advertised names are capped at 23 bytes when location is included, which a repeater always is, so the prefix spends part of that budget.",
+  "name_prefix": "al-",
+
   "_units": "advert.interval: minutes (60-240). flood.advert.interval: hours (3-168). agc.reset.interval: seconds, rounded down to a multiple of 4. Both intervals take 0 to disable.",
   "_radio": "Sets freq/bw/sf/cr together, COMMA-separated -- spaces parse as one field and the command is rejected. Out-of-range is rejected, not clamped. Needs a reboot, which the flasher sends itself after the list.",
   "_regions": "def walks a cursor from the wildcard *: a bare token creates a child and moves onto it, 'name|jump' creates a child then jumps elsewhere. Cursor resets to * per command. 160 chars max per line.",

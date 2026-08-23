@@ -338,6 +338,11 @@ function renderError(error, retry) {
 // --- location (GCM's node-config screen) --------------------------------------------
 
 // region-map's own basemap: already dark, already attributed, already vendored.
+// The advert budget, minus the zone's name prefix. Advisory, not a cap: measured on a
+// Heltec v4, the firmware stores 31 bytes either way and only the advert clips.
+const NAME_BYTES = 20;
+const NAME_STORED_BYTES = 31;
+
 const MAP_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 // The same labels composited over the base, which compounds their alpha -- dark_all alone
 // renders them too dark to read. Contrast keeps the doubled halo from reading as a glow.
@@ -443,13 +448,17 @@ function renderLocation(step) {
   const form = document.createElement('div');
   form.className = 'location-form';
   form.innerHTML =
+    '<div class="name-wrap">' +
     `<input type="text" class="field" id="node-name" placeholder="${roleName} name" maxlength="31" />` +
+    '<span class="name-count" id="name-count" aria-hidden="true"></span>' +
+    '</div>' +
+    '<p class="field-note is-warn" id="name-warn" hidden>fyi: this name will be clipped on radio broadcasts</p>' +
     '<div class="map-wrap">' +
     '<div class="map-frame" id="map"></div>' +
     `<button type="button" class="map-expand" id="map-expand" title="Expand map"` +
     ` aria-label="Expand map">${icon('expand', 16)}</button>` +
     '<span class="map-hint">Drag to pan · scroll or +/\u2212 to zoom · click to place</span>' +
-    `<div class="map-empty" id="map-empty">Click map to pin ${noun} location</div>` +
+    `<div class="map-empty" id="map-empty"><span>Click map to pin ${noun} location</span></div>` +
     '</div>' +
     '<div class="coord-row" id="coords" hidden>' +
     '<label class="coord">Latitude<input type="number" step="0.000001" class="field" id="lat" /></label>' +
@@ -494,14 +503,25 @@ function renderLocation(step) {
   };
   nameField.value = draft.name;
 
-  // 31 usable bytes, counted encoded — an emoji is four, so characters would overcount.
+  // Counted encoded -- an emoji is four bytes, so characters would overcount.
   const encoder = new TextEncoder();
+  const counter = form.querySelector('#name-count');
+  const nameWarn = form.querySelector('#name-warn');
+  const countName = () => {
+    const used = encoder.encode(nameField.value).length;
+    counter.textContent = `${used}/${NAME_BYTES}`;
+    counter.classList.toggle('is-full', used === NAME_BYTES);
+    counter.classList.toggle('is-over', used > NAME_BYTES);
+    nameWarn.hidden = used < NAME_BYTES + 2;
+  };
   nameField.addEventListener('input', () => {
-    while (encoder.encode(nameField.value).length > 31) {
+    while (encoder.encode(nameField.value).length > NAME_STORED_BYTES) {
       nameField.value = [...nameField.value].slice(0, -1).join('');
     }
     draft.name = nameField.value;
+    countName();
   });
+  countName();
 
   const map = L.map(form.querySelector('#map'), { zoomControl: true, attributionControl: true })
     .setView(draft.latitude != null ? [draft.latitude, draft.longitude] : MAP_HOME,

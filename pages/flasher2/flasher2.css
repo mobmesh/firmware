@@ -265,12 +265,20 @@
   text-transform: uppercase;
 }
 
-.map-hint {
-  right: 0.75rem;
-  bottom: 2rem;
+/* Both hints wear the same pill. */
+.map-hint,
+.map-empty > span {
   padding: 0.25rem 0.55rem;
   border-radius: var(--radius-full);
   background: rgba(6, 18, 31, 0.9);
+}
+
+/* Bottom-right corner. Leaflet's controls sit at 1000, so this has to clear them to cover
+   the attribution rather than sit behind it. */
+.map-hint {
+  right: 0;
+  bottom: 4px;
+  z-index: 1001;
   color: var(--fg-muted);
   font-size: 0.56rem;
   letter-spacing: 0.16em;
@@ -285,7 +293,6 @@
   color: var(--fg);
   font-size: 0.62rem;
   letter-spacing: 0.22em;
-  text-shadow: 0 1px 6px rgba(3, 8, 15, 0.9);
 }
 
 /* Uncovers the map the moment the pointer is over it — by then the instruction has
@@ -362,7 +369,8 @@
 /* Sits directly under its field: the negative margin cancels .location-form's gap.
    Same face and size as .identity-line -- at equal px, Inter reads larger than mono. */
 .field-note {
-  margin: -1rem 0 0;
+  /* 4px in from the field's rounded edge, so it reads as belonging to it. */
+  margin: -1rem 0 0 4px;
   color: var(--fg-muted);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 0.72rem;
@@ -456,6 +464,34 @@
 
 /* The shared sheet right-aligns .actions; the closing screen centres its one button. */
 .actions.is-centred { justify-content: center; }
+
+/* Byte counter, inside the name field. The input gets room on the right so typed text
+   never runs under it. */
+.name-wrap {
+  position: relative;
+}
+
+.name-wrap input.field {
+  padding-right: 3.4rem;
+}
+
+.name-count {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.5rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.62rem;
+  line-height: 1;
+  color: var(--fg-muted);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.name-count.is-full { color: var(--accent-warm); opacity: 0.9; }
+.name-count.is-over { color: var(--danger); opacity: 1; }
+
+/* Advisory: the firmware stores the name, the advert is what clips. */
+.field-note.is-warn { color: var(--danger); opacity: 0.7; }
 
 /* Maximise, within the card. The fields stand down rather than the map covering them, so
    nothing is hidden behind anything and the card keeps one scroll position. */

@@ -1,0 +1,14 @@
+{
+  "_comment": "Baseline settings for any home area without its own file. Same radio and interval settings as the Mobile file, with the region tree left out -- a region tree is per-area and must not be inherited by default.",
+  "_units": "advert.interval: minutes (60-240). flood.advert.interval: hours (3-168). agc.reset.interval: seconds, rounded down to a multiple of 4. Both intervals take 0 to disable.",
+  "_radio": "Sets freq/bw/sf/cr together, COMMA-separated -- spaces parse as one field and the command is rejected. Out-of-range is rejected, not clamped. Needs a reboot, which the flasher sends itself after the list.",
+  "commands": [
+    "set radio 910.525,62.5,7,8",
+    "set advert.interval 240",
+    "set flood.advert.interval 23",
+    "set path.hash.mode 1",
+    "set loop.detect minimal",
+    "set agc.reset.interval 4",
+    "set multi.acks 1"
+  ]
+}
