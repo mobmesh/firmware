@@ -618,6 +618,21 @@ export function buildManualFlashPlan(file, { family, wipe = false }) {
     );
   }
   const merged = looksMerged(file.bytes);
+  // A full erase takes the bootloader and partition table with it, and an application
+  // image supplies neither — the combination can only ever produce a device that does not
+  // boot. Measured on a Heltec v4: it also lands in §10.2 state 3, which correctly refuses
+  // to erase an unknown device, so the tool cannot undo it either.
+  //
+  // Refused rather than quietly downgraded to an update: the New/Update declaration is the
+  // user's and is authoritative (see decisions.md), so the answer is to say the
+  // combination is impossible, not to silently substitute a different write.
+  if (wipe && !merged) {
+    throw new UnsupportedFirmwareFileError(
+      `${file.name} is an application image, not a full one. Erasing first would remove the ` +
+        `bootloader it needs, leaving the device unable to boot — choose Upgrade Existing ` +
+        `to write it, or supply a merged image.`
+    );
+  }
   return createFlashPlan({
     engine: 'esptool',
     files: [{ data: file.bytes, address: merged ? STOCK_ESP32_MERGED_ADDRESS : STOCK_ESP32_APP_ADDRESS }],

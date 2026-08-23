@@ -534,13 +534,32 @@ export const STEPS = [
     accept: (flow) => (flow.state.family === 'nrf52' ? '.zip' : '.bin'),
     async apply(flow, picked) {
       const file = await plans.readUploadedFirmware(picked);
+      const wipe = flow.state.install === INSTALL.NEW;
+
       // Build the plan and throw it away: the point is the checks inside it. A file the
       // device cannot take should be refused while the picker is still on screen, not
       // several steps later with the device already in programming mode.
-      plans.buildManualFlashPlan(file, {
-        family: flow.state.family,
-        wipe: flow.state.install === INSTALL.NEW,
-      });
+      plans.buildManualFlashPlan(file, { family: flow.state.family, wipe });
+
+      if (flow.state.family === 'nrf52') {
+        // §9A: the package must parse before hardware is touched. `executeDfuPlan` parses
+        // it too, but by then the board is already in DFU mode — a bad zip would strand it
+        // there. The extension check above says nothing about the contents.
+        await plans.validateDfuPackage(file.blob);
+
+        // A wipe on this family is upstream's separate erase package (§11), which a
+        // user-supplied zip does not carry. Refused for the same reason as the ESP32 rule
+        // above: the New declaration is the user's, so say it cannot be honoured rather
+        // than writing an update while it says New.
+        if (wipe) {
+          throw new plans.UnsupportedFirmwareFileError(
+            `${file.name} carries no erase step, so New Device cannot be honoured — the ` +
+              `existing identity and settings would survive it. Choose Upgrade Existing, ` +
+              `or use a stock build to erase the device.`
+          );
+        }
+      }
+
       flow.state.file = file;
     },
   },
