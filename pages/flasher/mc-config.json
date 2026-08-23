@@ -2811,16 +2811,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "WioTrackerL1_kiss_modem-1.17.0-727fc051.zip",
+									"name": "WioTrackerL1_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "WioTrackerL1_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "WioTrackerL1_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -2886,16 +2886,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "LilyGo_T3S3_sx1262_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "LilyGo_T3S3_sx1262_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "LilyGo_T3S3_sx1262_kiss_modem-1.17.0-727fc051.bin",
+									"name": "LilyGo_T3S3_sx1262_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -2961,16 +2961,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "LilyGo_T3S3_sx1276_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "LilyGo_T3S3_sx1276_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "LilyGo_T3S3_sx1276_kiss_modem-1.17.0-727fc051.bin",
+									"name": "LilyGo_T3S3_sx1276_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -3036,16 +3036,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "Tbeam_SX1262_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "Tbeam_SX1262_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "Tbeam_SX1262_kiss_modem-1.17.0-727fc051.bin",
+									"name": "Tbeam_SX1262_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -3111,16 +3111,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "Tbeam_SX1276_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "Tbeam_SX1276_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "Tbeam_SX1276_kiss_modem-1.17.0-727fc051.bin",
+									"name": "Tbeam_SX1276_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -3186,16 +3186,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "LilyGo_TBeam_1W_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "LilyGo_TBeam_1W_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "LilyGo_TBeam_1W_kiss_modem-1.17.0-727fc051.bin",
+									"name": "LilyGo_TBeam_1W_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -3260,16 +3260,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "T_Beam_S3_Supreme_SX1262_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "T_Beam_S3_Supreme_SX1262_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "T_Beam_S3_Supreme_SX1262_kiss_modem-1.17.0-727fc051.bin",
+									"name": "T_Beam_S3_Supreme_SX1262_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -3341,16 +3341,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "LilyGo_T-Echo_kiss_modem-1.17.0-727fc051.zip",
+									"name": "LilyGo_T-Echo_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "LilyGo_T-Echo_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "LilyGo_T-Echo_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -3416,16 +3416,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "LilyGo_T-Echo-Lite_kiss_modem-1.17.0-727fc051.zip",
+									"name": "LilyGo_T-Echo-Lite_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "LilyGo_T-Echo-Lite_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "LilyGo_T-Echo-Lite_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -3491,16 +3491,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "LilyGo_T-Echo_Card_kiss_modem-1.17.0-727fc051.zip",
+									"name": "LilyGo_T-Echo_Card_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "LilyGo_T-Echo_Card_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "LilyGo_T-Echo_Card_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -3565,16 +3565,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "LilyGo_TLora_V2_1_1_6_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "LilyGo_TLora_V2_1_1_6_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "LilyGo_TLora_V2_1_1_6_kiss_modem-1.17.0-727fc051.bin",
+									"name": "LilyGo_TLora_V2_1_1_6_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -3644,16 +3644,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "GAT562_Mesh_Tracker_Pro_kiss_modem-1.17.0-727fc051.zip",
+									"name": "GAT562_Mesh_Tracker_Pro_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "GAT562_Mesh_Tracker_Pro_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "GAT562_Mesh_Tracker_Pro_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -3723,16 +3723,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "GAT562_30S_Mesh_Kit_kiss_modem-1.17.0-727fc051.zip",
+									"name": "GAT562_30S_Mesh_Kit_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "GAT562_30S_Mesh_Kit_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "GAT562_30S_Mesh_Kit_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -3797,16 +3797,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "Heltec_E213_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "Heltec_E213_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "Heltec_E213_kiss_modem-1.17.0-727fc051.bin",
+									"name": "Heltec_E213_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -3871,16 +3871,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "Heltec_E290_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "Heltec_E290_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "Heltec_E290_kiss_modem-1.17.0-727fc051.bin",
+									"name": "Heltec_E290_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -3945,16 +3945,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "Heltec_v2_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "Heltec_v2_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "Heltec_v2_kiss_modem-1.17.0-727fc051.bin",
+									"name": "Heltec_v2_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -4019,16 +4019,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "Heltec_v3_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "Heltec_v3_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "Heltec_v3_kiss_modem-1.17.0-727fc051.bin",
+									"name": "Heltec_v3_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -4089,20 +4089,68 @@
 					}
 				},
 				{
+					"title": "[R8] Companion radio",
+					"class": "community",
+					"role": "companionBle",
+					"github": {
+						"type": "companion",
+						"files": {
+							"flash-wipe": "heltec_v4_r8_companion_radio_ble.*?-merged\\.bin",
+							"flash-update": "heltec_v4_r8_companion_radio_ble.*?-[a-f0-9]{7}\\.bin"
+						}
+					}
+				},
+				{
+					"title": "[R8] Companion radio",
+					"class": "community",
+					"role": "companionUsb",
+					"github": {
+						"type": "companion",
+						"files": {
+							"flash-wipe": "heltec_v4_r8_companion_radio_usb.*?-merged\\.bin",
+							"flash-update": "heltec_v4_r8_companion_radio_usb.*?-[a-f0-9]{7}\\.bin"
+						}
+					}
+				},
+				{
+					"title": "[R8] Repeater",
+					"class": "community",
+					"role": "repeater",
+					"github": {
+						"type": "repeater",
+						"files": {
+							"flash-wipe": "heltec_v4_r8_[rR]epeater.*?-merged\\.bin",
+							"flash-update": "heltec_v4_r8_[rR]epeater.*?-[a-f0-9]{7}\\.bin"
+						}
+					}
+				},
+				{
+					"title": "[R8] Room Server",
+					"class": "community",
+					"role": "roomServer",
+					"github": {
+						"type": "room-server",
+						"files": {
+							"flash-wipe": "heltec_v4_r8_room_server.*?-merged\\.bin",
+							"flash-update": "heltec_v4_r8_room_server.*?-[a-f0-9]{7}\\.bin"
+						}
+					}
+				},
+				{
 					"class": "community",
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "heltec_v4_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "heltec_v4_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "heltec_v4_kiss_modem-1.17.0-727fc051.bin",
+									"name": "heltec_v4_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -4232,16 +4280,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "Heltec_t1_kiss_modem-1.17.0-727fc051.zip",
+									"name": "Heltec_t1_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "Heltec_t1_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "Heltec_t1_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -4365,16 +4413,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "Heltec_t114_kiss_modem-1.17.0-727fc051.zip",
+									"name": "Heltec_t114_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "Heltec_t114_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "Heltec_t114_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -4439,16 +4487,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "heltec_tracker_v2_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "heltec_tracker_v2_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "heltec_tracker_v2_kiss_modem-1.17.0-727fc051.bin",
+									"name": "heltec_tracker_v2_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -4514,16 +4562,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "Mesh_pocket_kiss_modem-1.17.0-727fc051.zip",
+									"name": "Mesh_pocket_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "Mesh_pocket_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "Mesh_pocket_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -4589,16 +4637,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "Heltec_mesh_solar_kiss_modem-1.17.0-727fc051.zip",
+									"name": "Heltec_mesh_solar_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "Heltec_mesh_solar_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "Heltec_mesh_solar_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -4717,16 +4765,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "Heltec_Wireless_Tracker_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "Heltec_Wireless_Tracker_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "Heltec_Wireless_Tracker_kiss_modem-1.17.0-727fc051.bin",
+									"name": "Heltec_Wireless_Tracker_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -4791,16 +4839,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "Heltec_Wireless_Paper_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "Heltec_Wireless_Paper_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "Heltec_Wireless_Paper_kiss_modem-1.17.0-727fc051.bin",
+									"name": "Heltec_Wireless_Paper_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -5030,16 +5078,16 @@
 					"notice": "kissRadioNotice",
 					"title": "KISS Radio - 22dBm",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "ikoka_stick_nrf_22dbm_kiss_modem-1.17.0-727fc051.zip",
+									"name": "ikoka_stick_nrf_22dbm_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "ikoka_stick_nrf_22dbm_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "ikoka_stick_nrf_22dbm_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -5052,16 +5100,16 @@
 					"notice": "kissRadioNotice",
 					"title": "KISS Radio - 30dBm",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "ikoka_stick_nrf_30dbm_kiss_modem-1.17.0-727fc051.zip",
+									"name": "ikoka_stick_nrf_30dbm_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "ikoka_stick_nrf_30dbm_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "ikoka_stick_nrf_30dbm_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -5074,16 +5122,16 @@
 					"notice": "kissRadioNotice",
 					"title": "KISS Radio - 33dBm",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "ikoka_stick_nrf_33dbm_kiss_modem-1.17.0-727fc051.zip",
+									"name": "ikoka_stick_nrf_33dbm_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "ikoka_stick_nrf_33dbm_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "ikoka_stick_nrf_33dbm_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -5260,16 +5308,16 @@
 					"notice": "kissRadioNotice",
 					"title": "KISS Radio - 22dBm",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "ikoka_nano_nrf_22dbm_kiss_modem-1.17.0-727fc051.zip",
+									"name": "ikoka_nano_nrf_22dbm_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "ikoka_nano_nrf_22dbm_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "ikoka_nano_nrf_22dbm_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -5282,16 +5330,16 @@
 					"notice": "kissRadioNotice",
 					"title": "KISS Radio - 30dBm",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "ikoka_nano_nrf_30dbm_kiss_modem-1.17.0-727fc051.zip",
+									"name": "ikoka_nano_nrf_30dbm_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "ikoka_nano_nrf_30dbm_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "ikoka_nano_nrf_30dbm_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -5304,16 +5352,16 @@
 					"notice": "kissRadioNotice",
 					"title": "KISS Radio - 33dBm",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "ikoka_nano_nrf_33dbm_kiss_modem-1.17.0-727fc051.zip",
+									"name": "ikoka_nano_nrf_33dbm_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "ikoka_nano_nrf_33dbm_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "ikoka_nano_nrf_33dbm_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -5383,16 +5431,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "KeepteenLT1_kiss_modem-1.17.0-727fc051.zip",
+									"name": "KeepteenLT1_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "KeepteenLT1_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "KeepteenLT1_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -5457,16 +5505,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "RAK_3112_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "RAK_3112_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "RAK_3112_kiss_modem-1.17.0-727fc051.bin",
+									"name": "RAK_3112_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -5538,16 +5586,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "RAK_4631_kiss_modem-1.17.0-727fc051.zip",
+									"name": "RAK_4631_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "RAK_4631_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "RAK_4631_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -5619,16 +5667,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "RAK_3401_kiss_modem-1.17.0-727fc051.zip",
+									"name": "RAK_3401_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "RAK_3401_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "RAK_3401_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -5700,16 +5748,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "RAK_WisMesh_Tag_kiss_modem-1.17.0-727fc051.zip",
+									"name": "RAK_WisMesh_Tag_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "RAK_WisMesh_Tag_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "RAK_WisMesh_Tag_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -5893,16 +5941,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "MeshTracker_X1_kiss_modem-1.17.0-727fc051.zip",
+									"name": "MeshTracker_X1_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "MeshTracker_X1_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "MeshTracker_X1_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -5974,16 +6022,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "WioTrackerL1Eink_kiss_modem-1.17.0-727fc051.zip",
+									"name": "WioTrackerL1Eink_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "WioTrackerL1Eink_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "WioTrackerL1Eink_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -6049,16 +6097,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "Xiao_C3_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "Xiao_C3_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "Xiao_C3_kiss_modem-1.17.0-727fc051.bin",
+									"name": "Xiao_C3_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -6123,16 +6171,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "Xiao_S3_WIO_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "Xiao_S3_WIO_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "Xiao_S3_WIO_kiss_modem-1.17.0-727fc051.bin",
+									"name": "Xiao_S3_WIO_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -6206,16 +6254,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "Xiao_nrf52_kiss_modem-1.17.0-727fc051.zip",
+									"name": "Xiao_nrf52_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "Xiao_nrf52_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "Xiao_nrf52_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -6287,16 +6335,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "ThinkNode_M1_kiss_modem-1.17.0-727fc051.zip",
+									"name": "ThinkNode_M1_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "ThinkNode_M1_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "ThinkNode_M1_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -6355,6 +6403,27 @@
 							"flash-update": "ThinkNode_M2_room_server.*?-[a-f0-9]{7}\\.bin"
 						}
 					}
+				},
+				{
+					"class": "community",
+					"role": "kissRadio",
+					"notice": "kissRadioNotice",
+					"version": {
+						"1.17.1": {
+							"files": [
+								{
+									"type": "flash-wipe",
+									"name": "ThinkNode_M2_kiss_modem-1.17.1-45c0c323-merged.bin",
+									"title": "Combined app+partition+bootloader firmware bin"
+								},
+								{
+									"type": "flash-update",
+									"name": "ThinkNode_M2_kiss_modem-1.17.1-45c0c323.bin",
+									"title": "App firmware bin"
+								}
+							]
+						}
+					}
 				}
 			]
 		},
@@ -6411,6 +6480,27 @@
 						"files": {
 							"flash": "ThinkNode_M3_room_server.*?\\.zip",
 							"download": "ThinkNode_M3_room_server.*?\\.uf2"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "kissRadio",
+					"notice": "kissRadioNotice",
+					"version": {
+						"1.17.1": {
+							"files": [
+								{
+									"type": "flash",
+									"name": "ThinkNode_M3_kiss_modem-1.17.1-45c0c323.zip",
+									"title": "Firmware OTA zip"
+								},
+								{
+									"type": "download",
+									"name": "ThinkNode_M3_kiss_modem-1.17.1-45c0c323.uf2",
+									"title": "Firmware uf2"
+								}
+							]
 						}
 					}
 				}
@@ -6472,16 +6562,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "ThinkNode_M5_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "ThinkNode_M5_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "ThinkNode_M5_kiss_modem-1.17.0-727fc051.bin",
+									"name": "ThinkNode_M5_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -6553,16 +6643,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "ThinkNode_M6_kiss_modem-1.17.0-727fc051.zip",
+									"name": "ThinkNode_M6_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "ThinkNode_M6_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "ThinkNode_M6_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -6627,16 +6717,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "ThinkNode_M7_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "ThinkNode_M7_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "ThinkNode_M7_kiss_modem-1.17.0-727fc051.bin",
+									"name": "ThinkNode_M7_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -6733,16 +6823,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "Station_G3_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "Station_G3_ESP32_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "Station_G3_kiss_modem-1.17.0-727fc051.bin",
+									"name": "Station_G3_ESP32_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -6807,16 +6897,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash-wipe",
-									"name": "Station_G2_kiss_modem-1.17.0-727fc051-merged.bin",
+									"name": "Station_G2_kiss_modem-1.17.1-45c0c323-merged.bin",
 									"title": "Combined app+partition+bootloader firmware bin"
 								},
 								{
 									"type": "flash-update",
-									"name": "Station_G2_kiss_modem-1.17.0-727fc051.bin",
+									"name": "Station_G2_kiss_modem-1.17.1-45c0c323.bin",
 									"title": "App firmware bin"
 								}
 							]
@@ -6876,6 +6966,27 @@
 							"download": "Nano_G2_Ultra_room_server.*?\\.uf2"
 						}
 					}
+				},
+				{
+					"class": "community",
+					"role": "kissRadio",
+					"notice": "kissRadioNotice",
+					"version": {
+						"1.17.1": {
+							"files": [
+								{
+									"type": "flash",
+									"name": "Nano_G2_Ultra_kiss_modem-1.17.1-45c0c323.zip",
+									"title": "Firmware OTA zip"
+								},
+								{
+									"type": "download",
+									"name": "Nano_G2_Ultra_kiss_modem-1.17.1-45c0c323.uf2",
+									"title": "Firmware uf2"
+								}
+							]
+						}
+					}
 				}
 			]
 		},
@@ -6930,6 +7041,27 @@
 						"files": {
 							"flash": "R1Neo_room_server.*?\\.zip",
 							"download": "R1Neo_room_server.*?\\.uf2"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "kissRadio",
+					"notice": "kissRadioNotice",
+					"version": {
+						"1.17.1": {
+							"files": [
+								{
+									"type": "flash",
+									"name": "R1Neo_kiss_modem-1.17.1-45c0c323.zip",
+									"title": "Firmware OTA zip"
+								},
+								{
+									"type": "download",
+									"name": "R1Neo_kiss_modem-1.17.1-45c0c323.uf2",
+									"title": "Firmware uf2"
+								}
+							]
 						}
 					}
 				}
@@ -6998,16 +7130,16 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "flash",
-									"name": "ProMicro_kiss_modem-1.17.0-727fc051.zip",
+									"name": "ProMicro_kiss_modem-1.17.1-45c0c323.zip",
 									"title": "Firmware OTA zip"
 								},
 								{
 									"type": "download",
-									"name": "ProMicro_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "ProMicro_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
@@ -7068,11 +7200,11 @@
 					"role": "kissRadio",
 					"notice": "kissRadioNotice",
 					"version": {
-						"1.17.0": {
+						"1.17.1": {
 							"files": [
 								{
 									"type": "download",
-									"name": "PicoW_kiss_modem-1.17.0-727fc051.uf2",
+									"name": "PicoW_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
