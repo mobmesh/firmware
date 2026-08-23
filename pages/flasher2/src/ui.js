@@ -6,6 +6,7 @@
 import * as flowApi from './flow.js';
 import { findAvailablePrefix, generateIdentityKeypair, extractPrefix } from './gcm-reg.js';
 import { PortSelectionRequiredError, promptForSerialPort } from './serial-port.js';
+import { ManualEntryRequiredError } from './esp32.js';
 
 const elements = {
   wizard: document.getElementById('wizard'),
@@ -276,6 +277,13 @@ async function renderAction(step) {
     advance();
   } catch (error) {
     if (error instanceof PortSelectionRequiredError) return renderCheckpoint(error, step);
+    // The gesture re-enumerates the board, so retry has to re-acquire, not re-probe.
+    if (error instanceof ManualEntryRequiredError) {
+      return renderError(error, async () => {
+        await flowApi.rewindToConnect(flow);
+        render();
+      });
+    }
     renderError(error, () => render());
   }
 }
@@ -595,11 +603,14 @@ function renderDone(step) {
   // The write succeeded either way -- this says only that the settings pass did not, which
   // is the one thing the user has to finish by hand.
   const rejected = s.provision?.results?.filter((result) => !result.ok) ?? [];
+  const FINISH_BY_HAND =
+    'Connect over usb serial or bluetooth to finish device setup with MeshCore apps.';
   const warning = s.provision?.error
     ? `The firmware is written, but the settings could not be applied (${s.provision.error}). ` +
-      'Connect over serial to finish setting the device up.'
+      FINISH_BY_HAND
     : rejected.length
-      ? `The firmware is written, but ${rejected.length} setting(s) were rejected by the device.`
+      ? `The firmware is written, but ${rejected.length} setting(s) were rejected by the device. ` +
+        FINISH_BY_HAND
       : null;
   if (warning) {
     const box = document.createElement('div');

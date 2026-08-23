@@ -172,16 +172,16 @@ async function armEsp32(flow, onStatus) {
   s.mode = mode;
   onStatus(`found in ${mode}${version ? ` — ${version}` : ''}`);
 
-  if (mode === esp32.ESP32_MODE.APP) {
+  // State 3 included: both probes are passive, so "unknown" is also what a boot loop looks
+  // like. Entry is not destructive; C1's erase guard still runs downstream on §10.5.
+  if (mode !== esp32.ESP32_MODE.BOOTLOADER) {
     s.port = await esp32.enterDownloadMode(s.port, {
-      manualInstruction: 'hold the PGM/BOOT button and tap RST, then release',
+      manualInstruction:
+        'This device could not be put into flash mode automatically. Do it by hand: hold ' +
+        'the PGM/BOOT button, tap RST, then release — and try again. Nothing has been ' +
+        'written or erased.',
       onStatus,
     });
-  } else if (mode !== esp32.ESP32_MODE.BOOTLOADER) {
-    throw new FlowBlockedError(
-      'This device answers neither the CLI nor the bootloader, so what is on it is unknown. ' +
-        'It will not be erased (§10.2 state 3).'
-    );
   }
 
   s.session = await esptool.openEsptoolSession(s.port);
@@ -780,6 +780,16 @@ async function loadZoneCommands(zone) {
     console.warn(`[flow] No regional settings for ${zone}:`, error);
     return [];
   }
+}
+
+/** Re-run acquisition: the manual gesture re-enumerates the board, so the held port dies. */
+export async function rewindToConnect(flow) {
+  const { session, port } = flow.state;
+  flow.state.session = null;
+  flow.state.mode = null;
+  if (session) await esptool.closeEsptoolSession(session).catch(() => {});
+  if (port) await closeSerialPortQuietly(port);
+  flow.stepIndex = Math.max(applicableSteps(flow).findIndex((step) => step.id === 'connect'), 0);
 }
 
 // --- navigation -------------------------------------------------------------------------
