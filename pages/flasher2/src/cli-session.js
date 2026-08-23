@@ -103,7 +103,10 @@ export function startCliSession(port) {
     }
   })();
 
-  async function runCommand(command, { timeoutMs = CLI_COMMAND_TIMEOUT_MS } = {}) {
+  // `awaitReply: false` is for the handful of commands the firmware answers nothing to
+  // (`reboot`, `poweroff`). Waiting on those costs a full timeout and reports a failure
+  // for a command that worked.
+  async function runCommand(command, { timeoutMs = CLI_COMMAND_TIMEOUT_MS, awaitReply = true } = {}) {
     if (pending) throw new Error('runCommand called while a command is still in flight');
 
     // Discard anything already buffered. A response cannot precede its command, so
@@ -131,6 +134,11 @@ export function startCliSession(port) {
 
     console.log(`[cli] > ${command}`);
     await writer.write(encoder.encode(`${command}${CLI_LINE_TERMINATOR}`));
+
+    if (!awaitReply) {
+      if (CLI_INTER_COMMAND_DELAY_MS) await sleep(CLI_INTER_COMMAND_DELAY_MS);
+      return null;
+    }
 
     const answer = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => {

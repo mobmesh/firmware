@@ -12,6 +12,7 @@ import * as esptool from './esptool.js';
 import * as nrf52 from './nrf52.js';
 import * as plans from './flash-plan.js';
 import { partitionTablesMatch } from './partitions.js';
+import { buildProvisionCommands, provisionDevice } from './provision.js';
 import { STOCK_RELAY_BASE } from './constants.js';
 
 /** Which half of the mesh a node is for. Chosen early so the role list stays short. */
@@ -616,13 +617,46 @@ export const STEPS = [
     title: 'Post-flash setup',
     kind: 'action',
     applies: () => true,
+    // Runs for every role; `buildProvisionCommands` decides whether there is anything to
+    // send. Never fails the flash — the bytes are already on the device, and a settings
+    // pass that could not reach it is a warning the user can act on by hand.
     async run(flow, { onStatus }) {
-      const commands = flow.state.plan?.postFlash?.commands ?? null;
-      if (!commands) {
-        onStatus('nothing to send — §10.7 role → command table does not exist yet');
+      const s = flow.state;
+      const commands = buildProvisionCommands(s);
+      if (!commands.length) {
+        onStatus('no settings to send for this role');
         return;
       }
-      onStatus(`would send ${commands.length} command(s): ${commands.join(', ')}`);
+
+      if (flow.dryRun) {
+        onStatus(`dry run — would send ${commands.length} command(s)`);
+        s.provision = { dryRun: true, commands: commands.map((step) => step.command) };
+        return;
+      }
+
+      // The write left the esptool session holding the port; it has to go before the
+      // device can be reopened at CLI baud.
+      if (s.session) {
+        await esptool.closeEsptoolSession(s.session).catch(() => {});
+        s.session = null;
+      }
+      await closeSerialPortQuietly(s.port);
+
+      try {
+        const done = await provisionDevice(s, { preferredPort: s.port, onStatus });
+        s.port = done.port;
+        s.provision = { results: done.results };
+        const failed = done.results.filter((result) => !result.ok);
+        onStatus(
+          failed.length
+            ? `${failed.length} of ${done.results.length} settings were rejected`
+            : `applied ${done.results.length} setting(s)`
+        );
+      } catch (error) {
+        console.warn('[provision] post-flash setup failed:', error);
+        s.provision = { error: error.message };
+        onStatus(`could not finish setup over serial — ${error.message}`);
+      }
     },
   },
 

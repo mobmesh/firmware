@@ -75,7 +75,12 @@ export const CLI_LINE_ENDING = '\r\n';
 
 // `measured`. The first command can land while the device is still generating its identity
 // keypair; CLI traffic during that is suspected of corrupting it.
-export const CLI_FIRST_COMMAND_TIMEOUT_MS = 30000;
+// Measured on a Heltec v4: a full-erase install answers `ver` 37.4 s after the reset, so
+// 30 s — the shipped flasher's value — lands just inside the keypair generation and times
+// out on a device that is perfectly healthy. This is a single long window on purpose:
+// polling would put CLI traffic on the wire during keygen, which is suspected of
+// corrupting the key.
+export const CLI_FIRST_COMMAND_TIMEOUT_MS = 60000;
 
 // `design`. Once the CLI is confirmed up and answering.
 export const CLI_COMMAND_TIMEOUT_MS = 5000;
@@ -86,6 +91,19 @@ export const CLI_INTER_COMMAND_DELAY_MS = 100;
 // `design`. Liveness probe only (§10.2 state 1) — a fast no is the point. No measured
 // value exists; revisit against hardware.
 export const CLI_PROBE_TIMEOUT_MS = 1500;
+
+// Post-flash reconnect (§10.7). Wait for the device to actually drop off the bus before
+// looking for it again — the handle from the write stays openable for a moment after the
+// reset and reconnecting to it lands on a port that never speaks.
+export const PORT_DROP_TIMEOUT_MS = 10000;
+
+// A freshly written node announces its public key once it has finished generating its
+// identity — measured at +33.3 s on a Heltec v4 after a full-erase install, against
+// +0.5 s for the SPIFFS mount error that precedes it. Listening for that costs nothing
+// and puts no CLI traffic on the wire during keygen; the ceiling is only a fallback.
+export const BOOT_ANNOUNCE_TIMEOUT_MS = 60000;
+export const POST_FLASH_RECONNECT_ATTEMPTS = 20;
+export const POST_FLASH_RECONNECT_DELAY_MS = 500;
 
 // --- esptool / ROM (§7.1) ---
 
