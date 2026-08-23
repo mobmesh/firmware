@@ -574,7 +574,7 @@ export const STEPS = [
     // The renderer owns this one: a map and three fields are not a list of options.
     kind: 'location',
     applies: (flow) => LOCATION_ROLES.has(selectedRole(flow)),
-    apply: (flow, { name, latitude, longitude, heightFt, email, adminPassword, identity, identityStatus }) => {
+    async apply(flow, { name, latitude, longitude, heightFt, email, adminPassword, identity, identityStatus, zone }) {
       const s = flow.state;
       s.nodeName = name ?? '';
       s.latitude = latitude ?? null;
@@ -584,6 +584,11 @@ export const STEPS = [
       s.adminPassword = adminPassword ?? '';
       s.identity = identity ?? null;
       s.identityStatus = identityStatus ?? null;
+      // The subscription zone the pin fell in (data/zones.geojson), and the settings that
+      // go with it. Fetched here rather than at send time so the provision step can stay
+      // synchronous about what it is going to send.
+      s.zone = zone ?? null;
+      s.zoneCommands = await loadZoneCommands(s.zone);
     },
   },
 
@@ -748,6 +753,33 @@ export function chooseUploadYourOwn(flow) {
   flow.state.source = SOURCE.MANUAL;
   const index = applicableSteps(flow).findIndex((step) => step.id === 'file');
   if (index >= 0) flow.stepIndex = index;
+}
+
+/**
+ * The regional settings for a zone, from `data/<code>-settings.json`.
+ *
+ * Absent or unreadable means no settings are applied — the same rule the shipped flasher
+ * uses for a location with no entry. A zone the group has not written a file for yet must
+ * not fail a flash.
+ *
+ * Array entries are commands in order; a leading underscore parks one without deleting it,
+ * matching the convention inside the file.
+ */
+async function loadZoneCommands(zone) {
+  if (!zone) return [];
+  try {
+    const res = await fetch(new URL(`../data/${zone}-settings.json`, import.meta.url), {
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const doc = await res.json();
+    return (doc.commands ?? []).filter(
+      (command) => typeof command === 'string' && !command.startsWith('_')
+    );
+  } catch (error) {
+    console.warn(`[flow] No regional settings for ${zone}:`, error);
+    return [];
+  }
 }
 
 // --- navigation -------------------------------------------------------------------------

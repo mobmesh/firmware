@@ -358,6 +358,45 @@ async function resolveIdentity(onStatus) {
   return { identity, status: 'unchecked' };
 }
 
+// Subscription zones (data/zones.geojson). Loaded once, on the step that shows them —
+// the flash path never touches this.
+let zonesPromise = null;
+function loadZones() {
+  zonesPromise ??= fetch(new URL('../data/zones.geojson', import.meta.url), { cache: 'no-store' })
+    .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+    .catch((error) => {
+      // Cosmetic and informational only, so a missing file must not break the step.
+      console.warn('[ui] Could not load the zone overlay:', error);
+      return null;
+    });
+  return zonesPromise;
+}
+
+// Ray casting against a feature's outer rings. Holes are ignored: none of these shapes
+// has one, and a wrong answer inside a hole would still be a neighbouring zone.
+function featureContains(feature, lat, lon) {
+  const { type, coordinates } = feature.geometry;
+  const polygons = type === 'Polygon' ? [coordinates] : coordinates;
+  return polygons.some((polygon) => {
+    const ring = polygon[0];
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i];
+      const [xj, yj] = ring[j];
+      if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  });
+}
+
+/** The most specific zone containing a point: a nested zone before the state around it. */
+function zoneAt(zones, lat, lon) {
+  if (!zones) return null;
+  const hits = zones.features.filter((feature) => featureContains(feature, lat, lon));
+  if (!hits.length) return null;
+  return (hits.find((feature) => feature.properties.parent) ?? hits[0]).properties.code;
+}
+
 function renderLocation(step) {
   const { body, foot, head } = frame({ title: text(step.title), desc: text(step.desc) });
   head.classList.add('is-centred');
@@ -441,6 +480,23 @@ function renderLocation(step) {
              draft.latitude != null ? 13 : MAP_HOME_ZOOM);
   L.tileLayer(MAP_TILES, { maxZoom: 20, subdomains: 'abcd', attribution: MAP_ATTRIBUTION }).addTo(map);
   let pin = null;
+  let zones = null;
+
+  // No labels or hover: this step picks a home area to size the settings against, not a
+  // site. The fills stack where a zone sits on its state, so both are kept very low.
+  loadZones().then((loaded) => {
+    zones = loaded;
+    if (!zones) return;
+    L.geoJSON(zones, {
+      interactive: false,
+      style: (feature) =>
+        feature.properties.parent
+          ? { color: '#f9a228', weight: 2, fillColor: '#f9a228', fillOpacity: 0.04 }
+          : { color: '#2dd1bd', weight: 1, fillColor: '#2dd1bd', fillOpacity: 0.08 },
+    }).addTo(map);
+    // A pin restored from an earlier visit predates the fetch.
+    if (draft.latitude != null) draft.zone = zoneAt(zones, draft.latitude, draft.longitude);
+  });
 
   function setPoint(lat, lon, recentre) {
     draft.latitude = Number(lat.toFixed(6));
@@ -452,6 +508,7 @@ function renderLocation(step) {
       pin = L.marker([draft.latitude, draft.longitude], { draggable: true }).addTo(map);
       pin.on('dragend', () => { const p = pin.getLatLng(); setPoint(p.lat, p.lng, false); });
     }
+    draft.zone = zoneAt(zones, draft.latitude, draft.longitude);
     if (recentre) map.setView([draft.latitude, draft.longitude], Math.max(map.getZoom(), 13));
     // Coordinates appear only once there is something to show, as GCM's does.
     coordRow.hidden = false;

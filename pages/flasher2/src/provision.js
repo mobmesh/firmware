@@ -129,6 +129,13 @@ export function buildProvisionCommands(state) {
     steps.push({ command, label: 'Applying board defaults' });
   }
 
+  // §10.7's order: board defaults, then the regional set for the zone the node sits in,
+  // then the node's own identity below. Radio and interval settings, so nothing here
+  // collides with name or position.
+  for (const command of state.zoneCommands ?? []) {
+    steps.push({ command, label: 'Applying regional settings' });
+  }
+
   const name = trimmed(state.nodeName);
   const lat = degrees(state.latitude);
   const lon = degrees(state.longitude);
