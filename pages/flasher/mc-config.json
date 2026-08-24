@@ -268,321 +268,11 @@
 					"class": "ripple",
 					"role": "gui",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v12.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v12.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v12.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "WiFi map tile downloads\nnew shortcut to switches popup (sound, brightness, etc) (tap middle of titlebar)\nChannel pause/resume\nSet timezone now specified in hours (not minutes)\nSnake game improvements"
-						},
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "new touch drag scrolling, and map panning\nChannel names now up to 31 chars\ndouble space-bar press -> period + space\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nMap, Scan Local map visualisation\nnew radio presets\nChannel enable/disable preserves key\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu"
-						},
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "long tap copy/paste bug fix\nfix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nSnake mini game!"
-						},
-						"v10.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v10.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v10.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "new direct-tap UI\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nstartup sound now suppressed if sound off\nChannel scope, select '*' for un-scoped\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/361676'>Full changelog</a></b>"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "UI theme: Light, Dark or Auto\nCustom accent color support\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/361676'>Full changelog</a></b>"
-						},
-						"v9.6": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v9.6-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v9.6.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Default Scope region support\nNew advert sounds suppressed in kid mode.\n* Long-press on Login button for 'Reset Path' then Login\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/361676'>Full changelog</a></b>"
-						},
-						"v9.4": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v9.4-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v9.4.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.4 changes:\n* Display: map theme: Light, Dark, Auto\n* Discover, node details \"Delete\" menu\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/361676'>Full changelog</a></b>"
-						},
-						"v9.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v9.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v9.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.2 changes:\n* multibyte path hash support\n\nv9.1 changes:\n* Off-grid (client repeat) mode\n* faster map rendering\n* Bandwidth 500 support\n* trackball crash fix\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/361676'>Full changelog</a></b>"
-						},
-						"v8.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v8.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v8.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Updated UI colour scheme\n* New Regions screen, with 'Scan Local' menu\n* New 'Owner Info' menu, from Discover > Scan Local\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/361676'>Full changelog</a></b>"
-						},
-						"v7.14": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v7.14-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v7.14.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* NEW: 'Scan Local' menu in Discover\n* Message text: now converts accented chars to ASCII equivalent\n* Popular emojis now converted, eg ':thumbsup'\n* Contacts can be tagged and custom notes added\n* Repeater CLI, 'neighbors' command now using binary req/resp\n* Max group channels now upped to 6\n* Bug fix: some CLI responses were lost from dup timestamp.\n* #channel key calc now forces lowercase\n* Better canned messages for CLI screens\n* Group channel message, 'Reply To' menu\n* Kid Mode: now supports up to 1 group channel chat"
-						},
-						"v7.12": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v7.12-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v7.12.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Vibe pref now saved\n* Remote admin prefixes, extra spaces allowed\n* Presets updated\n* Msg details: ‘heard by’ \n* Repeater and room CLI: “get” command (get full telemetry)\n* Channel details: Alerts ON/OFF menu"
-						},
-						"v7.11": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v7.11-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v7.11.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* New: Kid Mode and remote admin\n* message details, ENTER to goto next message\n* Group channel message rendering improved"
-						},
-						"v7.10": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v7.10-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v7.10.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* New network: region presets\n* Security: new PIN Lock Screen\n* Pixel art: improved colour picker\n* Message details: new ‘Show on Map’ menu\n* New clipboard system: long press for copy/paste"
-						},
-						"v7.9": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v7.9-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v7.9.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Max group channels now 4\n* Auto channel support (name starting with ‘#’)\n* Home Screen: ‘$’ key jumps to next contact with unread > 0\n* New message details screen (scroll up to msg, then select)\n* GPS Config screen redesign\n* Home Screen, tap on top-right of screen opens GPS Info\n* Repeater and room server admin CLI: added “setperm” and “get acl” support"
-						},
-						"v7.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v7.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v7.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Max contacts now doubled\n* Only (home) contacts can now DM you\n* Home Screen, swipe left/right to go thru filters\n* Identity screen: new advert location pref\n* New “Permissions” screen: set Telemetry permissions\n* Map view: new “Set Advert Loc” menu.\n* Canned Message: special “< prev msg>” item (re-type last msg)"
-						},
-						"v7.6": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v7.6-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v7.6.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* \"Multi ACKs\" support (Optimise menu)\n* Advert path details (from node details screen)\n* Group channel chats, message path details\n* Home menu: Brightness DAY/NIGHT\n* Canned Messages support\n* MeshCore lib updates/fixes"
-						},
-						"v7.5": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v7.5-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v7.5.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Sensor node support\n* Preamble now 16\n* Home Screen: node ID prefixes displayed\n* Discover list: space to toggle ID prefixes"
-						},
-						"v7.4": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v7.4-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v7.4.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Discover, Node details now shows advert path\n* New GPS telemetry permissions: ALLOW:Home, ALLOW:All\n* Group channel outbound messages now with confirmation counters\n* T-Deck Plus (new keyboard model) auto backlight on/off\n* Map labels now non-overlapping\n* Network profiles now with customisable BW and CR"
-						},
-						"v7.3": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-v7.3-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-v7.3.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* GPS tracks!\n* Optimise menu: Interference threshold, AGC reset interval"
-						},
-						"v7.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-UKStore-v7.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-UKStore-v7.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Channel details hex or base64 input\n* Screen off long press shortened to 1 sec\n* A-Z key press now jumps to contacts\n* ‘@‘ key now refreshes/reorders list by most recent advert\n* MeshCore lib updates/fixes\n* better Help/Tutorial screens"
-						},
-						"v7.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-UKStore-v7.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-UKStore-v7.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Saved paths, manual set path,\n* Trackball press is now select, long press for screen off,\n* Room keep-alive packets now not sent,\n* Discover screen, max now 140,\n* New customisable sounds: new-advert.mp3, existing-advert.mp3"
+					"github-ripple": {
+						"type": "t-deck-plus",
+						"files": {
+							"flash-wipe": "Ultra-TDeck-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TDeck-[^-]+\\.bin"
 						}
 					}
 				},
@@ -590,321 +280,11 @@
 					"class": "ripple",
 					"role": "guiSD",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v12.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v12.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v12.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "WiFi map tile downloads\nnew shortcut to switches popup (sound, brightness, etc) (tap middle of titlebar)\nChannel pause/resume\nSet timezone now specified in hours (not minutes)\nSnake game improvements"
-						},
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "new touch drag scrolling, and map panning\nChannel names now up to 31 chars\ndouble space-bar press -> period + space\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nMap, Scan Local map visualisation\nnew radio presets\nChannel enable/disable preserves key\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu"
-						},
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "long tap copy/paste bug fix\nfix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nSnake mini game!"
-						},
-						"v10.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v10.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v10.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "new direct-tap UI\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nstartup sound now suppressed if sound off\nChannel scope, select '*' for un-scoped\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/361676'>Full changelog</a></b>"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "UI theme: Light, Dark or Auto\nCustom accent color support\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/361676'>Full changelog</a></b>"
-						},
-						"v9.6": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v9.6-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v9.6.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Default Scope region support\nNew advert sounds suppressed in kid mode.\n* Long-press on Login button for 'Reset Path' then Login\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/361676'>Full changelog</a></b>"
-						},
-						"v9.4": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v9.4-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v9.4.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.4 changes:\n* Display: map theme: Light, Dark, Auto\n* Discover, node details \"Delete\" menu\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/361676'>Full changelog</a></b>"
-						},
-						"v9.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v9.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v9.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.2 changes:\n* multibyte path hash support\n\nv9.1 changes:\n* Off-grid (client repeat) mode\n* faster map rendering\n* Bandwidth 500 support\n* trackball crash fix\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/361676'>Full changelog</a></b>"
-						},
-						"v8.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v8.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v8.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Updated UI colour scheme\n* New Regions screen, with 'Scan Local' menu\n* New 'Owner Info' menu, from Discover > Scan Local\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/361676'>Full changelog</a></b>"
-						},
-						"v7.14": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v7.14-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v7.14.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* NEW: 'Scan Local' menu in Discover\n* Message text: now converts accented chars to ASCII equivalent\n* Popular emojis now converted, eg ':thumbsup'\n* Contacts can be tagged and custom notes added\n* Repeater CLI, 'neighbors' command now using binary req/resp\n* Max group channels now upped to 6\n* Bug fix: some CLI responses were lost from dup timestamp.\n* #channel key calc now forces lowercase\n* Better canned messages for CLI screens\n* Group channel message, 'Reply To' menu\n* Kid Mode: now supports up to 1 group channel chat"
-						},
-						"v7.12": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v7.12-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v7.12.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Vibe pref now saved\n* Remote admin prefixes, extra spaces allowed\n* Presets updated\n* Msg details: ‘heard by’ \n* Repeater and room CLI: “get” command (get full telemetry)\n* Channel details: Alerts ON/OFF menu"
-						},
-						"v7.11": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v7.11-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v7.11.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* New: Kid Mode and remote admin\n* message details, ENTER to goto next message\n* Group channel message rendering improved"
-						},
-						"v7.10": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v7.10-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v7.10.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* New network: region presets\n* Security: new PIN Lock Screen\n* Pixel art: improved colour picker\n* Message details: new ‘Show on Map’ menu\n* New clipboard system: long press for copy/paste"
-						},
-						"v7.9": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v7.9-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v7.9.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Max group channels now 4\n* Auto channel support (name starting with ‘#’)\n* Home Screen: ‘$’ key jumps to next contact with unread > 0\n* New message details screen (scroll up to msg, then select)\n* GPS Config screen redesign\n* Home Screen, tap on top-right of screen opens GPS Info\n* Repeater and room server admin CLI: added “setperm” and “get acl” support"
-						},
-						"v7.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v7.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v7.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Max contacts now doubled\n* Only (home) contacts can now DM you\n* Home Screen, swipe left/right to go thru filters\n* Identity screen: new advert location pref\n* New “Permissions” screen: set Telemetry permissions\n* Map view: new “Set Advert Loc” menu.\n* Canned Message: special “< prev msg>” item (re-type last msg)"
-						},
-						"v7.6": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v7.6-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v7.6.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* \"Multi ACKs\" support (Optimise menu)\n* Advert path details (from node details screen)\n* Group channel chats, message path details\n* Home menu: Brightness DAY/NIGHT\n* Canned Messages support\n* MeshCore lib updates/fixes"
-						},
-						"v7.5": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v7.5-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v7.5.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Sensor node support\n* Preamble now 16\n* Home Screen: node ID prefixes displayed\n* Discover list: space to toggle ID prefixes"
-						},
-						"v7.4": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v7.4-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v7.4.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Discover, Node details now shows advert path\n* New GPS telemetry permissions: ALLOW:Home, ALLOW:All\n* Group channel outbound messages now with confirmation counters\n* T-Deck Plus (new keyboard model) auto backlight on/off\n* Map labels now non-overlapping\n* Network profiles now with customisable BW and CR"
-						},
-						"v7.3": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-v7.3-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-v7.3.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* GPS tracks!\n* Optimise menu: Interference threshold, AGC reset interval"
-						},
-						"v7.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-UKStore-v7.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-UKStore-v7.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Channel details hex or base64 input\n* Screen off long press shortened to 1 sec\n* A-Z key press now jumps to contacts\n* ‘@‘ key now refreshes/reorders list by most recent advert\n* MeshCore lib updates/fixes\n* better Help/Tutorial screens"
-						},
-						"v7.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeck-SD-UKStore-v7.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeck-SD-UKStore-v7.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Saved paths, manual set path,\n* Trackball press is now select, long press for screen off,\n* Room keep-alive packets now not sent,\n* Discover screen, max now 140,\n* New customisable sounds: new-advert.mp3, existing-advert.mp3"
+					"github-ripple": {
+						"type": "t-deck-plus",
+						"files": {
+							"flash-wipe": "Ultra-TDeck-SD-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TDeck-SD-[^-]+\\.bin"
 						}
 					}
 				},
@@ -965,51 +345,11 @@
 					"class": "ripple",
 					"role": "gui",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckMax-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckMax-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Channel names now up to 31 chars\ndouble space-bar press -> period + space\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nMap, Scan Local map visualisation\nnew radio presets\nChannel enable/disable preserves key\nTimestamps menu fix\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu"
-						},
-						"v10.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckMax-v10.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckMax-v10.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Internal/External antenna switching support (from \"sx1262\" menu)\nBacklight brightness percent preference added\nGrid icon shortcut for Backlight on/off\nMap, visual 'Scan Local'\nNetherlands radio preset added"
-						},
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckMax-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckMax-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "long tap copy/paste bug fix\nfix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
+					"github-ripple": {
+						"type": "t-deck-max",
+						"files": {
+							"flash-wipe": "Ultra-TDeckMax-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TDeckMax-[^-]+\\.bin"
 						}
 					}
 				},
@@ -1017,51 +357,11 @@
 					"class": "ripple",
 					"role": "guiSD",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckMax-SD-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckMax-SD-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Channel names now up to 31 chars\ndouble space-bar press -> period + space\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nMap, Scan Local map visualisation\nnew radio presets\nChannel enable/disable preserves key\nTimestamps menu fix\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu"
-						},
-						"v10.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckMax-SD-v10.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckMax-SD-v10.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Internal/External antenna switching support (from \"sx1262\" menu)\nBacklight brightness percent preference added\nGrid icon shortcut for Backlight on/off\nMap, visual 'Scan Local'\nNetherlands radio preset added"
-						},
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckMax-SD-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckMax-SD-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "long tap copy/paste bug fix\nfix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
+					"github-ripple": {
+						"type": "t-deck-max",
+						"files": {
+							"flash-wipe": "Ultra-TDeckMax-SD-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TDeckMax-SD-[^-]+\\.bin"
 						}
 					}
 				}
@@ -1093,156 +393,6 @@
 								}
 							],
 							"notes": "long tap copy/paste bug fix\nfix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "repeater CLI text input helper (tap on bottom input textbox)\nDefault Scope region support\nLong-press on Login button for 'Reset Path' then Login\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/450194'>Full changelog</a></b>"
-						},
-						"v9.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-v9.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-v9.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.2 changes:\n* multibyte path hash support\n\nv9.1 changes:\n* Off-grid (client repeat) mode\n* Bandwidth 500 support\n\nv9.0 changes:\n*support for v1.0 and v1.1 hardware models (separate .bin files in zip)\n* Discover list now overwrites oldest entry if full\n* new UI: customisable home icon grid, and new icon grid menus\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/450194'>Full changelog</a></b>"
-						},
-						"v8.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-v8.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-v8.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Updated UI colour scheme\n* New Regions screen, with 'Scan Local' menu\n* New 'Owner Info' menu, from Discover > Scan Local\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/450194'>Full changelog</a></b>"
-						},
-						"v7.14": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-v7.14-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-v7.14.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* NEW: 'Scan Local' menu in Discover\n* Message text: now converts accented chars to ASCII equivalent\n* Popular emojis now converted, eg ':thumbsup'\n* Contacts can be tagged and custom notes added\n* Repeater CLI, 'neighbors' command now using binary req/resp\n* Max group channels now upped to 6\n* Bug fix: some CLI responses were lost from dup timestamp.\n* #channel key calc now forces lowercase\n* Better canned messages for CLI screens\n* Group channel message, 'Reply To' menu\n* Kid Mode: now supports up to 1 group channel chat"
-						},
-						"v7.12": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-v7.12-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-v7.12.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Vibe pref now saved\n* Display off pref (to locked screen)\n* UI style updates\n* Remote admin prefixes, extra spaces allowed\n* Presets updated\n* Msg details: ‘heard by’\n* Repeater and room CLI: “get” command (get full telemetry)\n* Channel details: Alerts ON/OFF menu"
-						},
-						"v7.11": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-v7.11-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-v7.11.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* New: Kid Mode and remote admin\n* message details, ENTER to goto next message\n* Group channel message rendering improved"
-						},
-						"v7.10": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-v7.10-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-v7.10.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* New network: region presets\n* Security: new PIN Lock Screen\n* Map view: keys 0..9 change map contrast\n* Message details: new ‘Show on Map’ menu\n* New clipboard system: long press for copy/paste\n* Locked screen redesign\n* LED alert option: now flashes keyboard backlight"
-						},
-						"v7.9": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-v7.9-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-v7.9.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Max group channels now 4\n* Auto channel support (name starting with ‘#’)\n* Home Screen: ‘$’ key jumps to next contact with unread > 0\n* Home Screen, tap on top-right of screen opens GPS Info\n* Repeater and room server admin CLI: added “setperm” and “get acl” support\n* Map tiles dir now “/tiles-bw” (or “/tiles” as fallback)"
-						},
-						"v7.8": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-v7.8-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-v7.8.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Map support!\n* GPS Config screen fixed\n* Lock screen, current date added\n* Various screen layout fixes"
-						},
-						"v7.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-v7.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-v7.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Initial release"
 						}
 					}
 				},
@@ -1265,247 +415,67 @@
 								}
 							],
 							"notes": "long tap copy/paste bug fix\nfix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-SD-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-SD-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "repeater CLI text input helper (tap on bottom input textbox)\nDefault Scope region support\nLong-press on Login button for 'Reset Path' then Login\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/450194'>Full changelog</a></b>"
-						},
-						"v9.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-SD-v9.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-SD-v9.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.2 changes:\n* multibyte path hash support\n\nv9.1 changes:\n* Off-grid (client repeat) mode\n* Bandwidth 500 support\n\nv9.0 changes:\n*support for v1.0 and v1.1 hardware models (separate .bin files in zip)\n* Discover list now overwrites oldest entry if full\n* new UI: customisable home icon grid, and new icon grid menus\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/450194'>Full changelog</a></b>"
-						},
-						"v7.14": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-SD-v7.14-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-SD-v7.14.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* NEW: 'Scan Local' menu in Discover\n* Message text: now converts accented chars to ASCII equivalent\n* Popular emojis now converted, eg ':thumbsup'\n* Contacts can be tagged and custom notes added\n* Repeater CLI, 'neighbors' command now using binary req/resp\n* Max group channels now upped to 6\n* Bug fix: some CLI responses were lost from dup timestamp.\n* #channel key calc now forces lowercase\n* Better canned messages for CLI screens\n* Group channel message, 'Reply To' menu\n* Kid Mode: now supports up to 1 group channel chat"
-						},
-						"v7.12": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-SD-v7.12-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-SD-v7.12.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Vibe pref now saved\n* Display off pref (to locked screen)\n* UI style updates\n* Remote admin prefixes, extra spaces allowed\n* Presets updated\n* Msg details: ‘heard by’\n* Repeater and room CLI: “get” command (get full telemetry)\n* Channel details: Alerts ON/OFF menu"
-						},
-						"v7.11": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-SD-v7.11-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-SD-v7.11.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* New: Kid Mode and remote admin\n* message details, ENTER to goto next message\n* Group channel message rendering improved"
-						},
-						"v7.10": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-SD-v7.10-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-SD-v7.10.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* New network: region presets\n* Security: new PIN Lock Screen\n* Map view: keys 0..9 change map contrast\n* Message details: new ‘Show on Map’ menu\n* New clipboard system: long press for copy/paste\n* Locked screen redesign\n* LED alert option: now flashes keyboard backlight"
-						},
-						"v7.9": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-SD-v7.9-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-SD-v7.9.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Max group channels now 4\n* Auto channel support (name starting with ‘#’)\n* Home Screen: ‘$’ key jumps to next contact with unread > 0\n* Home Screen, tap on top-right of screen opens GPS Info\n* Repeater and room server admin CLI: added “setperm” and “get acl” support\n* Map tiles dir now “/tiles-bw” (or “/tiles” as fallback)"
-						},
-						"v7.8": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-SD-v7.8-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-SD-v7.8.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Map support!\n* GPS Config screen fixed\n* Lock screen, current date added\n* Various screen layout fixes"
-						},
-						"v7.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckPro-SD-v7.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckPro-SD-v7.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Initial release"
 						}
 					}
-				},
+				}
+			]
+		},
+		{
+			"maker": "lilygo",
+			"name": "LilyGo T-Deck Pro v1.1",
+			"tooltip": "<img class='device' src='/img/lilygo_tdeck_pro.svg'>",
+			"icon": "/img/lora.svg",
+			"type": "esp32",
+			"firmware": [
 				{
 					"class": "ripple",
 					"role": "gui",
-					"title": "Ripple GUI (T-Deck Pro v1.1)",
+					"title": "[1st Edition] Ripple GUI",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckProV1.1B-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckProV1.1B-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "long tap copy/paste bug fix\nfix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckProV1.1B-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckProV1.1B-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "repeater CLI text input helper (tap on bottom input textbox)\nDefault Scope region support\nLong-press on Login button for 'Reset Path' then Login\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/450194'>Full changelog</a></b>"
-						},
-						"v9.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckProV11-v9.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckProV11-v9.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.2 changes:\n* multibyte path hash support\n\nv9.1 changes:\n* Off-grid (client repeat) mode\n* Bandwidth 500 support\n\nv9.0 changes:\n*support for v1.0 and v1.1 hardware models (separate .bin files in zip)\n* Discover list now overwrites oldest entry if full\n* new UI: customisable home icon grid, and new icon grid menus\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/450194'>Full changelog</a></b>"
+					"github-ripple": {
+						"type": "t-deck-prov11",
+						"files": {
+							"flash-wipe": "Ultra-TDeckProV1.1-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TDeckProV1.1-[^-]+\\.bin"
 						}
 					}
 				},
 				{
 					"class": "ripple",
 					"role": "guiSD",
-					"title": "Ripple GUI: data on SD card (T-Deck Pro v1.1)",
+					"title":"[1st Edition] Ripple GUI: data on SD card",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckProV1.1B-SD-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckProV1.1B-SD-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "long tap copy/paste bug fix\nfix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckProV1.1B-SD-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckProV1.1B-SD-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "repeater CLI text input helper (tap on bottom input textbox)\nDefault Scope region support\nLong-press on Login button for 'Reset Path' then Login\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/450194'>Full changelog</a></b>"
-						},
-						"v9.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TDeckProV11-SD-v9.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TDeckProV11-SD-v9.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.2 changes:\n* multibyte path hash support\n\nv9.1 changes:\n* Off-grid (client repeat) mode\n* Bandwidth 500 support\n\nv9.0 changes:\n*support for v1.0 and v1.1 hardware models (separate .bin files in zip)\n* Discover list now overwrites oldest entry if full\n* new UI: customisable home icon grid, and new icon grid menus\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/450194'>Full changelog</a></b>"
+					"github-ripple": {
+						"type": "t-deck-prov11",
+						"files": {
+							"flash-wipe": "Ultra-TDeckProV1.1-SD-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TDeckProV1.1-SD-[^-]+\\.bin"
+						}
+					}
+				},
+				{
+					"class": "ripple",
+					"role": "gui",
+					"title": "[2nd Edition] Ripple GUI",
+					"notice": "rippleUserGuide",
+					"github-ripple": {
+						"type": "t-deck-prov11",
+						"files": {
+							"flash-wipe": "Ultra-TDeckProV1.1-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TDeckProV1.1-[^-]+\\.bin"
+						}
+					}
+				},
+				{
+					"class": "ripple",
+					"role": "guiSD",
+					"title":"[2nd Edition] Ripple GUI: data on SD card",
+					"notice": "rippleUserGuide",
+					"github-ripple": {
+						"type": "t-deck-prov11",
+						"files": {
+							"flash-wipe": "Ultra-TDeckProV1.1-2nd-SD-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TDeckProV1.1-2nd-SD-[^-]+\\.bin"
 						}
 					}
 				}
@@ -1522,66 +492,11 @@
 					"class": "ripple",
 					"role": "gui",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-T5Pro-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-T5Pro-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Channel names now up to 31 chars\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nMap, Scan Local map visualisation\nnew radio presets\nChannel enable/disable preserves key\nTimestamps menu fix\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu\nGrid icon shortcut for Backlight on/off"
-						},
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-T5Pro-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-T5Pro-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "long tap copy/paste bug fix\nfix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped\nDefault Scope region support\nDiscover, node details \"Delete\" menu"
-						},
-						"v9.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-T5Pro-v9.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-T5Pro-v9.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.2 changes:\n* multibyte path hash support\n\nv9.1 changes:\n* Off-grid (client repeat) mode\n* Bandwidth 500 support\n\n<b><a target='blank' href='https://buymeacoffee.com/ripplebiz/e/478441'>full changelog</a></b>"
-						},
-						"v8.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-T5Pro-v8.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-T5Pro-v8.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v8.2 changes:\n* updated UI colour scheme\n* new Regions screen, with 'Scan Local' menu\n* new 'Owner Info' menu, from Discover > Scan Local\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/478441'>Full changelog</a></b>"
+					"github-ripple": {
+						"type": "t5-pro",
+						"files": {
+							"flash-wipe": "Ultra-T5Pro-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-T5Pro-[^-]+\\.bin"
 						}
 					}
 				},
@@ -1589,36 +504,11 @@
 					"class": "ripple",
 					"role": "guiSD",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-T5Pro-SD-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-T5Pro-SD-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Channel names now up to 31 chars\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nMap, Scan Local map visualisation\nnew radio presets\nChannel enable/disable preserves key\nTimestamps menu fix\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu\nGrid icon shortcut for Backlight on/off"
-						},
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-T5Pro-SD-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-T5Pro-SD-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "long tap copy/paste bug fix\nfix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped\nDefault Scope region support\nDiscover, node details \"Delete\" menu"
+					"github-ripple": {
+						"type": "t5-pro",
+						"files": {
+							"flash-wipe": "Ultra-T5Pro-SD-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-T5Pro-SD-[^-]+\\.bin"
 						}
 					}
 				}
@@ -1636,261 +526,11 @@
 					"role": "gui",
 					"title": "[SX1262] Ripple GUI",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SX1262-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SX1262-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Channel names now up to 31 chars\ndouble space-bar press -> period + space\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nMap, Scan Local map visualisation\nnew radio presets\nChannel enable/disable preserves key\nTimestamps menu fix\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu"
-						},
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SX1262-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SX1262-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "fix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nSnake mini game!\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SX1262-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SX1262-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "UI theme: Light, Dark or Auto\nCustom accent color support\n\n<b><a target='blank' href='https://buymeacoffee.com/ripplebiz/e/415984'>full changelog</a></b>"
-						},
-						"v9.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SX1262-v9.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SX1262-v9.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.2 changes:\n* multibyte path hash support\n\nv9.1 changes:\n* Off-grid (client repeat) mode\n* Bandwidth 500 support\n\n<b><a target='blank' href='https://buymeacoffee.com/ripplebiz/e/415984'>full changelog</a></b>"
-						},
-						"v8.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-sx1262-v8.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-sx1262-v8.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Updated UI colour scheme\n* New Regions screen, with 'Scan Local' menu\n* New 'Owner Info' menu, from Discover > Scan Local\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/415984'>Full changelog</a></b>"
-						},
-						"v7.14": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-sx1262-v7.14-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-sx1262-v7.14.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* NEW: 'Scan Local' menu in Discover\n* Message text: now converts accented chars to ASCII equivalent\n* Popular emojis now converted, eg ':thumbsup'\n* Contacts can be tagged and custom notes added\n* Repeater CLI, 'neighbors' command now using binary req/resp\n* Max group channels now upped to 6\n* Bug fix: some CLI responses were lost from dup timestamp.\n* #channel key calc now forces lowercase\n* Better canned messages for CLI screens\n* Group channel message, 'Reply To' menu\n* Kid Mode: now supports up to 1 group channel chat"
-						},
-						"v7.12": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-v7.12-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-v7.12.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Vibe pref now saved\n* Remote admin prefixes, extra spaces allowed\n* Presets updated\n* Msg details: ‘heard by’\n* Repeater and room CLI: “get” command (get full telemetry)\n* Channel details: Alerts ON/OFF menu"
-						},
-						"v7.11": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-v7.11-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-v7.11.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* New: Kid Mode and remote admin\n* message details, ENTER to goto next message\n* Group channel message rendering improved"
-						},
-						"v7.10": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-v7.10-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-v7.10.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* New network: region presets\n* Security: new PIN Lock Screen\n* Channel details: “Type ‘#’” menu\n* Message details: new ‘Show on Map’ menu\n* New clipboard system: long press scroll wheel for copy/paste"
-						},
-						"v7.9": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-v7.9-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-v7.9.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Max group channels now 4\n* Auto channel support (name starting with ‘#’)\n* Scroll wheel disabled while screen off\n* Keyboard backlight now flashes on new message (config via LED menu option)\n* Home Screen: ‘$’ key jumps to next contact with unread > 0\n* New message details screen (scroll up to msg, then select)\n* GPS Config screen redesign\n* Home Screen, tap on top-right of screen opens GPS Info\n* Repeater and room server admin CLI: added “setperm” and “get acl” support"
-						},
-						"v7.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-v7.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-v7.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Max contacts now doubled\n* Only (home) contacts can now DM you\n* Home Screen, ‘.’ and ‘,’ keys to go thru filters\n* Identity screen: new advert location pref\n* New “Permissions” screen: set Telemetry permissions\n* Canned Message: special “< prev msg>” item (re-type last msg)\n* Long press Enter and Backspace now more snappy\n* New GPS power ON / OFF setting\n* New Brightness: DAY / NIGHT setting"
-						},
-						"v7.6": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-v7.6-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-v7.6.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* \"Multi ACKs\" support (Optimise menu)\n* Advert path details (from node details screen)\n* Group channel chats, message path details\n* Home menu: Brightness DAY/NIGHT\n* Canned Messages support\n* MeshCore lib updates/fixes"
-						},
-						"v7.5": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-v7.5-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-v7.5.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Sensor node support\n* Map panning, keys: W,S,A,D\n* Preamble now 16\n* Home Screen: node ID prefixes displayed\n* Discover list: space to toggle ID prefixes"
-						},
-						"v7.4": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-v7.4-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-v7.4.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Discover, Node details now shows advert path\n* New GPS telemetry permissions: ALLOW:Home, ALLOW:All\n* Group channel outbound messages now with confirmation counters\n* Map labels now non-overlapping\n* Network profiles now with customisable BW and CR"
-						},
-						"v7.3": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-v7.3-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-v7.3.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* GPS tracks!\n* Optimise menu: Interference threshold, AGC reset interval"
-						},
-						"v7.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-UKStore-v7.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-UKStore-v7.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Channel details hex or base64 input\n* A-Z key press now jumps to contacts\n* ‘@‘ key now refreshes/reorders list by most recent advert\n* MeshCore lib updates/fixes"
-						},
-						"v7.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-UKStore-v7.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-UKStore-v7.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Initial release"
+					"github-ripple": {
+						"type": "t-pager",
+						"files": {
+							"flash-wipe": "Ultra-TPager-SX1262-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TPager-SX1262-[^-]+\\.bin"
 						}
 					}
 				},
@@ -1899,246 +539,11 @@
 					"role": "guiSD",
 					"title": "[SX1262] Ripple GUI: data on SD card",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SX1262-SD-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SX1262-SD-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Channel names now up to 31 chars\ndouble space-bar press -> period + space\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nMap, Scan Local map visualisation\nnew radio presets\nChannel enable/disable preserves key\nTimestamps menu fix\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu"
-						},
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SX1262-SD-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SX1262-SD-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "fix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nSnake mini game!\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SX1262-SD-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SX1262-SD-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "UI theme: Light, Dark or Auto\nCustom accent color support\n\n<b><a target='blank' href='https://buymeacoffee.com/ripplebiz/e/415984'>full changelog</a></b>"
-						},
-						"v9.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SX1262-SD-v9.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SX1262-SD-v9.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.2 changes:\n* multibyte path hash support\n\nv9.1 changes:\n* Off-grid (client repeat) mode\n* Bandwidth 500 support\n\n<b><a target='blank' href='https://buymeacoffee.com/ripplebiz/e/415984'>full changelog</a></b>"
-						},
-						"v8.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-sx1262-v8.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-sx1262-v8.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Updated UI colour scheme\n* New Regions screen, with 'Scan Local' menu\n* New 'Owner Info' menu, from Discover > Scan Local\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/415984'>Full changelog</a></b>"
-						},
-						"v7.14": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-sx1262-v7.14-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-sx1262-v7.14.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* NEW: 'Scan Local' menu in Discover\n* Message text: now converts accented chars to ASCII equivalent\n* Popular emojis now converted, eg ':thumbsup'\n* Contacts can be tagged and custom notes added\n* Repeater CLI, 'neighbors' command now using binary req/resp\n* Max group channels now upped to 6\n* Bug fix: some CLI responses were lost from dup timestamp.\n* #channel key calc now forces lowercase\n* Better canned messages for CLI screens\n* Group channel message, 'Reply To' menu\n* Kid Mode: now supports up to 1 group channel chat"
-						},
-						"v7.12": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-v7.12-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-v7.12.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Vibe pref now saved\n* Remote admin prefixes, extra spaces allowed\n* Presets updated\n* Msg details: ‘heard by’ \n* Repeater and room CLI: “get” command (get full telemetry)\n* Channel details: Alerts ON/OFF menu"
-						},
-						"v7.11": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-v7.11-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-v7.11.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* New: Kid Mode and remote admin\n* message details, ENTER to goto next message\n* Group channel message rendering improved"
-						},
-						"v7.10": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-v7.10-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-v7.10.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* New network: region presets\n* Security: new PIN Lock Screen\n* Channel details: “Type ‘#’” menu\n* Message details: new ‘Show on Map’ menu\n* New clipboard system: long press scroll wheel for copy/paste"
-						},
-						"v7.9": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-v7.9-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-v7.9.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Max group channels now 4\n* Auto channel support (name starting with ‘#’)\n* Scroll wheel disabled while screen off\n* Keyboard backlight now flashes on new message (config via LED menu option)\n* Home Screen: ‘$’ key jumps to next contact with unread > 0\n* New message details screen (scroll up to msg, then select)\n* GPS Config screen redesign\n* Home Screen, tap on top-right of screen opens GPS Info\n* Repeater and room server admin CLI: added “setperm” and “get acl” support"
-						},
-						"v7.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-v7.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-v7.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Max contacts now doubled\n* Only (home) contacts can now DM you\n* Home Screen, ‘.’ and ‘,’ keys to go thru filters\n* Identity screen: new advert location pref\n* New “Permissions” screen: set Telemetry permissions\n* Canned Message: special “< prev msg>” item (re-type last msg)\n* Long press Enter and Backspace now more snappy\n* New GPS power ON / OFF setting\n* New Brightness: DAY / NIGHT setting"
-						},
-						"v7.5": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-v7.5-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-v7.5.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Sensor node support\n* Map panning, keys: W,S,A,D\n* Preamble now 16\n* Home Screen: node ID prefixes displayed\n* Discover list: space to toggle ID prefixes"
-						},
-						"v7.4": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-v7.4-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-v7.4.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Discover, Node details now shows advert path\n* New GPS telemetry permissions: ALLOW:Home, ALLOW:All\n* Group channel outbound messages now with confirmation counters\n* Map labels now non-overlapping\n* Network profiles now with customisable BW and CR"
-						},
-						"v7.3": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-v7.3-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-v7.3.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* GPS tracks!\n* Optimise menu: Interference threshold, AGC reset interval"
-						},
-						"v7.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-UKStore-v7.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-UKStore-v7.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Channel details hex or base64 input\n* A-Z key press now jumps to contacts\n* ‘@‘ key now refreshes/reorders list by most recent advert\n* MeshCore lib updates/fixes"
-						},
-						"v7.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-UKStore-v7.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-UKStore-v7.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Initial release"
+					"github-ripple": {
+						"type": "t-pager",
+						"files": {
+							"flash-wipe": "Ultra-TPager-SX1262-SD-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TPager-SX1262-SD-[^-]+\\.bin"
 						}
 					}
 				},
@@ -2147,111 +552,11 @@
 					"role": "gui",
 					"title": "[LR1121] Ripple GUI",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-LR1121-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-LR1121-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Channel names now up to 31 chars\ndouble space-bar press -> period + space\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nMap, Scan Local map visualisation\nnew radio presets\nChannel enable/disable preserves key\nTimestamps menu fix\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu"
-						},
-						"v10.1B": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-LR1121-v10.1B-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-LR1121-v10.1B.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Bugfixes"
-						},
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-LR1121-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-LR1121-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "fix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nSnake mini game!\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-LR1121-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-LR1121-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "UI theme: Light, Dark or Auto\nCustom accent color support\n\n<b><a target='blank' href='https://buymeacoffee.com/ripplebiz/e/415984'>full changelog</a></b>"
-						},
-						"v9.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-LR1121-v9.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-LR1121-v9.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.2 changes:\n* multibyte path hash support\n\nv9.1 changes:\n* Off-grid (client repeat) mode\n* Bandwidth 500 support\n\n<b><a target='blank' href='https://buymeacoffee.com/ripplebiz/e/415984'>full changelog</a></b>"
-						},
-						"v8.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-LR1121-v8.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-LR1121-v8.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Updated UI colour scheme\n* New Regions screen, with 'Scan Local' menu\n* New 'Owner Info' menu, from Discover > Scan Local\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/415984'>Full changelog</a></b>"
-						},
-						"v7.14": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-LR1121-v7.14-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-LR1121-v7.14.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* NEW: 'Scan Local' menu in Discover\n* Message text: now converts accented chars to ASCII equivalent\n* Popular emojis now converted, eg ':thumbsup'\n* Contacts can be tagged and custom notes added\n* Repeater CLI, 'neighbors' command now using binary req/resp\n* Max group channels now upped to 6\n* Bug fix: some CLI responses were lost from dup timestamp.\n* #channel key calc now forces lowercase\n* Better canned messages for CLI screens\n* Group channel message, 'Reply To' menu\n* Kid Mode: now supports up to 1 group channel chat"
+					"github-ripple": {
+						"type": "t-pager",
+						"files": {
+							"flash-wipe": "Ultra-TPager-LR1121-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TPager-LR1121-[^-]+\\.bin"
 						}
 					}
 				},
@@ -2260,111 +565,11 @@
 					"role": "guiSD",
 					"title": "[LR1121] Ripple GUI: data on SD card",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-LR1121-SD-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-LR1121-SD-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Channel names now up to 31 chars\ndouble space-bar press -> period + space\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nMap, Scan Local map visualisation\nnew radio presets\nChannel enable/disable preserves key\nTimestamps menu fix\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu"
-						},
-						"v10.1B": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-LR1121-SD-v10.1B-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-LR1121-SD-v10.1B.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Bugfixes"
-						},
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-LR1121-SD-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-LR1121-SD-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "fix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nSnake mini game!\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-LR1121-SD-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-LR1121-SD-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "UI theme: Light, Dark or Auto\nCustom accent color support\n\n<b><a target='blank' href='https://buymeacoffee.com/ripplebiz/e/415984'>full changelog</a></b>"
-						},
-						"v9.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-LR1121-SD-v9.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-LR1121-SD-v9.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "v9.2 changes:\n* multibyte path hash support\n\nv9.1 changes:\n* Off-grid (client repeat) mode\n* Bandwidth 500 support\n\n<b><a target='blank' href='https://buymeacoffee.com/ripplebiz/e/415984'>full changelog</a></b>"
-						},
-						"v8.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-LR1121-v8.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-LR1121-v8.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Updated UI colour scheme\n* New Regions screen, with 'Scan Local' menu\n* New 'Owner Info' menu, from Discover > Scan Local\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/415984'>Full changelog</a></b>"
-						},
-						"v7.14": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TPager-SD-LR1121-v7.14-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TPager-SD-LR1121-v7.14.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* NEW: 'Scan Local' menu in Discover\n* Message text: now converts accented chars to ASCII equivalent\n* Popular emojis now converted, eg ':thumbsup'\n* Contacts can be tagged and custom notes added\n* Repeater CLI, 'neighbors' command now using binary req/resp\n* Max group channels now upped to 6\n* Bug fix: some CLI responses were lost from dup timestamp.\n* #channel key calc now forces lowercase\n* Better canned messages for CLI screens\n* Group channel message, 'Reply To' menu\n* Kid Mode: now supports up to 1 group channel chat"
+					"github-ripple": {
+						"type": "t-pager",
+						"files": {
+							"flash-wipe": "Ultra-TPager-LR1121-SD-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TPager-LR1121-SD-[^-]+\\.bin"
 						}
 					}
 				}
@@ -2426,165 +631,13 @@
 				{
 					"class": "ripple",
 					"role": "gui",
-					"notice": "rippleUserGuide",
-					"version": {
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatchS3Plus-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatchS3Plus-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "new touch drag scrolling, and map panning\nChannel names now up to 31 chars\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nStopwatch and countdown timer now on watch face screen\nnew radio presets\nChannel enable/disable preserves key\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu"
-						},
-						"v10.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatchS3Plus-v10.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatchS3Plus-v10.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Grid view/icon shortcuts support\nGPS power on/off fix (much better battery life)\nMap, visual 'Scan Local' feature\nCanned messages fixes"
-						},
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatchS3Plus-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatchS3Plus-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "long tap copy/paste bug fix\nfix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSnake mini game!\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatchS3Plus-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatchS3Plus-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "UI theme: Light, Dark or Auto.\nCustom accent color support\nDefault Scope region support\nLong-press on Login button for 'Reset Path' then Login\nDiscover, node details 'Delete' menu"
-						},
-						"v9.3": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatchS3Plus-v9.3-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatchS3Plus-v9.3.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Power saving added (battery life from ~12 hr to ~20 hr)\n* Stopwatch and countdown Timer home screen widgets\n* Help tutorial screens"
-						}
-					}
-				},
-				{
-					"class": "ripple",
-					"role": "gui",
 					"title": "Ripple GUI: LittleFS",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatchS3Plus-LFS-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatchS3Plus-LFS-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "new touch drag scrolling, and map panning\nChannel names now up to 31 chars\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nStopwatch and countdown timer now on watch face screen\nnew radio presets\nChannel enable/disable preserves key\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu"
-						},
-						"v10.2": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatchS3Plus-LFS-v10.2-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatchS3Plus-LFS-v10.2.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "Grid view/icon shortcuts support\nGPS power on/off fix (much better battery life)\nMap, visual 'Scan Local' feature\nCanned messages fixes"
-						},
-						"v10.1": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatchS3Plus-LFS-v10.1-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatchS3Plus-LFS-v10.1.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "long tap copy/paste bug fix\nfix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSnake mini game!\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatchS3Plus-LFS-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatchS3Plus-LFS-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "UI theme: Light, Dark or Auto.\nCustom accent color support\nDefault Scope region support\nLong-press on Login button for 'Reset Path' then Login\nDiscover, node details 'Delete' menu"
-						},
-						"v9.3": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatchS3Plus-LFS-v9.3-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatchS3Plus-LFS-v9.3.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Power saving added (battery life from ~12 hr to ~20 hr)\n* Stopwatch and countdown Timer home screen widgets\n* Help tutorial screens"
+					"github-ripple": {
+						"type": "t-watch-plus",
+						"files": {
+							"flash-wipe": "Ultra-TWatchS3Plus-LFS-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TWatchS3Plus-LFS-[^-]+\\.bin"
 						}
 					}
 				}
@@ -2601,51 +654,24 @@
 					"class": "ripple",
 					"role": "guiSD",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v11.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatch-SD-v11.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatch-SD-v11.0.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "new direct-tap UI\nnew touch drag scrolling, and map panning\nChannel names now up to 31 chars\nPath dialog, custom path ‘bad format’ bug fix\noff-grid EU freq now 869.495\nMap, Scan Local map visualisation\nStopwatch and countdown timer now on watch face screen\nnew radio presets\nChannel enable/disable preserves key\nmisc UI cleanups\nMessage details screen: new “Add Contact” menu\nlong tap copy/paste bug fix\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nSD variant now supports network profile rename\nSnake mini game!\nnew 'Get Telemetry...' menu in conversation screens\nbetter battery gauge on home screen\nChannel scope, select \"*\" for un-scoped"
-						},
-						"v9.7": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatch-SD-v9.7-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatch-SD-v9.7.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "UI theme: Light, Dark or Auto\nCustom accent color support\nGPS time sync bug fix\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/443565'>Full changelog</a></b>"
-						},
-						"v9.5": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-TWatch-SD-v9.5-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-TWatch-SD-v9.5.bin",
-									"title": "App firmware bin (use with m5 booloader)"
-								}
-							],
-							"notes": "* Support for lock screen with analog or digital watch face\n* Tilt wrist to show watch face\n* Custom watch face background support (on SD card)\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/443565'>Full changelog</a></b>"
+					"github-ripple": {
+						"type": "t-watch-ultra",
+						"files": {
+							"flash-wipe": "Ultra-TWatch-SD-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TWatch-SD-[^-]+\\.bin"
+						}
+					}
+				},
+				{
+					"class": "ripple",
+					"role": "guiSD",
+					"title": "Ripple GUI: data on SD card (quadrant tapping)",
+					"notice": "rippleUserGuide",
+					"github-ripple": {
+						"type": "t-watch-ultra",
+						"files": {
+							"flash-wipe": "Ultra-TWatch-SD-quad-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TWatch-SD-quad-[^-]+\\.bin"
 						}
 					}
 				}
@@ -6747,21 +4773,11 @@
 					"role": "gui",
 					"title": "Ripple GUI",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v12.0": {
-							"files": [
-								{
-									"type": "flash-wipe",
-									"name": "Ultra-Thinknode-M9-v12.0-merged.bin",
-									"title": "Combined app+partition+bootloader firmware bin"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-Thinknode-M9-v12.0.bin",
-									"title": "App firmware bin (use with m5 bootloader)"
-								}
-							],
-							"notes": "Initial release"
+					"github-ripple": {
+						"type": "thinknode-m9",
+						"files": {
+							"flash-wipe": "Ultra-Thinknode-M9-.*?-merged\\.bin",
+							"flash-update": "Ultra-Thinknode-M9-[^-]+\\.bin"
 						}
 					}
 				}
