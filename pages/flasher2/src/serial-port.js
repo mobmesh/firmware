@@ -10,6 +10,10 @@ import {
   PORT_SETTLE_AFTER_CONNECT_MS,
   ESPRESSIF_VENDOR_ID,
   NORDIC_UF2_VENDOR_ID,
+  SEEED_VENDOR_ID,
+  SILABS_VENDOR_ID,
+  WCH_VENDOR_ID,
+  RASPBERRY_VENDOR_ID,
   SERIAL_PORT_FILTERS,
 } from './constants.js';
 // Typed errors: a failure the user must act on carries its payload as data, never as
@@ -121,13 +125,19 @@ async function probeSerialPortUsable(port) {
 }
 
 /**
- * Firmware family from the USB vendor. 'unknown' rather than a guess: a legacy ESP32
- * behind a CP210x or CH340 bridge reports the bridge, and defaulting would be wrong.
+ * Firmware family from the USB vendor. A bridge names itself, not the MCU, but in this
+ * catalogue a bridge is a legacy ESP32 — nRF52840 has native USB and does not need one.
+ * A wrong guess costs a failed sync at the arm step, not a bad write.
  */
 export function deviceFamily(port) {
   switch (port.getInfo().usbVendorId) {
-    case ESPRESSIF_VENDOR_ID: return 'esp32';
-    case NORDIC_UF2_VENDOR_ID: return 'nrf52';
+    case ESPRESSIF_VENDOR_ID:
+    case SILABS_VENDOR_ID:
+    case WCH_VENDOR_ID: return 'esp32';
+    case NORDIC_UF2_VENDOR_ID:
+    case SEEED_VENDOR_ID: return 'nrf52';
+    // Named rather than folded into 'unknown': the arm step can then say what it is.
+    case RASPBERRY_VENDOR_ID: return 'rp2040';
     default: return 'unknown';
   }
 }

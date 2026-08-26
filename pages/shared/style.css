@@ -494,20 +494,6 @@ button.btn {
   border-color: rgb(230, 180, 60);
 }
 
-#back {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  opacity: 0.5;
-  transition: opacity 0.15s ease;
-}
-
-#back:hover {
-  opacity: 1;
-}
-
 /* Halves the stacked gap where a description sits directly above the bar */
 .step-desc:has(+ .progress-track) {
   margin-bottom: 0.75rem;

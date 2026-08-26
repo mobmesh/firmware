@@ -691,7 +691,6 @@
   /* Tight to the label: generous padding fires the hover well before the pointer
      reaches the text, and edge crossings in that dead space flash the fade. */
   padding: 0.2rem 0.35rem;
-  transition: opacity 0.15s ease;
 }
 
 .back-link:hover { opacity: 1; }

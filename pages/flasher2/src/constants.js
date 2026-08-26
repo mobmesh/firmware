@@ -112,11 +112,28 @@ export const LEGACY_CDC_PRODUCT_ID = 0x0002;
 // 239a:8029 running, 239a:0071 in DFU). Family detection has no other signal.
 export const NORDIC_UF2_VENDOR_ID = 0x239a;
 
-// The picker only offers these two vendors. A board behind a CP210x or CH340 bridge is
-// rejected at the arm step anyway, so filtering says so before the user picks.
+// `measured`. Seeed's own VID, on the XIAO nRF52840 (2886:0059) rather than Adafruit's
+// UF2 VID above. Same MCU family, different board vendor.
+export const SEEED_VENDOR_ID = 0x2886;
+
+// `noflash` in upstream's catalogue: RP2040/RP2350 boards enumerate here, and this tool
+// writes neither. Listed so the picker can offer one and say why it is refused.
+export const RASPBERRY_VENDOR_ID = 0x2e8a;
+
+// USB-UART bridges. They name the bridge, not the MCU, but every bridged board in this
+// catalogue is a legacy ESP32 — see `deviceFamily`.
+export const SILABS_VENDOR_ID = 0x10c4;   // Silicon Laboratories, CP210x
+export const WCH_VENDOR_ID = 0x1a86;      // Nanjing Qinheng (WCH), CH340 / CH9102
+
+// Every vendor the picker offers. The bridges are listed so a legacy board is reachable
+// at all; whether it can be flashed is decided later, on evidence.
 export const SERIAL_PORT_FILTERS = [
   { usbVendorId: ESPRESSIF_VENDOR_ID },
   { usbVendorId: NORDIC_UF2_VENDOR_ID },
+  { usbVendorId: SEEED_VENDOR_ID },
+  { usbVendorId: SILABS_VENDOR_ID },
+  { usbVendorId: WCH_VENDOR_ID },
+  { usbVendorId: RASPBERRY_VENDOR_ID },
 ];
 
 // `measured`. Between signal transitions in the TinyUSB entry gesture. Both

@@ -297,6 +297,14 @@ export const STEPS = [
     applies: (flow) => !flow.dryRun,
     async run(flow, { onStatus }) {
       const s = flow.state;
+      // Everything below the two supported families is refused here, because the branch
+      // that follows treats anything not 'esp32' as Nordic.
+      if (s.family === 'rp2040') {
+        throw new FlowBlockedError(
+          'This is an RP2040 board. It is flashed by copying a UF2 file to the drive it ' +
+            'exposes, which this tool does not do. It has not been touched.'
+        );
+      }
       // Every board this tool targets is Espressif or Nordic; a bridge chip hides the MCU
       // and there is no second signal to fall back on.
       if (s.family === 'unknown') {
@@ -603,7 +611,12 @@ export const STEPS = [
       `These are basic settings for your ${(selectedRoleName(flow) ?? 'Repeater').toLowerCase()}.`,
     // The renderer owns this one: a map and three fields are not a list of options.
     kind: 'location',
-    applies: (flow) => LOCATION_ROLES.has(selectedRole(flow)),
+    // Upgrade-path fields render blank rather than pre-filled with the device's current
+    // values, and a blank field still gets stacked into the CLI command at the end —
+    // including the keypair. Skipping the step avoids sending blanks until that's fixed
+    // (see handoff.md, "Open, needing David").
+    applies: (flow) =>
+      flow.state.install !== INSTALL.UPDATE && LOCATION_ROLES.has(selectedRole(flow)),
     async apply(flow, { name, latitude, longitude, heightFt, email, adminPassword, identity, identityStatus, zone, zoneSettings }) {
       const s = flow.state;
       s.nodeName = name ?? '';
