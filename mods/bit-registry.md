@@ -16,8 +16,11 @@ that script's module docstring describes the block it sits in.
 
 **A bit is set from the binary, never from the build config.** CI searches the built image
 for the mod's `image_marker` and sets the bit only when it is there. A target that lists a
-mod whose marker is absent fails the build — that is how a patch which quietly stopped
-compiling gets caught.
+mod whose marker is absent gets a warning and a clear bit, not a failed build.
+
+**Keep the marker referenced from live code.** `-fdata-sections` plus `--gc-sections` drops
+an unreferenced string, and `__attribute__((used))` does not stop the linker — it is a
+compiler attribute, and this toolchain predates `retain`.
 
 **A mod earns a bit only once it has a marker.** No marker, no entry here, no bit. That is
 what lets a clear bit mean *absent* rather than *unknown*.

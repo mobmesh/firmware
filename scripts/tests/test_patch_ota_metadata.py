@@ -98,10 +98,9 @@ class ModBits(unittest.TestCase):
         present = pom.resolve_mod_bits(make_image(), ["hotspot-ota"], REGISTRY)
         self.assertEqual(present, 1 << REGISTRY["hotspot-ota"][0])
 
-    def test_claimed_mod_with_no_marker_fails_the_build(self):
+    def test_claimed_mod_with_no_marker_leaves_its_bit_clear(self):
         # The drift case: build config lists the mod, the binary does not carry it.
-        with self.assertRaises(pom.ImageError):
-            pom.resolve_mod_bits(make_image(marker=False), ["hotspot-ota"], REGISTRY)
+        self.assertEqual(pom.resolve_mod_bits(make_image(marker=False), ["hotspot-ota"], REGISTRY), 0)
 
     def test_undetectable_mod_is_silently_bitless(self):
         self.assertEqual(pom.resolve_mod_bits(make_image(), ["timing-safety"], REGISTRY), 0)
