@@ -97,6 +97,14 @@ function degrees(value) {
   return Number.isFinite(value) ? Number(value.toFixed(5)) : null;
 }
 
+// The device stores positions as float32, so what it reads back is never textually what
+// was written — measured on a P1: `set lon -89.01235` reads back `-89.0123519`. Comparing
+// at float32 precision is exact, where any decimal tolerance would be a guess.
+function sameDegrees(a, b) {
+  if (a === null || b === null) return false;
+  return Math.fround(a) === Math.fround(b);
+}
+
 /**
  * The command set for this flow's state, in send order, chosen by role. `heightFt` and
  * `email` are absent on purpose: registry fields, with no firmware command for either.
@@ -124,9 +132,21 @@ export function buildProvisionCommands(state) {
   const password = trimmed(state.adminPassword);
   const privateKey = trimmed(state.identity?.privateKeyHex);
 
-  if (name) steps.push({ command: `set name ${name}`, label: 'Setting the node name' });
-  if (lat !== null) steps.push({ command: `set lat ${lat}`, label: 'Setting latitude' });
-  if (lon !== null) steps.push({ command: `set lon ${lon}`, label: 'Setting longitude' });
+  // What the device already had, read at arm. Absent on a New install and on any device
+  // that answered nothing, in which case every field below counts as changed.
+  const existing = state.existingConfig ?? null;
+
+  if (name && name !== existing?.name) {
+    steps.push({ command: `set name ${name}`, label: 'Setting the node name' });
+  }
+  if (lat !== null && !sameDegrees(lat, existing?.latitude ?? null)) {
+    steps.push({ command: `set lat ${lat}`, label: 'Setting latitude' });
+  }
+  if (lon !== null && !sameDegrees(lon, existing?.longitude ?? null)) {
+    steps.push({ command: `set lon ${lon}`, label: 'Setting longitude' });
+  }
+  // No `get` for this one, so an unchanged password cannot be detected here — the UI
+  // sends an empty string when its masked placeholder was left alone.
   if (password) steps.push({ command: `password ${password}`, label: 'Setting the admin password' });
 
   // Last of the settings: it takes effect on the reboot below, and the identity the device

@@ -9,7 +9,8 @@ import * as nrf52 from './nrf52.js';
 import * as plans from './flash-plan.js';
 import { partitionTablesMatch } from './partitions.js';
 import { buildProvisionCommands, provisionDevice } from './provision.js';
-import { STOCK_RELAY_BASE } from './constants.js';
+import { readNodeConfig } from './cli-session.js';
+import { CLI_BAUD_RATE, STOCK_RELAY_BASE } from './constants.js';
 
 /** Which half of the mesh a node is for. Chosen early so the role list stays short. */
 export const USAGE = { INFRASTRUCTURE: 'infrastructure', CLIENT: 'client' };
@@ -105,6 +106,9 @@ export function createFlow({
       mode: null,
       // `get bootloader.ver`'s raw answer, read at arm before any DFU transition. Null
       // means no answer, not "no bootloader" — the OTAFIX gate offers on silence.
+      // { name, latitude, longitude } read at arm while the app still answered, or null.
+      // Pre-fills the Upgrade path so a write does not silently replace what is there.
+      existingConfig: null,
       bootloaderVersion: null,
       bootloaderUpdated: null,
       // Cached between a FilePickerRequiredError and the checkpoint's retry, so the UF2
@@ -181,11 +185,45 @@ const CONNECT_HEAD = {
 
 // --- step 1: connect and arm ----------------------------------------------------------
 
+/**
+ * Read what the node is already set to, while the application still answers. This is the
+ * only window: the ESP32 enters download mode moments later and DFU serves no CLI at all,
+ * so a value not captured here cannot be recovered before the write.
+ *
+ * Never fails the flow — a silent device (a T1, a factory-fresh board, Meshtastic) leaves
+ * the fields blank, which is what the Upgrade path did for every device before this.
+ */
+async function readExistingConfig(flow, onStatus) {
+  const s = flow.state;
+  onStatus('Reading the current settings…');
+  try {
+    await s.port.open({ baudRate: CLI_BAUD_RATE });
+    try {
+      s.existingConfig = await readNodeConfig(s.port);
+    } finally {
+      await closeSerialPortQuietly(s.port);
+    }
+  } catch (error) {
+    // An unopenable port is "cannot tell", the same as silence. The engine's own entry
+    // is what reports a device that genuinely cannot be reached.
+    console.warn('[flow] Could not read existing settings:', error);
+    s.existingConfig = null;
+    return;
+  }
+  const { name, latitude, longitude } = s.existingConfig ?? {};
+  onStatus(name ? `current name: ${name}` : 'no existing settings answered');
+  if (latitude !== null && longitude !== null) onStatus(`current position: ${latitude}, ${longitude}`);
+}
+
 async function armEsp32(flow, onStatus) {
   const s = flow.state;
   const { mode, version } = await esp32.resolveEsp32Mode(s.port);
   s.mode = mode;
   onStatus(`found in ${mode}${version ? ` — ${version}` : ''}`);
+
+  // Before download mode, not after: the CLI is the only source for these and it is about
+  // to be gone. Skipped unless the application is actually running.
+  if (mode === esp32.ESP32_MODE.APP) await readExistingConfig(flow, onStatus);
 
   // State 3 included: both probes are passive, so "unknown" is also what a boot loop looks
   // like. Entry is not destructive; the erase decision still runs on evidence downstream.
@@ -322,6 +360,9 @@ export const STEPS = [
       onStatus('Reading the bootloader version…');
       s.bootloaderVersion = await nrf52.readBootloaderVersion(s.port);
       s.mode = 'app';
+      // Same window as the ESP32 side, and this family keeps it open longer — DFU entry
+      // is deferred to the write. Read here anyway so both families behave alike.
+      await readExistingConfig(flow, onStatus);
       // No recon beyond that: nothing else device-side feeds the erase decision, and the
       // declaration in the next step is the only input for it.
     },
@@ -672,12 +713,9 @@ export const STEPS = [
       `These are basic settings for your ${(selectedRoleName(flow) ?? 'Repeater').toLowerCase()}.`,
     // The renderer owns this one: a map and three fields are not a list of options.
     kind: 'location',
-    // Upgrade-path fields render blank rather than pre-filled with the device's current
-    // values, and a blank field still gets stacked into the CLI command at the end —
-    // including the keypair. Skipping the step avoids sending blanks until that's fixed
-    // (see handoff.md, "Open, needing David").
-    applies: (flow) =>
-      flow.state.install !== INSTALL.UPDATE && LOCATION_ROLES.has(selectedRole(flow)),
+    // Shown on both paths now: the arm-time read means an Upgrade arrives pre-filled with
+    // what is on the device, so continuing changes nothing unless the user edits a field.
+    applies: (flow) => LOCATION_ROLES.has(selectedRole(flow)),
     async apply(flow, { name, latitude, longitude, heightFt, email, adminPassword, identity, identityStatus, zone, zoneSettings }) {
       const s = flow.state;
       s.nodeName = name ?? '';
@@ -686,8 +724,10 @@ export const STEPS = [
       s.heightFt = heightFt ?? '';
       s.email = email ?? '';
       s.adminPassword = adminPassword ?? '';
-      s.identity = identity ?? null;
-      s.identityStatus = identityStatus ?? null;
+      // Never on an Upgrade: the device keeps the identity it already has, and `set
+      // prv.key` would replace a working node's address with a freshly minted one.
+      s.identity = s.install === INSTALL.UPDATE ? null : (identity ?? null);
+      s.identityStatus = s.install === INSTALL.UPDATE ? null : (identityStatus ?? null);
       // The zone the pin fell in, and its settings. Fetched here so the provision step
       // stays synchronous about what it will send.
       s.zone = zone ?? null;

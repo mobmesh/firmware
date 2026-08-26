@@ -444,6 +444,10 @@ function renderError(error, retry) {
 const NAME_BYTES = 20;
 const NAME_STORED_BYTES = 31;
 
+// Stands in for a password that is set but cannot be read back — no `get` exists for it.
+// Never sent: the field clears on first touch, and untouched means no command.
+const PASSWORD_PLACEHOLDER = '•'.repeat(9);
+
 const MAP_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 // The same labels composited over the base, which compounds their alpha -- dark_all alone
 // renders them too dark to read. Contrast keeps the doubled halo from reading as a glow.
@@ -533,10 +537,14 @@ function renderLocation(step) {
   const { body, foot, head } = frame({ title: text(step.title), desc: text(step.desc) });
   head.classList.add('is-centred');
   const s = flow.state;
+  const isUpgrade = s.install === flowApi.INSTALL.UPDATE;
+  // Read at arm while the application still answered. Pre-filling is what makes an
+  // Upgrade safe to walk through: continuing unchanged sends nothing.
+  const existing = s.existingConfig ?? null;
   const draft = {
-    name: s.nodeName || '',
-    latitude: s.latitude,
-    longitude: s.longitude,
+    name: s.nodeName || existing?.name || '',
+    latitude: s.latitude ?? existing?.latitude ?? null,
+    longitude: s.longitude ?? existing?.longitude ?? null,
     heightFt: s.heightFt || '',
     email: s.email || '',
     adminPassword: s.adminPassword || '',
@@ -584,6 +592,24 @@ function renderLocation(step) {
     const field = form.querySelector(id);
     field.value = draft[key];
     field.addEventListener('input', () => { draft[key] = field.value; });
+  }
+
+  // There is no `get` for the admin password, so an Upgrade cannot show the real one and
+  // cannot tell whether it changed. A placeholder says one is set; touching the field
+  // clears it, and leaving it alone sends no `password` command at all.
+  const passwordField = form.querySelector('#admin-password');
+  let passwordUntouched = false;
+  if (isUpgrade && !draft.adminPassword) {
+    passwordField.value = PASSWORD_PLACEHOLDER;
+    passwordUntouched = true;
+    const clearOnce = () => {
+      if (!passwordUntouched) return;
+      passwordUntouched = false;
+      passwordField.value = '';
+      draft.adminPassword = '';
+    };
+    passwordField.addEventListener('focus', clearOnce);
+    passwordField.addEventListener('pointerdown', clearOnce);
   }
 
   const coordRow = form.querySelector('#coords');
@@ -739,8 +765,33 @@ function renderLocation(step) {
   next.type = 'button';
   next.className = 'btn btn-primary';
   next.textContent = 'Continue';
+  // Both are required for MeshCore operation, so an empty one is never "leave it alone".
+  // The password counts as set when its placeholder is still untouched on an Upgrade.
+  const invalidField = () => {
+    if (!draft.name.trim()) return [nameField, 'Give this device a name.'];
+    if (!passwordUntouched && !draft.adminPassword.trim()) {
+      return [passwordField, 'Set an admin password.'];
+    }
+    return null;
+  };
+
+  const validationNote = document.createElement('p');
+  validationNote.className = 'field-note is-warn';
+  validationNote.hidden = true;
+  foot.append(validationNote);
+
   next.addEventListener('click', async () => {
-    await step.apply(flow, draft);
+    const problem = invalidField();
+    if (problem) {
+      const [field, message] = problem;
+      validationNote.textContent = message;
+      validationNote.hidden = false;
+      field.focus();
+      return;
+    }
+    validationNote.hidden = true;
+    // The placeholder is not a password — send nothing rather than the bullets.
+    await step.apply(flow, { ...draft, adminPassword: passwordUntouched ? '' : draft.adminPassword });
     advance();
   });
   actions.append(next);
@@ -755,7 +806,11 @@ function renderLocation(step) {
   }
   nameField.focus();
 
-  if (draft.identity) {
+  // An Upgrade keeps the identity the node already has. Mining a new one here would only
+  // produce a key that `set prv.key` then writes over a working node's address.
+  if (isUpgrade) {
+    identityLine.textContent = 'Keeping this device’s existing identity.';
+  } else if (draft.identity) {
     showIdentity(draft.identity.prefix, draft.identityStatus);
   } else {
     resolveIdentity((message) => { identityLine.textContent = message; }).then((result) => {

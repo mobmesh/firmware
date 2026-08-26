@@ -157,12 +157,54 @@ export async function probeCliVersion(port, { timeoutMs = CLI_PROBE_TIMEOUT_MS }
   }
 }
 
+// `get` replies carry a second marker the session's own anchor does not strip: measured
+// on a P1, `get name` answers "> RigBench" while `ver` answers unprefixed.
+function stripGetMarker(answer) {
+  return answer?.startsWith('> ') ? answer.slice(2) : answer;
+}
+
+/**
+ * The device's current name, position and admin-password presence, for pre-filling the
+ * Upgrade path rather than overwriting what is already on the node. Read while the
+ * application is still running — no transport serves this once the engine is entered.
+ *
+ * Every field is independently nullable: a device that answers nothing (the T1, a
+ * factory-fresh board, Meshtastic) must degrade to blank fields, never fail the flow.
+ */
+export async function readNodeConfig(port, { timeoutMs = CLI_COMMAND_TIMEOUT_MS } = {}) {
+  const session = startCliSession(port);
+  const read = async (command) => {
+    try {
+      return stripGetMarker(await session.runCommand(command, { timeoutMs }));
+    } catch (error) {
+      if (error instanceof CliTimeoutError || error instanceof CliConnectionLostError) return null;
+      throw error;
+    }
+  };
+  try {
+    const name = await read('get name');
+    // Degrees, not the ×1000 scale the radio fields use — measured on a P1. Stored as
+    // float32 on the device, so a value read back is not textually what was written.
+    const latitude = numberOrNull(await read('get lat'));
+    const longitude = numberOrNull(await read('get lon'));
+    return { name, latitude, longitude };
+  } finally {
+    await session.close();
+  }
+}
+
+function numberOrNull(answer) {
+  if (answer === null) return null;
+  const value = Number.parseFloat(answer);
+  return Number.isFinite(value) ? value : null;
+}
+
 // nRF52-only per the firmware docs; a null means "cannot tell", not "no bootloader" —
 // the OTAFIX gate must offer the update rather than act on silence.
 export async function probeBootloaderVersion(port, { timeoutMs = CLI_PROBE_TIMEOUT_MS } = {}) {
   const session = startCliSession(port);
   try {
-    return await session.runCommand('get bootloader.ver', { timeoutMs });
+    return stripGetMarker(await session.runCommand('get bootloader.ver', { timeoutMs }));
   } catch (error) {
     if (error instanceof CliTimeoutError || error instanceof CliConnectionLostError) return null;
     throw error;
