@@ -301,12 +301,12 @@ async function loadMemberCommands() {
   }
 }
 
-async function verifySha256(data, shaPath, label) {
-  const res = await fetch(`./${shaPath}`, { cache: "no-store" });
-  if (!res.ok) return; // no sidecar committed for this build yet -- proceed unverified
-  const body = (await res.text()).trim();
-  const expected = body.split(":")[0].toLowerCase();   // "<hash>" or "<hash>:<offset>"
-  const digest = await crypto.subtle.digest("SHA-256", data);
+// The image's own SHA-256 is its last 32 bytes, so nothing is fetched. Header byte 23
+// says the digest is there -- a build setting, not a format guarantee.
+async function verifyEmbeddedDigest(data, label) {
+  if (data.length < 56 || data[0] !== 0xe9 || data[23] !== 1) return; // not a hashed image
+  const expected = [...data.slice(-32)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const digest = await crypto.subtle.digest("SHA-256", data.slice(0, -32));
   const actual = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
   if (actual !== expected) {
     throw new Error(`${label} failed checksum verification (expected ${expected}, got ${actual}).`);
@@ -741,7 +741,7 @@ async function runFlash(onProgress, onStatus, onTitle) {
   const board = currentBoard();
   const variant = currentVariant();
   const firmware = await step(onStatus, "Loading firmware", () => loadLocalBinary(variant.firmwareFile));
-  await step(onStatus, "Verifying firmware", () => verifySha256(firmware, variant.firmwareShaFile, variant.firmwareFile));
+  await step(onStatus, "Verifying firmware", () => verifyEmbeddedDigest(firmware, variant.firmwareFile));
 
   const fileArray = [];
   let eraseAll = false;

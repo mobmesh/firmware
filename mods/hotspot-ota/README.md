@@ -62,7 +62,7 @@ set ota.wan.wifi MyHotspot,hunter2
 start ota wan https://example.com/firmware/heltec_v4_repeater-v1.16.0.bin
 ```
 
-If a file named `<url>.sha256` exists next to the firmware file, it is downloaded automatically and used to verify the firmware. You don't need to manually set the checksum in that case.
+The firmware is verified against a SHA-256 the image carries in its own final 32 bytes, so nothing is fetched but the image. You only need to set a checksum manually when the firmware comes from a source you do not trust to serve it honestly.
 
 For complete details about these commands, see `docs/cli-additions.md`. The standard MeshCore CLI commands are documented in the upstream `docs/cli_commands.md`.
 

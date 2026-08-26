@@ -63,7 +63,7 @@ and from then on the whole update is:
 start ota wan update
 ```
 
-Every download is checked against a SHA-256 hash. Put a `.sha256` file next to the firmware and it gets fetched and verified automatically, no extra step. There's also an authenticity check that confirms the image is genuinely a build from this project (and has remote OTA abilities) rather than something that merely downloaded successfully. This prevents you from losing remote OTA abilities by flashing a non-capable image.
+Every download is checked against a SHA-256 hash the image carries inside itself, so there's no second file to fetch and nothing to keep in step. The same block tells the node whether the image is genuinely a build from this project (and has remote OTA abilities), whether it was built for this board and role, and whether it's the build already running — each decided from the first few hundred bytes, before the rest comes down. This prevents you from losing remote OTA abilities by flashing a non-capable image, and from spending a metered connection on a download that was never going to be used.
 
 ### The part that lets you sleep
 

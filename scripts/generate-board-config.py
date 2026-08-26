@@ -254,7 +254,6 @@ def cmd_boards_json(args):
         "assetBasename": args.asset_basename,
         "version": args.version,
         "firmwareFile": args.firmware_file,
-        "firmwareShaFile": args.firmware_sha_file,
     }
 
     # Optional per-variant CLI settings from overrides.yaml's
@@ -520,7 +519,6 @@ def main():
     p_bj.add_argument("--asset-basename", required=True)
     p_bj.add_argument("--version", required=True)
     p_bj.add_argument("--firmware-file", required=True)
-    p_bj.add_argument("--firmware-sha-file", required=True)
     p_bj.add_argument("--output", required=True)
     p_bj.set_defaults(func=cmd_boards_json)
 

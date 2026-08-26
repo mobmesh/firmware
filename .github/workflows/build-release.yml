@@ -24,6 +24,11 @@ on:
         required: false
         type: boolean
         default: false
+      dry_run:
+        description: 'Build and run every check, but publish nothing: no release, no vendored-asset commits, no Pages deploy. The built .bin is uploaded as a workflow artifact instead. Use with force_rebuild to exercise a tag that has already shipped.'
+        required: false
+        type: boolean
+        default: false
 
 env:
   UPSTREAM_REPO: meshcore-dev/MeshCore
@@ -311,7 +316,7 @@ jobs:
           cp "$APP0" "$DEST/boot_app0.bin"
 
       - name: Commit vendored flasher assets if changed
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.vendor_flasher_assets
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.vendor_flasher_assets && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -347,7 +352,7 @@ jobs:
           python3 scripts/generate-commands-json.py
 
       - name: Commit generated commands.json if changed
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.sync_docs
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.sync_docs && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -381,6 +386,17 @@ jobs:
           cp "$BIN" "../$NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
+      - name: Write OTA metadata into the image's reserved app-descriptor field
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          python3 .github/scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" \
+            --upstream-version "${{ steps.pick.outputs.version }}" \
+            --repo-sha "$(echo "${{ github.sha }}" | cut -c1-7)" \
+            --board "${{ matrix.board_id }}" \
+            --role "${{ matrix.id }}" \
+            --mods "${{ join(matrix.mods, ',') }}" \
+            --show
+
       - name: Locate bootloader.bin and partitions.bin (needed for the partition-layout drift check below)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         id: flash_parts
@@ -410,7 +426,6 @@ jobs:
             --asset-basename ${{ matrix.asset_basename }} \
             --version "${{ steps.pick.outputs.version }}" \
             --firmware-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" \
-            --firmware-sha-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin.sha256" \
             --output pages/flasher/boards.json
 
       - name: Verify firmware.bin fits within its OTA app partition
@@ -425,22 +440,10 @@ jobs:
             exit 1
           fi
 
-      - id: marker_check
-        name: Verify the OTA authenticity marker lands within HotspotOTA's early-abort scan window
+      - name: Verify the image reports its own metadata back
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
-          WINDOW=65536   # must match OTA_MOD_MARKER_SCAN_WINDOW in src/helpers/esp32/HotspotOTA.cpp
-          OFFSET=$(grep -aob 'H0TSP0T' "${{ steps.artifact.outputs.name }}" | head -1 | cut -d: -f1)
-          if [ -z "$OFFSET" ]; then
-            echo "::error::H0TSP0T marker not found anywhere in ${{ steps.artifact.outputs.name }} -- HotspotOTA.cpp's OTA_MOD_MARKER constant may have been removed or renamed."
-            exit 1
-          fi
-          echo "H0TSP0T marker found at byte offset $OFFSET (scan window: first $WINDOW bytes)"
-          if [ "$OFFSET" -ge "$WINDOW" ]; then
-            echo "::error::H0TSP0T marker found at byte offset $OFFSET, past HotspotOTA.cpp's $WINDOW-byte early-abort scan window. A legitimate build of this project would fail its own 'start ota url' authenticity check. Either whatever pushed the marker later needs addressing, or OTA_MOD_MARKER_SCAN_WINDOW in HotspotOTA.cpp needs widening to match."
-            exit 1
-          fi
-          echo "offset=$OFFSET" >> "$GITHUB_OUTPUT"
+          python3 .github/scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" --check
 
       # Note: there is no longer a separate "does partitions.bin match boards.json" drift check
       # here -- boards.json is now generated FROM this exact partitions.bin a few steps above
@@ -448,27 +451,20 @@ jobs:
       # The equivalent safety net (failing loudly if the expected otadata/ota_0/ota_1 partitions
       # aren't present) now lives inside generate-board-config.py's own partition-table parser.
 
-      - name: Generate SHA-256 sidecar
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
-        run: |
-          HASH=$(sha256sum "${{ steps.artifact.outputs.name }}" | awk '{print $1}')
-          echo "$HASH:${{ steps.marker_check.outputs.offset }}" > "${{ steps.artifact.outputs.name }}.sha256"
-
       - name: Vendor firmware.bin for the web flasher (GitHub Release assets have no CORS headers, so the page's fetch() can't read them cross-origin)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
           DEST="pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}"
           mkdir -p "$DEST"
           cp "${{ steps.artifact.outputs.name }}" "$DEST/firmware.bin"
-          cp "${{ steps.artifact.outputs.name }}.sha256" "$DEST/firmware.bin.sha256"
 
       - name: Commit vendored firmware.bin and this variant's boards.json entry if changed
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for i in 1 2 3 4 5; do
-            git add "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin.sha256" pages/flasher/boards.json
+            git add "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" pages/flasher/boards.json
             git diff --staged --quiet && break
             git commit -m "docs: vendor ${{ matrix.board_id }}/${{ matrix.id }} firmware.bin (${{ steps.pick.outputs.version }}) and refresh boards.json for the web flasher"
             git push && break
@@ -494,24 +490,28 @@ jobs:
               --asset-basename ${{ matrix.asset_basename }} \
               --version "${{ steps.pick.outputs.version }}" \
               --firmware-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" \
-              --firmware-sha-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin.sha256" \
-              --output pages/flasher/boards.json
+                --output pages/flasher/boards.json
             mkdir -p "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}"
             cp "${{ steps.artifact.outputs.name }}" "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin"
-            cp "${{ steps.artifact.outputs.name }}.sha256" "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin.sha256"
           done
 
-      - name: Publish release with .bin + .sha256 sidecar
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+      - name: Upload the built image when nothing is being published
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && !(github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.board_id }}-${{ matrix.id }}
+          path: ${{ steps.artifact.outputs.name }}
+          retention-days: 7
+
+      - name: Publish release
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.pick.outputs.release_tag }}
           name: "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - mobmesh"
           body_path: release-notes.md
           make_latest: ${{ matrix.make_latest }}
-          files: |
-            ${{ steps.artifact.outputs.name }}
-            ${{ steps.artifact.outputs.name }}.sha256
+          files: ${{ steps.artifact.outputs.name }}
 
       - name: Notify on patch/build failure
         if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && steps.rollback_check.outputs.failed != 'true'
@@ -553,6 +553,9 @@ jobs:
   # be set to "GitHub Actions" (one-time manual step) instead of "Deploy from a branch".
   publish-pages:
     needs: build
+    # Only from the default branch, and never on a dry run. Without the ref guard a run
+    # started on any branch deployed production Pages from that branch's tree.
+    if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

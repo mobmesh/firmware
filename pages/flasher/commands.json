@@ -518,7 +518,7 @@
     "parameters": [
       "`url`: HTTP(S) URL of the firmware `.bin` to download and flash"
     ],
-    "note": "Requires ota.wan.wifi to be set first (see below). Joins the configured WiFi network as a station, downloads the file, verifies it against ota.fw.sha256 (or a <url>.sha256 sidecar fetched automatically if ota.fw.sha256 isn't set), confirms the download is actually a build of this project (refuses otherwise, even if the checksum matches -- catches <url> mistakenly pointing at a different, unmodified MeshCore build), and reboots on success. Does not reboot on failure. The authenticity check aborts as soon as it's clear the download isn't a match, rather than pulling the whole file over what may be a metered cellular connection -- normally within the first 64KB, or however far in a <url>.sha256 sidecar says to look (a <hash>:<offset> sidecar, generated automatically by this project's own release builds, carries the exact position for that specific build). See set ota.fw.marker below for the rare case where neither applies."
+    "note": "Requires ota.wan.wifi to be set first (see below). Joins the configured WiFi network as a station, downloads the file, verifies it against the SHA-256 the image carries in its own final 32 bytes (or against ota.fw.sha256 when one has been pinned), confirms the download is actually a build of this project (refuses otherwise, even if the checksum matches -- catches <url> mistakenly pointing at a different, unmodified MeshCore build), and reboots on success. Does not reboot on failure. Nothing is fetched but the image itself. Three things are decided from the first 288 bytes, before the rest of the file is pulled over what may be a metered connection: - Not a build of this project -- aborts. The identifying block sits at a fixed offset, so this needs no scanning and nothing fetched from outside the file. - Built without OTA support -- aborts. The block names which mods the image actually carries, read out of the built binary rather than off the build config, so flashing a build that could never be updated again is refused rather than discovered afterwards. - Built for a different board or role -- aborts, naming both. Nothing before this could tell one board's build from another's. - Already running exactly this build -- stops and says so, rather than rewriting a partition with what is already in it. set ota.fw.marker off forces it through, which is how a deliberate re-flash over a corrupt partition still works."
   },
   {
     "usage": "start ota wan update",
@@ -538,7 +538,7 @@
     "parameters": [
       "`hex`: 64-character lowercase hex SHA-256 digest of the target firmware `.bin`"
     ],
-    "note": "RAM-only \u2014 cleared on every boot, never persisted. Once set, this hash verifies the download and is not overridden by a <url>.sha256 sidecar. set ota.fw.sha256 clear removes it so sidecar-fetch takes effect again \u2014 do this before pointing start ota wan at a different firmware image, or a stale hash will block its sidecar."
+    "note": "RAM-only \u2014 cleared on every boot, never persisted. Pinning a hash here is the only integrity check that does not come from the same host as the image, so it is what to use when the source is not trusted. Once set it takes precedence over the image's own embedded digest. set ota.fw.sha256 clear returns to that digest \u2014 do this before pointing start ota wan at a different firmware image, or a stale pin will block it."
   },
   {
     "usage": "get ota.fw.url / set ota.fw.url <url>",
@@ -552,7 +552,7 @@
     "parameters": [
       "`on` / `off`: Enables or disables the marker/authenticity scan (default `on`)"
     ],
-    "note": "RAM-only and one-time \u2014 consumed by the very next start ota wan call regardless of outcome, and always starts back at on on every boot (never persisted, never survives a reboot). off is a last resort for a download that fails the authenticity check with no <url>.sha256 offset available to explain why (self-hosted firmware not built by this project's own release pipeline, for example) \u2014 not intended for routine use, since it skips the check that exists specifically to catch a mistaken <url>. This only ever skips the marker scan \u2014 it never bypasses the ota.fw.sha256 hash check, which is always enforced."
+    "note": "RAM-only and one-time \u2014 consumed by the very next start ota wan call regardless of outcome, and always starts back at on on every boot (never persisted, never survives a reboot). off is a last resort for firmware that carries no identifying block at all (self-hosted, not built by this project's own release pipeline, for example) \u2014 not intended for routine use, since it skips the check that exists specifically to catch a mistaken <url>. It also forces a re-flash of a build the node is already running. It never bypasses the hash check, which is always enforced."
   },
   {
     "usage": "get ota.wan.pwr / set ota.wan.pwr <on|off>",

@@ -1,11 +1,11 @@
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
-index 5dc4807..2018fdc 100644
+index 31d8875..d1d57a1 100644
 --- a/src/helpers/esp32/HotspotOTA.cpp
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -4,8 +4,10 @@
- #include <Update.h>
- #include <SPIFFS.h>
+@@ -6,8 +6,10 @@
  #include <mbedtls/sha256.h>
+ #include <esp_ota_ops.h>
+ #include <esp_partition.h>
 +#include <time.h>
  #include <Utils.h>                    // mesh::Utils::fromHex
  #include <helpers/TxtDataHelpers.h>   // StrHelper lives here, no standalone StrHelper.h
@@ -13,10 +13,10 @@ index 5dc4807..2018fdc 100644
  
  // Board-specific: OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS, OTA_WIFI_JOIN_RETRY_DELAY_MS,
  // OTA_WIFI_JOIN_MAX_ATTEMPTS, OTA_HTTP_TIMEOUT_MS, OTA_DIAG_WIFI_JOIN_ATTEMPTS,
-@@ -14,6 +16,15 @@
- // not defined here -- see that file for each board's actual values and rationale.
- #define OTA_WAN_CHECK_HOST       "google.com"   // 3rd-party host, distinct from the firmware host
- 
+@@ -19,6 +21,14 @@
+ // Nothing reads this at runtime; CI scans for it to set this mod's bit below, so the bit
+ // is evidence the mod compiled in rather than a claim from build config. `used` or it goes.
+ static const char OTA_MOD_MARKER[] __attribute__((used)) = "H0TSP0T";   // must never change
 +// Neither board this mod targets has a battery-backed RTC chip, so the clock is always wrong
 +// after a reboot (see AutoDiscoverRTCClock's fallback). Piggybacked on WiFi join rather than a
 +// dedicated connectivity step -- this reuses whatever radio-on window OTA already paid for
@@ -25,11 +25,10 @@ index 5dc4807..2018fdc 100644
 +#define OTA_NTP_SERVER_FALLBACK   "pool.ntp.org"       // global pool, only tried if the regional zone doesn't answer
 +#define OTA_NTP_SYNC_TIMEOUT_MS   5000
 +#define OTA_NTP_SANITY_FLOOR      1700000000   // ~Nov 2023 -- rules out an unset/failed sync
-+
- static const char OTA_MOD_MARKER[] = "H0TSP0T";   // must never change
- #define OTA_MOD_MARKER_LEN   (sizeof(OTA_MOD_MARKER) - 1)
  
-@@ -64,6 +75,31 @@ struct MarkerScanner {
+ // 80 bytes CI writes into esp_app_desc_t's reserved tail -- patch_ota_metadata.py. Fixed
+ // offset, so no scan window and no sidecar carrying where the marker happened to land.
+@@ -130,6 +140,31 @@ struct TrailingDigest {
    }
  };
  
@@ -61,7 +60,7 @@ index 5dc4807..2018fdc 100644
  // run() is unattended and can be patient; wifiConnect() runs inline in the CLI and must fail fast.
  static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int max_attempts) {
    WiFi.mode(WIFI_STA);
-@@ -73,7 +109,10 @@ static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int
+@@ -139,7 +174,10 @@ static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int
      while (WiFi.status() != WL_CONNECTED && millis() - start < OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS) {
        delay(250);
      }

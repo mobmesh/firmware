@@ -83,7 +83,7 @@ The patch checks are important because they catch configuration changes or other
 
 After a successful build, `pages/flasher/boards.json` is regenerated using the board overrides, the upstream board information, and the actual `partitions.bin` from the build. This means the flasher configuration is generated from the build itself instead of being maintained separately by hand.
 
-The firmware `.bin` file and its `.sha256` checksum are then published as a GitHub release.
+The firmware `.bin` file is then published as a GitHub release. It carries its own SHA-256 and its build identity inside the image, so there is no separate checksum file to keep in step with it.
 
 The GitHub Pages flasher is only updated after every board and variant has built successfully. This means a failed build will not result in a broken version being published.
 
@@ -100,7 +100,6 @@ For example:
 Each release includes:
 
 * `<asset-basename>-vX.Y.Z.bin` — the firmware image
-* `<asset-basename>-vX.Y.Z.bin.sha256` — the checksum for the firmware image
 
 The release notes come directly from the upstream MeshCore release for that tag.
 

@@ -19,7 +19,6 @@
         "assetBasename": "heltec_v4_rep_ota_ts",
         "version": "v1.17.1",
         "firmwareFile": "heltec_v4/repeater/firmware.bin",
-        "firmwareShaFile": "heltec_v4/repeater/firmware.bin.sha256",
         "postFlashCommands": [
           "set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin",
           "set tx 20"
@@ -29,8 +28,7 @@
         "label": "Room",
         "assetBasename": "heltec_v4_room_ota_ts",
         "version": "v1.17.1",
-        "firmwareFile": "heltec_v4/room_server/firmware.bin",
-        "firmwareShaFile": "heltec_v4/room_server/firmware.bin.sha256"
+        "firmwareFile": "heltec_v4/room_server/firmware.bin"
       }
     },
     "bootApp0": "heltec_v4/boot_app0.bin",
@@ -55,15 +53,13 @@
         "label": "Repeater",
         "assetBasename": "xiao_c3_rep_ota_ts",
         "version": "v1.17.1",
-        "firmwareFile": "xiao_c3/repeater/firmware.bin",
-        "firmwareShaFile": "xiao_c3/repeater/firmware.bin.sha256"
+        "firmwareFile": "xiao_c3/repeater/firmware.bin"
       },
       "room_server": {
         "label": "Room",
         "assetBasename": "xiao_c3_room_ota_ts",
         "version": "v1.17.1",
-        "firmwareFile": "xiao_c3/room_server/firmware.bin",
-        "firmwareShaFile": "xiao_c3/room_server/firmware.bin.sha256"
+        "firmwareFile": "xiao_c3/room_server/firmware.bin"
       }
     },
     "bootApp0": "xiao_c3/boot_app0.bin",

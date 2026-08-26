@@ -323,7 +323,6 @@ class BoardsJsonTestCase(unittest.TestCase):
             asset_basename="heltec_v4_rep_ota_ts",
             version="1.16.0",
             firmware_file="heltec_v4/repeater/firmware.bin",
-            firmware_sha_file="heltec_v4/repeater/firmware.bin.sha256",
             output=str(out),
         ))
         return json.loads(out.read_text())["heltec_v4"]["variants"][variant_id]
