@@ -1,7 +1,7 @@
 // The step order, made executable: every delivery path sequenced into the decisions a user
 // actually makes. DOM-free, so the order outlives whatever renders it.
 
-import { compatibilityCopy, detectBrowserKind, detectSerialSupport } from './capability.js';
+import { compatibilityCopy, detectBrowserKind, detectSerialSupport, fileSystemAccessCopy } from './capability.js';
 import { acquireUsableSerialPort, closeSerialPortQuietly, deviceFamily } from './serial-port.js';
 import * as esp32 from './esp32.js';
 import * as esptool from './esptool.js';
@@ -103,6 +103,13 @@ export function createFlow({
       // Step 1 reads this off the PID. A dry run has no device, so the harness supplies it.
       family,
       mode: null,
+      // `get bootloader.ver`'s raw answer, read at arm before any DFU transition. Null
+      // means no answer, not "no bootloader" — the OTAFIX gate offers on silence.
+      bootloaderVersion: null,
+      bootloaderUpdated: null,
+      // Cached between a FilePickerRequiredError and the checkpoint's retry, so the UF2
+      // isn't re-fetched on every re-entry.
+      pendingBootloaderUf2: null,
       devicePartitions: null,
       plannedPartitions: null,
       evidence: null,
@@ -156,6 +163,13 @@ async function stockManifest(flow) {
 function selectedStockDevice(flow) {
   const { stockManifest: manifest, deviceName } = flow.state;
   return manifest?.devices.find((device) => device.name === deviceName) ?? null;
+}
+
+/** The device and firmware entry the bootloader gate reads, or null before both are chosen. */
+function bootloaderTarget(flow) {
+  const device = selectedStockDevice(flow);
+  const entry = device?.firmware?.[flow.state.firmwareIndex] ?? null;
+  return device && entry ? { device, entry } : null;
 }
 
 // Connect and arm share one heading on purpose: the device is armed while the user is
@@ -237,18 +251,6 @@ async function buildPlan(flow, onStatus) {
     s.planNotes.push(`file: ${s.file.name} (${s.file.bytes.length} bytes)`);
   }
 
-  if (s.plan.bootloaderPackage) {
-    const because =
-      s.plan.bootloaderReason === 'otafixNeeded'
-        ? 'its factory bootloader cannot update over Bluetooth at all'
-        : 'its factory bootloader updates over Bluetooth unreliably';
-    s.planNotes.push(
-      `This device also gets the OTAFIX bootloader (${s.plan.bootloaderPackage.size} bytes), ` +
-        `because ${because}. It is written first and erases the application, which the ` +
-        `firmware below then replaces.`
-    );
-  }
-
   // The page states the integrity position rather than letting verify no-op.
   s.planNotes.push(
     s.plan.verify
@@ -314,10 +316,14 @@ export const STEPS = [
         );
       }
       if (s.family === 'esp32') return armEsp32(flow, onStatus);
-      s.port = await nrf52.enterDfuMode(s.port, { onStatus });
-      s.mode = 'dfu';
-      // No recon on this side: DFU cannot read flash back, so nothing device-side
-      // feeds the erase decision and the declaration in the next step is the only input.
+      // Stays in application mode here — the bootloader gate (nrf52-bootloader-plan.md)
+      // needs to read it before any DFU transition, since DFU serves no CLI at all. DFU
+      // entry now happens just before the write, in the `flash` step.
+      onStatus('Reading the bootloader version…');
+      s.bootloaderVersion = await nrf52.readBootloaderVersion(s.port);
+      s.mode = 'app';
+      // No recon beyond that: nothing else device-side feeds the erase decision, and the
+      // declaration in the next step is the only input for it.
     },
   },
 
@@ -603,6 +609,61 @@ export const STEPS = [
   },
 
   {
+    id: 'bootloader',
+    title: 'Update the bootloader',
+    desc: (flow) =>
+      bootloaderTarget(flow)?.entry?.notice === 'otafixNeeded'
+        ? "This device's factory bootloader cannot update over Bluetooth at all — updating " +
+          'it now is strongly recommended.'
+        : "This device's factory bootloader updates over Bluetooth unreliably.",
+    kind: 'action',
+    // New Device only (nrf52-bootloader-plan.md): needs a double-tap and a Chromium file
+    // picker, both New-device-grade asks, and a half-finished write costs nothing only
+    // because the next stages erase and reflash anyway.
+    applies: (flow) => {
+      // The dry-run harness calls an action step's run() with no hardware or window
+      // present; this step needs both, so it never applies there — same as connect/arm.
+      if (flow.dryRun) return false;
+      if (flow.state.install !== INSTALL.NEW) return false;
+      if (flow.state.family !== 'nrf52') return false;
+      if (flow.state.source !== SOURCE.STOCK) return false;
+      if (plans.bootloaderAlreadyCurrent(flow.state.bootloaderVersion)) return false;
+      const target = bootloaderTarget(flow);
+      if (!target) return false;
+      try {
+        return Boolean(plans.resolveBootloaderUpdate(target.device, target.entry));
+      } catch {
+        // Ambiguous file set (Xiao nRF52 WIO's `_ble`/`_ble_sense` pair): shown so run()
+        // can explain why it cannot proceed, rather than silently vanishing.
+        return true;
+      }
+    },
+    async run(flow, { onStatus }) {
+      const s = flow.state;
+      // Re-entered after the checkpoint's click already did the write: nothing left to do.
+      if (s.bootloaderUpdated) return;
+
+      // Checked here, not at connect: this is the first point we know the step is needed,
+      // and failing before the fetch means the user reads this instead of double-tapping
+      // for a picker that was never going to open (Brave ships this off by default).
+      const copy = fileSystemAccessCopy();
+      if (copy) throw new FlowBlockedError(`${copy.title} — ${copy.body} ${copy.suggestion}`);
+
+      const target = bootloaderTarget(flow);
+      const wanted = plans.resolveBootloaderUpdate(target.device, target.entry);
+      // Cached so a re-entry (dismissed picker, a prior failure) doesn't re-fetch.
+      s.pendingBootloaderUf2 ??= await plans.loadBootloaderUf2(wanted, { relayBase: flow.relayBase, onStatus });
+
+      // showSaveFilePicker() needs a fresh click, which run() never has — the UI answers
+      // this with a checkpoint button, whose click is what actually writes the file.
+      throw new nrf52.FilePickerRequiredError(
+        'Double-tap the reset button so the UF2 drive mounts, then save the file there.',
+        { bytes: s.pendingBootloaderUf2.bytes, suggestedName: s.pendingBootloaderUf2.file }
+      );
+    },
+  },
+
+  {
     id: 'location',
     // By this point the role is known, so the screen names it. Falls back to Repeater
     // rather than a generic word: they are the overwhelming majority of this path.
@@ -665,6 +726,13 @@ export const STEPS = [
         return;
       }
 
+      // DFU entry waits until here: the bootloader step and its `get bootloader.ver` gate
+      // both need the application still running, which is what arm() now leaves in place.
+      if (s.mode !== 'dfu') {
+        onStatus('Entering DFU mode…');
+        s.port = await nrf52.enterDfuMode(s.port, { onStatus });
+        s.mode = 'dfu';
+      }
       const written = await nrf52.executeDfuPlan(s.port, s.plan, { onProgress, onStatus });
       const exit = await nrf52.returnToApplication(written.port ?? s.port, { onStatus });
       s.port = exit.port;

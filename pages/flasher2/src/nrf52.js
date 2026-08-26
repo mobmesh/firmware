@@ -2,6 +2,7 @@
 // `esp32.js`, same shape and a different MCU family.
 
 import {
+  CLI_BAUD_RATE,
   DFU_FLASH_ATTEMPTS,
   DFU_POST_ERASE_SETTLE_MS,
   DFU_RESET_DTR_HIGH_MS,
@@ -16,6 +17,7 @@ import {
   listGrantedSerialPorts,
   waitForUsableSerialPort,
 } from './serial-port.js';
+import { probeBootloaderVersion } from './cli-session.js';
 import { validateDfuPackage } from './flash-plan.js';
 
 function sleep(milliseconds) {
@@ -30,6 +32,19 @@ let loadedApi = null;
 export async function loadDfuApi() {
   if (!loadedApi) loadedApi = await import(DFU_JS_URL);
   return loadedApi;
+}
+
+// Mirrors `PortSelectionRequiredError`: `showSaveFilePicker()` needs a fresh click, so a
+// step that calls it from `run()` (no gesture) must throw this instead — the UI answers it
+// with a checkpoint button, whose click is what actually calls the picker.
+export class FilePickerRequiredError extends Error {
+  constructor(prompt, { bytes, suggestedName }) {
+    super(prompt);
+    this.name = 'FilePickerRequiredError';
+    this.prompt = prompt;
+    this.bytes = bytes;
+    this.suggestedName = suggestedName;
+  }
 }
 
 // `phase` is what the UI must say next, as on ESP32: nothing was written on `connect`,
@@ -79,6 +94,58 @@ async function reacquireAfterTransition(before, heldPort, { prompt, onStatus, re
 }
 
 /**
+ * Reads the running bootloader version over CLI, before any DFU transition — the bootloader
+ * gate (nrf52-bootloader-plan.md) needs the application answering, which DFU never does.
+ * Takes a closed port and returns it closed, like esp32's `resolveEsp32Mode`. Null means no
+ * answer, treated by the gate as "cannot tell", never as evidence there is no bootloader.
+ */
+export async function readBootloaderVersion(port) {
+  await port.open({ baudRate: CLI_BAUD_RATE });
+  try {
+    return await probeBootloaderVersion(port);
+  } finally {
+    await closeSerialPortQuietly(port);
+  }
+}
+
+/**
+ * Writes a bootloader UF2 to the mounted drive via the file-system picker, then waits for
+ * the device to come back as the application on USB. The bootloader boots the app once the
+ * write lands — measured on a SenseCAP P1, never over DFU. `w.close()` throwing is normal:
+ * the board reboots as the last block lands and the drive unmounts before close() settles.
+ *
+ * Must be called from a real click — `showSaveFilePicker()` needs a fresh user gesture, so
+ * this cannot be called from a step's `run()` directly. Throw `FilePickerRequiredError`
+ * there instead; the UI calls this from the checkpoint button it renders in response.
+ */
+export async function writeBootloaderUf2(appPort, bytes, suggestedName, { onStatus } = {}) {
+  if (typeof window === 'undefined' || !window.showSaveFilePicker) {
+    throw new Error('This browser cannot write to the UF2 drive directly — use Chrome or Edge.');
+  }
+  // The picker must be the first thing called here — any await ahead of it risks the
+  // browser deciding the click's user activation has lapsed, which can fail the call
+  // silently rather than throwing something a caller could act on.
+  const handle = await window.showSaveFilePicker({
+    suggestedName,
+    types: [{ description: 'UF2 firmware', accept: { 'application/octet-stream': ['.uf2'] } }],
+  });
+  const before = await listGrantedSerialPorts();
+  onStatus?.('Writing the bootloader…');
+  const writable = await handle.createWritable();
+  await writable.write(bytes);
+  try {
+    await writable.close();
+  } catch (error) {
+    console.warn('[nrf52] writable.close() threw after a UF2 write — normal, board rebooted:', error);
+  }
+  onStatus?.('Waiting for the device to come back…');
+  return reacquireAfterTransition(before, appPort, {
+    prompt: 'Select the device to continue.',
+    onStatus,
+  });
+}
+
+/**
  * Takes the running application's port, returns the DFU port. Raises selection-required
  * when the DFU identity was never granted; the UI answers that, never this module.
  */
@@ -105,12 +172,10 @@ export async function executeDfuPlan(port, plan, { onProgress, onStatus } = {}) 
   const { Dfu } = await loadDfuApi();
   let target = port;
 
-  // Order is load-bearing: the bootloader package erases the application and leaves the
-  // device in DFU, the erase package clears the filesystem, then the firmware goes back.
+  // Order is load-bearing: the erase package clears the filesystem, then the firmware goes
+  // back. The bootloader is a guided pre-flash step now, never a stage here — see
+  // nrf52-bootloader-plan.md.
   const stages = [];
-  if (plan.bootloaderPackage) {
-    stages.push({ package: plan.bootloaderPackage, label: 'Updating the bootloader…' });
-  }
   if (plan.erasePackage) stages.push({ package: plan.erasePackage, label: 'Erasing the device…' });
   stages.push({ package: plan.package, label: 'Writing firmware…' });
   const totalBytes = stages.reduce((sum, stage) => sum + stage.package.size, 0);

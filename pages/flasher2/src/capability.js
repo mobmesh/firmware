@@ -80,3 +80,29 @@ export function compatibilityCopy(support, browserKind) {
   if (support === 'insecure') return INSECURE_COPY;
   return UNSUPPORTED_COPY[browserKind] ?? UNSUPPORTED_COPY.unknown;
 }
+
+/** Only reached once Web Serial already works, so the browser is already Chromium —
+ * this is never checked on Firefox/Safari/iOS. */
+export function detectFileSystemAccessSupport() {
+  return typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function';
+}
+
+// Brave is the one Chromium browser that ships this disabled by default — a privacy
+// decision on their end, not a bug — and its UA string doesn't self-identify (see
+// `detectBrowserKind`, which folds it into 'chromium'), so the copy names both causes
+// rather than guessing which one applies.
+const FILE_SYSTEM_ACCESS_COPY = {
+  title: 'This browser can’t save the bootloader file directly',
+  body:
+    'Writing the bootloader update needs the File System Access API, which is on by default in ' +
+    'Chrome and Edge but is disabled by default in Brave as a privacy setting.',
+  suggestion:
+    'If you’re on Brave: open brave://flags/#file-system-access-api, set it to Enabled, and relaunch. ' +
+    'Otherwise, try this page in Chrome or Edge.',
+};
+
+/** Null when the picker will work; otherwise the copy to show before asking for a
+ * double-tap the browser can't follow through on. */
+export function fileSystemAccessCopy() {
+  return detectFileSystemAccessSupport() ? null : FILE_SYSTEM_ACCESS_COPY;
+}

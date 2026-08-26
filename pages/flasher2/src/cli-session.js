@@ -156,3 +156,17 @@ export async function probeCliVersion(port, { timeoutMs = CLI_PROBE_TIMEOUT_MS }
     await session.close();
   }
 }
+
+// nRF52-only per the firmware docs; a null means "cannot tell", not "no bootloader" —
+// the OTAFIX gate must offer the update rather than act on silence.
+export async function probeBootloaderVersion(port, { timeoutMs = CLI_PROBE_TIMEOUT_MS } = {}) {
+  const session = startCliSession(port);
+  try {
+    return await session.runCommand('get bootloader.ver', { timeoutMs });
+  } catch (error) {
+    if (error instanceof CliTimeoutError || error instanceof CliConnectionLostError) return null;
+    throw error;
+  } finally {
+    await session.close();
+  }
+}

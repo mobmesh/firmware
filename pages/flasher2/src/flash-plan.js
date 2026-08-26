@@ -22,9 +22,7 @@ import {
  * @property {'esptool'|'dfu'} engine
  * @property {FlashFile[]} files        esptool only; empty for dfu
  * @property {Blob|null} package        dfu only
- * @property {Blob|null} erasePackage   dfu only; flashed after the bootloader when present
- * @property {Blob|null} bootloaderPackage  dfu only; the OTAFIX bootloader, flashed before everything
- * @property {string|null} bootloaderReason which upstream notice triggered it
+ * @property {Blob|null} erasePackage   dfu only
  * @property {boolean} eraseAll
  * @property {boolean} preserveFs       esp32 custom only
  * @property {{ sha256: string }|null} verify
@@ -39,10 +37,6 @@ export function createFlashPlan(fields) {
     // nRF52 has no merged image: upstream wipes the
     // filesystem with a separate erase package flashed ahead of the firmware.
     erasePackage: fields.erasePackage ?? null,
-    // dfu only; the OTAFIX bootloader, flashed ahead of everything else when upstream
-    // flags the device. Null on every other path.
-    bootloaderPackage: fields.bootloaderPackage ?? null,
-    bootloaderReason: fields.bootloaderReason ?? null,
     eraseAll: fields.eraseAll ?? false,
     preserveFs: fields.preserveFs ?? false,
     // Null means no checksum was supplied, which the UI must state rather than skip.
@@ -472,12 +466,40 @@ export async function loadStockManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {})
 // upstream tiers are treated the same: identical roles on non-overlapping devices.
 const OTAFIX_NOTICES = new Set(['otafixNeeded', 'otafixRecommended']);
 
-/** The bootloader DFU package for a device, or null when upstream does not flag one. */
+// `get bootloader.ver` answers like "0.9.2-OTAFIX2.3-BP1.4" — only OTAFIX's own numbering
+// is compared here, never ours.
+const OTAFIX_VERSION_RE = /OTAFIX(\d+(?:\.\d+)*)/i;
+
+/**
+ * True when a `get bootloader.ver` answer already carries OTAFIX >= 2.2 — the gate's "skip,
+ * already fine" reading. A missing or unparsable answer returns false: "cannot tell" means
+ * offer the update, never skip on silence.
+ */
+export function bootloaderAlreadyCurrent(answer) {
+  const match = OTAFIX_VERSION_RE.exec(answer ?? '');
+  if (!match) return false;
+  const [major, minor = 0] = match[1].split('.').map(Number);
+  return major > 2 || (major === 2 && minor >= 2);
+}
+
+/**
+ * The bootloader UF2 for a device, or null when upstream flags no notice or ships no file
+ * (Muzi Works R1 Neo: notice with no bootloader files at all — deliberate null, not a miss).
+ * Throws on more than one `.uf2` candidate (Xiao nRF52 WIO's `_ble`/`_ble_sense` pair) rather
+ * than guessing, since a wrong pick writes another board's bootloader.
+ */
 export function resolveBootloaderUpdate(device, entry) {
   if (!OTAFIX_NOTICES.has(entry?.notice)) return null;
-  // `.uf2` is the drag-and-drop route and cannot be written over serial.
-  const file = (device.bootloader ?? []).find((name) => name.endsWith('.zip'));
-  return file ? { file, reason: entry.notice } : null;
+  // `.zip` is the DFU route and strands OTAFIX 2.1+ devices in BLE OTA — never write it.
+  const files = (device.bootloader ?? []).filter((name) => name.endsWith('.uf2'));
+  if (files.length === 0) return null;
+  if (files.length > 1) {
+    throw new ManifestError(
+      `'${device.name}' ships ${files.length} bootloader UF2 candidates (${files.join(', ')}) ` +
+        `and none can be picked automatically.`
+    );
+  }
+  return { file: files[0], reason: entry.notice };
 }
 
 // A role is not unique within a device — eight carry the same role twice — so the entry
@@ -541,37 +563,32 @@ export async function loadStockFirmwareSource(
     eraseBytes = new Uint8Array(await eraseRes.arrayBuffer());
   }
 
-  // Fetched here for the same reason as the erase package: failing after the bootloader
-  // was written would leave a device with no application and nothing to write back.
-  let bootloader = null;
-  const wanted = resolveBootloaderUpdate(device, entry);
-  if (wanted) {
-    onStatus?.('Downloading the bootloader update…');
-    const blRes = await fetch(new URL(wanted.file, relayBase), { cache: 'no-store' });
-    if (!blRes.ok) {
-      throw new ManifestError(
-        `Could not download ${wanted.file} from the relay: HTTP ${blRes.status}.`
-      );
-    }
-    bootloader = { ...wanted, bytes: new Uint8Array(await blRes.arrayBuffer()) };
-  }
+  return { device, entry, version, wipe, file, bytes, eraseBytes };
+}
 
-  return { device, entry, version, wipe, file, bytes, eraseBytes, bootloader };
+/** Fetches the resolved bootloader UF2's bytes from the relay, for the guided nRF52
+ * bootloader step. Null input passes through — there is nothing to fetch. */
+export async function loadBootloaderUf2(wanted, { relayBase = STOCK_RELAY_BASE, onStatus } = {}) {
+  if (!wanted) return null;
+  onStatus?.('Downloading the bootloader update…');
+  const res = await fetch(new URL(wanted.file, relayBase), { cache: 'no-store' });
+  if (!res.ok) {
+    throw new ManifestError(`Could not download ${wanted.file} from the relay: HTTP ${res.status}.`);
+  }
+  return { ...wanted, bytes: new Uint8Array(await res.arrayBuffer()) };
 }
 
 // Stage two. Always one file, and the address follows from which was chosen: the donor
 // keeps it in mutable page state, where a wipe then an update writes the app to 0x0.
 export function buildStockFlashPlan(source, { partitions = [] } = {}) {
-  const { device, bytes, eraseBytes, wipe, bootloader } = source;
+  const { device, bytes, eraseBytes, wipe } = source;
 
   if (device.type === 'nrf52') {
     return createFlashPlan({
       engine: 'dfu',
       package: new Blob([bytes]),
-      // Written first: it erases the application and leaves the device in DFU, which is
-      // where the stages after it need to start. A failure there has cost nothing yet.
-      bootloaderPackage: bootloader ? new Blob([bootloader.bytes]) : null,
-      bootloaderReason: bootloader?.reason ?? null,
+      // The bootloader is a guided pre-flash step now (nrf52-bootloader-plan.md), never a
+      // DFU stage: the .zip route stages every payload in the app region and destroys it.
       // The wipe. `Dfu`'s own `eraseBeforeUpdate` clears the application region the write
       // is about to overwrite anyway, so `eraseAll` stays false and this carries it.
       erasePackage: eraseBytes ? new Blob([eraseBytes]) : null,

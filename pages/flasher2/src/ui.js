@@ -5,6 +5,7 @@ import * as flowApi from './flow.js';
 import { findAvailablePrefix, generateIdentityKeypair, extractPrefix } from './gcm-reg.js';
 import { PortSelectionRequiredError, promptForSerialPort } from './serial-port.js';
 import { ManualEntryRequiredError } from './esp32.js';
+import { FilePickerRequiredError, writeBootloaderUf2 } from './nrf52.js';
 
 const elements = {
   wizard: document.getElementById('wizard'),
@@ -334,6 +335,7 @@ async function renderAction(step) {
     advance();
   } catch (error) {
     if (error instanceof PortSelectionRequiredError) return renderCheckpoint(error, step);
+    if (error instanceof FilePickerRequiredError) return renderFilePickerCheckpoint(error, step);
     // The gesture re-enumerates the board, so retry has to re-acquire, not re-probe.
     if (error instanceof ManualEntryRequiredError) {
       return renderError(error, async () => {
@@ -371,6 +373,46 @@ function renderCheckpoint(error, step) {
     render();
   });
   actions.append(pick);
+  body.append(actions);
+}
+
+// Only a click may call showSaveFilePicker(), so the write itself happens here — never
+// inside the step's run(), which has no gesture by the time it's called.
+function renderFilePickerCheckpoint(error, step) {
+  const { body } = frame({ title: text(step.title), desc: error.message, centred: true });
+  const art = document.createElement('div');
+  art.className = 'connect-art';
+  art.innerHTML = icon('usb', 56);
+  body.append(art);
+  const status = document.createElement('p');
+  status.className = 'status-text';
+  body.append(status);
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  actions.style.justifyContent = 'center';
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.className = 'btn btn-primary';
+  save.textContent = 'Save to drive';
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    try {
+      flow.state.port = await writeBootloaderUf2(flow.state.port, error.bytes, error.suggestedName, {
+        onStatus: (message) => { status.textContent = message; },
+      });
+      flow.state.bootloaderUpdated = error.suggestedName;
+    } catch (writeError) {
+      if (writeError?.name === 'AbortError') {
+        save.disabled = false;
+        return; // Picker dismissed; leave the checkpoint as it was.
+      }
+      renderError(writeError, () => render());
+      return;
+    }
+    render();
+  });
+  actions.append(save);
   body.append(actions);
 }
 

@@ -8,6 +8,8 @@ import {
   promptForSerialPort,
 } from './serial-port.js';
 import { closeEsptoolSession } from './esptool.js';
+import { FilePickerRequiredError, writeBootloaderUf2 } from './nrf52.js';
+import { generateIdentityKeypair } from './gcm-reg.js';
 
 const elements = {
   steps: document.querySelector('#steps'),
@@ -111,7 +113,7 @@ function renderStepList() {
     const done = index < flow.stepIndex;
     const marker = index === flow.stepIndex ? '▶' : done ? '✓' : '·';
     elements.steps.append(
-      line(`${marker} ${index + 1}. ${step.title}`, index === flow.stepIndex ? 'now' : done ? 'done' : 'past')
+      line(`${marker} ${index + 1}. ${text(step.title)}`, index === flow.stepIndex ? 'now' : done ? 'done' : 'past')
     );
   });
 }
@@ -139,6 +141,12 @@ function withBack(node) {
   return node;
 }
 
+// A step's title may be a function of the flow, for copy that names a choice — `location`
+// is the first step here that uses one. Matches ui.js's own `text()` helper.
+function text(value) {
+  return typeof value === 'function' ? value(flow) : value;
+}
+
 function describePort(port) {
   const { usbVendorId: vid, usbProductId: pid } = port.getInfo();
   const hex = (n) => (n ?? 0).toString(16).padStart(4, '0');
@@ -164,8 +172,33 @@ function checkpoint(error, retry) {
   redraw();
 }
 
+// showSaveFilePicker() needs a fresh click, same reason the port picker needs one below.
+function fileCheckpoint(error, retry) {
+  clear(elements.panel);
+  elements.panel.append(line(error.message, 'title'));
+  elements.panel.append(button('Save to drive…', async () => {
+    try {
+      flow.state.port = await writeBootloaderUf2(flow.state.port, error.bytes, error.suggestedName, {
+        onStatus: log,
+      });
+      flow.state.bootloaderUpdated = error.suggestedName;
+    } catch (writeError) {
+      if (writeError?.name === 'AbortError') {
+        log('picker dismissed');
+        return;
+      }
+      log(`${writeError.name}: ${writeError.message}`);
+      return;
+    }
+    retry();
+  }));
+  elements.panel.append(button('Start over', () => start({ dryRun: flow.dryRun })));
+  redraw();
+}
+
 function fail(error, retry) {
   if (error instanceof PortSelectionRequiredError && retry) return checkpoint(error, retry);
+  if (error instanceof FilePickerRequiredError && retry) return fileCheckpoint(error, retry);
   log(`${error.name}: ${error.message}`);
   clear(elements.panel);
   elements.panel.append(line(`Stopped: ${error.message}`, 'err'));
@@ -182,7 +215,7 @@ async function renderStep() {
   clear(elements.panel);
   if (!step) return;
 
-  elements.panel.append(line(step.title, 'title'));
+  elements.panel.append(line(text(step.title), 'title'));
 
   if (step.kind === 'action') {
     // Runs on entry. Nothing here needs a gesture — the picker is reached through the checkpoint's
@@ -190,6 +223,12 @@ async function renderStep() {
     elements.panel.append(line('Running…'));
     try {
       await step.run(flow, progress);
+      // Test-only override, this file only: simulates a stale bootloader so the guided
+      // step can be exercised without an actual factory-bootloader board on the bench.
+      if (step.id === 'arm' && new URLSearchParams(location.search).has('forceStaleBootloader')) {
+        log(`TEST OVERRIDE: bootloaderVersion was ${JSON.stringify(flow.state.bootloaderVersion)}, forcing null`);
+        flow.state.bootloaderVersion = null;
+      }
       next();
     } catch (error) {
       fail(error, () => renderStep());
@@ -240,6 +279,40 @@ async function renderStep() {
     return;
   }
 
+  if (step.kind === 'location') {
+    // No map here — sequencing only. Real values, a bench default instead of a picked pin.
+    elements.panel.append(line('No map in this renderer — bench defaults below.'));
+    const nameInput = document.createElement('input');
+    nameInput.value = 'RigBench';
+    nameInput.placeholder = 'Node name';
+    const latInput = document.createElement('input');
+    latInput.value = '30.27112';
+    latInput.placeholder = 'Latitude';
+    const lonInput = document.createElement('input');
+    lonInput.value = '-89.01235';
+    lonInput.placeholder = 'Longitude';
+    elements.panel.append(nameInput, latInput, lonInput);
+    elements.panel.append(button('Continue', async () => {
+      try {
+        const identity = await generateIdentityKeypair();
+        await step.apply(flow, {
+          name: nameInput.value,
+          latitude: parseFloat(latInput.value),
+          longitude: parseFloat(lonInput.value),
+          identity,
+          identityStatus: 'unchecked',
+        });
+        log(`location: applied (identity ${identity.prefix})`);
+      } catch (error) {
+        fail(error, () => renderStep());
+        return;
+      }
+      next();
+    }));
+    withBack(elements.panel);
+    return;
+  }
+
   if (step.kind === 'confirm') {
     elements.panel.append(line('Resolving firmware…'));
     try {
@@ -250,7 +323,7 @@ async function renderStep() {
     }
     redraw();
     clear(elements.panel);
-    elements.panel.append(line(step.title, 'title'));
+    elements.panel.append(line(text(step.title), 'title'));
     const plan = flow.state.plan;
     const summary = plan.engine === 'dfu'
       ? `dfu package ${plan.package.size} B${plan.erasePackage ? ` + erase ${plan.erasePackage.size} B` : ''}`
