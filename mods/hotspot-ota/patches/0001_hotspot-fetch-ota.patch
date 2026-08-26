@@ -176,10 +176,10 @@ index 26df75c..20df357 100644
  }
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..23c08a8
+index 0000000..40199a3
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,441 @@
+@@ -0,0 +1,451 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -348,6 +348,16 @@ index 0000000..23c08a8
 +  return false;
 +}
 +
++// Drops the transfer instead of reading it out. drainAndClose() below is for aborts that
++// fire near the end, where little is left; this one fires ~288 bytes in with the whole
++// image outstanding, and draining it costs the bandwidth the early check exists to save.
++// The ordering that fix established is kept: the socket is closed before Update is touched.
++static void closeNow(HTTPClient& http) {
++  WiFiClient* stream = http.getStreamPtr();
++  if (stream != NULL) stream->stop();
++  http.end();
++}
++
 +// The only hash that does not come from the same server as the image, so this path stays.
 +static bool resolvePinnedHash(const char* manual_hex, uint8_t expect[32]) {
 +  if (manual_hex[0] == 0) return false;
@@ -502,7 +512,7 @@ index 0000000..23c08a8
 +
 +      if (refusal != NULL) {
 +        if (refusal != reply) strcpy(reply, refusal);
-+        drainAndClose(http);   // network torn down before touching Update state -- see drainAndClose()
++        closeNow(http);   // network torn down before touching Update state -- see drainAndClose()
 +        Update.abort();
 +        if (!have_pinned) trailing.release();
 +        digitalWrite(PIN_HOTSPOT_PWR, LOW);
