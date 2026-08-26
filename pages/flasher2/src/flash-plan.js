@@ -493,10 +493,14 @@ export function resolveBootloaderUpdate(device, entry) {
   // `.zip` is the DFU route and strands OTAFIX 2.1+ devices in BLE OTA — never write it.
   const files = (device.bootloader ?? []).filter((name) => name.endsWith('.uf2'));
   if (files.length === 0) return null;
+  // Settled 2026-08-26: refuse, don't ask. `board` cannot tell the candidates apart —
+  // it returns a compile-time constant and upstream ships one build for both variants.
   if (files.length > 1) {
     throw new ManifestError(
-      `'${device.name}' ships ${files.length} bootloader UF2 candidates (${files.join(', ')}) ` +
-        `and none can be picked automatically.`
+      `'${device.name}' ships ${files.length} bootloader files for different board variants ` +
+        `(${files.join(', ')}), and nothing the device reports can tell them apart. Writing ` +
+        `the wrong one would replace this board's bootloader with another board's, so the ` +
+        `bootloader update is not offered here.`
     );
   }
   return { file: files[0], reason: entry.notice };
