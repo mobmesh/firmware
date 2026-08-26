@@ -176,10 +176,10 @@ index 26df75c..20df357 100644
  }
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..31d8875
+index 0000000..23c08a8
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
-@@ -0,0 +1,439 @@
+@@ -0,0 +1,441 @@
 +#include "HotspotOTA.h"
 +#include <WiFi.h>
 +#include <HTTPClient.h>
@@ -198,9 +198,10 @@ index 0000000..31d8875
 +// not defined here -- see that file for each board's actual values and rationale.
 +#define OTA_WAN_CHECK_HOST       "google.com"   // 3rd-party host, distinct from the firmware host
 +
-+// Nothing reads this at runtime; CI scans for it to set this mod's bit below, so the bit
-+// is evidence the mod compiled in rather than a claim from build config. `used` or it goes.
-+static const char OTA_MOD_MARKER[] __attribute__((used)) = "H0TSP0T";   // must never change
++// CI scans the built image for this to set the mod's bit below, so the bit is evidence the
++// mod compiled in rather than a claim from build config. Keep it referenced -- --gc-sections
++// drops an unreferenced string, and `used` alone does not stop the linker.
++static const char OTA_MOD_MARKER[] = "H0TSP0T";   // must never change
 +
 +// 80 bytes CI writes into esp_app_desc_t's reserved tail -- patch_ota_metadata.py. Fixed
 +// offset, so no scan window and no sidecar carrying where the marker happened to land.
@@ -479,7 +480,8 @@ index 0000000..31d8875
 +
 +      if (!header.read(incoming)) {
 +        if (!bypass_marker_check) {
-+          refusal = "ERR: not a build of this project (no metadata) -- aborting";
++          sprintf(reply, "ERR: no %s metadata -- not a build of this project", OTA_MOD_MARKER);
++          refusal = reply;
 +        }
 +      } else if (!(incoming.mods & MOD_BIT_HOTSPOT_OTA) && !bypass_marker_check) {
 +        // A build of this project, but without the OTA mod -- flashing it strands this node.

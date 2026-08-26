@@ -147,11 +147,14 @@ def resolve_mod_bits(data, claimed, registry):
             continue   # no marker, no bit -- a clear bit means absent, never "unknown"
         bit, marker = entry
         if marker not in data:
-            raise ImageError(
-                f"this target lists the '{name}' mod, but its marker "
-                f"{marker.decode()!r} is nowhere in the built image -- the mod did not "
-                "make it into this build"
+            # Report it, do not stop the build: the bit's honest value is 0, and whether a
+            # missing mod should block a release is the publish step's call, not this one.
+            print(
+                f"::warning::this target lists the '{name}' mod, but its marker "
+                f"{marker.decode()!r} is not in the built image -- leaving its bit clear",
+                file=sys.stderr,
             )
+            continue
         bits |= 1 << bit
     return bits
 

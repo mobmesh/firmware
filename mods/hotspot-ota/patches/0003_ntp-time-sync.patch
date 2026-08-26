@@ -1,5 +1,5 @@
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
-index 31d8875..d1d57a1 100644
+index 23c08a8..b0bfea9 100644
 --- a/src/helpers/esp32/HotspotOTA.cpp
 +++ b/src/helpers/esp32/HotspotOTA.cpp
 @@ -6,8 +6,10 @@
@@ -14,9 +14,9 @@ index 31d8875..d1d57a1 100644
  // Board-specific: OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS, OTA_WIFI_JOIN_RETRY_DELAY_MS,
  // OTA_WIFI_JOIN_MAX_ATTEMPTS, OTA_HTTP_TIMEOUT_MS, OTA_DIAG_WIFI_JOIN_ATTEMPTS,
 @@ -19,6 +21,14 @@
- // Nothing reads this at runtime; CI scans for it to set this mod's bit below, so the bit
- // is evidence the mod compiled in rather than a claim from build config. `used` or it goes.
- static const char OTA_MOD_MARKER[] __attribute__((used)) = "H0TSP0T";   // must never change
+ // CI scans the built image for this to set the mod's bit below, so the bit is evidence the
+ // mod compiled in rather than a claim from build config. Keep it referenced -- --gc-sections
+ // drops an unreferenced string, and `used` alone does not stop the linker.
 +// Neither board this mod targets has a battery-backed RTC chip, so the clock is always wrong
 +// after a reboot (see AutoDiscoverRTCClock's fallback). Piggybacked on WiFi join rather than a
 +// dedicated connectivity step -- this reuses whatever radio-on window OTA already paid for
@@ -25,10 +25,10 @@ index 31d8875..d1d57a1 100644
 +#define OTA_NTP_SERVER_FALLBACK   "pool.ntp.org"       // global pool, only tried if the regional zone doesn't answer
 +#define OTA_NTP_SYNC_TIMEOUT_MS   5000
 +#define OTA_NTP_SANITY_FLOOR      1700000000   // ~Nov 2023 -- rules out an unset/failed sync
+ static const char OTA_MOD_MARKER[] = "H0TSP0T";   // must never change
  
  // 80 bytes CI writes into esp_app_desc_t's reserved tail -- patch_ota_metadata.py. Fixed
- // offset, so no scan window and no sidecar carrying where the marker happened to land.
-@@ -130,6 +140,31 @@ struct TrailingDigest {
+@@ -131,6 +141,31 @@ struct TrailingDigest {
    }
  };
  
@@ -60,7 +60,7 @@ index 31d8875..d1d57a1 100644
  // run() is unattended and can be patient; wifiConnect() runs inline in the CLI and must fail fast.
  static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int max_attempts) {
    WiFi.mode(WIFI_STA);
-@@ -139,7 +174,10 @@ static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int
+@@ -140,7 +175,10 @@ static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int
      while (WiFi.status() != WL_CONNECTED && millis() - start < OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS) {
        delay(250);
      }
