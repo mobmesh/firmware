@@ -17,7 +17,7 @@ import {
   WATCHDOG_TIMEOUT,
   WATCHDOG_WRITE_PROTECT_KEY,
 } from './constants.js';
-import { probeCliVersion } from './cli-session.js';
+import { readNodeConfig } from './cli-session.js';
 import {
   hardResetDevice,
   probeEsptoolSync,
@@ -153,21 +153,26 @@ export const ESP32_MODE = {
 
 // Affirmative signals only, CLI first: silence from both is a real state, and calling it
 // "bootloader" is what erases a live device. Takes a closed port and returns it closed.
+//
+// The app's settings come back with the mode: `ver` proves the CLI is alive and the reads
+// that follow ride the same session, because this is the last moment they are reachable —
+// download mode is entered immediately after and serves no CLI.
 export async function resolveEsp32Mode(port) {
   await port.open({ baudRate: CLI_BAUD_RATE });
-  let version = null;
+  let config = null;
   try {
-    version = await probeCliVersion(port);
+    config = await readNodeConfig(port);
   } finally {
     await closeSerialPortQuietly(port);
   }
 
-  if (version) return { mode: ESP32_MODE.APP, version };
+  const version = config?.version ?? null;
+  if (version) return { mode: ESP32_MODE.APP, version, config };
 
   // Passive — no reset is issued, so a device in state 3 is still in state 3
   // afterwards and can be reported to the user as it was found.
   const answeredSync = await probeEsptoolSync(port);
-  return { mode: answeredSync ? ESP32_MODE.BOOTLOADER : ESP32_MODE.UNKNOWN, version: null };
+  return { mode: answeredSync ? ESP32_MODE.BOOTLOADER : ESP32_MODE.UNKNOWN, version: null, config: null };
 }
 
 // `phase` is what the UI must say next: nothing was touched on `connect`, whereas a

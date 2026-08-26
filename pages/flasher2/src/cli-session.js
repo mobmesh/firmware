@@ -173,21 +173,31 @@ function stripGetMarker(answer) {
  */
 export async function readNodeConfig(port, { timeoutMs = CLI_COMMAND_TIMEOUT_MS } = {}) {
   const session = startCliSession(port);
-  const read = async (command) => {
+  const read = async (command, commandTimeoutMs = timeoutMs) => {
     try {
-      return stripGetMarker(await session.runCommand(command, { timeoutMs }));
+      return stripGetMarker(await session.runCommand(command, { timeoutMs: commandTimeoutMs }));
     } catch (error) {
       if (error instanceof CliTimeoutError || error instanceof CliConnectionLostError) return null;
       throw error;
     }
   };
   try {
+    // `ver` first, at the probe timeout, as the liveness gate. Silence here means no CLI
+    // at all (a T1, a bootloader, a factory-fresh board) and the reads below would each
+    // burn the full command timeout proving the same thing — 15 s to learn nothing.
+    const version = await read('ver', CLI_PROBE_TIMEOUT_MS);
+    if (version === null) return { version: null, name: null, latitude: null, longitude: null };
+
     const name = await read('get name');
     // Degrees, not the ×1000 scale the radio fields use — measured on a P1. Stored as
     // float32 on the device, so a value read back is not textually what was written.
     const latitude = numberOrNull(await read('get lat'));
     const longitude = numberOrNull(await read('get lon'));
-    return { name, latitude, longitude };
+    // One call returns all four fields `set radio` writes, and `set radio` is one of only
+    // three commands the firmware says needs a reboot — so this read is what decides
+    // whether an upgrade has to restart a working node.
+    const radio = parseRadio(await read('get radio'));
+    return { version, name, latitude, longitude, radio };
   } finally {
     await session.close();
   }
@@ -197,6 +207,18 @@ function numberOrNull(answer) {
   if (answer === null) return null;
   const value = Number.parseFloat(answer);
   return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * `freq,bw,sf,cr` as the device reports it — measured on a P1: `869.6179809,62.5,8,5`.
+ * Comma-separated, and the same four fields `set radio` takes in the same order.
+ */
+export function parseRadio(answer) {
+  if (!answer) return null;
+  const parts = answer.split(',').map((part) => Number.parseFloat(part.trim()));
+  if (parts.length !== 4 || parts.some((value) => !Number.isFinite(value))) return null;
+  const [freq, bw, sf, cr] = parts;
+  return { freq, bw, sf, cr };
 }
 
 // nRF52-only per the firmware docs; a null means "cannot tell", not "no bootloader" —

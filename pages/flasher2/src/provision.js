@@ -9,7 +9,7 @@ import {
   POST_FLASH_RECONNECT_ATTEMPTS,
   POST_FLASH_RECONNECT_DELAY_MS,
 } from './constants.js';
-import { startCliSession } from './cli-session.js';
+import { parseRadio, startCliSession } from './cli-session.js';
 import { acquireUsableSerialPort, closeSerialPortQuietly } from './serial-port.js';
 
 // The firmware answers a failed command in prose. There is no status code, so this is the
@@ -105,6 +105,25 @@ function sameDegrees(a, b) {
   return Math.fround(a) === Math.fround(b);
 }
 
+// The only three the firmware answers "reboot to apply" to — CommonCLI.cpp, lines 518, 602
+// and 716. Everything else savePrefs() and takes effect at once, so a list without one of
+// these needs no restart. `set freq` is here for completeness; our zone files use `radio`.
+const NEEDS_REBOOT = /^set (radio|freq|prv\.key) /;
+
+// `set radio <freq>,<bw>,<sf>,<cr>` against what `get radio` reported. Frequency and
+// bandwidth take the float32 treatment for the same reason positions do.
+function radioCommandMatches(command, current) {
+  if (!current) return false;
+  const parsed = parseRadio(command.slice('set radio '.length));
+  if (!parsed) return false;
+  return (
+    Math.fround(parsed.freq) === Math.fround(current.freq) &&
+    Math.fround(parsed.bw) === Math.fround(current.bw) &&
+    parsed.sf === current.sf &&
+    parsed.cr === current.cr
+  );
+}
+
 /**
  * The command set for this flow's state, in send order, chosen by role. `heightFt` and
  * `email` are absent on purpose: registry fields, with no firmware command for either.
@@ -114,6 +133,21 @@ function sameDegrees(a, b) {
 export function buildProvisionCommands(state) {
   const steps = [];
 
+  // What the device already had, read at arm. Absent on a New install and on any device
+  // that answered nothing, in which case everything below counts as changed.
+  const existing = state.existingConfig ?? null;
+
+  // Every path, every role: a device that has been unpowered comes up with a bogus clock,
+  // and this is the one moment we are certainly talking to it. Forward-only in the
+  // firmware — it answers "cannot go backwards" rather than rewinding a good clock — so
+  // it is safe to send unconditionally. Also the post-flash liveness check, being first.
+  steps.push({
+    command: `time ${Math.floor(Date.now() / 1000)}`,
+    label: 'Setting the clock',
+    // A clock already ahead of ours is refused, which is the firmware working, not a fault.
+    tolerateFailure: true,
+  });
+
   // Board defaults first, so a location setting overrides one. From the manifest variant,
   // so only the custom path carries any.
   for (const command of state.plan?.postFlash?.commands ?? []) {
@@ -121,8 +155,13 @@ export function buildProvisionCommands(state) {
   }
 
   // Then the regional set for the node's zone. Radio and interval settings, so nothing
-  // here collides with name or position.
+  // here collides with name or position. Re-asserted on every path so a drifted node is
+  // corrected — except `set radio`, which is dropped when the device already reports
+  // those exact parameters, because sending it is what forces the reboot below.
   for (const command of state.zoneCommands ?? []) {
+    if (command.startsWith('set radio ') && radioCommandMatches(command, existing?.radio)) {
+      continue;
+    }
     steps.push({ command, label: 'Applying regional settings' });
   }
 
@@ -131,10 +170,6 @@ export function buildProvisionCommands(state) {
   const lon = degrees(state.longitude);
   const password = trimmed(state.adminPassword);
   const privateKey = trimmed(state.identity?.privateKeyHex);
-
-  // What the device already had, read at arm. Absent on a New install and on any device
-  // that answered nothing, in which case every field below counts as changed.
-  const existing = state.existingConfig ?? null;
 
   if (name && name !== existing?.name) {
     steps.push({ command: `set name ${name}`, label: 'Setting the node name' });
@@ -155,8 +190,10 @@ export function buildProvisionCommands(state) {
     steps.push({ command: `set prv.key ${privateKey}`, label: 'Installing the node identity' });
   }
 
-  // No reply is sent — see commands.json. Only worth the round trip if something changed.
-  if (steps.length) {
+  // No reply is sent — see commands.json. Keyed on what the firmware actually says needs
+  // one: everything else saves and applies at once, so restarting a working node for a
+  // name change or an interval is a cost with nothing bought.
+  if (steps.some((step) => NEEDS_REBOOT.test(step.command))) {
     steps.push({ command: 'reboot', label: 'Restarting the device', awaitReply: false });
   }
   return steps;
@@ -205,7 +242,7 @@ export async function sendProvisionCommands(port, commands, { onStatus, onProgre
         awaitReply: step.awaitReply !== false,
         ...(index === 0 ? { timeoutMs: CLI_FIRST_COMMAND_TIMEOUT_MS } : {}),
       });
-      const ok = answer === null || !FAILED_ANSWER.test(answer);
+      const ok = answer === null || step.tolerateFailure === true || !FAILED_ANSWER.test(answer);
       if (!ok) onStatus?.(`${step.command} → ${answer}`);
       results.push({ command: step.command, answer, ok });
       onProgress?.((index + 1) / commands.length);

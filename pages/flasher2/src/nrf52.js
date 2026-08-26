@@ -17,7 +17,7 @@ import {
   listGrantedSerialPorts,
   waitForUsableSerialPort,
 } from './serial-port.js';
-import { probeBootloaderVersion } from './cli-session.js';
+import { probeBootloaderVersion, readNodeConfig } from './cli-session.js';
 import { validateDfuPackage } from './flash-plan.js';
 
 function sleep(milliseconds) {
@@ -94,15 +94,23 @@ async function reacquireAfterTransition(before, heldPort, { prompt, onStatus, re
 }
 
 /**
- * Reads the running bootloader version over CLI, before any DFU transition — the bootloader
- * gate (nrf52-bootloader-plan.md) needs the application answering, which DFU never does.
- * Takes a closed port and returns it closed, like esp32's `resolveEsp32Mode`. Null means no
- * answer, treated by the gate as "cannot tell", never as evidence there is no bootloader.
+ * Everything the CLI can tell us before a DFU transition, in one session: the bootloader
+ * version the OTAFIX gate reads, and the settings the Upgrade path pre-fills from. DFU
+ * serves no CLI, so this is the only window for either.
+ *
+ * Takes a closed port and returns it closed, like esp32's `resolveEsp32Mode`. Returns
+ * `{ bootloaderVersion, config }`, both nullable — silence is "cannot tell", never
+ * evidence that a device lacks a bootloader.
  */
-export async function readBootloaderVersion(port) {
+export async function readAppState(port) {
   await port.open({ baudRate: CLI_BAUD_RATE });
   try {
-    return await probeBootloaderVersion(port);
+    // Settings first: its `ver` probe is the cheap liveness gate, and it returns early
+    // on silence rather than letting each read burn the full command timeout.
+    const config = await readNodeConfig(port);
+    // A device with no CLI cannot answer this either — skip it rather than wait again.
+    const bootloaderVersion = config?.version ? await probeBootloaderVersion(port) : null;
+    return { bootloaderVersion, config };
   } finally {
     await closeSerialPortQuietly(port);
   }

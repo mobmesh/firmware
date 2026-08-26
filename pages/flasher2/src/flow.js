@@ -9,8 +9,7 @@ import * as nrf52 from './nrf52.js';
 import * as plans from './flash-plan.js';
 import { partitionTablesMatch } from './partitions.js';
 import { buildProvisionCommands, provisionDevice } from './provision.js';
-import { readNodeConfig } from './cli-session.js';
-import { CLI_BAUD_RATE, STOCK_RELAY_BASE } from './constants.js';
+import { STOCK_RELAY_BASE } from './constants.js';
 
 /** Which half of the mesh a node is for. Chosen early so the role list stays short. */
 export const USAGE = { INFRASTRUCTURE: 'infrastructure', CLIENT: 'client' };
@@ -104,11 +103,11 @@ export function createFlow({
       // Step 1 reads this off the PID. A dry run has no device, so the harness supplies it.
       family,
       mode: null,
-      // `get bootloader.ver`'s raw answer, read at arm before any DFU transition. Null
-      // means no answer, not "no bootloader" — the OTAFIX gate offers on silence.
-      // { name, latitude, longitude } read at arm while the app still answered, or null.
-      // Pre-fills the Upgrade path so a write does not silently replace what is there.
+      // { version, name, latitude, longitude } read at arm while the app still answered,
+      // or null. Pre-fills the Upgrade path so a write does not replace what is there.
       existingConfig: null,
+      // `get bootloader.ver`'s answer, read in that same session. Null means no answer,
+      // not "no bootloader" — the OTAFIX gate offers on silence.
       bootloaderVersion: null,
       bootloaderUpdated: null,
       // Cached between a FilePickerRequiredError and the checkpoint's retry, so the UF2
@@ -185,45 +184,26 @@ const CONNECT_HEAD = {
 
 // --- step 1: connect and arm ----------------------------------------------------------
 
-/**
- * Read what the node is already set to, while the application still answers. This is the
- * only window: the ESP32 enters download mode moments later and DFU serves no CLI at all,
- * so a value not captured here cannot be recovered before the write.
- *
- * Never fails the flow — a silent device (a T1, a factory-fresh board, Meshtastic) leaves
- * the fields blank, which is what the Upgrade path did for every device before this.
- */
-async function readExistingConfig(flow, onStatus) {
-  const s = flow.state;
-  onStatus('Reading the current settings…');
-  try {
-    await s.port.open({ baudRate: CLI_BAUD_RATE });
-    try {
-      s.existingConfig = await readNodeConfig(s.port);
-    } finally {
-      await closeSerialPortQuietly(s.port);
-    }
-  } catch (error) {
-    // An unopenable port is "cannot tell", the same as silence. The engine's own entry
-    // is what reports a device that genuinely cannot be reached.
-    console.warn('[flow] Could not read existing settings:', error);
-    s.existingConfig = null;
-    return;
+/** Say what was found, so a silent device reads as a state rather than a stall. */
+function reportExistingConfig(config, onStatus) {
+  onStatus(config?.name ? `current name: ${config.name}` : 'no existing settings answered');
+  if (config?.latitude != null && config?.longitude != null) {
+    onStatus(`current position: ${config.latitude}, ${config.longitude}`);
   }
-  const { name, latitude, longitude } = s.existingConfig ?? {};
-  onStatus(name ? `current name: ${name}` : 'no existing settings answered');
-  if (latitude !== null && longitude !== null) onStatus(`current position: ${latitude}, ${longitude}`);
 }
 
 async function armEsp32(flow, onStatus) {
   const s = flow.state;
-  const { mode, version } = await esp32.resolveEsp32Mode(s.port);
+  // One session: the mode probe's own `ver` is the liveness gate, and the settings come
+  // back with it. Download mode is entered below and serves no CLI, so this is the last
+  // chance to read them.
+  const { mode, version, config } = await esp32.resolveEsp32Mode(s.port);
   s.mode = mode;
   onStatus(`found in ${mode}${version ? ` — ${version}` : ''}`);
-
-  // Before download mode, not after: the CLI is the only source for these and it is about
-  // to be gone. Skipped unless the application is actually running.
-  if (mode === esp32.ESP32_MODE.APP) await readExistingConfig(flow, onStatus);
+  if (mode === esp32.ESP32_MODE.APP) {
+    s.existingConfig = config;
+    reportExistingConfig(config, onStatus);
+  }
 
   // State 3 included: both probes are passive, so "unknown" is also what a boot loop looks
   // like. Entry is not destructive; the erase decision still runs on evidence downstream.
@@ -357,12 +337,15 @@ export const STEPS = [
       // Stays in application mode here — the bootloader gate (nrf52-bootloader-plan.md)
       // needs to read it before any DFU transition, since DFU serves no CLI at all. DFU
       // entry now happens just before the write, in the `flash` step.
-      onStatus('Reading the bootloader version…');
-      s.bootloaderVersion = await nrf52.readBootloaderVersion(s.port);
+      // One session for both, same as the ESP32 side: the bootloader gate's reading and
+      // the settings the Upgrade path pre-fills from. DFU serves no CLI, and this family
+      // stays in the application until the write, so nothing is lost by reading now.
+      onStatus('Reading the current settings…');
+      const appState = await nrf52.readAppState(s.port);
+      s.bootloaderVersion = appState.bootloaderVersion;
+      s.existingConfig = appState.config;
       s.mode = 'app';
-      // Same window as the ESP32 side, and this family keeps it open longer — DFU entry
-      // is deferred to the write. Read here anyway so both families behave alike.
-      await readExistingConfig(flow, onStatus);
+      reportExistingConfig(appState.config, onStatus);
       // No recon beyond that: nothing else device-side feeds the erase decision, and the
       // declaration in the next step is the only input for it.
     },
