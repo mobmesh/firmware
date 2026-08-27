@@ -1,32 +1,8 @@
-diff --git a/src/MeshCore.h b/src/MeshCore.h
-index e67371e..6bb49ec 100644
---- a/src/MeshCore.h
-+++ b/src/MeshCore.h
-@@ -71,6 +71,7 @@ public:
-   virtual bool setLoRaFemPaGainEnabled(bool enable) { return false; }
-   virtual bool canControlLoRaFemPaGain() const { return false; }
-   virtual bool isLoRaFemPaGainEnabled() const { return false; }
-+  virtual bool startOTAUpdateFromURL(const char* url, char reply[]) { return false; }   // not supported
- 
-   // Power management interface (boards with power management override these)
-   virtual bool isExternalPowered() { return false; }
-diff --git a/src/helpers/ESP32Board.h b/src/helpers/ESP32Board.h
-index d7eb5fe..e88a785 100644
---- a/src/helpers/ESP32Board.h
-+++ b/src/helpers/ESP32Board.h
-@@ -155,6 +155,7 @@ public:
-   }
- 
-   bool startOTAUpdate(const char* id, char reply[]) override;
-+  bool startOTAUpdateFromURL(const char* url, char reply[]) override;
- 
-   void setInhibitSleep(bool inhibit) {
-     inhibit_sleep = inhibit;
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index 26df75c..20df357 100644
+index f200a4ff..f3e04588 100644
 --- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
-@@ -1,16 +1,144 @@
+@@ -1,17 +1,145 @@
 -// Hook points for mod CLI commands, dispatched ahead of upstream's own chain so a
 -// mod can match a longer prefix first. No-ops until a mod fills them in.
 +// Every CLI command our mods add lives here, so upstream's CommonCLI.cpp carries
@@ -34,6 +10,7 @@ index 26df75c..20df357 100644
 +// Called before upstream's own chain, which is what lets `start ota wan ...` be
 +// matched ahead of upstream's shorter `start ota` prefix.
  #include <helpers/CommonCLI.h>
+ #include <helpers/ModHooks.h>
 +#include <helpers/TxtDataHelpers.h>
  #include <target.h>
  
@@ -60,12 +37,12 @@ index 26df75c..20df357 100644
 +    HotspotOTA::loadConfig(cfg);
 +    if (cfg.url[0] == 0) {
 +      strcpy(reply, "ERR: ota.fw.url not configured");
-+    } else if (!_board->startOTAUpdateFromURL(cfg.url, reply)) {
++    } else if (!modBoardStartOtaFromUrl(cfg.url, reply)) {
 +      // reply[] already carries the specific error from HotspotOTA::run
 +    }
 +#endif
 +  } else if (memcmp(command, "start ota wan ", 14) == 0) {
-+    if (!_board->startOTAUpdateFromURL(&command[14], reply)) {
++    if (!modBoardStartOtaFromUrl(&command[14], reply)) {
 +      // reply[] already carries the specific error from HotspotOTA::run
 +    }
 +#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
@@ -176,7 +153,7 @@ index 26df75c..20df357 100644
  }
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
 new file mode 100644
-index 0000000..40199a3
+index 00000000..40199a30
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.cpp
 @@ -0,0 +1,451 @@
@@ -633,10 +610,10 @@ index 0000000..40199a3
 +}
 diff --git a/src/helpers/esp32/HotspotOTA.h b/src/helpers/esp32/HotspotOTA.h
 new file mode 100644
-index 0000000..cc25f01
+index 00000000..04c0ebb4
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOTA.h
-@@ -0,0 +1,42 @@
+@@ -0,0 +1,46 @@
 +#pragma once
 +#include <Arduino.h>
 +#include <helpers/BaseChatMesh.h>   // MAX_TEXT_LEN
@@ -654,6 +631,10 @@ index 0000000..cc25f01
 +// long URLs again -- as a compile error instead.
 +static_assert(sizeof(HotspotOtaConfig::url) == MAX_TEXT_LEN - 14 + 1,
 +              "HotspotOtaConfig.url must track MAX_TEXT_LEN minus the \"start ota wan \" prefix");
++
++// Reached from the CLI hook. Declared here rather than as a board virtual so this mod
++// leaves upstream's class hierarchy alone; the body is in HotspotOtaBoard.cpp.
++bool modBoardStartOtaFromUrl(const char* url, char reply[]);
 +
 +namespace HotspotOTA {
 +  bool loadConfig(HotspotOtaConfig& cfg);
@@ -681,23 +662,21 @@ index 0000000..cc25f01
 +}
 diff --git a/src/helpers/esp32/HotspotOtaBoard.cpp b/src/helpers/esp32/HotspotOtaBoard.cpp
 new file mode 100644
-index 0000000..8a5d1e6
+index 00000000..6c014c56
 --- /dev/null
 +++ b/src/helpers/esp32/HotspotOtaBoard.cpp
-@@ -0,0 +1,34 @@
-+// ESP32Board::startOTAUpdateFromURL lives here rather than in upstream's
-+// ESP32Board.cpp -- a member may be defined in any translation unit, so the
-+// patch to that file is only the one-line declaration in ESP32Board.h.
-+#include <helpers/ESP32Board.h>
-+#include <target.h>
+@@ -0,0 +1,32 @@
++// A free function rather than a board virtual, so hotspot-ota patches neither
++// MeshCore.h nor ESP32Board.h and upstream owns its own class hierarchy.
++#include <helpers/ModHooks.h>
++#include <helpers/esp32/HotspotOTA.h>
 +
 +// Same gate upstream puts around startOTAUpdate(): no WiFi stack, no URL update.
 +#if defined(WITH_HOTSPOT_OTA) && defined(ADMIN_PASSWORD) && !defined(DISABLE_WIFI_OTA)
 +
-+#include <helpers/esp32/HotspotOTA.h>
 +#include <helpers/TxtDataHelpers.h>   // StrHelper -- there is no standalone StrHelper.h
 +
-+bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
++bool modBoardStartOtaFromUrl(const char* url, char reply[]) {
 +  HotspotOtaConfig cfg;
 +  HotspotOTA::loadConfig(cfg);
 +  // Reject outright rather than silently truncate to a wrong-but-valid-looking URL.
@@ -707,15 +686,15 @@ index 0000000..8a5d1e6
 +  }
 +  StrHelper::strncpy(cfg.url, url, sizeof(cfg.url));
 +
-+  inhibit_sleep = true;
++  modBoardInhibitSleep(true);
 +  bool ok = HotspotOTA::run(cfg, reply);   // owns GPIO47 power-switch sequencing internally
-+  if (ok) reboot();                        // doesn't return
-+  inhibit_sleep = false;                   // failure returns here -- re-allow sleep
++  if (ok) modBoardReboot();                // doesn't return
++  modBoardInhibitSleep(false);             // failure returns here -- re-allow sleep
 +  return ok;
 +}
 +
 +#else
-+bool ESP32Board::startOTAUpdateFromURL(const char* url, char reply[]) {
++bool modBoardStartOtaFromUrl(const char* url, char reply[]) {
 +  return false; // not supported
 +}
 +#endif

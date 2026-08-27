@@ -1,5 +1,5 @@
 diff --git a/src/helpers/esp32/HotspotOTA.cpp b/src/helpers/esp32/HotspotOTA.cpp
-index 40199a3..afa56e0 100644
+index 40199a30..f9d8f332 100644
 --- a/src/helpers/esp32/HotspotOTA.cpp
 +++ b/src/helpers/esp32/HotspotOTA.cpp
 @@ -6,8 +6,10 @@
@@ -9,7 +9,7 @@ index 40199a3..afa56e0 100644
 +#include <time.h>
  #include <Utils.h>                    // mesh::Utils::fromHex
  #include <helpers/TxtDataHelpers.h>   // StrHelper lives here, no standalone StrHelper.h
-+#include <target.h>                   // rtc_clock -- same global main.cpp/MyMesh.cpp use directly
++#include <helpers/ModHooks.h>          // modClockSet()
  
  // Board-specific: OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS, OTA_WIFI_JOIN_RETRY_DELAY_MS,
  // OTA_WIFI_JOIN_MAX_ATTEMPTS, OTA_HTTP_TIMEOUT_MS, OTA_DIAG_WIFI_JOIN_ATTEMPTS,
@@ -38,7 +38,7 @@ index 40199a3..afa56e0 100644
 +// epoch is UTC everywhere else in this codebase (see CommonCLI's "clock"/"time" commands), so
 +// this matches rather than introducing a local-time conversion nothing else expects.
 +//
-+// Calls rtc_clock.setCurrentTime() directly -- NOT via the "time <epoch>" CLI command's code
++// Sets the clock directly -- NOT via the "time <epoch>" CLI command's code
 +// path, so this does not go through its "clock cannot go backwards" guard. That's deliberate:
 +// NTP is authoritative here, and neither board this mod targets has a battery-backed RTC, so
 +// the clock is always wrong (reset to VolatileRTCClock's fixed fallback epoch) after every
@@ -53,7 +53,7 @@ index 40199a3..afa56e0 100644
 +  time_t now;
 +  time(&now);
 +  if (now > OTA_NTP_SANITY_FLOOR) {
-+    rtc_clock.setCurrentTime((uint32_t)now);
++    modClockSet((uint32_t)now);
 +  }
 +}
 +

@@ -1,11 +1,11 @@
 diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
-index 9ca21bc..195d809 100644
+index 1fc23750..90710e4d 100644
 --- a/src/helpers/ModHooks.cpp
 +++ b/src/helpers/ModHooks.cpp
 @@ -1,11 +1,37 @@
  #include <helpers/ModHooks.h>
 +#include <MeshCore.h>
- #include <target.h>   // radio_init(), board
+ #include <target.h>   // radio_init(), board, rtc_clock
  
 +#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
 +#include <SPIFFS.h>
@@ -41,10 +41,10 @@ index 9ca21bc..195d809 100644
  
  bool modWantsPowerSaving() {
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index b170987..4b7326e 100644
+index f3e04588..66d77a48 100644
 --- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
-@@ -10,6 +10,10 @@
+@@ -11,6 +11,10 @@
  #include <helpers/esp32/HotspotOTA.h>
  #endif
  
@@ -55,7 +55,7 @@ index b170987..4b7326e 100644
  // Set via a CI build flag to this build's date, so `ver` can show it distinct from upstream's own
  // FIRMWARE_BUILD_DATE. Falls back to "unknown" for local/dev builds.
  #ifndef OTA_MOD_BUILD_DATE
-@@ -47,6 +51,12 @@ bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char*
+@@ -48,6 +52,12 @@ bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char*
    } else if (memcmp(command, "ota wan check", 13) == 0) {
      // Pre-flight check -- see `ota wan join`. Assumes WiFi already joined.
      HotspotOTA::checkWan(reply);
@@ -63,7 +63,7 @@ index b170987..4b7326e 100644
 +#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
 +  } else if (memcmp(command, "ota slot boot ", 14) == 0) {
 +    if (RollbackGuard::setActivePartition(command[14], reply)) {
-+      _board->reboot();  // doesn't return
++      modBoardReboot();  // doesn't return
 +    }
  #endif
    } else {
@@ -81,7 +81,7 @@ index b170987..4b7326e 100644
    }
 diff --git a/src/helpers/esp32/RollbackGuard.cpp b/src/helpers/esp32/RollbackGuard.cpp
 new file mode 100644
-index 0000000..8246a20
+index 00000000..8246a201
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.cpp
 @@ -0,0 +1,201 @@
@@ -288,7 +288,7 @@ index 0000000..8246a20
 +}
 diff --git a/src/helpers/esp32/RollbackGuard.h b/src/helpers/esp32/RollbackGuard.h
 new file mode 100644
-index 0000000..7154365
+index 00000000..71543655
 --- /dev/null
 +++ b/src/helpers/esp32/RollbackGuard.h
 @@ -0,0 +1,47 @@

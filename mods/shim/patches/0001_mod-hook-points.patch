@@ -1,5 +1,5 @@
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
-index a714db6..8d5b884 100644
+index a714db68..8d5b8841 100644
 --- a/examples/simple_repeater/main.cpp
 +++ b/examples/simple_repeater/main.cpp
 @@ -2,6 +2,7 @@
@@ -37,7 +37,7 @@ index a714db6..8d5b884 100644
      board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
  #else
 diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
-index d833fff..f2abfe8 100644
+index d833fff3..f2abfe85 100644
 --- a/examples/simple_room_server/main.cpp
 +++ b/examples/simple_room_server/main.cpp
 @@ -2,6 +2,7 @@
@@ -66,41 +66,35 @@ index d833fff..f2abfe8 100644
    while (Serial.available() && len < sizeof(command)-1) {
      char c = Serial.read();
 diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index b318bb5..d5d2f12 100644
+index b318bb58..7ebc2067 100644
 --- a/src/helpers/CommonCLI.cpp
 +++ b/src/helpers/CommonCLI.cpp
-@@ -180,7 +180,8 @@ uint8_t CommonCLI::buildAdvertData(uint8_t node_type, uint8_t* app_data) {
+@@ -180,6 +180,7 @@ uint8_t CommonCLI::buildAdvertData(uint8_t node_type, uint8_t* app_data) {
  }
  
  void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* reply) {
--    if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
-+    if (handleModCommand(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
-+    } else if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
++    if (handleModCommand(sender_timestamp, command, reply)) return;   // CommonCliMods.cpp
+     if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
        _board->powerOff();  // doesn't return
      } else if (memcmp(command, "reboot", 6) == 0) {
-       _board->reboot();  // doesn't return
-@@ -447,7 +448,8 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
+@@ -447,6 +448,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
  
  void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* reply) {
    const char* config = &command[4];
--  if (memcmp(config, "dutycycle ", 10) == 0) {
-+  if (handleModSetCmd(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
-+  } else if (memcmp(config, "dutycycle ", 10) == 0) {
++  if (handleModSetCmd(sender_timestamp, command, reply)) return;   // CommonCliMods.cpp
+   if (memcmp(config, "dutycycle ", 10) == 0) {
      float dc = atof(&config[10]);
      if (dc < 1 || dc > 100) {
-       strcpy(reply, "ERROR: dutycycle must be 1-100");
-@@ -806,7 +808,8 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
+@@ -806,6 +808,7 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
  
  void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* reply) {
    const char* config = &command[4];
--  if (memcmp(config, "dutycycle", 9) == 0) {
-+  if (handleModGetCmd(sender_timestamp, command, reply)) {   // mods first -- CommonCliMods.cpp
-+  } else if (memcmp(config, "dutycycle", 9) == 0) {
++  if (handleModGetCmd(sender_timestamp, command, reply)) return;   // CommonCliMods.cpp
+   if (memcmp(config, "dutycycle", 9) == 0) {
      float dc = 100.0f / (_prefs->airtime_factor + 1.0f);
      int dc_int = (int)dc;
-     int dc_frac = (int)((dc - dc_int) * 10.0f + 0.5f);
 diff --git a/src/helpers/CommonCLI.h b/src/helpers/CommonCLI.h
-index 237c758..8d2c019 100644
+index 237c758e..8d2c0198 100644
 --- a/src/helpers/CommonCLI.h
 +++ b/src/helpers/CommonCLI.h
 @@ -267,6 +267,11 @@ class CommonCLI {
@@ -117,12 +111,12 @@ index 237c758..8d2c019 100644
        : _board(&board), _rtc(&rtc), _sensors(&sensors), _region_map(&region_map), _acl(&acl), _prefs(prefs), _callbacks(callbacks) { }
 diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
 new file mode 100644
-index 0000000..9ca21bc
+index 00000000..1fc23750
 --- /dev/null
 +++ b/src/helpers/ModHooks.cpp
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,37 @@
 +#include <helpers/ModHooks.h>
-+#include <target.h>   // radio_init(), board
++#include <target.h>   // radio_init(), board, rtc_clock
 +
 +bool modRadioInit(const char* build_id) {
 +  return radio_init();
@@ -134,13 +128,39 @@ index 0000000..9ca21bc
 +bool modWantsPowerSaving() {
 +  return false;
 +}
++
++// Reached through the concrete `board`, not a mesh::MainBoard*, so a virtual that
++// upstream moves down into variant code still resolves here.
++void     modBoardReboot()                  { board.reboot(); }
++uint16_t modBoardBattMilliVolts()          { return board.getBattMilliVolts(); }
++void     modBoardDeepSleep(uint32_t secs)  { board.enterDeepSleep(secs); }
++void     modBoardInhibitSleep(bool inhibit) { board.setInhibitSleep(inhibit); }
++uint32_t modClockGet()                     { return rtc_clock.getCurrentTime(); }
++void     modClockSet(uint32_t epoch)       { rtc_clock.setCurrentTime(epoch); }
++
++#ifdef MOBMESH_HAS_FEM_LNA
++// Through the FEM object, not the board's own wrappers: upstream made those private on
++// dev, while LoRaFEMControl's public API is identical on both refs.
++bool modFemLnaAvailable()  { return board.loRaFEMControl.isLnaCanControl(); }
++bool modFemLnaGet()        { return board.loRaFEMControl.isLNAEnabled(); }
++void modFemLnaSet(bool on) {
++  board.loRaFEMControl.setLNAEnable(on);
++  board.loRaFEMControl.setRxModeEnable();   // re-arm RX, as upstream's own setter does
++}
++#else
++bool modFemLnaAvailable()  { return false; }
++bool modFemLnaGet()        { return false; }
++void modFemLnaSet(bool on) { }
++#endif
 diff --git a/src/helpers/ModHooks.h b/src/helpers/ModHooks.h
 new file mode 100644
-index 0000000..8ab58a9
+index 00000000..8ab93c5d
 --- /dev/null
 +++ b/src/helpers/ModHooks.h
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,26 @@
 +#pragma once
++
++#include <stdint.h>
 +
 +// One hook surface for every mod, so upstream's main.cpp carries a handful of
 +// one-line calls instead of each mod's code inline -- and so two mods never
@@ -149,15 +169,31 @@ index 0000000..8ab58a9
 +bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
 +void modLoop();                            // called first in loop()
 +bool modWantsPowerSaving();                // OR'd with the operator's powersaving_enabled
++
++// The reverse direction. Bodies name the concrete `board` and `rtc_clock`, so an
++// upstream refactor breaks this one file instead of silently unhooking a mod.
++void     modBoardReboot();                     // does not return
++uint16_t modBoardBattMilliVolts();
++void     modBoardDeepSleep(uint32_t secs);     // does not return
++void     modBoardInhibitSleep(bool inhibit);
++uint32_t modClockGet();
++void     modClockSet(uint32_t epoch);
++
++// FEM LNA bypass, where the board declares MOBMESH_HAS_FEM_LNA. Elsewhere the
++// query answers false and the setter does nothing.
++bool modFemLnaAvailable();
++bool modFemLnaGet();
++void modFemLnaSet(bool on);
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
 new file mode 100644
-index 0000000..26df75c
+index 00000000..f200a4ff
 --- /dev/null
 +++ b/src/helpers/esp32/CommonCliMods.cpp
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,17 @@
 +// Hook points for mod CLI commands, dispatched ahead of upstream's own chain so a
 +// mod can match a longer prefix first. No-ops until a mod fills them in.
 +#include <helpers/CommonCLI.h>
++#include <helpers/ModHooks.h>
 +#include <target.h>
 +
 +bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
