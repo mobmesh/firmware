@@ -2,4 +2,3 @@
 # which declare per-patch env contributions. This file holds facts about
 # the mod as a whole.
 name: power-guard
-suffix: ""   # failsafes, not features -- asset basenames are unchanged

@@ -2,7 +2,6 @@
 # 0002.meta.yaml) which declare per-patch env contributions. This file holds
 # facts about the mod as a whole.
 name: hotspot-ota
-suffix: ota
 
 # A mod earns a bit only if the built image carries something that proves it is compiled
 # in. Bits are permanent: never renumber one, never reuse a retired mod's. See

@@ -320,7 +320,7 @@ class BoardsJsonTestCase(unittest.TestCase):
             partitions_bin=str(self._partitions_bin()),
             variant_id=variant_id,
             variant_label="Repeater",
-            asset_basename="heltec_v4_rep_ota_ts",
+            asset_basename="heltec_v4_rep_mobmesh",
             version="1.16.0",
             firmware_file="heltec_v4/repeater/firmware.bin",
             output=str(out),
@@ -358,7 +358,7 @@ class BoardsJsonTestCase(unittest.TestCase):
 
 
 class ResolveTargetsTestCase(unittest.TestCase):
-    """cmd_resolve_targets: asset_basename assembly from mod suffixes."""
+    """cmd_resolve_targets: mod resolution and the fixed asset_basename."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -377,8 +377,8 @@ class ResolveTargetsTestCase(unittest.TestCase):
         path.write_text(content)
         return path
 
-    def _make_mod(self, name: str, suffix: str):
-        self._write(f"mods/{name}/mod.yaml", f"name: {name}\nsuffix: \"{suffix}\"\n")
+    def _make_mod(self, name: str):
+        self._write(f"mods/{name}/mod.yaml", f"name: {name}\n")
 
     def _run(self, mods, core=None) -> dict:
         head = f"core_mods: [{', '.join(core)}]\n" if core else ""
@@ -398,47 +398,40 @@ class ResolveTargetsTestCase(unittest.TestCase):
         gbc.cmd_resolve_targets(argparse.Namespace(out=str(out)))
         return json.loads(out.read_text())["include"][0]
 
-    def test_empty_suffix_mod_does_not_alter_asset_basename(self):
-        self._make_mod("hotspot-ota", "ota")
-        self._make_mod("shim", "")
+    def test_asset_basename_does_not_vary_with_the_mod_set(self):
+        self._make_mod("hotspot-ota")
+        self._make_mod("shim")
 
-        row = self._run(["hotspot-ota", "shim"])
+        one = self._run(["shim"])
+        both = self._run(["hotspot-ota", "shim"])
 
-        self.assertEqual(row["asset_basename"], "heltec_v4_rep_ota")
-
-    def test_all_empty_suffixes_leave_bare_board_and_role(self):
-        self._make_mod("shim", "")
-
-        row = self._run(["shim"])
-
-        self.assertEqual(row["asset_basename"], "heltec_v4_rep")
+        self.assertEqual(one["asset_basename"], "heltec_v4_rep_mobmesh")
+        self.assertEqual(both["asset_basename"], "heltec_v4_rep_mobmesh")
 
     def test_core_mods_apply_before_target_mods(self):
-        self._make_mod("shim", "")
-        self._make_mod("hotspot-ota", "ota")
-        self._make_mod("batt-saver", "bs")
+        self._make_mod("shim")
+        self._make_mod("hotspot-ota")
+        self._make_mod("batt-saver")
 
         row = self._run(["batt-saver"], core=["shim", "hotspot-ota"])
 
         self.assertEqual(row["mods"], ["shim", "hotspot-ota", "batt-saver"])
-        self.assertEqual(row["asset_basename"], "heltec_v4_rep_ota_bs")
 
     def test_core_mods_alone_are_enough(self):
-        self._make_mod("shim", "")
-        self._make_mod("hotspot-ota", "ota")
+        self._make_mod("shim")
+        self._make_mod("hotspot-ota")
 
         row = self._run([], core=["shim", "hotspot-ota"])
 
         self.assertEqual(row["mods"], ["shim", "hotspot-ota"])
 
     def test_target_repeating_a_core_mod_does_not_duplicate_or_reorder(self):
-        self._make_mod("shim", "")
-        self._make_mod("hotspot-ota", "ota")
+        self._make_mod("shim")
+        self._make_mod("hotspot-ota")
 
         row = self._run(["hotspot-ota"], core=["shim", "hotspot-ota"])
 
         self.assertEqual(row["mods"], ["shim", "hotspot-ota"])
-        self.assertEqual(row["asset_basename"], "heltec_v4_rep_ota")
 
     def test_no_mods_anywhere_is_an_error(self):
         with self.assertRaises(SystemExit):
