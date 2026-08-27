@@ -25,6 +25,25 @@ REGISTRY = pom.load_mod_registry()
 MARKER = REGISTRY["hotspot-ota"][1]
 
 
+def unpatched(data):
+    """A vendored image with its metadata block zeroed, as it was before CI patched it.
+
+    patch() refuses a non-zero reserved area, so a round-trip test needs the pristine
+    bytes. Zeroing the block alone leaves the checksum and digest stale, so both are
+    restored the same way the patcher computes them.
+    """
+    out = bytearray(data)
+    region = slice(pom.RESERVED_OFFSET, pom.RESERVED_OFFSET + pom.RESERVED_LEN)
+    delta = 0
+    for byte in out[region]:
+        delta ^= byte
+    checksum_offset = len(out) - pom.DIGEST_LEN - 1
+    out[region] = bytes(pom.RESERVED_LEN)
+    out[checksum_offset] ^= delta
+    out[-pom.DIGEST_LEN:] = hashlib.sha256(bytes(out[:-pom.DIGEST_LEN])).digest()
+    return bytes(out)
+
+
 def make_image(segment_len=512, hash_appended=1, segment_count=1, marker=True):
     """A minimal but structurally real ESP32 image, big enough to hold the reserved area.
 
@@ -60,10 +79,17 @@ class ParserGroundTruth(unittest.TestCase):
             with self.subTest(image=str(image.relative_to(REPO))):
                 pom.verify(image.read_bytes(), str(image))
 
-    def test_vendored_images_are_unpatched(self):
+    def test_vendored_images_carry_their_metadata(self):
+        # These are CI output, patched at build time. A missing block means the release
+        # step did not run, not that the parser is wrong.
         for image in VENDORED:
             with self.subTest(image=str(image.relative_to(REPO))):
-                self.assertIsNone(pom.read_metadata(image.read_bytes()))
+                meta = pom.read_metadata(image.read_bytes())
+                self.assertIsNotNone(meta, "vendored image carries no metadata block")
+                self.assertEqual(meta["layout_version"], pom.LAYOUT_VERSION)
+                board, _, role = meta["board_role"].partition("/")
+                self.assertEqual((board, role), (image.parent.parent.name, image.parent.name))
+                self.assertTrue(meta["mods"] & (1 << REGISTRY["hotspot-ota"][0]))
 
 
 class Payload(unittest.TestCase):
@@ -126,7 +152,7 @@ class Patching(unittest.TestCase):
     def test_round_trip_on_vendored_images(self):
         for image in VENDORED:
             with self.subTest(image=str(image.relative_to(REPO))):
-                out = pom.patch(image.read_bytes(), self.payload)
+                out = pom.patch(unpatched(image.read_bytes()), self.payload)
                 meta = pom.read_metadata(out)
                 self.assertEqual(meta["upstream_version"], "v1.17.1")
                 self.assertEqual(meta["repo_sha"], "ceb8915")
