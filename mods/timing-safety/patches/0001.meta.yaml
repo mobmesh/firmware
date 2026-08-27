@@ -5,5 +5,5 @@ requires: []
 # their state daily: once one is MERGED the corresponding hunks are probably redundant
 # and the patch should be re-reviewed, not just rebased. Upstream fixing something
 # itself produces no failure signal of its own -- the patch keeps applying cleanly
-# while duplicating a fix that already landed (see docs/rebasing-patches.md).
+# while duplicating a fix that already landed.
 upstream_prs: [1972, 1349]

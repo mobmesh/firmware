@@ -531,7 +531,7 @@ jobs:
                     RESCUE_ATTEMPTED, RESCUE_PATCH, RESCUE_VERDICT } = process.env;
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const detail = RESCUE_ATTEMPTED === 'true'
-              ? `**Patch drift**: \`${RESCUE_PATCH}\` no longer applies. A three-way merge was attempted as a starting point -- ${RESCUE_VERDICT}. The rescued diff is attached to the run as artifact \`patch-rescue-${BOARD_ID}-${VARIANT_ID}-${UPSTREAM_REF}\`. It is NOT validated and was NOT built; treat it as a head start on the rebase, not a fix. See docs/rebasing-patches.md.`
+              ? `**Patch drift**: \`${RESCUE_PATCH}\` no longer applies. A three-way merge was attempted as a starting point -- ${RESCUE_VERDICT}. The rescued diff is attached to the run as artifact \`patch-rescue-${BOARD_ID}-${VARIANT_ID}-${UPSTREAM_REF}\`. It is NOT validated and was NOT built; treat it as a head start on the rebase, not a fix.`
               : 'The failure was not in the patch-apply step -- check the build log.';
             await github.rest.issues.create({
               owner: context.repo.owner,

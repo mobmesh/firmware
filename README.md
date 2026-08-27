@@ -50,8 +50,6 @@ Some mods may add extra options or requirements for a traditional flasher. Check
 
 Patches are applied in numeric order within each mod. Every patch also lists any other patches it depends on. CI checks these dependencies before applying anything.
 
-* `docs/rebasing-patches.md` covers moving the patches onto a new upstream release.
-
 If a patch no longer applies cleanly to the current upstream version, the build fails and an issue is opened with the name of the affected patch. The system does not try to automatically merge or fix the patch.
 
 ## Supported Boards 
