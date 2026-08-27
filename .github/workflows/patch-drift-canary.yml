@@ -1,6 +1,6 @@
 # Early warning for patch drift.
 #
-# sync-build-release only notices drift when upstream *tags a release* -- i.e. at the
+# build-release only notices drift when upstream *tags a release* -- i.e. at the
 # exact moment we want to ship. This runs daily against upstream's moving branches so
 # breakage surfaces days or weeks earlier, decoupled from release pressure.
 #

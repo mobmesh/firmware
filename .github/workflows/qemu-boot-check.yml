@@ -10,7 +10,7 @@ name: qemu-boot-check
 
 on:
   workflow_run:
-    workflows: ["sync-build-release"]
+    workflows: ["build-release"]
     types: [completed]
   workflow_dispatch:
 

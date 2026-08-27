@@ -250,7 +250,7 @@ def cmd_resolve_targets(args):
     rows = []
     for t in targets:
         for field in ("board", "role", "build_env", "upstream_tag_prefix", "release_title",
-                      "asset_role_abbrev", "sync_docs", "vendor_flasher_assets", "make_latest"):
+                      "asset_role_abbrev", "vendor_flasher_assets", "make_latest"):
             if field not in t:
                 sys.exit(f"error: build-targets.yaml entry for board '{t.get('board')}' "
                           f"role '{t.get('role')}' is missing required field '{field}'")
@@ -270,7 +270,6 @@ def cmd_resolve_targets(args):
             "upstream_tag_prefix": t["upstream_tag_prefix"],
             "release_title": t["release_title"],
             "asset_basename": asset_basename,
-            "sync_docs": t["sync_docs"],
             "vendor_flasher_assets": t["vendor_flasher_assets"],
             "make_latest": t["make_latest"],
             "mods": mods,
