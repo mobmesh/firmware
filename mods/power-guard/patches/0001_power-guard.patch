@@ -1,5 +1,5 @@
 diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
-index 90710e4d..8fb8eef1 100644
+index 90710e4d..8aa61af6 100644
 --- a/src/helpers/ModHooks.cpp
 +++ b/src/helpers/ModHooks.cpp
 @@ -7,7 +7,94 @@
@@ -7,8 +7,8 @@ index 90710e4d..8fb8eef1 100644
  #endif
  
 +#ifdef WITH_POWER_GUARD
-+#include <helpers/esp32/BattSaver.h>
-+BattSaver batt_saver;   // extern'd by CommonCliMods.cpp
++#include <helpers/esp32/PowerGuardPolicy.h>
++PowerGuardPolicy power_guard;   // extern'd by CommonCliMods.cpp
 +#endif
 +
 +#if defined(ESP32) && defined(WITH_POWER_GUARD)
@@ -102,24 +102,129 @@ index 90710e4d..8fb8eef1 100644
    RollbackGuard::poll();
  #endif
 +#ifdef WITH_POWER_GUARD
-+  batt_saver.loop();
++  power_guard.loop();
 +#endif
  }
  
  bool modWantsPowerSaving() {
 +#ifdef WITH_POWER_GUARD
-+  return batt_saver.isActive();   // runtime only; NodePrefs is never written
++  return power_guard.isActive();   // runtime only; NodePrefs is never written
 +#else
    return false;
 +#endif
  }
  
  // Reached through the concrete `board`, not a mesh::MainBoard*, so a virtual that
-diff --git a/src/helpers/esp32/BattSaver.h b/src/helpers/esp32/BattSaver.h
+diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
+index 66d77a48..9d8d4102 100644
+--- a/src/helpers/esp32/CommonCliMods.cpp
++++ b/src/helpers/esp32/CommonCliMods.cpp
+@@ -21,7 +21,100 @@
+ #define OTA_MOD_BUILD_DATE "unknown"
+ #endif
+ 
++#if defined(ESP_PLATFORM) && defined(WITH_POWER_GUARD)
++#include <helpers/esp32/PowerGuardPolicy.h>
++extern PowerGuardPolicy power_guard;
++// Board-specific rail power-down, where the board ships one. The radio is already
++// initialised on this path, so enterDeepSleep()'s own powerOff() sleeps the SX1262 --
++// only the rails are ours to drop.
++#ifdef P_LORA_PA_POWER
++#define POWER_GUARD_HAS_POWERDOWN 1
++#include <PowerGuard.h>
++#endif
++#ifndef POWER_GUARD_POWEROFF_MIN_SECS
++#define POWER_GUARD_POWEROFF_MIN_SECS 60
++#endif
++#ifndef POWER_GUARD_POWEROFF_MAX_SECS
++#define POWER_GUARD_POWEROFF_MAX_SECS 86400
++#endif
++#endif
++
+ bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
++#if defined(ESP_PLATFORM) && defined(WITH_POWER_GUARD)
++  // Claimed ahead of upstream's 11-char "powersaving" prefix, which would answer
++  // any of these as a status query and look like it worked.
++  if (memcmp(command, "powersaving safe.mv ", 20) == 0) {
++    uint32_t mv = (uint32_t) atol(command + 20);
++    if (!power_guard.setSleepMilliVolts((uint16_t) mv)) {
++      sprintf(reply, "ERR: %u-%u or 0", (unsigned)POWER_GUARD_SAFE_FLOOR_MV,
++              (unsigned)POWER_GUARD_SAFE_MAX_MV);
++    } else if (mv == 0) {
++      strcpy(reply, "OK - safe.mv 0 (rung disabled)");
++    } else {
++      sprintf(reply, "OK - safe.mv %umV%s", (unsigned)mv,
++              power_guard.safeEnabled() ? "" : " (safe is off)");
++    }
++    return true;
++  }
++  if (memcmp(command, "powersaving safe", 16) == 0
++      && (command[16] == 0 || command[16] == ' ')) {
++    const char* arg = (command[16] == ' ') ? command + 17 : "";
++    if (*arg == 0) {
++      sprintf(reply, "safe %s, %umV, batt %umV", power_guard.safeEnabled() ? "on" : "off",
++              (unsigned)power_guard.sleepMilliVolts(), (unsigned)power_guard.lastMilliVolts());
++    } else if (memcmp(arg, "on", 2) == 0) {
++      if (power_guard.sleepMilliVolts() == 0) {
++        strcpy(reply, "ERR: no threshold -- set powersaving safe.mv first");
++      } else {
++        power_guard.setSafeEnabled(true);
++        sprintf(reply, "OK - safe on, %umV", (unsigned)power_guard.sleepMilliVolts());
++      }
++    } else if (memcmp(arg, "off", 3) == 0) {
++      power_guard.setSafeEnabled(false);
++      sprintf(reply, "OK - safe off (%umV kept)", (unsigned)power_guard.sleepMilliVolts());
++    } else {
++      strcpy(reply, "ERR: usage: powersaving safe [on|off]");
++    }
++    return true;
++  }
++  if (memcmp(command, "powersaving auto", 16) == 0
++      && (command[16] == 0 || command[16] == ' ')) {
++    const char* arg = (command[16] == ' ') ? command + 17 : "";
++    if (*arg == 0) {
++      sprintf(reply, "auto %s, active %s, transitions %u", power_guard.isAuto() ? "on" : "off",
++              power_guard.isActive() ? "yes" : "no", (unsigned)power_guard.transitionCount());
++    } else if (memcmp(arg, "on", 2) == 0 || memcmp(arg, "off", 3) == 0) {
++      power_guard.setAuto(*arg == 'o' && arg[1] == 'n');
++      sprintf(reply, "OK - auto %s", power_guard.isAuto() ? "on" : "off");
++    } else {
++      strcpy(reply, "ERR: usage: powersaving auto [on|off]");
++    }
++    return true;
++  }
++
++  // Claimed ahead of upstream's own branch, which calls powerOff() -> enterDeepSleep(0)
++  // and never wakes. A node that cannot wake itself needs a site visit.
++  if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
++    const char* arg = command + 8;   // both verbs are 8 chars
++    uint32_t secs = (*arg == ' ') ? (uint32_t) atol(arg + 1) : 0;
++    if (sender_timestamp != 0) {
++      strcpy(reply, "ERR: poweroff is serial-only");
++    } else if (secs < POWER_GUARD_POWEROFF_MIN_SECS || secs > POWER_GUARD_POWEROFF_MAX_SECS) {
++      sprintf(reply, "ERR: usage: poweroff <secs> (%u-%u)",
++              (unsigned)POWER_GUARD_POWEROFF_MIN_SECS, (unsigned)POWER_GUARD_POWEROFF_MAX_SECS);
++    } else {
++      // enterDeepSleep() never returns, so reply[] would never be printed -- say it here.
++      Serial.printf("OK - deep sleep %us (%uh%um), then reboots\n",
++                    (unsigned)secs, (unsigned)(secs / 3600), (unsigned)((secs % 3600) / 60));
++      Serial.flush();
++#ifdef POWER_GUARD_HAS_POWERDOWN
++      powerGuardDownPostRadio();
++#endif
++      modBoardDeepSleep(secs);   // does not return
++    }
++    return true;
++  }
++#endif
+   if (memcmp(command, "ver", 3) == 0) {
+     // Shadows upstream's own `ver` branch, which never runs while this mod is built in.
+     sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
+diff --git a/src/helpers/esp32/PowerGuardPolicy.h b/src/helpers/esp32/PowerGuardPolicy.h
 new file mode 100644
-index 00000000..be94ca09
+index 00000000..8a6245e7
 --- /dev/null
-+++ b/src/helpers/esp32/BattSaver.h
++++ b/src/helpers/esp32/PowerGuardPolicy.h
 @@ -0,0 +1,203 @@
 +#pragma once
 +
@@ -192,7 +297,7 @@ index 00000000..be94ca09
 +    (POWER_GUARD_RESUME_MV > 0 ? POWER_GUARD_RESUME_MV - 1 : 0)
 +#endif
 +
-+class BattSaver {
++class PowerGuardPolicy {
 +  unsigned long _next_sample_at;
 +  uint8_t _agree;
 +  uint8_t _sleep_agree;
@@ -223,7 +328,7 @@ index 00000000..be94ca09
 +  }
 +
 +public:
-+  BattSaver()
++  PowerGuardPolicy()
 +    : _next_sample_at(0), _agree(0), _sleep_agree(0),
 +      _auto(POWER_GUARD_AUTO_DEFAULT), _active(false),
 +      _lna_was_enabled(false), _last_mv(0), _transitions(0),
@@ -324,111 +429,6 @@ index 00000000..be94ca09
 +#endif
 +  }
 +};
-diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index 66d77a48..423f4304 100644
---- a/src/helpers/esp32/CommonCliMods.cpp
-+++ b/src/helpers/esp32/CommonCliMods.cpp
-@@ -21,7 +21,100 @@
- #define OTA_MOD_BUILD_DATE "unknown"
- #endif
- 
-+#if defined(ESP_PLATFORM) && defined(WITH_POWER_GUARD)
-+#include <helpers/esp32/BattSaver.h>
-+extern BattSaver batt_saver;
-+// Board-specific rail power-down, where the board ships one. The radio is already
-+// initialised on this path, so enterDeepSleep()'s own powerOff() sleeps the SX1262 --
-+// only the rails are ours to drop.
-+#ifdef P_LORA_PA_POWER
-+#define POWER_GUARD_HAS_POWERDOWN 1
-+#include <PowerGuard.h>
-+#endif
-+#ifndef POWER_GUARD_POWEROFF_MIN_SECS
-+#define POWER_GUARD_POWEROFF_MIN_SECS 60
-+#endif
-+#ifndef POWER_GUARD_POWEROFF_MAX_SECS
-+#define POWER_GUARD_POWEROFF_MAX_SECS 86400
-+#endif
-+#endif
-+
- bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
-+#if defined(ESP_PLATFORM) && defined(WITH_POWER_GUARD)
-+  // Claimed ahead of upstream's 11-char "powersaving" prefix, which would answer
-+  // any of these as a status query and look like it worked.
-+  if (memcmp(command, "powersaving safe.mv ", 20) == 0) {
-+    uint32_t mv = (uint32_t) atol(command + 20);
-+    if (!batt_saver.setSleepMilliVolts((uint16_t) mv)) {
-+      sprintf(reply, "ERR: %u-%u or 0", (unsigned)POWER_GUARD_SAFE_FLOOR_MV,
-+              (unsigned)POWER_GUARD_SAFE_MAX_MV);
-+    } else if (mv == 0) {
-+      strcpy(reply, "OK - safe.mv 0 (rung disabled)");
-+    } else {
-+      sprintf(reply, "OK - safe.mv %umV%s", (unsigned)mv,
-+              batt_saver.safeEnabled() ? "" : " (safe is off)");
-+    }
-+    return true;
-+  }
-+  if (memcmp(command, "powersaving safe", 16) == 0
-+      && (command[16] == 0 || command[16] == ' ')) {
-+    const char* arg = (command[16] == ' ') ? command + 17 : "";
-+    if (*arg == 0) {
-+      sprintf(reply, "safe %s, %umV, batt %umV", batt_saver.safeEnabled() ? "on" : "off",
-+              (unsigned)batt_saver.sleepMilliVolts(), (unsigned)batt_saver.lastMilliVolts());
-+    } else if (memcmp(arg, "on", 2) == 0) {
-+      if (batt_saver.sleepMilliVolts() == 0) {
-+        strcpy(reply, "ERR: no threshold -- set powersaving safe.mv first");
-+      } else {
-+        batt_saver.setSafeEnabled(true);
-+        sprintf(reply, "OK - safe on, %umV", (unsigned)batt_saver.sleepMilliVolts());
-+      }
-+    } else if (memcmp(arg, "off", 3) == 0) {
-+      batt_saver.setSafeEnabled(false);
-+      sprintf(reply, "OK - safe off (%umV kept)", (unsigned)batt_saver.sleepMilliVolts());
-+    } else {
-+      strcpy(reply, "ERR: usage: powersaving safe [on|off]");
-+    }
-+    return true;
-+  }
-+  if (memcmp(command, "powersaving auto", 16) == 0
-+      && (command[16] == 0 || command[16] == ' ')) {
-+    const char* arg = (command[16] == ' ') ? command + 17 : "";
-+    if (*arg == 0) {
-+      sprintf(reply, "auto %s, active %s, transitions %u", batt_saver.isAuto() ? "on" : "off",
-+              batt_saver.isActive() ? "yes" : "no", (unsigned)batt_saver.transitionCount());
-+    } else if (memcmp(arg, "on", 2) == 0 || memcmp(arg, "off", 3) == 0) {
-+      batt_saver.setAuto(*arg == 'o' && arg[1] == 'n');
-+      sprintf(reply, "OK - auto %s", batt_saver.isAuto() ? "on" : "off");
-+    } else {
-+      strcpy(reply, "ERR: usage: powersaving auto [on|off]");
-+    }
-+    return true;
-+  }
-+
-+  // Claimed ahead of upstream's own branch, which calls powerOff() -> enterDeepSleep(0)
-+  // and never wakes. A node that cannot wake itself needs a site visit.
-+  if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
-+    const char* arg = command + 8;   // both verbs are 8 chars
-+    uint32_t secs = (*arg == ' ') ? (uint32_t) atol(arg + 1) : 0;
-+    if (sender_timestamp != 0) {
-+      strcpy(reply, "ERR: poweroff is serial-only");
-+    } else if (secs < POWER_GUARD_POWEROFF_MIN_SECS || secs > POWER_GUARD_POWEROFF_MAX_SECS) {
-+      sprintf(reply, "ERR: usage: poweroff <secs> (%u-%u)",
-+              (unsigned)POWER_GUARD_POWEROFF_MIN_SECS, (unsigned)POWER_GUARD_POWEROFF_MAX_SECS);
-+    } else {
-+      // enterDeepSleep() never returns, so reply[] would never be printed -- say it here.
-+      Serial.printf("OK - deep sleep %us (%uh%um), then reboots\n",
-+                    (unsigned)secs, (unsigned)(secs / 3600), (unsigned)((secs % 3600) / 60));
-+      Serial.flush();
-+#ifdef POWER_GUARD_HAS_POWERDOWN
-+      powerGuardDownPostRadio();
-+#endif
-+      modBoardDeepSleep(secs);   // does not return
-+    }
-+    return true;
-+  }
-+#endif
-   if (memcmp(command, "ver", 3) == 0) {
-     // Shadows upstream's own `ver` branch, which never runs while this mod is built in.
-     sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
 diff --git a/variants/heltec_v4/PowerGuard.h b/variants/heltec_v4/PowerGuard.h
 new file mode 100644
 index 00000000..96416484
