@@ -159,7 +159,7 @@ jobs:
             const report = `${{ steps.probe.outputs.report }}`.replace(/\\`/g, '`');
             const title = process.env.ISSUE_TITLE;
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const body = `${report}\n\nChecked ${new Date().toISOString().slice(0,10)} by [patch-drift-canary](${runUrl}).\n\nThis is a warning, not a build failure -- releases still build from tagged upstream refs. See docs/rebasing-patches.md.`;
+            const body = `${report}\n\nChecked ${new Date().toISOString().slice(0,10)} by [patch-drift-canary](${runUrl}).\n\nThis is a warning, not a build failure -- releases still build from tagged upstream refs.`;
 
             const existing = (await github.rest.issues.listForRepo({
               owner: context.repo.owner, repo: context.repo.repo,

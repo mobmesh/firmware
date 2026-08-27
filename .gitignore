@@ -1,9 +1,6 @@
 __pycache__/
 *.pyc
 
-# Local planning scratch -- deliberately never committed
-docs/region-catalog-plan.md
-
 # MCP server config -- local only, never synced
 .vscode/mcp.json
 
@@ -17,12 +14,7 @@ docs/region-catalog-plan.md
 TODO.md
 **/TODO.md
 
-# Internal notes stay local -- never published
-docs/conventions.md
-docs/oppie-testing-procedures.md
+docs/
 
 # Browser automation scratch output
 .playwright-mcp/
-
-# Flasher rewrite scratch -- local only
-docs/flasher 2.0/

@@ -12,8 +12,7 @@
 #   ./scripts/rebase-patches.sh finish
 #
 # `finish` rewrites mods/*/patches/*.patch in place from the rebased commits.
-# It does NOT build. Always build all envs before committing -- see
-# docs/rebasing-patches.md.
+# It does NOT build. Always build all envs before committing.
 set -euo pipefail
 
 UPSTREAM_REPO="${UPSTREAM_REPO:-meshcore-dev/MeshCore}"
