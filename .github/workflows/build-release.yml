@@ -52,9 +52,8 @@ jobs:
 
   build:
     needs: compute-matrix
-    # Boards sharing a role (matrix.upstream_tag_prefix) publish to the same release tag --
-    # queue them rather than let parallel matrix jobs race to create/update that release.
-    # Different roles still build in parallel; only same-role jobs across boards serialize.
+    # Boards sharing a role publish to one release tag, so same-role jobs queue rather
+    # than race to create it. Different roles still build in parallel.
     concurrency:
       group: release-${{ github.workflow }}-${{ matrix.upstream_tag_prefix }}
       cancel-in-progress: false
@@ -110,8 +109,7 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Boards sharing a role publish to the same release tag -- release existence alone
-          # doesn't mean THIS board's asset is in it, so check the assets list, not just the tag.
+          # Release existence alone does not mean THIS board's asset is in it.
           ASSET_NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}.bin"
           STATUS=$(curl -s -o /tmp/release.json -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
@@ -170,10 +168,8 @@ jobs:
           done
           echo "Sidecar dependency order OK: applied order was:$applied"
 
-      # Strict apply is still the gate: a patch that does not apply cleanly never ships.
-      # On failure we additionally attempt a three-way merge, purely to hand the maintainer
-      # a starting point for the rebase -- the step fails either way. Each patch is committed
-      # as it applies, so a rescued patch can be emitted as an exact one-commit diff.
+      # Strict apply is the gate: a patch that does not apply cleanly never ships. The
+      # three-way retry only produces a rebase starting point -- the step fails either way.
       - id: apply
         name: Apply maintained patches in order (fail loudly on drift; emit a rescue diff, never auto-merge)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
@@ -268,9 +264,8 @@ jobs:
           FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
           HITS=$([ -n "$FRAMEWORK_DIR" ] && grep -ro "verifyRollbackLater" "$FRAMEWORK_DIR" | wc -l || echo 0)
           echo "verifyRollbackLater occurrences in installed core: $HITS"
-          # Expect >=2: one for the weak prototype, one for the actual call site inside initArduino().
-          # A count of 1 means it's declared but no longer referenced anywhere -- our override would
-          # link fine and simply never run, which link success alone would not catch.
+          # Expect >=2: the weak prototype and the call site in initArduino(). A count of 1
+          # means the override would link and never run, which link success would not catch.
           if [ -z "$FRAMEWORK_DIR" ] || [ "$HITS" -lt 2 ]; then
             echo "::error::verifyRollbackLater() found $HITS time(s) in the installed Arduino-ESP32 core ($FRAMEWORK_DIR), expected >=2 (declaration + call site)."
             echo "failed=true" >> "$GITHUB_OUTPUT"
@@ -303,9 +298,8 @@ jobs:
         run: |
           BOOT="upstream-src/.pio/build/${{ matrix.build_env }}/bootloader.bin"
           PART="upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin"
-          # boot_app0.bin is NOT a per-build .pio/build/ artifact -- it's a static file shipped
-          # inside the Arduino-ESP32 framework package itself (same file regardless of board or
-          # partition table), so it has to be located in the installed package, not the build dir.
+          # boot_app0.bin ships inside the Arduino-ESP32 framework package, identical for every
+          # board, so it comes from the installed package rather than .pio/build.
           FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
           APP0=$(find "$FRAMEWORK_DIR" -name 'boot_app0.bin' | head -1)
           test -f "$BOOT"
@@ -334,10 +328,8 @@ jobs:
             git reset --hard HEAD~1
             git fetch origin "${{ github.ref_name }}"
             git reset --hard "origin/${{ github.ref_name }}"
-            # These are per-board build output (this board's own partition table), not shared
-            # or generic -- re-copy from THIS run's own .pio/build/, never another board's.
-            # (boot_app0.bin is the one exception -- it's generic framework-package content,
-            # not per-board, but still re-copied fresh each retry for consistency.)
+            # Per-board build output, so re-copy from THIS run's .pio/build, never another
+            # board's. boot_app0.bin is generic but re-copied too, for consistency.
             FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
             cp "upstream-src/.pio/build/${{ matrix.build_env }}/bootloader.bin" "pages/flasher/${{ matrix.board_id }}/bootloader.bin"
             cp "upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin" "pages/flasher/${{ matrix.board_id }}/partitions.bin"
@@ -418,9 +410,8 @@ jobs:
         run: |
           python3 .github/scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" --check
 
-      # pages/flasher's bootloader/partitions are vendored by one target per board, so a
-      # target that doesn't vendor them merges against another build's copy. Fail rather
-      # than ship a merged image whose bootloader disagrees with what this build produced.
+      # One target per board vendors these, so any other target would merge against a copy
+      # from a different build. Fail rather than ship a mismatched bootloader.
       - name: Check the vendored bootloader/partitions match this build's own
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && !matrix.vendor_flasher_assets
         run: |
@@ -452,11 +443,6 @@ jobs:
             --out "$NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
-      # Note: there is no longer a separate "does partitions.bin match boards.json" drift check
-      # here -- boards.json is now generated FROM this exact partitions.bin a few steps above
-      # (scripts/generate-board-config.py boards-json), so that comparison would be a tautology.
-      # The equivalent safety net (failing loudly if the expected otadata/ota_0/ota_1 partitions
-      # aren't present) now lives inside generate-board-config.py's own partition-table parser.
 
       - name: Vendor firmware.bin for the web flasher (GitHub Release assets have no CORS headers, so the page's fetch() can't read them cross-origin)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
@@ -479,12 +465,9 @@ jobs:
               echo "::error::failed to push ${{ matrix.board_id }}/${{ matrix.id }} firmware.bin/boards.json after 5 attempts"
               exit 1
             fi
-            # boards.json is fully re-serialized on every run (json.dumps of the whole file),
-            # so two concurrent boards/roles regenerating it will conflict on a textual rebase
-            # even when their actual changes don't overlap. Discard our commit and regenerate
-            # fresh against the latest remote tip instead -- this is idempotent and always
-            # converges, since boards-json only ever touches this target's own board/variant
-            # entry and preserves everything else already in the file.
+            # boards.json is fully re-serialized each run, so concurrent targets conflict on a
+            # textual rebase even when their entries do not overlap. Regenerating against the
+            # remote tip is idempotent: boards-json only touches this target's own entry.
             git reset --hard HEAD~1
             git fetch origin "${{ github.ref_name }}"
             git reset --hard "origin/${{ github.ref_name }}"
@@ -535,8 +518,8 @@ jobs:
           RESCUE_PATCH: ${{ steps.apply.outputs.rescue_patch }}
           RESCUE_VERDICT: ${{ steps.apply.outputs.rescue_verdict }}
         with:
-          # Values arrive via env, never interpolated into this script -- the drift text
-          # carries markdown backticks that terminate a JS template literal early.
+          # Values arrive via env: the drift text carries backticks that would terminate
+          # a JS template literal early.
           script: |
             const { BOARD_ID, VARIANT_ID, UPSTREAM_REF,
                     RESCUE_ATTEMPTED, RESCUE_PATCH, RESCUE_VERDICT } = process.env;
@@ -557,11 +540,8 @@ jobs:
               ].join('\n')
             });
 
-  # Runs only after every matrix combination above has succeeded (GitHub Actions' default
-  # `needs:` behavior for a matrix job) -- so a red build can never publish, closing the gap
-  # classic branch/docs-folder Pages deployment had (it auto-published on any push touching the
-  # folder, independent of whether checks passed). Requires repo Settings -> Pages -> Source to
-  # be set to "GitHub Actions" (one-time manual step) instead of "Deploy from a branch".
+  # Runs only after every matrix combination succeeds, so a red build cannot publish.
+  # Requires Settings -> Pages -> Source set to "GitHub Actions", a one-time manual step.
   publish-pages:
     needs: build
     # Only from the default branch, and never on a dry run. Without the ref guard a run

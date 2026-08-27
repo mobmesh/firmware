@@ -1,17 +1,8 @@
-# Early warning for patch drift.
+# Early warning for patch drift. Never builds, never publishes.
 #
-# build-release only notices drift when upstream *tags a release* -- i.e. at the
-# exact moment we want to ship. This runs daily against upstream's moving branches so
-# breakage surfaces days or weeks earlier, decoupled from release pressure.
-#
-# It never builds and never publishes. It only answers two questions:
-#   1. do our patches still apply to upstream's current branches?
-#   2. has an upstream PR we are carrying been merged, making a patch redundant?
-#
-# Question 2 exists because a patch that quietly stops being *needed* has no failure
-# signal of its own -- it keeps applying cleanly while duplicating a fix upstream has
-# since made. That is how two hunks of timing-safety survived until a rebase forced
-# someone to read the surrounding code.
+# build-release only notices drift when upstream tags a release, which is the worst moment
+# to find out, so this probes upstream's moving branches daily. It also flags patches that
+# have stopped being needed -- one duplicating a merged upstream fix still applies cleanly.
 name: patch-drift-canary
 
 on:
@@ -45,8 +36,7 @@ jobs:
           DRIFT=false
 
           # --- 1. do the patches still apply? -------------------------------------
-          # Patch order across mods is the union used by every target in build-targets.yaml;
-          # all targets currently share the same mod list, so one probe covers them all.
+          # Every target shares one mod list today, so a single probe covers them all.
           MODS=$(python3 -c "
           import yaml
           d = yaml.safe_load(open('build-targets.yaml'))
@@ -84,9 +74,9 @@ jobs:
             fi
           done
 
-          # --- 2. has an upstream PR we carry been merged? -------------------------
+          # --- 2. has a carried upstream PR been merged? ---------------------------
           # Sidecars may declare `upstream_prs: [1972, 1349]`. A merged PR means the patch
-          # carrying it is probably now redundant and should be re-reviewed, not just rebased.
+          # carrying it wants re-review, not just a rebase.
           PRS=$(python3 -c "
           import glob, yaml
           out = []
@@ -108,10 +98,9 @@ jobs:
             fi
           done
 
-          # --- 3. has an upstream default we override been changed? ----------------
-          # We override ADC_MULTIPLIER in variants/heltec_v4/overrides.yaml with a
-          # bench-measured value. If upstream revises its own default, ours silently
-          # masks it -- worth re-measuring, not worth failing a build over.
+          # --- 3. has an overridden upstream default changed? ----------------------
+          # ADC_MULTIPLIER is overridden with a bench-measured value, which silently masks
+          # any upstream revision. Worth re-measuring, not worth failing a build over.
           EXPECTED_ADC_MULT=5.42
           if [ -d probe-src ]; then
             found=$(grep -oE '^ *# *define +ADC_MULTIPLIER +[0-9.]+' \
@@ -129,13 +118,9 @@ jobs:
           fi
 
           # --- 4. does upstream still sleep the radio the way power-guard assumes? --
-          # power-guard's poweroff path calls radio_driver.powerOff() and relies on it
-          # reaching the SX1262's sleep. If that stops sleeping the chip, the radio
-          # stays awake through a deliberate hibernation -- higher current, not a
-          # stranded node, so warn rather than fail.
-          #
-          # Only meaningful while some target actually builds the mod; $MODS is the
-          # union across build-targets.yaml, so this goes quiet if it is dropped.
+          # power-guard's poweroff relies on radio_driver.powerOff() reaching the SX1262's
+          # sleep. Losing that means higher current through a hibernation, not a stranded
+          # node, so warn rather than fail. Goes quiet if no target builds the mod.
           if [ -d probe-src ] && echo " $MODS " | grep -q " power-guard "; then
             if grep -qE 'sleep\(false\)' \
               probe-src/src/helpers/radiolib/CustomSX1262Wrapper.h 2>/dev/null; then
