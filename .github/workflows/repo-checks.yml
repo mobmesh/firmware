@@ -1,0 +1,37 @@
+name: repo-checks
+
+# Checks the repo's own contents, not code in isolation: patch ownership, the vendored
+# images, the generated board config. Ran nowhere automated until 2026-08-26.
+on:
+  push:
+    paths:
+      # Narrow on purpose: the tests read patches, mod manifests and the build config,
+      # not prose. `mods/**` fired on a markdown edit under mods/*/docs/ on 2026-08-26.
+      - 'scripts/**'
+      - 'mods/**/patches/**'
+      - 'mods/**/mod.yaml'
+      - '.github/scripts/**'
+      - 'build-targets.yaml'
+      - 'variants/**/overrides.yaml'
+      - '.github/workflows/repo-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: patches, config, images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install what the tests import
+        run: pip install --quiet pyyaml
+
+      - name: Run scripts/tests
+        run: python3 -m unittest discover -s scripts/tests -v
