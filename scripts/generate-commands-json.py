@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate commands.json from cli_commands.md for the serial console help system.
+Generate auto_commands.json from auto_cli_commands.md for the serial console help system.
 
 This script parses the CLI commands documentation and extracts command usage,
 parameters, and notes into a structured JSON format used by the web-based
@@ -137,8 +137,8 @@ def main():
     # Paths
     script_dir = Path(__file__).parent
     repo_dir = script_dir.parent
-    md_file = repo_dir / "mods" / "hotspot-ota" / "docs" / "cli_commands.md"
-    json_file = repo_dir / "pages" / "flasher" / "commands.json"
+    md_file = repo_dir / "mods" / "hotspot-ota" / "docs" / "auto_cli_commands.md"
+    json_file = repo_dir / "pages" / "flasher" / "auto_commands.json"
 
     if not md_file.exists():
         print(f"Error: {md_file} not found")

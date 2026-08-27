@@ -1193,7 +1193,7 @@ Ethernet support is available on RAK4631 boards with a RAK13800 (W5100S) Etherne
 ---
 <!-- Source of truth for the CLI commands mods/hotspot-ota adds. The upstream-sync
      workflow appends this to upstream's docs/cli_commands.md daily and regenerates
-     pages/flasher/commands.json from the result. -->
+     pages/flasher/auto_commands.json from the result. -->
 
 # CLI commands added by these patches
 

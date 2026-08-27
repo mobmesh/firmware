@@ -100,11 +100,11 @@ async function send(text) {
 
 async function loadCommands() {
   try {
-    const res = await fetch("./commands.json");
+    const res = await fetch("./auto_commands.json");
     commands = await res.json();
     updateReference();
   } catch (err) {
-    console.error("Failed to load commands.json:", err);
+    console.error("Failed to load auto_commands.json:", err);
   }
 }
 

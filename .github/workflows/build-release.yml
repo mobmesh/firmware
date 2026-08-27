@@ -78,7 +78,7 @@ jobs:
         if: steps.filter.outputs.skip == 'false'
         run: |
           test -f "variants/${{ matrix.board_id }}/overrides.yaml" || {
-            echo "::error::variants/${{ matrix.board_id }}/overrides.yaml not found. Add one (see scripts/generate-board-config.py) before this board can build -- pages/flasher/boards.json is regenerated from it every run, not hand-maintained."
+            echo "::error::variants/${{ matrix.board_id }}/overrides.yaml not found. Add one (see scripts/generate-board-config.py) before this board can build -- pages/flasher/auto_boards.json is regenerated from it every run, not hand-maintained."
             exit 1
           }
 
@@ -374,7 +374,7 @@ jobs:
           echo "bootloader_name=$BOOT_NAME" >> "$GITHUB_OUTPUT"
           echo "partitions_name=$PART_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Regenerate pages/flasher/boards.json from overrides.yaml + upstream + this build's real partitions.bin
+      - name: Regenerate pages/flasher/auto_boards.json from overrides.yaml + upstream + this build's real partitions.bin
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
           pip install --quiet pyyaml
@@ -387,18 +387,18 @@ jobs:
             --asset-basename ${{ matrix.asset_basename }} \
             --version "${{ steps.pick.outputs.version }}" \
             --firmware-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" \
-            --output pages/flasher/boards.json
+            --output pages/flasher/auto_boards.json
 
       - name: Verify firmware.bin fits within its OTA app partition
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
-          MAX_HEX=$(jq -r '.["${{ matrix.board_id }}"].offsets.appMaxSize' pages/flasher/boards.json)
+          MAX_HEX=$(jq -r '.["${{ matrix.board_id }}"].offsets.appMaxSize' pages/flasher/auto_boards.json)
           MAX=$((MAX_HEX))
           SIZE=$(stat -c%s "${{ steps.artifact.outputs.name }}")
           PCT=$((SIZE * 100 / MAX))
           echo "firmware.bin size: $SIZE bytes; app partition max: $MAX bytes (${PCT}%, $((MAX - SIZE)) free)"
           if [ "$SIZE" -gt "$MAX" ]; then
-            echo "::error::firmware.bin ($SIZE bytes) exceeds the ${{ matrix.board_id }} app partition size ($MAX bytes, from pages/flasher/boards.json). Flashing this into an OTA slot would overrun into the next partition."
+            echo "::error::firmware.bin ($SIZE bytes) exceeds the ${{ matrix.board_id }} app partition size ($MAX bytes, from pages/flasher/auto_boards.json). Flashing this into an OTA slot would overrun into the next partition."
             exit 1
           fi
           if [ "$PCT" -ge "$WARN_PCT" ]; then
@@ -437,7 +437,7 @@ jobs:
           python3 .github/scripts/merge_flash_image.py \
             --board-id ${{ matrix.board_id }} \
             --variant ${{ matrix.id }} \
-            --boards-json pages/flasher/boards.json \
+            --boards-json pages/flasher/auto_boards.json \
             --flasher-dir pages/flasher \
             --firmware "${{ steps.artifact.outputs.name }}" \
             --out "$NAME"
@@ -451,13 +451,13 @@ jobs:
           mkdir -p "$DEST"
           cp "${{ steps.artifact.outputs.name }}" "$DEST/firmware.bin"
 
-      - name: Commit vendored firmware.bin and this variant's boards.json entry if changed
+      - name: Commit vendored firmware.bin and this variant's auto_boards.json entry if changed
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for i in 1 2 3 4 5; do
-            git add "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" pages/flasher/boards.json
+            git add "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" pages/flasher/auto_boards.json
             git diff --staged --quiet && break
             git commit -m "docs: vendor ${{ matrix.board_id }}/${{ matrix.id }} firmware.bin (${{ steps.pick.outputs.version }}) and refresh boards.json for the web flasher"
             git push && break
@@ -465,7 +465,7 @@ jobs:
               echo "::error::failed to push ${{ matrix.board_id }}/${{ matrix.id }} firmware.bin/boards.json after 5 attempts"
               exit 1
             fi
-            # boards.json is fully re-serialized each run, so concurrent targets conflict on a
+            # auto_boards.json is fully re-serialized each run, so concurrent targets conflict on a
             # textual rebase even when their entries do not overlap. Regenerating against the
             # remote tip is idempotent: boards-json only touches this target's own entry.
             git reset --hard HEAD~1
@@ -480,7 +480,7 @@ jobs:
               --asset-basename ${{ matrix.asset_basename }} \
               --version "${{ steps.pick.outputs.version }}" \
               --firmware-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" \
-                --output pages/flasher/boards.json
+                --output pages/flasher/auto_boards.json
             mkdir -p "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}"
             cp "${{ steps.artifact.outputs.name }}" "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin"
           done

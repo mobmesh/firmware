@@ -83,7 +83,7 @@ When a new release is found, the workflow:
 
 The patch checks are important because they catch configuration changes or other upstream changes that could cause problems. If a patch no longer applies, the build stops and an issue is opened identifying the patch that failed.
 
-After a successful build, `pages/flasher/boards.json` is regenerated using the board overrides, the upstream board information, and the actual `partitions.bin` from the build. This means the flasher configuration is generated from the build itself instead of being maintained separately by hand.
+After a successful build, `pages/flasher/auto_boards.json` is regenerated using the board overrides, the upstream board information, and the actual `partitions.bin` from the build. This means the flasher configuration is generated from the build itself instead of being maintained separately by hand.
 
 The firmware `.bin` file is then published as a GitHub release. It carries its own SHA-256 and its build identity inside the image, so there is no separate checksum file to keep in step with it.
 
