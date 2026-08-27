@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       UPSTREAM_URL: https://flasher.meshcore.io/config.json
-      DEST: pages/flasher/mc-config.json
+      DEST: pages/flasher/mc_config.json
       MAX_SHRINK_PCT: 20
     steps:
       - name: Checkout this repo
@@ -96,7 +96,7 @@ jobs:
           done
 
   cli_docs:
-    name: sync CLI docs and regenerate commands.json
+    name: sync CLI docs and regenerate auto_commands.json
     runs-on: ubuntu-latest
     steps:
       - name: Checkout this repo
@@ -121,7 +121,7 @@ jobs:
             "https://raw.githubusercontent.com/${UPSTREAM_REPO}/${{ steps.pick.outputs.ref }}/docs/cli_commands.md"
           test -s upstream-cli.md
           cat upstream-cli.md mods/hotspot-ota/docs/cli-additions.md \
-            > mods/hotspot-ota/docs/cli_commands.md
+            > mods/hotspot-ota/docs/auto_cli_commands.md
           python3 scripts/generate-commands-json.py
 
       - name: Commit the synced docs if changed
@@ -129,19 +129,19 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           for i in 1 2 3 4 5; do
-            git add mods/hotspot-ota/docs/cli_commands.md pages/flasher/commands.json
+            git add mods/hotspot-ota/docs/auto_cli_commands.md pages/flasher/auto_commands.json
             git diff --staged --quiet && { echo "no change upstream"; break; }
-            git commit -m "docs: sync cli_commands.md with upstream ${{ steps.pick.outputs.ref }} and regenerate commands.json"
+            git commit -m "docs: sync auto_cli_commands.md with upstream ${{ steps.pick.outputs.ref }} and regenerate auto_commands.json"
             git push && break
             if [ "$i" -eq 5 ]; then
-              echo "::error::failed to push commands.json after 5 attempts"
+              echo "::error::failed to push auto_commands.json after 5 attempts"
               exit 1
             fi
             git reset --hard HEAD~1
             git fetch origin "${{ github.ref_name }}"
             git reset --hard "origin/${{ github.ref_name }}"
             cat upstream-cli.md mods/hotspot-ota/docs/cli-additions.md \
-              > mods/hotspot-ota/docs/cli_commands.md
+              > mods/hotspot-ota/docs/auto_cli_commands.md
             python3 scripts/generate-commands-json.py
           done
 
@@ -159,7 +159,7 @@ jobs:
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const which = [
               `mirror MeshCore's stock device manifest: ${{ needs.mc_config.result }}`,
-              `sync CLI docs and regenerate commands.json: ${{ needs.cli_docs.result }}`,
+              `sync CLI docs and regenerate auto_commands.json: ${{ needs.cli_docs.result }}`,
             ].map(l => `- ${l}`).join('\n');
             const body = `A daily upstream sync failed, so a file this repo mirrors is no longer being refreshed.\n\n${which}\n\nSee [the run](${runUrl}) for the failing step. This closes itself once a later run succeeds.`;
 

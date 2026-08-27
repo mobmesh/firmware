@@ -178,7 +178,7 @@
   </div>
 
   <script>
-    fetch("flasher/boards.json", { cache: "no-cache" })
+    fetch("flasher/auto_boards.json", { cache: "no-cache" })
       .then((r) => (r.ok ? r.json() : null))
       .then((boards) => {
         const version = boards && boards._version;

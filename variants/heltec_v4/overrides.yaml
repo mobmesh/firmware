@@ -85,7 +85,7 @@ partitions_override: null
 # Facts needed by the web flasher that aren't derivable from upstream (mcu,
 # flash size, etc. -- those come from upstream's boards/heltec_v4.json) or
 # from the built partitions.bin (offsets -- see scripts/generate-board-config.py).
-# This is the only other hand-maintained source for pages/flasher/boards.json.
+# This is the only other hand-maintained source for pages/flasher/auto_boards.json.
 flasher:
   label: "Heltec V4"
   connect_note: "Put the board into flash mode first (hold PGM, tap RST, then release PGM), then connect over USB."

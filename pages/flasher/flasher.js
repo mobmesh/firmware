@@ -38,7 +38,7 @@ const state = {
 };
 
 let boards = null;
-// Tiles for renderBoard(), separate from generated boards.json so several can
+// Tiles for renderBoard(), separate from generated auto_boards.json so several can
 // point at one board and labels can be overridden. { id, label, board }
 let boardDisplay = null;
 // { <location key>: <settings definition URL> }, from member-config-urls.json.
@@ -231,12 +231,12 @@ async function rebootToBootloaderMode(port) {
 }
 
 async function loadBoards() {
-  const res = await fetch("./boards.json", { cache: "no-store" });
-  if (!res.ok) throw new Error(`Could not load boards.json (${res.status})`);
+  const res = await fetch("./auto_boards.json", { cache: "no-store" });
+  if (!res.ok) throw new Error(`Could not load auto_boards.json (${res.status})`);
   boards = await res.json();
 }
 
-// Optional -- falls back to one tile per boards.json entry
+// Optional -- falls back to one tile per auto_boards.json entry
 async function loadBoardDisplay() {
   try {
     const res = await fetch("./board-display.json", { cache: "no-store" });

@@ -62,7 +62,7 @@ jobs:
           python3 .github/scripts/qemu_boot_check.py \
             --board-id ${{ matrix.board }} \
             --variant ${{ matrix.variant }} \
-            --boards-json pages/flasher/boards.json \
+            --boards-json pages/flasher/auto_boards.json \
             --flasher-dir pages/flasher \
             --qemu-bin qemu/bin/qemu-system-${{ matrix.arch }} \
             --machine ${{ matrix.machine }} \

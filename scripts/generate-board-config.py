@@ -7,7 +7,7 @@ Single source of truth for per-board config, split three ways:
                    variants/<board>/overrides.yaml's `flasher:` facts, and
                    partition byte offsets parsed from an actual built
                    partitions.bin (never hand-entered), into
-                   pages/flasher/boards.json. Only the given board/variant
+                   pages/flasher/auto_boards.json. Only the given board/variant
                    entry is touched; everything else in the file is
                    preserved as-is.
 
@@ -466,7 +466,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_bj = sub.add_parser("boards-json", help="regenerate a board/variant entry in pages/flasher/boards.json")
+    p_bj = sub.add_parser("boards-json", help="regenerate a board/variant entry in pages/flasher/auto_boards.json")
     p_bj.add_argument("--board", required=True)
     p_bj.add_argument("--upstream-dir", required=True)
     p_bj.add_argument("--partitions-bin", required=True)
