@@ -17,9 +17,7 @@
 # erase) flow. These files are NOT shared/generic across boards or roles -- each
 # board's partition table (see variants/<board>/overrides.yaml's partitions_override)
 # is different, so they're always sourced fresh from THIS target's own build output,
-# never copied from another board or reused across runs. Distinct from sync_docs,
-# which governs global project docs (CLI docs, commands.json) and should stay set on
-# exactly one target repo-wide, not one per board.
+# never copied from another board or reused across runs.
 # Applied to every target, in this order, before any target-specific mods below.
 # Keep entries here only while they genuinely ship everywhere -- a mod that becomes
 # optional belongs in a target's own `mods:` list instead.
@@ -32,7 +30,6 @@ targets:
     upstream_tag_prefix: repeater
     release_title: Repeater
     asset_role_abbrev: rep
-    sync_docs: true
     vendor_flasher_assets: true
     # If true, must match across all targets of this role.
     make_latest: true
@@ -48,7 +45,6 @@ targets:
     upstream_tag_prefix: room-server
     release_title: Room
     asset_role_abbrev: room
-    sync_docs: false
     vendor_flasher_assets: false
     make_latest: false
     mods: []      # extras beyond core_mods
@@ -59,7 +55,6 @@ targets:
     upstream_tag_prefix: repeater
     release_title: Repeater
     asset_role_abbrev: rep
-    sync_docs: false
     vendor_flasher_assets: true
     # If true, must match across all targets of this role.
     make_latest: true
@@ -71,7 +66,6 @@ targets:
     upstream_tag_prefix: room-server
     release_title: Room
     asset_role_abbrev: room
-    sync_docs: false
     vendor_flasher_assets: false
     make_latest: false
     mods: []      # extras beyond core_mods

@@ -1,5 +1,6 @@
-<!-- Source of truth for the CLI commands mods/hotspot-ota adds. Appended to
-     upstream's docs/cli_commands.md at build time to generate commands.json. -->
+<!-- Source of truth for the CLI commands mods/hotspot-ota adds. The upstream-sync
+     workflow appends this to upstream's docs/cli_commands.md daily and regenerates
+     pages/flasher/commands.json from the result. -->
 
 # CLI commands added by these patches
 

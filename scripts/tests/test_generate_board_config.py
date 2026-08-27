@@ -389,7 +389,6 @@ class ResolveTargetsTestCase(unittest.TestCase):
             "    upstream_tag_prefix: repeater\n"
             "    release_title: Repeater\n"
             "    asset_role_abbrev: rep\n"
-            "    sync_docs: true\n"
             "    vendor_flasher_assets: true\n"
             "    make_latest: true\n"
             f"    mods: [{', '.join(mods)}]\n"

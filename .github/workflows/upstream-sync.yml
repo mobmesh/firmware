@@ -1,0 +1,197 @@
+# Daily pull of the upstream files we mirror. Never builds, never publishes.
+#
+# Both jobs answer the same question -- has upstream changed something we carry a copy
+# of? -- so they share a schedule and one tracking issue. Publishing to Pages stays
+# manual (publish-pages), so every change here is reviewed before it reaches
+# tools.mobmesh.org.
+#
+# mc-config: flasher.meshcore.io serves config.json with no CORS header, so the browser
+# cannot fetch it live. Mirroring rather than proxying turns upstream device and role
+# additions into a reviewable diff. The file carries no version tag and moves fast, so
+# the job validates shape, never counts -- a parse failure or a sharp drop in device
+# count is the early warning for a format change.
+#
+# cli-docs: upstream's cli_commands.md plus our cli-additions.md, taken from the tag the
+# repeater ships from so the console documents the CLI the released firmware answers.
+# This half used to live inside build-release, which meant commands.json only refreshed
+# when a repeater build happened to run.
+name: upstream-sync
+
+on:
+  schedule:
+    - cron: "20 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  UPSTREAM_REPO: meshcore-dev/MeshCore
+  ISSUE_TITLE: "upstream-sync failing"
+
+jobs:
+  mc_config:
+    name: mirror MeshCore's stock device manifest
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM_URL: https://flasher.meshcore.io/config.json
+      DEST: pages/flasher/mc-config.json
+      MAX_SHRINK_PCT: 20
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+
+      - name: Fetch upstream manifest
+        run: |
+          curl -sSfL --max-time 60 --retry 3 --retry-delay 5 \
+            -o fetched.json "$UPSTREAM_URL"
+
+      - name: Validate shape against the committed mirror
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          def fail(msg):
+              print(f"::error::{msg}")
+              sys.exit(1)
+
+          try:
+              new = json.load(open("fetched.json"))
+          except json.JSONDecodeError as e:
+              fail(f"upstream config.json does not parse: {e}")
+
+          for key in ("staticPath", "device"):
+              if key not in new:
+                  fail(f"upstream config.json lost top-level key '{key}'")
+          if not isinstance(new["device"], list):
+              fail("upstream 'device' is no longer a list -- the manifest shape changed")
+
+          count = len(new["device"])
+          if count == 0:
+              fail("upstream config.json lists no devices")
+          for i, dev in enumerate(new["device"]):
+              for key in ("name", "type", "firmware"):
+                  if key not in dev:
+                      fail(f"device[{i}] ({dev.get('name', '?')}) has no '{key}'")
+
+          dest = os.environ["DEST"]
+          if os.path.exists(dest):
+              old = len(json.load(open(dest))["device"])
+              floor = old * (100 - int(os.environ["MAX_SHRINK_PCT"])) / 100
+              if count < floor:
+                  fail(f"device count fell {old} -> {count}, past the "
+                       f"{os.environ['MAX_SHRINK_PCT']}% floor of {floor:.0f}")
+              print(f"device count {old} -> {count}")
+          else:
+              print(f"first mirror, {count} devices")
+          PY
+
+      - name: Commit the mirror if changed
+        run: |
+          mkdir -p "$(dirname "$DEST")"
+          mv fetched.json "$DEST"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4 5; do
+            git add "$DEST"
+            git diff --staged --quiet && { echo "no change upstream"; break; }
+            git commit -m "docs: mirror MeshCore stock device manifest"
+            git push && break
+            if [ "$i" -eq 5 ]; then
+              echo "::error::failed to push the mirrored manifest after 5 attempts"
+              exit 1
+            fi
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+            curl -sSfL --max-time 60 -o "$DEST" "$UPSTREAM_URL"
+          done
+
+  cli_docs:
+    name: sync CLI docs and regenerate commands.json
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+
+      - id: pick
+        name: Resolve the latest upstream repeater tag
+        run: |
+          REF=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${UPSTREAM_REPO}/releases" \
+            | jq -r '[.[] | select(.tag_name | startswith("repeater-v"))][0].tag_name')
+          if [ -z "$REF" ] || [ "$REF" = "null" ]; then
+            echo "::error::No upstream repeater-v* release found."
+            exit 1
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch upstream's cli_commands.md and regenerate
+        run: |
+          curl -sSfL --max-time 60 --retry 3 --retry-delay 5 \
+            -o upstream-cli.md \
+            "https://raw.githubusercontent.com/${UPSTREAM_REPO}/${{ steps.pick.outputs.ref }}/docs/cli_commands.md"
+          test -s upstream-cli.md
+          cat upstream-cli.md mods/hotspot-ota/docs/cli-additions.md \
+            > mods/hotspot-ota/docs/cli_commands.md
+          python3 scripts/generate-commands-json.py
+
+      - name: Commit the synced docs if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4 5; do
+            git add mods/hotspot-ota/docs/cli_commands.md pages/flasher/commands.json
+            git diff --staged --quiet && { echo "no change upstream"; break; }
+            git commit -m "docs: sync cli_commands.md with upstream ${{ steps.pick.outputs.ref }} and regenerate commands.json"
+            git push && break
+            if [ "$i" -eq 5 ]; then
+              echo "::error::failed to push commands.json after 5 attempts"
+              exit 1
+            fi
+            git reset --hard HEAD~1
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+            cat upstream-cli.md mods/hotspot-ota/docs/cli-additions.md \
+              > mods/hotspot-ota/docs/cli_commands.md
+            python3 scripts/generate-commands-json.py
+          done
+
+  report:
+    name: track failures in one issue
+    needs: [mc_config, cli_docs]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const failed = ${{ needs.mc_config.result == 'failure' || needs.cli_docs.result == 'failure' }};
+            const title = process.env.ISSUE_TITLE;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const which = [
+              `mirror MeshCore's stock device manifest: ${{ needs.mc_config.result }}`,
+              `sync CLI docs and regenerate commands.json: ${{ needs.cli_docs.result }}`,
+            ].map(l => `- ${l}`).join('\n');
+            const body = `A daily upstream sync failed, so a file this repo mirrors is no longer being refreshed.\n\n${which}\n\nSee [the run](${runUrl}) for the failing step. This closes itself once a later run succeeds.`;
+
+            const existing = (await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'upstream-sync',
+            })).data.find(i => i.title === title);
+
+            if (failed) {
+              if (existing) {
+                await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: existing.number, body });
+              } else {
+                await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo,
+                  title, body, labels: ['upstream-sync'] });
+              }
+            } else if (existing) {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Both syncs succeeded as of ${runUrl} -- closing.` });
+              await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing.number, state: 'closed' });
+            }

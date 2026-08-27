@@ -1,4 +1,4 @@
-name: sync-build-release
+name: build-release
 
 permissions:
   contents: write
@@ -342,39 +342,6 @@ jobs:
             cp "$(find "$FRAMEWORK_DIR" -name 'boot_app0.bin' | head -1)" "pages/flasher/${{ matrix.board_id }}/boot_app0.bin"
           done
 
-      - name: Sync upstream CLI documentation and regenerate commands.json
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.sync_docs
-        run: |
-          # Our own commands live in cli-additions.md, not in the patches -- appended
-          # here so commands.json still documents the full CLI the firmware answers.
-          cat upstream-src/docs/cli_commands.md mods/hotspot-ota/docs/cli-additions.md \
-            > mods/hotspot-ota/docs/cli_commands.md
-          python3 scripts/generate-commands-json.py
-
-      - name: Commit generated commands.json if changed
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.sync_docs && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          for i in 1 2 3 4 5; do
-            git add mods/hotspot-ota/docs/cli_commands.md pages/flasher/commands.json
-            git diff --staged --quiet && break
-            git commit -m "docs: sync cli_commands.md with upstream and regenerate commands.json for serial console"
-            git push && break
-            if [ "$i" -eq 5 ]; then
-              echo "::error::failed to push commands.json after 5 attempts"
-              exit 1
-            fi
-            git reset --hard HEAD~1
-            git fetch origin "${{ github.ref_name }}"
-            git reset --hard "origin/${{ github.ref_name }}"
-            # Our own commands live in cli-additions.md, not in the patches -- appended
-            # here so commands.json still documents the full CLI the firmware answers.
-            cat upstream-src/docs/cli_commands.md mods/hotspot-ota/docs/cli-additions.md \
-              > mods/hotspot-ota/docs/cli_commands.md
-            python3 scripts/generate-commands-json.py
-          done
-
       - name: Locate app-only .bin (not the merged/full-flash image)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         id: artifact
@@ -576,7 +543,7 @@ jobs:
               repo: context.repo.repo,
               title: `[${BOARD_ID}/${VARIANT_ID}] Patch or build failed against ${UPSTREAM_REF}`,
               body: [
-                `sync-build-release (${BOARD_ID}/${VARIANT_ID}) failed for upstream ref \`${UPSTREAM_REF}\`.`,
+                `build-release (${BOARD_ID}/${VARIANT_ID}) failed for upstream ref \`${UPSTREAM_REF}\`.`,
                 ``,
                 `Workflow run: ${runUrl}`,
                 ``,
