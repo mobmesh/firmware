@@ -51,7 +51,7 @@
     "variants": {
       "repeater": {
         "label": "Repeater",
-        "assetBasename": "xiao_c3_rep_ota_ts",
+        "assetBasename": "xiao_c3_rep_mobmesh",
         "version": "v1.17.1",
         "firmwareFile": "xiao_c3/repeater/firmware.bin"
       },
