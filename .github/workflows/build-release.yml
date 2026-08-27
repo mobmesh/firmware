@@ -32,6 +32,8 @@ on:
 
 env:
   UPSTREAM_REPO: meshcore-dev/MeshCore
+  # xiao_c3 sits near 75% of its 1.9MB OTA slot; heltec_v4 near 20% of 6.5MB.
+  WARN_PCT: 85
 
 jobs:
   compute-matrix:
@@ -401,10 +403,14 @@ jobs:
           MAX_HEX=$(jq -r '.["${{ matrix.board_id }}"].offsets.appMaxSize' pages/flasher/boards.json)
           MAX=$((MAX_HEX))
           SIZE=$(stat -c%s "${{ steps.artifact.outputs.name }}")
-          echo "firmware.bin size: $SIZE bytes; app partition max: $MAX bytes"
+          PCT=$((SIZE * 100 / MAX))
+          echo "firmware.bin size: $SIZE bytes; app partition max: $MAX bytes (${PCT}%, $((MAX - SIZE)) free)"
           if [ "$SIZE" -gt "$MAX" ]; then
             echo "::error::firmware.bin ($SIZE bytes) exceeds the ${{ matrix.board_id }} app partition size ($MAX bytes, from pages/flasher/boards.json). Flashing this into an OTA slot would overrun into the next partition."
             exit 1
+          fi
+          if [ "$PCT" -ge "$WARN_PCT" ]; then
+            echo "::warning::${{ matrix.board_id }}/${{ matrix.id }} fills ${PCT}% of its app partition, $((MAX - SIZE)) bytes free. Past ${WARN_PCT}% a new feature can overrun the OTA slot and block a release."
           fi
 
       - name: Verify the image reports its own metadata back
