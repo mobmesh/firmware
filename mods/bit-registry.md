@@ -1,7 +1,7 @@
 # Mod bit registry
 
 Every firmware image carries a `u32` at file offset 272 naming which mods it was built
-with. One bit per mod, little-endian. `.github/scripts/patch_ota_metadata.py` writes it;
+with. One bit per mod, little-endian. `scripts/patch_ota_metadata.py` writes it;
 that script's module docstring describes the block it sits in.
 
 ## The register

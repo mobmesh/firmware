@@ -44,7 +44,7 @@ Some mods may add extra options or requirements for a traditional flasher. Check
 
 * `scripts/generate-board-config.py` builds the final board configuration using the board's `overrides.yaml`, the board information from upstream, and the actual `partitions.bin` created during the build. This keeps us from having to manually enter the same information in multiple places.
 
-* `scripts/rebase-patches.sh` moves the patch set onto a newer upstream ref. It is the only script here meant to be run by hand; everything else under `scripts/` and `.github/scripts/` is invoked by a workflow. Scripts a test imports are named with underscores, the rest with hyphens.
+* `scripts/rebase-patches.sh` moves the patch set onto a newer upstream ref. It is the only script here meant to be run by hand; everything else under `scripts/` and `scripts/` is invoked by a workflow. Scripts a test imports are named with underscores, the rest with hyphens.
 
 * `pages/shared/vendor/` holds third-party libraries used by more than one page, each with a `PROVENANCE.md` recording the exact release and how to re-verify it.
 

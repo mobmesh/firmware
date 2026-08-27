@@ -350,7 +350,7 @@ jobs:
       - name: Write OTA metadata into the image's reserved app-descriptor field
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
-          python3 .github/scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" \
+          python3 scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" \
             --upstream-version "${{ steps.pick.outputs.version }}" \
             --repo-sha "$(echo "${{ github.sha }}" | cut -c1-7)" \
             --board "${{ matrix.board_id }}" \
@@ -408,7 +408,7 @@ jobs:
       - name: Verify the image reports its own metadata back
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
-          python3 .github/scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" --check
+          python3 scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" --check
 
       # One target per board vendors these, so any other target would merge against a copy
       # from a different build. Fail rather than ship a mismatched bootloader.
@@ -434,7 +434,7 @@ jobs:
         run: |
           pip install --quiet esptool==5.3.1
           NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}-merged.bin"
-          python3 .github/scripts/merge_flash_image.py \
+          python3 scripts/merge_flash_image.py \
             --board-id ${{ matrix.board_id }} \
             --variant ${{ matrix.id }} \
             --boards-json pages/flasher/auto_boards.json \

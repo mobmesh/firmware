@@ -24,7 +24,7 @@ import struct
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent
 MODS_DIR = REPO_ROOT / "mods"
 
 RESERVED_OFFSET = 208

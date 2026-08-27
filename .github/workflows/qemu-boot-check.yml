@@ -1,7 +1,7 @@
 name: qemu-boot-check
 
 # Boots the shipped firmware vendored under pages/flasher/ in QEMU and watches for a crash
-# or boot loop -- the real binary, byte for byte. See .github/scripts/qemu_boot_check.py for
+# or boot loop -- the real binary, byte for byte. See scripts/qemu_boot_check.py for
 # what counts as pass/fail. heltec_v4 is Xtensa, xiao_c3 RISC-V, so the matrix pairs each.
 
 on:
@@ -59,7 +59,7 @@ jobs:
         name: Boot ${{ matrix.board }}/${{ matrix.variant }} and check for crash/boot loop
         run: |
           mkdir -p workdir
-          python3 .github/scripts/qemu_boot_check.py \
+          python3 scripts/qemu_boot_check.py \
             --board-id ${{ matrix.board }} \
             --variant ${{ matrix.variant }} \
             --boards-json pages/flasher/auto_boards.json \

@@ -12,7 +12,6 @@ on:
       - 'scripts/**'
       - 'mods/**/patches/**'
       - 'mods/**/mod.yaml'
-      - '.github/scripts/**'
       - 'build-targets.yaml'
       - 'variants/**/overrides.yaml'
       - '.github/workflows/repo-checks.yml'
