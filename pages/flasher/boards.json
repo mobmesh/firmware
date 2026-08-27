@@ -16,7 +16,7 @@
     "variants": {
       "repeater": {
         "label": "Repeater",
-        "assetBasename": "heltec_v4_rep_ota_ts",
+        "assetBasename": "heltec_v4_rep_mobmesh",
         "version": "v1.17.1",
         "firmwareFile": "heltec_v4/repeater/firmware.bin",
         "postFlashCommands": [
