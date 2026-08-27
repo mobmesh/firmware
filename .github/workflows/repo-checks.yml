@@ -1,6 +1,6 @@
 name: repo-checks
 # Without this the run is titled with the commit subject, which says nothing about what ran.
-run-name: repo-checks
+run-name: repo-checks on ${{ github.ref_name }}
 
 # Checks the repo's own contents, not code in isolation: patch ownership, the vendored
 # images, the generated board config. Ran nowhere automated until 2026-08-26.
