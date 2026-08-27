@@ -1,4 +1,4 @@
-"""Header parsing and output verification for .github/scripts/merge_flash_image.py.
+"""Header parsing and output verification for scripts/merge_flash_image.py.
 
 esptool itself is not exercised here -- these cover the parts that decide what esptool is
 told and whether its output is acceptable, which is where a wrong answer ships a file that
@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".github" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import merge_flash_image as mfi
 

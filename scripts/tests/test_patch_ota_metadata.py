@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for .github/scripts/patch_ota_metadata.py.
+"""Unit tests for scripts/patch_ota_metadata.py.
 
 Run: python3 scripts/tests/test_patch_ota_metadata.py
 
@@ -15,7 +15,7 @@ import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent.parent
-SCRIPT_PATH = REPO / ".github" / "scripts" / "patch_ota_metadata.py"
+SCRIPT_PATH = REPO / "scripts" / "patch_ota_metadata.py"
 spec = importlib.util.spec_from_file_location("patch_ota_metadata", SCRIPT_PATH)
 pom = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pom)
