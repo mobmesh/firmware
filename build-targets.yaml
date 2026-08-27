@@ -8,9 +8,8 @@
 # combinations exist and which features go into each one.
 #
 # asset_basename is not listed here -- it's computed by
-# `scripts/generate-board-config.py resolve-targets` from
-# <board>_<asset_role_abbrev>_<mods' suffixes, in the order listed below,
-# from each mod's mods/<name>/mod.yaml>.
+# `scripts/generate-board-config.py resolve-targets` as
+# <board>_<asset_role_abbrev>_mobmesh -- a label, not a mod inventory.
 #
 # vendor_flasher_assets: exactly one target per BOARD should be true. It controls
 # whether this target's build vendors that board's bootloader.bin/partitions.bin/

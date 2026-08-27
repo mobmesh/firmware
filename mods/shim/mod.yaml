@@ -1,3 +1,1 @@
 name: shim
-# No suffix -- framework, not a feature; must not change asset filenames.
-suffix: ""

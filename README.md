@@ -57,10 +57,10 @@ If a patch no longer applies cleanly to the current upstream version, the build 
 
 | Variant     | Board          | Upstream Tag     | Release Asset                      |
 | ----------- | -------------- | ---------------- | ----------------------------------- |
-| Repeater    | Heltec V4      | `repeater-v*`    | `heltec_v4_rep_ota_ts-vX.Y.Z.bin`  |
-| Room Server | Heltec V4      | `room-server-v*` | `heltec_v4_room_ota_ts-vX.Y.Z.bin` |
-| Repeater    | Xiao ESP32-C3  | `repeater-v*`    | `xiao_c3_rep_ota_ts-vX.Y.Z.bin`    |
-| Room Server | Xiao ESP32-C3  | `room-server-v*` | `xiao_c3_room_ota_ts-vX.Y.Z.bin`   |
+| Repeater    | Heltec V4      | `repeater-v*`    | `heltec_v4_rep_mobmesh-vX.Y.Z.bin`  |
+| Room Server | Heltec V4      | `room-server-v*` | `heltec_v4_room_mobmesh-vX.Y.Z.bin` |
+| Repeater    | Xiao ESP32-C3  | `repeater-v*`    | `xiao_c3_rep_mobmesh-vX.Y.Z.bin`    |
+| Room Server | Xiao ESP32-C3  | `room-server-v*` | `xiao_c3_room_mobmesh-vX.Y.Z.bin`   |
 
 Each Variant/Board pair uses its own release tag, so they are all built and released independently even when they share an upstream tag sequence (e.g. both boards' Repeater builds track `repeater-v*`).
 

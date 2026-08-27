@@ -296,10 +296,8 @@ def cmd_resolve_targets(args):
             sys.exit(f"error: build-targets.yaml entry for board '{t.get('board')}' "
                       f"role '{t.get('role')}' resolves to no mods (set core_mods or mods)")
 
-        # A mod may declare an empty suffix (e.g. a framework or failsafe rather
-        # than a feature) to leave the asset filename unchanged.
-        suffixes = [s for s in (load_mod(name)["suffix"] for name in mods) if s]
-        asset_basename = "_".join([t["board"], t["asset_role_abbrev"], *suffixes])
+        # Fixed element -- the mod set lives in the image's bitfield, not the name.
+        asset_basename = "_".join([t["board"], t["asset_role_abbrev"], "mobmesh"])
 
         rows.append({
             "id": t["role"],
