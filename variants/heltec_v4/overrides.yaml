@@ -74,9 +74,9 @@ build_flags:
 # Optional: only set when a board's default partition scheme (from upstream's
 # boards/<name>.json) doesn't leave enough OTA slot room for this project's
 # added features. Not needed for heltec_v4 today. When set to a filename (e.g.
-# "custom_partitions.csv"), `scripts/generate-board-config.py flags` emits a
-# `board_build.partitions = <name>.csv` build-flag line for that board's
-# patch -- but vendoring the actual CSV file into the upstream tree is done
+# "custom_partitions.csv"), `scripts/generate-board-config.py inject-env` writes a
+# `board_build.partitions = <name>.csv` line into that board's env -- but
+# vendoring the actual CSV file into the upstream tree is done
 # by that same patch's own diff (as a new file, exactly like HotspotOTA.cpp
 # is added today), not by this script. This never touches upstream's own
 # board JSON.

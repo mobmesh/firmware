@@ -1,14 +1,6 @@
 #!/usr/bin/env python3
 """
-Single source of truth for per-board config, split two ways:
-
-  - "flags"       prints the exact `-D KEY=VALUE` (and, if set,
-                   `board_build.partitions = ...`) lines that should exist in
-                   a board's variant platformio.ini, derived from
-                   variants/<board>/overrides.yaml. Used both to help a human
-                   author/update a mod's patch, and by CI to verify the lines
-                   actually present in the patch haven't drifted from
-                   overrides.yaml.
+Single source of truth for per-board config, split three ways:
 
   - "boards-json"  merges upstream's boards/<board>.json (mcu, flash size,
                    USB hwids, psram -- read directly, never duplicated),
@@ -182,26 +174,6 @@ def load_upstream_board_json(upstream_dir: Path, board: str) -> dict:
     raise FileNotFoundError(
         f"upstream board definition not found: {path}, and no fallback at {fallback_path}"
     )
-
-
-def cmd_flags(args):
-    overrides = load_overrides(args.board)
-    lines = []
-    for key, value in (overrides.get("build_flags") or {}).items():
-        if isinstance(value, str):
-            lines.append(f'-D {key}=\'"{value}"\'')
-        else:
-            lines.append(f"-D {key}={value}")
-
-    partitions_override = overrides.get("partitions_override")
-    if partitions_override:
-        lines.append(f"board_build.partitions = {partitions_override}")
-
-    output = "\n".join(lines)
-    if args.out:
-        Path(args.out).write_text(output + "\n")
-    else:
-        print(output)
 
 
 def cmd_boards_json(args):
@@ -494,11 +466,6 @@ def cmd_inject_env(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-
-    p_flags = sub.add_parser("flags", help="print build-flag lines for a board's overrides")
-    p_flags.add_argument("--board", required=True)
-    p_flags.add_argument("--out", help="write to this file instead of stdout")
-    p_flags.set_defaults(func=cmd_flags)
 
     p_bj = sub.add_parser("boards-json", help="regenerate a board/variant entry in pages/flasher/boards.json")
     p_bj.add_argument("--board", required=True)
