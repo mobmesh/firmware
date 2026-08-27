@@ -82,7 +82,7 @@ jobs:
       # toolchain fetch fails loudly rather than being filed as a firmware crash.
       - name: Open, update, or close the tracking issue
         if: always() && steps.boot.outcome != 'skipped'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           FAILED: ${{ steps.boot.outcome == 'failure' }}
         with:
