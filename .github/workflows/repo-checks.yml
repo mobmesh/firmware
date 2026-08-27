@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -54,7 +54,7 @@ jobs:
       # One long-lived tracking issue, closed automatically when the checks pass again --
       # the same shape patch-drift-canary uses, so a fixed failure does not linger.
       - name: Open, update, or close the tracking issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           FAILED: ${{ steps.run.outputs.failed }}
           SUMMARY: ${{ steps.run.outputs.summary }}

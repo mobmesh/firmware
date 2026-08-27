@@ -151,7 +151,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v9
         with:
           script: |
             const failed = ${{ needs.mc_config.result == 'failure' || needs.cli_docs.result == 'failure' }};
