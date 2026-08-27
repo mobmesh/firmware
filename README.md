@@ -62,6 +62,10 @@ If a patch no longer applies cleanly to the current upstream version, the build 
 | Repeater    | Xiao ESP32-C3  | `repeater-v*`    | `xiao_c3_rep_mobmesh-vX.Y.Z.bin`    |
 | Room Server | Xiao ESP32-C3  | `room-server-v*` | `xiao_c3_room_mobmesh-vX.Y.Z.bin`   |
 
+Each also ships a `-merged.bin` alongside it: the same firmware plus the bootloader,
+partition table and otadata in one file, written at offset 0 to a blank board. The plain
+`.bin` is the app alone, for an OTA slot or an update over an existing install.
+
 Each Variant/Board pair uses its own release tag, so they are all built and released independently even when they share an upstream tag sequence (e.g. both boards' Repeater builds track `repeater-v*`).
 
 `build-targets.yaml` at the repo root is the single source of truth for which (board, role) combinations get built and which mods each one includes -- the CI matrix is generated from it, not hand-maintained. Adding support for another board is normally just adding entries there plus a `variants/<board>/overrides.yaml` file; the mod itself should not need any changes unless the new board requires something the existing mod does not support.

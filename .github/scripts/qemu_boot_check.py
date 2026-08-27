@@ -26,8 +26,10 @@ EXPECTED_RESET_REASONS = ("POWERON", "RTC_SW_CPU_RST")
 
 def merge_flash_image(board, variant, flasher_dir, out_path):
     offsets = {k: int(v, 16) for k, v in board["offsets"].items()}
-    # 16MB regardless of the board's real flash size -- both machine models expect it,
-    # and a correctly-sized image fails esp_flash_init() during IDF startup.
+    # 16MB regardless of the board's real flash size. QEMU picks the emulated chip from the
+    # drive size (4MB->gd25q32, 8MB->gd25q64, 16MB->is25lp128) and only the ISSI part gets past
+    # esp_flash_init_default_chip() -- 4 and 8MB assert in do_core_init and boot-loop, upstream's
+    # own images included. Measured 2026-08-27; the size is a chip selector, not a size check.
     flash_size = 16 * 1024 * 1024
     img = bytearray([0xFF] * flash_size)
 
