@@ -48,29 +48,50 @@ jobs:
           ")
           echo "mods: $MODS"
 
+          # Three-way on failure keeps the tree realistic, so one broken patch does not
+          # cascade into every later one. Never --depth 1: three-way silently degrades
+          # without the preimage blobs, and reports drift that is not there.
           for ref in main dev; do
             rm -rf probe-src
-            git clone --quiet --depth 1 --branch "$ref" \
+            git clone --quiet --branch "$ref" \
               "https://github.com/${UPSTREAM_REPO}.git" probe-src 2>/dev/null || {
                 echo "- \\\`$ref\\\`: **could not clone** (branch missing?)" >> "$REPORT"
                 continue
               }
             sha=$(git -C probe-src rev-parse --short HEAD)
-            failed=""
+            placed=""       # three-way relocated it unaided
+            conflicted=""   # three-way left markers
             for mod in $MODS; do
               for patch in "mods/$mod/patches"/*.patch; do
-                if ! git -C probe-src apply --check "../$patch" 2>/dev/null; then
-                  failed="$failed $mod/$(basename "$patch")"
-                  break 2
+                name="$mod/$(basename "$patch")"
+                if git -C probe-src apply --check "../$patch" 2>/dev/null; then
+                  git -C probe-src apply "../$patch"
+                  continue
                 fi
-                git -C probe-src apply "../$patch"
+                err=$(git -C probe-src apply -3 "../$patch" 2>&1) || true
+                if echo "$err" | grep -q "lacks the necessary blob"; then
+                  echo "::error::probe-src lacks preimage blobs -- three-way degraded to plain apply silently; the clone must not be shallow" >&2
+                  exit 1
+                fi
+                unmerged=$(git -C probe-src diff --name-only --diff-filter=U)
+                if [ -n "$unmerged" ]; then
+                  conflicted="$conflicted $name"
+                  for f in $unmerged; do
+                    git -C probe-src checkout --theirs -- "$f" 2>/dev/null || true
+                    git -C probe-src add "$f"
+                  done
+                else
+                  placed="$placed $name"
+                fi
               done
             done
-            if [ -n "$failed" ]; then
-              DRIFT=true
-              echo "- \\\`$ref\\\` (\\\`$sha\\\`): **FAILS** at$failed" >> "$REPORT"
-            else
+            if [ -z "$placed$conflicted" ]; then
               echo "- \\\`$ref\\\` (\\\`$sha\\\`): all patches apply" >> "$REPORT"
+            else
+              DRIFT=true
+              echo "- \\\`$ref\\\` (\\\`$sha\\\`): **DRIFT**" >> "$REPORT"
+              [ -n "$conflicted" ] && echo "  - **needs a person**:$conflicted" >> "$REPORT"
+              [ -n "$placed" ] && echo "  - three-way relocates unaided:$placed" >> "$REPORT"
             fi
           done
 
