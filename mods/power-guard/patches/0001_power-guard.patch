@@ -431,10 +431,10 @@ index 00000000..8a6245e7
 +};
 diff --git a/variants/heltec_v4/PowerGuard.h b/variants/heltec_v4/PowerGuard.h
 new file mode 100644
-index 00000000..96416484
+index 00000000..79a98d41
 --- /dev/null
 +++ b/variants/heltec_v4/PowerGuard.h
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,90 @@
 +#pragma once
 +
 +// Board-specific power-down for mods/power-guard's deep sleeps. Everything here is
@@ -444,6 +444,9 @@ index 00000000..96416484
 +// Both pins are in the S3's RTC range, so one hold mechanism covers them, and both
 +// releases are ours. A hold survives the wake reset by design, so a missed release
 +// leaves a node that transmits and is never heard.
++
++// No file-scope state here: two translation units include this, so a static would
++// become two independent copies. State belongs in ModHooks.cpp, as the boot counters do.
 +
 +#include <Arduino.h>
 +#include <SPI.h>
