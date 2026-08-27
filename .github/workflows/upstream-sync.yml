@@ -1,20 +1,8 @@
-# Daily pull of the upstream files we mirror. Never builds, never publishes.
+# Daily pull of the mirrored upstream files. Never builds, never publishes; Pages
+# deployment stays manual, so every change here is reviewed before it goes live.
 #
-# Both jobs answer the same question -- has upstream changed something we carry a copy
-# of? -- so they share a schedule and one tracking issue. Publishing to Pages stays
-# manual (publish-pages), so every change here is reviewed before it reaches
-# tools.mobmesh.org.
-#
-# mc-config: flasher.meshcore.io serves config.json with no CORS header, so the browser
-# cannot fetch it live. Mirroring rather than proxying turns upstream device and role
-# additions into a reviewable diff. The file carries no version tag and moves fast, so
-# the job validates shape, never counts -- a parse failure or a sharp drop in device
-# count is the early warning for a format change.
-#
-# cli-docs: upstream's cli_commands.md plus our cli-additions.md, taken from the tag the
-# repeater ships from so the console documents the CLI the released firmware answers.
-# This half used to live inside build-release, which meant commands.json only refreshed
-# when a repeater build happened to run.
+# mc-config has no version tag and moves fast, so the job validates shape, never counts.
+# cli-docs takes upstream's cli_commands.md from the tag the repeater ships from.
 name: upstream-sync
 
 on:
