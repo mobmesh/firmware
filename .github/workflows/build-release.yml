@@ -445,6 +445,40 @@ jobs:
         run: |
           python3 .github/scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" --check
 
+      # pages/flasher's bootloader/partitions are vendored by one target per board, so a
+      # target that doesn't vendor them merges against another build's copy. Fail rather
+      # than ship a merged image whose bootloader disagrees with what this build produced.
+      - name: Check the vendored bootloader/partitions match this build's own
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && !matrix.vendor_flasher_assets
+        run: |
+          for f in bootloader partitions; do
+            BUILT="upstream-src/.pio/build/${{ matrix.build_env }}/$f.bin"
+            VENDORED="pages/flasher/${{ matrix.board_id }}/$f.bin"
+            if ! cmp -s "$BUILT" "$VENDORED"; then
+              echo "::error::$f.bin from this build differs from the vendored pages/flasher copy."
+              echo "The vendored copy comes from ${{ matrix.board_id }}'s vendor_flasher_assets target."
+              echo "Rebuild that target first, or the -merged.bin would pair this app with a bootloader it was not built alongside."
+              exit 1
+            fi
+          done
+
+      # Pinned rather than taking PlatformIO's bundled copy: esptool 4.x spells this
+      # merge_bin/--flash_size and 5.x merge-bin/--flash-size.
+      - name: Build the whole-flash -merged.bin
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        id: merged
+        run: |
+          pip install --quiet esptool==5.3.1
+          NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}-merged.bin"
+          python3 .github/scripts/merge_flash_image.py \
+            --board-id ${{ matrix.board_id }} \
+            --variant ${{ matrix.id }} \
+            --boards-json pages/flasher/boards.json \
+            --flasher-dir pages/flasher \
+            --firmware "${{ steps.artifact.outputs.name }}" \
+            --out "$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
       # Note: there is no longer a separate "does partitions.bin match boards.json" drift check
       # here -- boards.json is now generated FROM this exact partitions.bin a few steps above
       # (scripts/generate-board-config.py boards-json), so that comparison would be a tautology.
@@ -500,7 +534,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: firmware-${{ matrix.board_id }}-${{ matrix.id }}
-          path: ${{ steps.artifact.outputs.name }}
+          path: |
+            ${{ steps.artifact.outputs.name }}
+            ${{ steps.merged.outputs.name }}
           retention-days: 7
 
       - name: Publish release
@@ -511,7 +547,9 @@ jobs:
           name: "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - mobmesh"
           body_path: release-notes.md
           make_latest: ${{ matrix.make_latest }}
-          files: ${{ steps.artifact.outputs.name }}
+          files: |
+            ${{ steps.artifact.outputs.name }}
+            ${{ steps.merged.outputs.name }}
 
       - name: Notify on patch/build failure
         if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && steps.rollback_check.outputs.failed != 'true'

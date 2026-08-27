@@ -124,14 +124,6 @@ def load_overrides(board: str) -> dict:
         return yaml.safe_load(f) or {}
 
 
-def load_mod(mod_name: str) -> dict:
-    path = REPO_ROOT / "mods" / mod_name / "mod.yaml"
-    if not path.exists():
-        raise FileNotFoundError(f"no mod.yaml for mod '{mod_name}': {path}")
-    with path.open() as f:
-        return yaml.safe_load(f) or {}
-
-
 def load_build_targets() -> list:
     path = REPO_ROOT / "build-targets.yaml"
     if not path.exists():
