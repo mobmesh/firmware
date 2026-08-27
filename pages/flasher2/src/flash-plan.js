@@ -108,7 +108,6 @@ function normaliseBoard(key, raw) {
       label: variant.label ?? variantKey,
       version: variant.version ?? null,
       firmwareFile: requirePath(variant.firmwareFile, key, `variants.${variantKey}.firmwareFile`),
-      firmwareShaFile: variant.firmwareShaFile ?? null,
       // Chosen by role, not by path — the variant key is the role.
       postFlashCommands: Array.isArray(variant.postFlashCommands)
         ? variant.postFlashCommands.slice()
@@ -184,19 +183,18 @@ export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}
   return { baseUrl, version: raw._version ?? null, boards, displays, variantIcons };
 }
 
-// Body is `<hash>` or `<hash>:<offset>`; the offset is not ours to use. Absent returns
-// null so the UI says unverified; a mismatch raises, since bad bytes must never be written.
-async function verifyAgainstSidecar(baseUrl, bytes, path) {
-  if (!path) return null;
-  const res = await fetch(assetUrl(baseUrl, path), { cache: 'no-store' });
-  if (!res.ok) return null;
+// The image's own SHA-256 is its last 32 bytes, so nothing is fetched. Header byte 23 says
+// the digest is there -- a build setting, not a format guarantee -- and an image carrying
+// none returns null so the UI says unverified. A mismatch raises: bad bytes are never written.
+async function verifyEmbeddedDigest(bytes, label) {
+  if (bytes.length < 56 || bytes[0] !== 0xe9 || bytes[23] !== 1) return null;
 
-  const expected = (await res.text()).trim().split(':')[0].toLowerCase();
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const expected = [...bytes.slice(-32)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const digest = await crypto.subtle.digest('SHA-256', bytes.slice(0, -32));
   const actual = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
   if (actual !== expected) {
     throw new FirmwareIntegrityError(
-      `${path.replace(/\.sha256$/, '')} failed checksum verification ` +
+      `${label} failed checksum verification ` +
         `(expected ${expected}, got ${actual}). Nothing has been written.`
     );
   }
@@ -222,7 +220,7 @@ export async function loadCustomFirmwareSource(manifest, boardKey, variantKey, {
   ]);
 
   onStatus?.('Verifying firmware…');
-  const sha256 = await verifyAgainstSidecar(manifest.baseUrl, firmware, variant.firmwareShaFile);
+  const sha256 = await verifyEmbeddedDigest(firmware, variant.firmwareFile);
 
   return {
     board,
@@ -529,8 +527,9 @@ function selectStockFile(device, entry, version, wipe) {
   );
 }
 
-// Stage one, the peer of `loadCustomFirmwareSource`. Bytes come through the relay; there
-// is no sidecar, so `verify` stays null and the UI must say the firmware is unverified.
+// Stage one, the peer of `loadCustomFirmwareSource`. Bytes come through the relay. Upstream
+// builds carry no MobMesh metadata but are still ESP32 images, so the appended digest is
+// checked where one is present and `verify` stays null where it is not.
 export async function loadStockFirmwareSource(
   manifest,
   { deviceName, firmwareIndex = 0, version, wipe = false },
@@ -567,7 +566,10 @@ export async function loadStockFirmwareSource(
     eraseBytes = new Uint8Array(await eraseRes.arrayBuffer());
   }
 
-  return { device, entry, version, wipe, file, bytes, eraseBytes };
+  // Only the ESP32 side is an app image; an nRF52 package is a zip with no appended digest.
+  const sha256 = device.type === 'nrf52' ? null : await verifyEmbeddedDigest(bytes, file.name);
+
+  return { device, entry, version, wipe, file, bytes, eraseBytes, sha256 };
 }
 
 /** Fetches the resolved bootloader UF2's bytes from the relay, for the guided nRF52
@@ -585,7 +587,7 @@ export async function loadBootloaderUf2(wanted, { relayBase = STOCK_RELAY_BASE, 
 // Stage two. Always one file, and the address follows from which was chosen: the donor
 // keeps it in mutable page state, where a wipe then an update writes the app to 0x0.
 export function buildStockFlashPlan(source, { partitions = [] } = {}) {
-  const { device, bytes, eraseBytes, wipe } = source;
+  const { device, bytes, eraseBytes, wipe, sha256 } = source;
 
   if (device.type === 'nrf52') {
     return createFlashPlan({
@@ -616,7 +618,7 @@ export function buildStockFlashPlan(source, { partitions = [] } = {}) {
     files,
     eraseAll: wipe,
     preserveFs: false,
-    verify: null,
+    verify: sha256 ? { sha256 } : null,
     // Post-flash provisioning applies here too, but the role → command-set table does not exist yet and
     // `boards.json`'s commands are ours, not upstream's. Nothing is invented.
     postFlash: null,
