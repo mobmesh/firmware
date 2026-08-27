@@ -1,5 +1,5 @@
 diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
-index 7d0179f..80017bf 100644
+index 7d0179f3..80017bfd 100644
 --- a/examples/simple_repeater/MyMesh.cpp
 +++ b/examples/simple_repeater/MyMesh.cpp
 @@ -1,5 +1,6 @@
@@ -28,7 +28,7 @@ index 7d0179f..80017bf 100644
      while (*dp)
        dp++; // find end of string
 diff --git a/examples/simple_repeater/UITask.cpp b/examples/simple_repeater/UITask.cpp
-index e722555..9e2e819 100644
+index e7225557..9e2e819f 100644
 --- a/examples/simple_repeater/UITask.cpp
 +++ b/examples/simple_repeater/UITask.cpp
 @@ -2,6 +2,7 @@
@@ -66,7 +66,7 @@ index e722555..9e2e819 100644
      }
    }
 diff --git a/examples/simple_room_server/UITask.cpp b/examples/simple_room_server/UITask.cpp
-index 8e4c2fc..43888b9 100644
+index 8e4c2fcf..43888b95 100644
 --- a/examples/simple_room_server/UITask.cpp
 +++ b/examples/simple_room_server/UITask.cpp
 @@ -1,6 +1,7 @@
@@ -113,7 +113,7 @@ index 8e4c2fc..43888b9 100644
      }
    }
 diff --git a/src/helpers/ArduinoHelpers.h b/src/helpers/ArduinoHelpers.h
-index 97596da..80d7d1c 100644
+index 97596daa..80d7d1cd 100644
 --- a/src/helpers/ArduinoHelpers.h
 +++ b/src/helpers/ArduinoHelpers.h
 @@ -24,6 +24,33 @@ public:

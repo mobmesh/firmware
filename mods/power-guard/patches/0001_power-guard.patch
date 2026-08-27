@@ -1,18 +1,17 @@
 diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
-index 195d809..7e11ba3 100644
+index 90710e4d..8fb8eef1 100644
 --- a/src/helpers/ModHooks.cpp
 +++ b/src/helpers/ModHooks.cpp
-@@ -7,7 +7,95 @@
+@@ -7,7 +7,94 @@
  #include <helpers/esp32/RollbackGuard.h>
  #endif
  
 +#ifdef WITH_POWER_GUARD
 +#include <helpers/esp32/BattSaver.h>
-+BattSaver batt_saver(board);   // extern'd by CommonCliMods.cpp
++BattSaver batt_saver;   // extern'd by CommonCliMods.cpp
 +#endif
 +
 +#if defined(ESP32) && defined(WITH_POWER_GUARD)
-+#include <helpers/ESP32Board.h>
 +// Board-specific deep-sleep power-down. A board that ships no PowerGuard.h keeps the
 +// stock sleep, which leaves its rails up.
 +#ifdef P_LORA_PA_POWER
@@ -98,7 +97,7 @@ index 195d809..7e11ba3 100644
  #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
    SPIFFS.begin(true);   // RollbackGuard's failure counter needs it mounted before use; safe to call twice
  
-@@ -32,8 +120,15 @@ void modLoop() {
+@@ -32,10 +119,17 @@ void modLoop() {
  #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
    RollbackGuard::poll();
  #endif
@@ -114,17 +113,18 @@ index 195d809..7e11ba3 100644
    return false;
 +#endif
  }
+ 
+ // Reached through the concrete `board`, not a mesh::MainBoard*, so a virtual that
 diff --git a/src/helpers/esp32/BattSaver.h b/src/helpers/esp32/BattSaver.h
 new file mode 100644
-index 0000000..45179ed
+index 00000000..be94ca09
 --- /dev/null
 +++ b/src/helpers/esp32/BattSaver.h
-@@ -0,0 +1,205 @@
+@@ -0,0 +1,203 @@
 +#pragma once
 +
 +#include <Arduino.h>
-+#include <MeshCore.h>
-+#include <helpers/ESP32Board.h>   // enterDeepSleep()
++#include <helpers/ModHooks.h>     // the board, without naming a board class
 +#include <Preferences.h>          // stored overrides
 +
 +// Engages MeshCore's existing power-saving sleep when the battery is low, and
@@ -193,7 +193,6 @@ index 0000000..45179ed
 +#endif
 +
 +class BattSaver {
-+  ESP32Board* _board;
 +  unsigned long _next_sample_at;
 +  uint8_t _agree;
 +  uint8_t _sleep_agree;
@@ -224,13 +223,13 @@ index 0000000..45179ed
 +  }
 +
 +public:
-+  BattSaver(ESP32Board& board)
-+    : _board(&board), _next_sample_at(0), _agree(0), _sleep_agree(0),
++  BattSaver()
++    : _next_sample_at(0), _agree(0), _sleep_agree(0),
 +      _auto(POWER_GUARD_AUTO_DEFAULT), _active(false),
 +      _lna_was_enabled(false), _last_mv(0), _transitions(0),
 +      _sleep_mv(POWER_GUARD_SAFE_MV), _safe_on(SAFE_UNSET), _loaded(false) { }
 +
-+  // No sleep inhibit here -- ESP32Board::sleep() already refuses while
++  // No sleep inhibit here -- upstream's own sleep already refuses while
 +  // inhibit_sleep is set, which covers OTA on every path.
 +  bool isActive() const { return _active; }
 +  bool isAuto() const { return _auto; }
@@ -263,7 +262,7 @@ index 0000000..45179ed
 +    if ((long)(now - _next_sample_at) < 0) return;   // rollover-safe
 +    _next_sample_at = now + POWER_GUARD_SAMPLE_INTERVAL_MS;
 +
-+    uint16_t mv = _board->getBattMilliVolts();
++    uint16_t mv = modBoardBattMilliVolts();
 +    _last_mv = mv;
 +
 +    // No reading at all. Both rungs act on low voltage, so a 0 would otherwise
@@ -284,7 +283,7 @@ index 0000000..45179ed
 +                      mv, (unsigned)_sleep_mv,
 +                      (unsigned)(POWER_GUARD_SAMPLE_INTERVAL_MS / 1000
 +                                 * POWER_GUARD_CONSECUTIVE_SAMPLES));
-+        _board->enterDeepSleep(POWER_GUARD_SAFE_SECS);   // does not return
++        modBoardDeepSleep(POWER_GUARD_SAFE_SECS);   // does not return
 +      }
 +    } else {
 +      _sleep_agree = 0;
@@ -314,22 +313,22 @@ index 0000000..45179ed
 +    _active = on;
 +    _transitions++;
 +#if POWER_GUARD_AUTO_DROP_FEM_LNA
-+    if (!_board->canControlLoRaFemLna()) return;
++    if (!modFemLnaAvailable()) return;
 +    if (on) {
 +      // Capture rather than assume, so release restores the operator's setting.
-+      _lna_was_enabled = _board->isLoRaFemLnaEnabled();
-+      if (_lna_was_enabled) _board->setLoRaFemLnaEnabled(false);
++      _lna_was_enabled = modFemLnaGet();
++      if (_lna_was_enabled) modFemLnaSet(false);
 +    } else if (_lna_was_enabled) {
-+      _board->setLoRaFemLnaEnabled(true);
++      modFemLnaSet(true);
 +    }
 +#endif
 +  }
 +};
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index 4b7326e..c15de3f 100644
+index 66d77a48..423f4304 100644
 --- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
-@@ -20,7 +20,100 @@
+@@ -21,7 +21,100 @@
  #define OTA_MOD_BUILD_DATE "unknown"
  #endif
  
@@ -422,7 +421,7 @@ index 4b7326e..c15de3f 100644
 +#ifdef POWER_GUARD_HAS_POWERDOWN
 +      powerGuardDownPostRadio();
 +#endif
-+      board.enterDeepSleep(secs);   // does not return
++      modBoardDeepSleep(secs);   // does not return
 +    }
 +    return true;
 +  }
@@ -432,7 +431,7 @@ index 4b7326e..c15de3f 100644
      sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
 diff --git a/variants/heltec_v4/PowerGuard.h b/variants/heltec_v4/PowerGuard.h
 new file mode 100644
-index 0000000..9641648
+index 00000000..96416484
 --- /dev/null
 +++ b/variants/heltec_v4/PowerGuard.h
 @@ -0,0 +1,87 @@

@@ -27,6 +27,10 @@
 build_flags:
   PIN_HOTSPOT_PWR: 47
 
+  # This board's FEM can gate its LNA. Upstream dropped the capability virtual from
+  # MainBoard, so the board states it here and ModHooks compiles the calls out elsewhere.
+  MOBMESH_HAS_FEM_LNA: 1
+
   # Bench-measured across 3 boards; the schematic ratio (4.9) reads ~270 mV low
   # and upstream's 5.42 reads ~90 mV high. A stored `set adc.multiplier` wins over this.
   ADC_MULTIPLIER: 5.32
