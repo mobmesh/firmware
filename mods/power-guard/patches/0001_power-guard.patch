@@ -116,7 +116,7 @@ index 90710e4d..8aa61af6 100644
  
  // Reached through the concrete `board`, not a mesh::MainBoard*, so a virtual that
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index 66d77a48..9d8d4102 100644
+index 66d77a48..00fd63ea 100644
 --- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
 @@ -21,7 +21,100 @@
@@ -128,7 +128,7 @@ index 66d77a48..9d8d4102 100644
 +extern PowerGuardPolicy power_guard;
 +// Board-specific rail power-down, where the board ships one. The radio is already
 +// initialised on this path, so enterDeepSleep()'s own powerOff() sleeps the SX1262 --
-+// only the rails are ours to drop.
++// only the rails are left to drop.
 +#ifdef P_LORA_PA_POWER
 +#define POWER_GUARD_HAS_POWERDOWN 1
 +#include <PowerGuard.h>

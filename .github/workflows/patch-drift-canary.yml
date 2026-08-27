@@ -137,12 +137,12 @@ jobs:
               | grep -oE '[0-9.]+$' || echo "")
             if [ -z "$found" ]; then
               DRIFT=true
-              echo "- upstream's \\\`ADC_MULTIPLIER\\\` default could not be found in HeltecV4Board.h -- our override may no longer apply" >> "$REPORT"
+              echo "- upstream's \\\`ADC_MULTIPLIER\\\` default could not be found in HeltecV4Board.h -- the override may no longer apply" >> "$REPORT"
             elif [ "$found" != "$EXPECTED_ADC_MULT" ]; then
               DRIFT=true
-              echo "- upstream changed \\\`ADC_MULTIPLIER\\\` from ${EXPECTED_ADC_MULT} to ${found}; ours stays 5.32 (bench-measured) -- worth re-measuring" >> "$REPORT"
+              echo "- upstream changed \\\`ADC_MULTIPLIER\\\` from ${EXPECTED_ADC_MULT} to ${found}; the override stays 5.32 (bench-measured) -- worth re-measuring" >> "$REPORT"
             else
-              echo "- upstream \\\`ADC_MULTIPLIER\\\` still ${found}; ours overrides with 5.32 (bench-measured)" >> "$REPORT"
+              echo "- upstream \\\`ADC_MULTIPLIER\\\` still ${found}; overridden with 5.32 (bench-measured)" >> "$REPORT"
             fi
           fi
 
@@ -195,7 +195,7 @@ jobs:
           rm -rf vanilla-src
           git clone --quiet --branch dev "https://github.com/${UPSTREAM_REPO}.git" vanilla-src
           if (cd vanilla-src && pio run -e "$env" > ../vanilla.log 2>&1); then
-            echo "verdict=ours" >> "$GITHUB_OUTPUT"
+            echo "verdict=patches" >> "$GITHUB_OUTPUT"
           else
             echo "verdict=upstream" >> "$GITHUB_OUTPUT"
           fi
@@ -208,11 +208,11 @@ jobs:
             const verdict = '${{ steps.buildcheck.outputs.verdict }}';
             const buildLine = {
               ok:       '- `dev`: patched tree **builds**',
-              ours:     '- `dev`: patched tree **FAILS TO BUILD** and the same ref builds vanilla -- the break is ours',
-              upstream: '- `dev`: patched tree fails to build, but so does vanilla -- upstream is broken today, not us',
+              patches:  '- `dev`: patched tree **FAILS TO BUILD** and the same ref builds vanilla -- the break is in the patches',
+              upstream: '- `dev`: patched tree fails to build, but so does vanilla -- upstream is broken today',
               '':       '- `dev`: build check skipped (patches need resolving first)',
             }[verdict] ?? '- `dev`: build check did not report';
-            const drift = ${{ steps.probe.outputs.drift }} || verdict === 'ours';
+            const drift = ${{ steps.probe.outputs.drift }} || verdict === 'patches';
             const report = `${{ steps.probe.outputs.report }}`.replace(/\\`/g, '`') + '\n' + buildLine;
             const title = process.env.ISSUE_TITLE;
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
