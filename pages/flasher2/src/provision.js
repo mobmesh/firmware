@@ -190,7 +190,7 @@ export function buildProvisionCommands(state) {
     steps.push({ command: `set prv.key ${privateKey}`, label: 'Installing the node identity' });
   }
 
-  // No reply is sent — see commands.json. Keyed on what the firmware actually says needs
+  // No reply is sent — see auto_commands.json. Keyed on what the firmware actually says needs
   // one: everything else saves and applies at once, so restarting a working node for a
   // name change or an interval is a cost with nothing bought.
   if (steps.some((step) => NEEDS_REBOOT.test(step.command))) {

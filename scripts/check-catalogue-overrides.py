@@ -2,7 +2,7 @@
 """Report override keys that no longer match upstream's catalogue.
 
 Overrides key on the maker slug and the exact device name, the only identities
-mc-config.json gives. An upstream rename drops the override silently, so this turns
+mc_config.json gives. An upstream rename drops the override silently, so this turns
 that into a visible failure.
 """
 import json
@@ -10,7 +10,7 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-CATALOGUE = ROOT / "pages/flasher/mc-config.json"
+CATALOGUE = ROOT / "pages/flasher/mc_config.json"
 OVERRIDES = ROOT / "pages/flasher2/data/catalogue-overrides.json"
 
 # Kept in step with IMAGE_FILTERS in flash-plan.js.

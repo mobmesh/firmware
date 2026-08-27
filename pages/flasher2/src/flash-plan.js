@@ -47,7 +47,7 @@ export function createFlashPlan(fields) {
 }
 
 // --- the custom manifest ------------------------------------------------------------
-// `boards.json` normalises here and is never written back to. Generated from each build's
+// `auto_boards.json` normalises here and is never written back to. Generated from each build's
 // real `partitions.bin`, so ESP32-only.
 
 // The tool's own directory, where the build pipeline commits the vendored builds. The dev
@@ -138,14 +138,14 @@ const CUSTOM_VARIANT_ICONS = {
 };
 
 export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}) {
-  const res = await fetch(assetUrl(baseUrl, 'boards.json'), { cache: 'no-store' });
-  if (!res.ok) throw new ManifestError(`Could not load boards.json: HTTP ${res.status}.`);
+  const res = await fetch(assetUrl(baseUrl, 'auto_boards.json'), { cache: 'no-store' });
+  if (!res.ok) throw new ManifestError(`Could not load auto_boards.json: HTTP ${res.status}.`);
 
   let raw;
   try {
     raw = await res.json();
   } catch (error) {
-    throw new ManifestError(`boards.json is not valid JSON (${error.message}).`, { cause: error });
+    throw new ManifestError(`auto_boards.json is not valid JSON (${error.message}).`, { cause: error });
   }
 
   const boards = {};
@@ -153,7 +153,7 @@ export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}
     if (key.startsWith('_')) continue;
     boards[key] = normaliseBoard(key, board);
   }
-  if (Object.keys(boards).length === 0) throw new ManifestError('boards.json lists no boards.');
+  if (Object.keys(boards).length === 0) throw new ManifestError('auto_boards.json lists no boards.');
 
   // Optional, falling back to one tile per board. Tiles may share a board, so the display
   // id is not the board key.
@@ -205,7 +205,7 @@ async function verifyEmbeddedDigest(bytes, label) {
 // table has to come first, since the scope answer selects the file list.
 export async function loadCustomFirmwareSource(manifest, boardKey, variantKey, { onStatus } = {}) {
   const board = manifest.boards[boardKey];
-  if (!board) throw new ManifestError(`boards.json has no board '${boardKey}'.`);
+  if (!board) throw new ManifestError(`auto_boards.json has no board '${boardKey}'.`);
   const variant = board.variants[variantKey];
   if (!variant) throw new ManifestError(`Board '${boardKey}' has no variant '${variantKey}'.`);
 
@@ -271,8 +271,8 @@ export function buildCustomFlashPlan(source, scope) {
 // Mirrored same-origin by CI, so only firmware bytes need the relay. Upstream is volatile,
 // so nothing validates against a count or fixed set; unusable entries are dropped.
 
-export const STOCK_MANIFEST_FILE = 'mc-config.json';
-export const STOCK_RELEASES_FILE = 'mc-releases.json';
+export const STOCK_MANIFEST_FILE = 'mc_config.json';
+export const STOCK_RELEASES_FILE = 'mc_releases.json';
 export const CATALOGUE_OVERRIDES_FILE = 'catalogue-overrides.json';
 
 // An entry either carries `version` directly or a release stream plus filename patterns.
@@ -620,7 +620,7 @@ export function buildStockFlashPlan(source, { partitions = [] } = {}) {
     preserveFs: false,
     verify: sha256 ? { sha256 } : null,
     // Post-flash provisioning applies here too, but the role → command-set table does not exist yet and
-    // `boards.json`'s commands are ours, not upstream's. Nothing is invented.
+    // `auto_boards.json`'s commands are ours, not upstream's. Nothing is invented.
     postFlash: null,
   });
 }
