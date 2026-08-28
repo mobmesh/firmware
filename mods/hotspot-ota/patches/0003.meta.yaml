@@ -1,3 +1,0 @@
-id: "0003"
-title: ntp-time-sync
-requires: ["hotspot-ota/0001"]

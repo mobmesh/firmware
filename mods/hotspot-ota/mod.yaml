@@ -1,7 +1,8 @@
-# Mod-level facts, distinct from the per-patch sidecars (0001.meta.yaml,
-# 0002.meta.yaml) which declare per-patch env contributions. This file holds
-# facts about the mod as a whole.
+# Mod-level facts. build_src_filter is not listed: it is derived from what is
+# actually under files/, so the two cannot drift apart.
 name: hotspot-ota
+
+env_flags: [WITH_HOTSPOT_OTA, WITH_OTA_ROLLBACK_GUARD]
 
 # A mod earns a bit only if the built image carries something that proves it is compiled
 # in. Bits are permanent: never renumber one, never reuse a retired mod's. See

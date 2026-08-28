@@ -170,6 +170,14 @@ jobs:
 
       # Strict apply is the gate: a patch that does not apply cleanly never ships. The
       # three-way retry only produces a rebase starting point -- the step fails either way.
+      # Mod-owned files arrive by copy, before any patch: a file nobody else owns needs no
+      # diff to land, so patches carry only what edits upstream's own source.
+      - name: Copy each mod's own source into the upstream clone
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          python3 scripts/generate-board-config.py copy-src \
+            --upstream upstream-src --mods "${{ join(matrix.mods, ',') }}"
+
       - id: apply
         name: Apply maintained patches in order (fail loudly on drift; emit a rescue diff, never auto-merge)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'

@@ -1,4 +1,5 @@
-# Mod-level facts, distinct from the per-patch sidecars (0001.meta.yaml)
-# which declare per-patch env contributions. This file holds facts about
-# the mod as a whole.
+# Mod-level facts. build_src_filter is derived from what is under files/, so the
+# two cannot drift apart; this mod ships headers only, so it contributes none.
 name: power-guard
+
+env_flags: [WITH_POWER_GUARD]

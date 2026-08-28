@@ -1,5 +1,4 @@
 id: "0001"
 title: hotspot-fetch-ota
+# Both of these are shim's files, not upstream's. The mod's own source lives in files/.
 requires: ["shim/0001"]
-env_flag: WITH_HOTSPOT_OTA
-build_src_filter: ["+<helpers/esp32/HotspotOTA.cpp>", "+<helpers/esp32/HotspotOtaBoard.cpp>"]

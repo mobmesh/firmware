@@ -1,6 +1,6 @@
 # shim - Hook Points for Everything Else
 
-Owns every place our patches reach into upstream to get called. Not a feature: with
+Owns every place a patch reaches into upstream to get called. Not a feature: with
 no other mod built, all hooks are no-ops and the firmware behaves as upstream does.
 
 ## What it owns
@@ -12,8 +12,10 @@ no other mod built, all hooks are no-ops and the firmware behaves as upstream do
 | `src/helpers/CommonCLI.cpp` | one dispatch line per verb handler (3) |
 | `src/helpers/CommonCLI.h` | the three `handleMod*` declarations |
 
-It creates the files those calls land in -- `helpers/ModHooks.{h,cpp}` and
-`helpers/esp32/CommonCliMods.cpp` -- as empty scaffolds that mods fill in.
+It ships the files those calls land in -- `helpers/ModHooks.{h,cpp}` and
+`helpers/esp32/CommonCliMods.cpp` -- from `files/`, as scaffolds that mods fill in.
+They arrive by copy rather than by patch, so they are edited directly and no upstream
+ref can change them.
 
 `CommonCliMods.cpp` is dispatched ahead of upstream's own chain, so a mod can match
 a longer prefix before a shorter upstream one (`start ota wan ...` before `start ota`).

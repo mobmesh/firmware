@@ -229,7 +229,7 @@ prefix and would otherwise answer these as a status query.
     powersaving auto              power saving state, active flag, transition count
     powersaving auto on|off       toggle automatic power saving
 
-`safe.mv` and `safe on|off` persist in an NVS namespace of our own -- no upstream
+`safe.mv` and `safe on|off` persist in a separate NVS namespace -- no upstream
 struct to drift, no flash write on the low-battery path, and an absent key stays
 distinguishable from a stored 0, which is what lets `off` persist while a board
 default stays in place. They are deliberately separate, so a threshold tuned for a
@@ -363,7 +363,7 @@ sustained uptime and a live WiFi association, and a 30-second sleep mid-download
 break it. That is handled already, and not by this mod.
 
 `ESP32Board::sleep()` refuses outright while `inhibit_sleep` is set, and both
-upstream's `startOTAUpdate()` and our own `hotspot-ota` patch set it around the
+upstream's `startOTAUpdate()` and `hotspot-ota` set it around the
 download. Since the guard sits inside `sleep()` itself, it applies no matter who asked
 for the sleep -- so a low battery cannot interrupt an update in progress.
 

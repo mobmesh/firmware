@@ -1,5 +1,0 @@
-id: "0002"
-title: ota-rollback-guard
-requires: ["shim/0001", "hotspot-ota/0001"]
-env_flag: WITH_OTA_ROLLBACK_GUARD
-build_src_filter: ["+<helpers/esp32/RollbackGuard.cpp>"]
