@@ -4,7 +4,7 @@ Custom firmware for MeshCore running on ESP32 boards.
 
 🔗 ["Give me the sales pitch, why do I need this?"](https://github.com/mobmesh/firmware/blob/main/README_PITCH.md)
 
-This project uses a set of patches that are applied to a fresh copy of the upstream MeshCore source instead of maintaining a separate long-term fork. Each build starts with the latest upstream release and applies our changes on top of it. This makes it easier to stay up to date without the project slowly getting out of sync with MeshCore.
+This project layers its changes onto a fresh copy of the upstream MeshCore source instead of maintaining a separate long-term fork. Each build starts with the latest upstream release: each mod's own source files are copied in, then a small set of patches edits the upstream files that need to call them. That keeps the project current without slowly drifting out of sync with MeshCore.
 
 The MeshCore source code itself is not stored in this repository. Instead, this repo contains the patches, board-specific configuration, and the GitHub Actions workflow that puts everything together and publishes the builds.
 
@@ -36,7 +36,12 @@ Some mods may add extra options or requirements for a traditional flasher. Check
 
 # Behind the Curtain
 
-* `mods/<name>/` contains the different features or modifications. Each mod has its own `patches/*.patch` files, along with a `.meta.yaml` file for each patch. The metadata files define patch dependencies. Each mod also has its own documentation. The feature mods are `hotspot-ota`, `timing-safety` and `power-guard`; `shim` is internal plumbing that owns the hook points the others attach to.
+* `mods/<name>/` contains the different features or modifications. A mod ships code two ways:
+
+  * `files/` mirrors the upstream directory layout and is copied into the source tree before anything is patched. This is the mod's own code -- files nothing upstream has ever seen, so there is no diff to apply and they are edited directly.
+  * `patches/*.patch` carries only the edits to files this mod did not create -- the upstream MeshCore source, or a file another mod added. Each has a `.meta.yaml` sidecar declaring its dependencies.
+
+  `mod.yaml` holds facts about the mod as a whole -- its build flags and, where it has one, its image marker bit. Each mod also has its own documentation. The feature mods are `hotspot-ota`, `timing-safety` and `power-guard`; `shim` is internal plumbing that owns the hook points the others attach to.
 
 * `variants/<board>/` contains configuration changes that are specific to a board. This includes things like GPIO pins, timing values, and sometimes a custom partition layout. The folder structure follows the same `variants/<board>/` layout used by upstream MeshCore.
 
@@ -44,7 +49,7 @@ Some mods may add extra options or requirements for a traditional flasher. Check
 
 * `scripts/generate-board-config.py` builds the final board configuration using the board's `overrides.yaml`, the board information from upstream, and the actual `partitions.bin` created during the build. This keeps us from having to manually enter the same information in multiple places.
 
-* `scripts/rebase-patches.sh` moves the patch set onto a newer upstream ref. It is the only script here meant to be run by hand; everything else under `scripts/` and `scripts/` is invoked by a workflow. Scripts a test imports are named with underscores, the rest with hyphens.
+* `scripts/rebase-patches.sh` moves the patch set onto a newer upstream ref. It is the only script here meant to be run by hand; everything else under `scripts/` and `scripts/tests/` is invoked by a workflow. Scripts a test imports are named with underscores, the rest with hyphens.
 
 * `pages/shared/vendor/` holds third-party libraries used by more than one page, each with a `PROVENANCE.md` recording the exact release and how to re-verify it.
 
@@ -52,7 +57,7 @@ Some mods may add extra options or requirements for a traditional flasher. Check
 
 * `.github/workflows/build-release.yml` handles building each board and variant against the latest upstream release and publishing the results.
 
-Patches are applied in numeric order within each mod. Every patch also lists any other patches it depends on. CI checks these dependencies before applying anything.
+Every mod's `files/` are copied in first, then patches are applied in numeric order within each mod. Every patch lists any other patches it depends on, and CI checks those dependencies before applying anything.
 
 If a patch no longer applies cleanly to the current upstream version, the build fails and an issue is opened with the name of the affected patch. The system does not try to automatically merge or fix the patch.
 
@@ -81,9 +86,10 @@ A scheduled GitHub Actions run checks upstream for new release tags for each var
 When a new release is found, the workflow:
 
 1. Clones the upstream MeshCore repository at that tag.
-2. Checks the patches against the board configuration.
-3. Applies the patches.
-4. Builds the firmware.
+2. Copies each in-scope mod's own source files into the tree.
+3. Checks the patches against the board configuration.
+4. Applies the patches.
+5. Builds the firmware.
 
 The patch checks are important because they catch configuration changes or other upstream changes that could cause problems. If a patch no longer applies, the build stops and an issue is opened identifying the patch that failed.
 
@@ -105,7 +111,8 @@ For example:
 
 Each release includes:
 
-* `<asset-basename>-vX.Y.Z.bin` — the firmware image
+* `<asset-basename>-vX.Y.Z.bin` — the app image, for an OTA slot or an update over an existing install
+* `<asset-basename>-vX.Y.Z-merged.bin` — the same firmware plus bootloader, partition table and otadata, written at offset 0 to a blank board
 
 The release notes come directly from the upstream MeshCore release for that tag.
 
