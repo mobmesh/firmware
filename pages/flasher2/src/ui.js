@@ -242,14 +242,26 @@ function renderChoice(step, options) {
         tileArt(option.image, option.imageFilter, option.imageDim, option.imagePlate), name);
     } else if (layout === 'row') {
       // Either a real picture (the custom path's PNGs) or a named glyph, never both.
-      const art = option.image
-        ? `<img class="tile-icon" src="${option.image}" alt="" />`
-        : option.icon
-          ? `<span class="tile-icon is-glyph">${icon(option.icon, 26)}</span>`
-          : '';
-      cell.className = art ? 'tile tile-with-icon' : 'tile';
+      const glyph = option.icon
+        ? `<span class="tile-icon is-glyph">${icon(option.icon, 26)}</span>`
+        : '';
+      cell.className = option.image || glyph ? 'tile tile-with-icon' : 'tile';
       cell.innerHTML =
-        art + `<strong>${option.label}</strong>` + (option.note ? `<small>${option.note}</small>` : '');
+        (option.image ? '' : glyph) +
+        `<strong>${option.label}</strong>` + (option.note ? `<small>${option.note}</small>` : '');
+      if (option.image) {
+        const picture = document.createElement('img');
+        picture.className = 'tile-icon';
+        picture.src = option.image;
+        picture.alt = '';
+        // Art that fails to decode falls back to the glyph, or to no art at all.
+        picture.addEventListener('error', () => {
+          picture.remove();
+          if (glyph) cell.insertAdjacentHTML('afterbegin', glyph);
+          else cell.className = 'tile';
+        });
+        cell.prepend(picture);
+      }
     } else {
       cell.className = 'choice';
       cell.innerHTML =
