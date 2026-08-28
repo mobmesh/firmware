@@ -8,26 +8,20 @@
 // hotspot-fetch update can already take.
 #define OTA_ROLLBACK_CONFIRM_DELAY_MS   90000
 
-// Cross-boot retry cap for onRadioInitFailure() -- gives a transient radio failure a few boot
-// attempts to clear before bottoming out at a permanent halt. SPIFFS used for the counter instead
-// of RTC memory (unreliable across esp_restart() on this chip/IDF combo).
+// Cross-boot retry cap for onRadioInitFailure(). The counter lives in SPIFFS, not RTC memory,
+// which is unreliable across esp_restart() on this chip/IDF combination.
 #define RADIO_INIT_RESET_CAP   5
 #define RADIO_FAIL_COUNT_PATH  "/radio_fail_count"
 
-// Arduino's own rollback-confirmation hook runs inside initArduino(), before setup() -- too early to
-// judge anything. This overrides it to defer to RollbackGuard instead. Must be extern "C": the weak
-// symbol it replaces is declared in a plain .c file, and C++ mangling would otherwise link a
-// different, unused symbol.
+// Arduino confirms inside initArduino(), before setup() and too early to judge; this defers to
+// RollbackGuard. extern "C" because the weak symbol it replaces is declared in a .c file.
 extern "C" bool verifyRollbackLater() { return true; }
 
 static uint32_t boot_time_ms = 0;
 static bool confirmed_or_not_applicable = false;
 
-// begin() runs synchronously inside setup(), already deep in MeshCore's own init call chain --
-// writing to SPIFFS there added enough extra stack-frame depth on top of that to reproduce the
-// same class of USB-CDC-flicker/boot instability as the handleGetCmd() stack incident (see
-// 987639c), even though no single variable here is anywhere near that large. Deferred to the
-// first poll() instead, which runs from loop()'s much shallower call depth.
+// begin() runs deep in MeshCore's init chain, where a SPIFFS write added enough stack depth to
+// reproduce the handleGetCmd() boot instability (987639c). Deferred to poll(), called shallower.
 static char pending_version[24] = {0};
 static bool version_write_pending = false;
 
@@ -80,9 +74,8 @@ static void writeFailCount(uint8_t count) {
   f.close();
 }
 
-// The compiled-in ESP-IDF app image header doesn't carry FIRMWARE_VERSION -- it's stamped with the
-// prebuilt Arduino core's own build info instead -- so each slot's version is self-reported into
-// SPIFFS the first time it actually boots, keyed by slot letter, and read back for the other slot.
+// The app image header carries the prebuilt Arduino core's build info, not FIRMWARE_VERSION, so
+// each slot self-reports its version into SPIFFS on first boot, keyed by slot letter.
 static const char* versionPath(char letter) {
   return (letter == 'A') ? "/ota_ver_a" : "/ota_ver_b";
 }

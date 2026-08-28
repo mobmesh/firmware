@@ -2,9 +2,8 @@
 
 #include <stdint.h>
 
-// One hook surface for every mod, so upstream's main.cpp carries a handful of
-// one-line calls instead of each mod's code inline -- and so two mods never
-// have to edit the same region of it. Bodies live in ModHooks.cpp (ours).
+// One hook surface for every mod, so upstream's main.cpp carries one-line calls instead
+// of each mod's code inline, and two mods never edit the same region of it.
 
 bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
 void modLoop();                            // called first in loop()

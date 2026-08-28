@@ -11,24 +11,19 @@
 #include <helpers/TxtDataHelpers.h>   // StrHelper lives here, no standalone StrHelper.h
 #include <helpers/ModHooks.h>          // modClockSet()
 
-// Board-specific: OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS, OTA_WIFI_JOIN_RETRY_DELAY_MS,
-// OTA_WIFI_JOIN_MAX_ATTEMPTS, OTA_HTTP_TIMEOUT_MS, OTA_DIAG_WIFI_JOIN_ATTEMPTS,
-// OTA_WAN_CHECK_ATTEMPTS, OTA_WAN_CHECK_RETRY_DELAY_MS, and PIN_HOTSPOT_PWR are injected as
-// build flags from variants/<board>/overrides.yaml (see scripts/generate-board-config.py),
-// not defined here -- see that file for each board's actual values and rationale.
+// The OTA_WIFI_*, OTA_HTTP_*, OTA_WAN_* and PIN_HOTSPOT_PWR values are injected as build flags
+// from variants/<board>/overrides.yaml, which carries each board's values and rationale.
 #define OTA_WAN_CHECK_HOST       "google.com"   // 3rd-party host, distinct from the firmware host
 
-// CI scans the built image for this to set the mod's bit below, so the bit is evidence the
-// mod compiled in rather than a claim from build config. Keep it referenced -- --gc-sections
-// drops an unreferenced string, and `used` alone does not stop the linker.
-// Neither board this mod targets has a battery-backed RTC chip, so the clock is always wrong
-// after a reboot (see AutoDiscoverRTCClock's fallback). Piggybacked on WiFi join rather than a
-// dedicated connectivity step -- this reuses whatever radio-on window OTA already paid for
-// instead of bringing WiFi up separately just to fetch time.
+// Neither target board has a battery-backed RTC, so the clock is always wrong after a reboot.
+// Piggybacked on WiFi join to reuse the radio-on window OTA already paid for.
 #define OTA_NTP_SERVER            "us.pool.ntp.org"   // regional zone -- lower latency on a blocking call
-#define OTA_NTP_SERVER_FALLBACK   "pool.ntp.org"       // global pool, only tried if the regional zone doesn't answer
+#define OTA_NTP_SERVER_FALLBACK   "pool.ntp.org"      // only tried if the regional zone doesn't answer
 #define OTA_NTP_SYNC_TIMEOUT_MS   5000
 #define OTA_NTP_SANITY_FLOOR      1700000000   // ~Nov 2023 -- rules out an unset/failed sync
+
+// CI scans the built image for this, so the mod's bit is evidence it compiled in rather than a
+// claim from build config. Keep it referenced: --gc-sections drops an unreferenced string.
 static const char OTA_MOD_MARKER[] = "H0TSP0T";   // must never change
 
 // 80 bytes CI writes into esp_app_desc_t's reserved tail -- patch_ota_metadata.py. Fixed
@@ -141,17 +136,8 @@ struct TrailingDigest {
   }
 };
 
-// Best-effort, never gates the caller -- same "advisory only" philosophy as
-// checkWanConnectivity() below. Uses the ESP32 Arduino core's own SNTP client (configTime() +
-// getLocalTime()) rather than a hand-rolled UDP client. gmtOffset/dstOffset are 0: RTCClock's
-// epoch is UTC everywhere else in this codebase (see CommonCLI's "clock"/"time" commands), so
-// this matches rather than introducing a local-time conversion nothing else expects.
-//
-// Sets the clock directly -- NOT via the "time <epoch>" CLI command's code
-// path, so this does not go through its "clock cannot go backwards" guard. That's deliberate:
-// NTP is authoritative here, and neither board this mod targets has a battery-backed RTC, so
-// the clock is always wrong (reset to VolatileRTCClock's fixed fallback epoch) after every
-// reboot -- there is nothing for a real time to go backwards from.
+// Best-effort, never gates the caller; offsets are 0 because RTCClock's epoch is UTC. Bypasses
+// the "time" command's cannot-go-backwards guard -- with no RTC there is nothing to go back from.
 static void syncNtpTime() {
   configTime(0, 0, OTA_NTP_SERVER, OTA_NTP_SERVER_FALLBACK);
   struct tm timeinfo;
@@ -204,10 +190,8 @@ static bool checkWanConnectivity() {
   return false;
 }
 
-// Drops the transfer instead of reading it out. drainAndClose() below is for aborts that
-// fire near the end, where little is left; this one fires ~288 bytes in with the whole
-// image outstanding, and draining it costs the bandwidth the early check exists to save.
-// The ordering that fix established is kept: the socket is closed before Update is touched.
+// Drops the transfer rather than draining it: this fires ~288 bytes in with the whole image
+// outstanding, and draining costs the bandwidth the early check exists to save.
 static void closeNow(HTTPClient& http) {
   WiFiClient* stream = http.getStreamPtr();
   if (stream != NULL) stream->stop();
@@ -220,18 +204,8 @@ static bool resolvePinnedHash(const char* manual_hex, uint8_t expect[32]) {
   return mesh::Utils::fromHex(expect, 32, manual_hex);
 }
 
-// Reads and discards the rest of an in-progress HTTP response and closes the connection, called
-// BEFORE Update.abort() at every mid-download abort site (real hardware testing showed the call
-// order matters, not just draining -- the one path that never crashes, a mismatch caught only after
-// a full completed download, always has the connection fully closed well before Update.abort() ever
-// runs; every abort site here must match that same order: network torn down first, then touch
-// Update's own state). Draining before closing (rather than tearing down a connection with most of
-// an HTTPS response still unread/in-flight) also matters on its own, matching the shape a normal
-// completed download closes in.
-//
-// Bounded by OTA_HTTP_TIMEOUT_MS overall (not per-byte, matching the ceiling already used for the
-// initial GET) so a server that stops sending mid-response can't hang this indefinitely -- worst
-// case, http.end() still runs, just no better off than before this fix.
+// Drains then closes, BEFORE Update.abort() at every abort site -- hardware testing showed the
+// order matters. Bounded by OTA_HTTP_TIMEOUT_MS, so a server that stops sending cannot hang it.
 static void drainAndClose(HTTPClient& http) {
   WiFiClient* stream = http.getStreamPtr();
   uint8_t discard[512];

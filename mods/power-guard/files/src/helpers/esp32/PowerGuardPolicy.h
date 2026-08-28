@@ -4,13 +4,11 @@
 #include <helpers/ModHooks.h>     // the board, without naming a board class
 #include <Preferences.h>          // stored overrides
 
-// Engages MeshCore's existing power-saving sleep when the battery is low, and
-// releases it once it recovers. Runtime-only: never writes NodePrefs, which is
-// operator intent and hits flash on every change.
+// Engages MeshCore's power-saving sleep when the battery is low, releasing it on recovery.
+// Runtime-only: NodePrefs is operator intent and hits flash on every change.
 
-// 0 disables the rung. No default worth having: a threshold is a fact about a
-// board's divider, and inheriting another board's measurement is how a node ends up
-// power saving at the wrong voltage.
+// 0 disables the rung. No default worth having: a threshold is a fact about a board's
+// divider, and inheriting another board's measurement power saves at the wrong voltage.
 #ifndef POWER_GUARD_AUTO_ON_MV
   #define POWER_GUARD_AUTO_ON_MV 0
 #endif
@@ -44,26 +42,19 @@
 #ifndef POWER_GUARD_SAFE_SECS
   #define POWER_GUARD_SAFE_SECS 60
 #endif
-// Lower rail for a stored threshold -- under this the board cannot reliably boot,
-// so the rung would never fire before a brownout did.
-// 0 means no floor enforced. The real one is a board's measured boot floor, which
-// this cannot know.
+// Lower rail for a stored threshold: below it a brownout fires before the rung does.
+// 0 enforces no floor -- the real one is a board's measured boot floor.
 #ifndef POWER_GUARD_SAFE_FLOOR_MV
   #define POWER_GUARD_SAFE_FLOOR_MV 0
 #endif
-// Upper rail for a stored threshold. Must stay under whatever the board needs to
-// read before it will return to service, or a node hibernates and immediately
-// qualifies to run again -- alive, but only between sleeps.
-// Return-to-service mark. Lives here rather than beside the boot check that uses it,
-// because the CLI ceiling below derives from it and both translation units need it.
-// 0 disables the check.
+// Return-to-service mark, and the upper rail for a stored threshold: at or above it a node
+// hibernates and immediately requalifies. Lives here because both TUs need it; 0 disables.
 #ifndef POWER_GUARD_RESUME_MV
   #define POWER_GUARD_RESUME_MV 0
 #endif
 
-// Defaults to one below the return-to-service mark, which is the invariant: a
-// threshold at or above it leaves a node hibernating and immediately qualifying to
-// run again. Deriving it means a board cannot get that wrong by omission.
+// One below the return-to-service mark, the invariant above. Derived so a board cannot
+// get it wrong by omission.
 #ifndef POWER_GUARD_SAFE_MAX_MV
   #define POWER_GUARD_SAFE_MAX_MV \
     (POWER_GUARD_RESUME_MV > 0 ? POWER_GUARD_RESUME_MV - 1 : 0)
@@ -75,7 +66,7 @@ class PowerGuardPolicy {
   uint8_t _sleep_agree;
   bool _auto;
   bool _active;
-  bool _lna_was_enabled;   // hardware state captured when we engaged
+  bool _lna_was_enabled;   // hardware state captured at engage
   uint16_t _last_mv;
   uint32_t _transitions;
   uint16_t _sleep_mv;
@@ -84,9 +75,8 @@ class PowerGuardPolicy {
 
   static const uint8_t SAFE_UNSET = 0xFF;
 
-  // NVS, not upstream's NodePrefs: no struct to drift, and an absent key stays
-  // distinguishable from a stored 0 -- which is what lets `off` persist while a
-  // board default of 2800 remains in place.
+  // NVS, not NodePrefs: no struct to drift, and an absent key stays distinguishable from a
+  // stored 0 -- which lets `off` persist while a board default remains in place.
   void ensureLoaded() {
     if (_loaded) return;
     _loaded = true;
