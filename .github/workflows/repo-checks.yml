@@ -11,6 +11,7 @@ on:
       # not prose. `mods/**` fired on a markdown edit under mods/*/docs/ on 2026-08-26.
       - 'scripts/**'
       - 'mods/**/patches/**'
+      - 'mods/**/files/**'
       - 'mods/**/mod.yaml'
       - 'build-targets.yaml'
       - 'variants/**/overrides.yaml'

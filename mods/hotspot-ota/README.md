@@ -12,15 +12,18 @@ The commands are also regular MeshCore CLI commands, so they can be sent remotel
 
 The mod also adds rollback protection. After an update, the new firmware is tested before it is considered good. If the new firmware fails during startup, the device automatically goes back to the previous working firmware.
 
-## Patches
+## What ships
 
-| File                                    | Purpose                                            |
-| --------------------------------------- | -------------------------------------------------- |
-| `patches/0001_hotspot-fetch-ota.patch`  | Adds the hotspot-based OTA update feature          |
-| `patches/0002_ota-rollback-guard.patch` | Adds automatic rollback protection after an update |
-| `patches/0003_ntp-time-sync.patch`      | Sets the device's clock from an NTP server whenever it joins WiFi |
+| Where | What |
+| ----- | ---- |
+| `files/src/helpers/esp32/HotspotOTA.{cpp,h}` | hotspot join, fetch, verify, flash, NTP clock set |
+| `files/src/helpers/esp32/HotspotOtaBoard.cpp` | `modBoardStartOtaFromUrl()`, reached from the CLI hook |
+| `files/src/helpers/esp32/RollbackGuard.{cpp,h}` | rollback protection after an update |
+| `patches/0001_hotspot-fetch-ota.patch` | the CLI commands and loop hook, in shim's two files |
 
-The second and third patches both depend on the first one. These dependencies are defined in `0002.meta.yaml`/`0003.meta.yaml`, so neither can be applied on its own.
+`files/` is copied into the upstream clone before any patch applies, so this mod's own
+source is edited directly rather than through a diff. The patch carries only what edits
+a file shim owns; it touches no upstream file at all.
 
 The patches don't contain board-specific settings such as the GPIO pin used for the power switch or WiFi and HTTP timing values.
 

@@ -22,6 +22,10 @@ STATE="$WORKDIR/.rebase-state"
 
 # Same order CI applies them in: mods in build-targets.yaml order (union across
 # targets, first appearance wins), then each mod's patches sorted by filename.
+mod_list() {
+  patch_list | cut -d/ -f1 | awk '!seen[$0]++' | paste -sd,
+}
+
 patch_list() {
   python3 - "$REPO_ROOT" <<'PY'
 import sys, glob, os, yaml
@@ -53,6 +57,13 @@ cmd_start() {
   echo "==> replaying patches as commits on $old"
   git -C "$WORKDIR" checkout --quiet "$old"
   git -C "$WORKDIR" checkout --quiet -B mods
+  # Mod-owned source first: the patches edit files that arrive this way, so without it
+  # everything after shim fails to apply. Committed into the base rather than rebased --
+  # a file nobody else owns has nothing to merge against.
+  python3 "$REPO_ROOT/scripts/generate-board-config.py" copy-src \
+    --upstream "$WORKDIR" --mods "$(mod_list)"
+  git -C "$WORKDIR" add -A
+  git -C "$WORKDIR" commit --quiet -m "mod source"
   while read -r name; do
     if ! git -C "$WORKDIR" apply "$REPO_ROOT/mods/$name"; then
       echo "!! $name does not apply to $old -- is $old really the ref these patches are current for?" >&2

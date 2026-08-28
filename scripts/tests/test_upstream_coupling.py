@@ -41,6 +41,16 @@ ALLOWED_REACHES = {
 }
 
 
+def reaches_in_source(path, repo_rel):
+    """(file, call) for each direct upstream reach in a mod's own source file."""
+    out = set()
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            for holder, op, member in CALL_RE.findall(COMMENT_RE.sub("", line)):
+                out.add((repo_rel, f"{holder}{op}{member}"))
+    return out
+
+
 def reaches(patch_path):
     """(file, call) for each direct upstream reach in the lines this patch adds.
 
@@ -76,7 +86,11 @@ def reaches(patch_path):
 
 
 def survey():
-    """Every non-adapter reach in every non-shim patch, as `<mod>/<id> <file> <call>`."""
+    """Every non-adapter reach a mod makes, from its patches and from its own source.
+
+    Both halves are needed: mods ship code two ways now, and scanning only patches went
+    quiet the moment shim's adapter moved into mods/shim/files/.
+    """
     found = set()
     for patch in sorted(glob.glob(os.path.join(REPO_ROOT, "mods", "*", "patches", "*.patch"))):
         mod = os.path.basename(os.path.dirname(os.path.dirname(patch)))
@@ -86,6 +100,16 @@ def survey():
         for target, call in reaches(patch):
             if not is_adapter(target):
                 found.add(f"{mod}/{pid} {target} {call}")
+    for src in sorted(glob.glob(os.path.join(REPO_ROOT, "mods", "*", "files", "**", "*"), recursive=True)):
+        if not os.path.isfile(src):
+            continue
+        mod = src.split(os.sep + "mods" + os.sep)[1].split(os.sep)[0]
+        if mod == "shim":
+            continue
+        rel = src.split(os.sep + "files" + os.sep)[1]
+        for target, call in reaches_in_source(src, rel):
+            if not is_adapter(target):
+                found.add(f"{mod}/files {target} {call}")
     return found
 
 
@@ -104,11 +128,11 @@ class UpstreamCouplingTestCase(unittest.TestCase):
         self.assertEqual(stale, [], f"permitted reaches no longer found in any patch: {stale}")
 
     def test_the_pattern_still_matches(self):
-        """Guards the regex: the adapter reaches upstream by definition, so it must match there."""
-        hits = set()
-        for patch in glob.glob(os.path.join(REPO_ROOT, "mods", "*", "patches", "*.patch")):
-            hits |= {c for f, c in reaches(patch) if f in ADAPTER_FILES}
-        self.assertTrue(hits, "regex matches nothing even in ModHooks")
+        """Guards the regex and the source scan: the adapter reaches upstream by definition."""
+        adapter = os.path.join(REPO_ROOT, "mods", "shim", "files", "src", "helpers", "ModHooks.cpp")
+        self.assertTrue(os.path.isfile(adapter), f"shim's adapter is not at {adapter}")
+        hits = reaches_in_source(adapter, "src/helpers/ModHooks.cpp")
+        self.assertTrue(hits, "regex matches nothing even in ModHooks.cpp")
 
 
 if __name__ == "__main__":

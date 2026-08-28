@@ -2,4 +2,4 @@ id: "0001"
 title: mod-hook-points
 requires: []
 # No env_flag -- the hook bodies are unconditional, and no-ops until a mod fills them.
-build_src_filter: ["+<helpers/ModHooks.cpp>", "+<helpers/esp32/CommonCliMods.cpp>"]
+# build_src_filter is derived from files/, not restated here.

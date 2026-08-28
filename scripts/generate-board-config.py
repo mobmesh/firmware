@@ -144,10 +144,18 @@ def target_mods(target: dict, core: list = None) -> list:
     return out
 
 
+def load_mod_manifest(mod_name: str) -> dict:
+    path = REPO_ROOT / "mods" / mod_name / "mod.yaml"
+    if not path.exists():
+        return {}   # optional here: it carries release facts, not build wiring
+    with path.open() as f:
+        return yaml.safe_load(f) or {}
+
+
 def load_mod_patch_sidecars(mod_name: str) -> list:
     patches_dir = REPO_ROOT / "mods" / mod_name / "patches"
     if not patches_dir.exists():
-        raise FileNotFoundError(f"no patches dir for mod '{mod_name}': {patches_dir}")
+        return []   # a mod may ship only files/
     sidecars = sorted(patches_dir.glob("*.meta.yaml"))
     result = []
     for path in sidecars:
@@ -362,6 +370,32 @@ def find_value_block_end(section_lines: list, key_idx: int):
     return last
 
 
+def cmd_copy_src(args):
+    """Copy each mod's own source into the upstream clone, before any patch applies.
+
+    mods/<name>/files/ mirrors the upstream root, so a mod can ship into variants/ as
+    well as src/. A file no one else owns needs no diff to arrive; patches stay for what
+    edits somebody else's file.
+    """
+    upstream = Path(args.upstream)
+    copied = 0
+    for mod in [m.strip() for m in args.mods.split(",") if m.strip()]:
+        src = REPO_ROOT / "mods" / mod / "files"
+        if not src.is_dir():
+            continue
+        for path in sorted(src.rglob("*")):
+            if not path.is_file():
+                continue
+            dest = upstream / path.relative_to(src)
+            if dest.exists():
+                sys.exit(f"ERROR: {mod} would overwrite an existing {dest.relative_to(upstream)} "
+                         f"-- upstream may have added a file of the same name")
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, dest)
+            copied += 1
+    print(f"OK: copied {copied} mod source file(s) into {upstream}")
+
+
 def cmd_inject_env(args):
     board = args.board
     env = args.env
@@ -375,7 +409,17 @@ def cmd_inject_env(args):
     seen_src_filter = set()
 
     for mod_name in mods:
-        for sidecar in load_mod_patch_sidecars(mod_name):
+        # A mod that ships its own source declares its flags once, in mod.yaml, and its
+        # build_src_filter is derived from what is actually under files/ rather than
+        # restated by hand. Sidecars still carry both for mods that are patch-only.
+        manifest = load_mod_manifest(mod_name)
+        mod_src = REPO_ROOT / "mods" / mod_name / "files" / "src"
+        declared = [{"env_flag": f} for f in (manifest.get("env_flags") or [])]
+        derived = [{"build_src_filter": [
+            f"+<{path.relative_to(mod_src).as_posix()}>"
+            for path in sorted(mod_src.rglob("*.cpp"))
+        ]}] if mod_src.is_dir() else []
+        for sidecar in declared + derived + load_mod_patch_sidecars(mod_name):
             flag = sidecar.get("env_flag")
             if flag:
                 owner = env_flag_owner.get(flag)
@@ -495,6 +539,11 @@ def main():
              "PlatformIO splits on spaces, so use the joined form (-UFOO, not -U FOO).",
     )
     p_ie.set_defaults(func=cmd_inject_env)
+
+    p_cs = sub.add_parser("copy-src", help="copy each mod's own source into the upstream clone")
+    p_cs.add_argument("--upstream", required=True, help="path to the upstream clone's root")
+    p_cs.add_argument("--mods", required=True, help="comma-separated mod names")
+    p_cs.set_defaults(func=cmd_copy_src)
 
     args = parser.parse_args()
     args.func(args)

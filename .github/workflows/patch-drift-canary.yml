@@ -60,6 +60,8 @@ jobs:
                 continue
               }
             sha=$(git -C probe-src rev-parse --short HEAD)
+            python3 scripts/generate-board-config.py copy-src \
+              --upstream probe-src --mods "$(echo $MODS | tr ' ' ',')" >/dev/null
             placed=""       # three-way relocated it unaided
             conflicted=""   # three-way left markers
             for mod in $MODS; do
