@@ -32,7 +32,9 @@ jobs:
         run: |
           pip install --quiet pyyaml
           REPORT=report.md
+          EXPLAIN=explain.md
           : > "$REPORT"
+          : > "$EXPLAIN"
           DRIFT=false
 
           # --- 1. do the patches still apply? -------------------------------------
@@ -71,6 +73,18 @@ jobs:
                   git -C probe-src apply "../$patch"
                   continue
                 fi
+                # Explained before three-way touches anything: the point is where upstream
+                # put the code, which a half-merged tree no longer shows.
+                base=$(git -C probe-src describe --tags --abbrev=0 --match 'repeater-v*' 2>/dev/null || true)
+                {
+                  echo "<details><summary><code>$name</code> -- what moved</summary>"
+                  echo
+                  python3 scripts/explain_patch_drift.py \
+                    --tree probe-src --patch "$patch" --ref "$ref" --base "$base" || true
+                  echo
+                  echo "</details>"
+                } >> "$EXPLAIN"
+
                 err=$(git -C probe-src apply -3 "../$patch" 2>&1) || true
                 if echo "$err" | grep -q "lacks the necessary blob"; then
                   echo "::error::probe-src lacks preimage blobs -- three-way degraded to plain apply silently; the clone must not be shallow" >&2
@@ -163,6 +177,9 @@ jobs:
           fi
 
           echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"
+          # Appended, not merged into $REPORT: the explanations are collapsed detail under
+          # the summary lines, and only exist when something failed.
+          cat "$EXPLAIN" >> "$REPORT"
           { echo 'report<<REPORT_EOF'; cat "$REPORT"; echo 'REPORT_EOF'; } >> "$GITHUB_OUTPUT"
           cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
 
