@@ -7,11 +7,14 @@ import unittest
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Upstream files that are insertion points: only shim may patch them.
+#
+# CommonCLI.cpp/.h left this set when the CLI hook moved to MyMesh.cpp, whose call site is
+# spelled identically on the release tag and on dev. MyMesh.cpp is not listed in its place:
+# timing-safety edits a different region of the same file, so ownership there is by region,
+# which a file-level check cannot express.
 SHIM_OWNED = {
     "examples/simple_repeater/main.cpp",
     "examples/simple_room_server/main.cpp",
-    "src/helpers/CommonCLI.cpp",
-    "src/helpers/CommonCLI.h",
 }
 
 DIFF_RE = re.compile(r"^diff --git a/(\S+) b/", re.MULTILINE)

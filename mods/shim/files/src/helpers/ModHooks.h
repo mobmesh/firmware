@@ -9,6 +9,11 @@ bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
 void modLoop();                            // called first in loop()
 bool modWantsPowerSaving();                // OR'd with the operator's powersaving_enabled
 
+// Every mod CLI command, dispatched from MyMesh before upstream's own chain runs. Version
+// and build date are passed because only the call site can see the example's macros.
+bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
+                         const char* fw_version, const char* fw_build_date);
+
 // The reverse direction. Bodies name the concrete `board` and `rtc_clock`, so an
 // upstream refactor breaks this one file instead of silently unhooking a mod.
 void     modBoardReboot();                     // does not return
