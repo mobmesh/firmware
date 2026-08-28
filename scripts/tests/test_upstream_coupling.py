@@ -2,7 +2,7 @@
 
 Anywhere else is coupling that breaks silently when upstream refactors: on 2026-08-27 a
 deleted MainBoard virtual stopped power-guard compiling while its patch still applied
-(issue #21). ALLOWED_REACHES holds the only two exceptions, each with its reason.
+(issue #21). ALLOWED_REACHES is the exception list, and is currently empty.
 """
 import glob
 import os
@@ -35,10 +35,9 @@ def is_adapter(path):
 # The two reaches that stay. CommonCLICallbacks is the CLI's own accessor for its own
 # strings, reached from inside a CommonCLI method body -- a free hook cannot see `_callbacks`
 # without inventing a global, and the interface exists to be called from exactly here.
-ALLOWED_REACHES = {
-    "hotspot-ota/0001 src/helpers/esp32/CommonCliMods.cpp _callbacks->getFirmwareVer",
-    "hotspot-ota/0001 src/helpers/esp32/CommonCliMods.cpp _callbacks->getBuildDate",
-}
+# Empty since the CLI hook moved to MyMesh: the `ver` branch takes the version and build
+# date as arguments from the call site, so nothing reaches CommonCLI's callbacks any more.
+ALLOWED_REACHES = set()
 
 
 def reaches_in_source(path, repo_rel):

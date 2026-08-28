@@ -116,10 +116,10 @@ index 90710e4d..8aa61af6 100644
  
  // Reached through the concrete `board`, not a mesh::MainBoard*, so a virtual that
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index 66d77a48..00fd63ea 100644
+index 651e2d16..f8ef25a2 100644
 --- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
-@@ -21,7 +21,100 @@
+@@ -21,11 +21,104 @@
  #define OTA_MOD_BUILD_DATE "unknown"
  #endif
  
@@ -141,7 +141,11 @@ index 66d77a48..00fd63ea 100644
 +#endif
 +#endif
 +
- bool CommonCLI::handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
+ // Filled by the dispatcher each call, so `ver` can answer without a CommonCLI callback.
+ static const char* mod_fw_version = "";
+ static const char* mod_fw_build_date = "";
+ 
+ bool handleModCommand(uint32_t sender_timestamp, char* command, char* reply) {
 +#if defined(ESP_PLATFORM) && defined(WITH_POWER_GUARD)
 +  // Claimed ahead of upstream's 11-char "powersaving" prefix, which would answer
 +  // any of these as a status query and look like it worked.
@@ -219,4 +223,4 @@ index 66d77a48..00fd63ea 100644
 +#endif
    if (memcmp(command, "ver", 3) == 0) {
      // Shadows upstream's own `ver` branch, which never runs while this mod is built in.
-     sprintf(reply, "%s (%s) + ota (%s)", _callbacks->getFirmwareVer(), _callbacks->getBuildDate(), OTA_MOD_BUILD_DATE);
+     sprintf(reply, "%s (%s) + ota (%s)", mod_fw_version, mod_fw_build_date, OTA_MOD_BUILD_DATE);

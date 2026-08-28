@@ -1,3 +1,23 @@
+diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
+index 7d0179f3..28abd6b9 100644
+--- a/examples/simple_repeater/MyMesh.cpp
++++ b/examples/simple_repeater/MyMesh.cpp
+@@ -1,4 +1,5 @@
+ #include "MyMesh.h"
++#include <helpers/ModHooks.h>
+ #include <algorithm>
+ 
+ /* ------------------------------ Config -------------------------------- */
+@@ -1280,6 +1281,9 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+       strcpy(reply, "OK - Discover sent");
+     }
+   } else{
++    // Mods first: this is the only call site both the release tag and dev spell the same way.
++    if (modHandleCliCommand(sender_timestamp, command, reply,
++                            FIRMWARE_VERSION, FIRMWARE_BUILD_DATE)) return;
+     _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
+   }
+ }
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
 index a714db68..8d5b8841 100644
 --- a/examples/simple_repeater/main.cpp
@@ -36,6 +56,26 @@ index a714db68..8d5b8841 100644
  #if defined(NRF52_PLATFORM)
      board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
  #else
+diff --git a/examples/simple_room_server/MyMesh.cpp b/examples/simple_room_server/MyMesh.cpp
+index 546d094f..3a60a722 100644
+--- a/examples/simple_room_server/MyMesh.cpp
++++ b/examples/simple_room_server/MyMesh.cpp
+@@ -1,4 +1,5 @@
+ #include "MyMesh.h"
++#include <helpers/ModHooks.h>
+ 
+ #define REPLY_DELAY_MILLIS          1500
+ #define PUSH_NOTIFY_DELAY_MILLIS    2000
+@@ -984,6 +985,9 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+       snprintf(reply, MAX_POST_TEXT_LEN, "OK");
+     }
+   } else{
++    // Mods first: this is the only call site both the release tag and dev spell the same way.
++    if (modHandleCliCommand(sender_timestamp, command, reply,
++                            FIRMWARE_VERSION, FIRMWARE_BUILD_DATE)) return;
+     _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
+   }
+ }
 diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
 index d833fff3..f2abfe85 100644
 --- a/examples/simple_room_server/main.cpp
@@ -65,47 +105,3 @@ index d833fff3..f2abfe85 100644
    int len = strlen(command);
    while (Serial.available() && len < sizeof(command)-1) {
      char c = Serial.read();
-diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
-index b318bb58..7ebc2067 100644
---- a/src/helpers/CommonCLI.cpp
-+++ b/src/helpers/CommonCLI.cpp
-@@ -180,6 +180,7 @@ uint8_t CommonCLI::buildAdvertData(uint8_t node_type, uint8_t* app_data) {
- }
- 
- void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* reply) {
-+    if (handleModCommand(sender_timestamp, command, reply)) return;   // CommonCliMods.cpp
-     if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
-       _board->powerOff();  // doesn't return
-     } else if (memcmp(command, "reboot", 6) == 0) {
-@@ -447,6 +448,7 @@ void CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* re
- 
- void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* reply) {
-   const char* config = &command[4];
-+  if (handleModSetCmd(sender_timestamp, command, reply)) return;   // CommonCliMods.cpp
-   if (memcmp(config, "dutycycle ", 10) == 0) {
-     float dc = atof(&config[10]);
-     if (dc < 1 || dc > 100) {
-@@ -806,6 +808,7 @@ void CommonCLI::handleSetCmd(uint32_t sender_timestamp, char* command, char* rep
- 
- void CommonCLI::handleGetCmd(uint32_t sender_timestamp, char* command, char* reply) {
-   const char* config = &command[4];
-+  if (handleModGetCmd(sender_timestamp, command, reply)) return;   // CommonCliMods.cpp
-   if (memcmp(config, "dutycycle", 9) == 0) {
-     float dc = 100.0f / (_prefs->airtime_factor + 1.0f);
-     int dc_int = (int)dc;
-diff --git a/src/helpers/CommonCLI.h b/src/helpers/CommonCLI.h
-index 237c758e..8d2c0198 100644
---- a/src/helpers/CommonCLI.h
-+++ b/src/helpers/CommonCLI.h
-@@ -267,6 +267,11 @@ class CommonCLI {
-   void handleGetCmd(uint32_t sender_timestamp, char* command, char* reply);
-   void handleSetCmd(uint32_t sender_timestamp, char* command, char* reply);
- 
-+  // Defined in helpers/esp32/CommonCliMods.cpp -- return true if the mod took the command.
-+  bool handleModCommand(uint32_t sender_timestamp, char* command, char* reply);
-+  bool handleModSetCmd(uint32_t sender_timestamp, char* command, char* reply);
-+  bool handleModGetCmd(uint32_t sender_timestamp, char* command, char* reply);
-+
- public:
-   CommonCLI(mesh::MainBoard& board, mesh::RTCClock& rtc, SensorManager& sensors, RegionMap& region_map, ClientACL& acl, NodePrefs* prefs, CommonCLICallbacks* callbacks)
-       : _board(&board), _rtc(&rtc), _sensors(&sensors), _region_map(&region_map), _acl(&acl), _prefs(prefs), _callbacks(callbacks) { }
