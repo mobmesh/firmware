@@ -58,7 +58,7 @@ jobs:
             rm -rf probe-src
             git clone --quiet --branch "$ref" \
               "https://github.com/${UPSTREAM_REPO}.git" probe-src 2>/dev/null || {
-                echo "- \\\`$ref\\\`: **could not clone** (branch missing?)" >> "$REPORT"
+                echo "- \`$ref\`: **could not clone** (branch missing?)" >> "$REPORT"
                 continue
               }
             sha=$(git -C probe-src rev-parse --short HEAD)
@@ -109,10 +109,10 @@ jobs:
               rm -rf dev-src && cp -a probe-src dev-src
             fi
             if [ -z "$placed$conflicted" ]; then
-              echo "- \\\`$ref\\\` (\\\`$sha\\\`): all patches apply" >> "$REPORT"
+              echo "- \`$ref\` (\`$sha\`): all patches apply" >> "$REPORT"
             else
               DRIFT=true
-              echo "- \\\`$ref\\\` (\\\`$sha\\\`): **DRIFT**" >> "$REPORT"
+              echo "- \`$ref\` (\`$sha\`): **DRIFT**" >> "$REPORT"
               [ -n "$conflicted" ] && echo "  - **needs a person**:$conflicted" >> "$REPORT"
               [ -n "$placed" ] && echo "  - three-way relocates unaided:$placed" >> "$REPORT"
               [ -n "$conflicted" ] && echo "  - patches after the first conflict were applied to a tree missing its hunks; treat their results as provisional" >> "$REPORT"
@@ -137,9 +137,9 @@ jobs:
               --jq 'if .merged then "MERGED" else .state end' 2>/dev/null || echo "unknown")
             if [ "$state" = "MERGED" ]; then
               DRIFT=true
-              echo "- \\\`$patch\\\` carries upstream PR #${pr}, which is now **MERGED** -- the patch may be redundant" >> "$REPORT"
+              echo "- \`$patch\` carries upstream PR #${pr}, which is now **MERGED** -- the patch may be redundant" >> "$REPORT"
             else
-              echo "- \\\`$patch\\\` carries upstream PR #${pr} (${state}) -- still needed" >> "$REPORT"
+              echo "- \`$patch\` carries upstream PR #${pr} (${state}) -- still needed" >> "$REPORT"
             fi
           done
 
@@ -153,12 +153,12 @@ jobs:
               | grep -oE '[0-9.]+$' || echo "")
             if [ -z "$found" ]; then
               DRIFT=true
-              echo "- upstream's \\\`ADC_MULTIPLIER\\\` default could not be found in HeltecV4Board.h -- the override may no longer apply" >> "$REPORT"
+              echo "- upstream's \`ADC_MULTIPLIER\` default could not be found in HeltecV4Board.h -- the override may no longer apply" >> "$REPORT"
             elif [ "$found" != "$EXPECTED_ADC_MULT" ]; then
               DRIFT=true
-              echo "- upstream changed \\\`ADC_MULTIPLIER\\\` from ${EXPECTED_ADC_MULT} to ${found}; the override stays 5.32 (bench-measured) -- worth re-measuring" >> "$REPORT"
+              echo "- upstream changed \`ADC_MULTIPLIER\` from ${EXPECTED_ADC_MULT} to ${found}; the override stays 5.32 (bench-measured) -- worth re-measuring" >> "$REPORT"
             else
-              echo "- upstream \\\`ADC_MULTIPLIER\\\` still ${found}; overridden with 5.32 (bench-measured)" >> "$REPORT"
+              echo "- upstream \`ADC_MULTIPLIER\` still ${found}; overridden with 5.32 (bench-measured)" >> "$REPORT"
             fi
           fi
 
@@ -169,10 +169,10 @@ jobs:
           if [ -d probe-src ] && echo " $MODS " | grep -q " power-guard "; then
             if grep -qE 'sleep\(false\)' \
               probe-src/src/helpers/radiolib/CustomSX1262Wrapper.h 2>/dev/null; then
-              echo "- upstream \\\`CustomSX1262Wrapper::powerOff()\\\` still sleeps the SX1262; power-guard's poweroff path relies on it" >> "$REPORT"
+              echo "- upstream \`CustomSX1262Wrapper::powerOff()\` still sleeps the SX1262; power-guard's poweroff path relies on it" >> "$REPORT"
             else
               DRIFT=true
-              echo "- upstream \\\`CustomSX1262Wrapper::powerOff()\\\` no longer calls \\\`sleep(false)\\\` -- power-guard's poweroff path may leave the radio awake (see mods/power-guard/README.md)" >> "$REPORT"
+              echo "- upstream \`CustomSX1262Wrapper::powerOff()\` no longer calls \`sleep(false)\` -- power-guard's poweroff path may leave the radio awake (see mods/power-guard/README.md)" >> "$REPORT"
             fi
           fi
 
@@ -222,6 +222,8 @@ jobs:
       # One long-lived tracking issue rather than a new one per day.
       - name: Open, update, or close the tracking issue
         uses: actions/github-script@v9
+        env:
+          REPORT: ${{ steps.probe.outputs.report }}
         with:
           script: |
             const verdict = '${{ steps.buildcheck.outputs.verdict }}';
@@ -232,7 +234,9 @@ jobs:
               '':       '- `dev`: build check skipped (patches need resolving first)',
             }[verdict] ?? '- `dev`: build check did not report';
             const drift = ${{ steps.probe.outputs.drift }} || verdict === 'patches';
-            const report = `${{ steps.probe.outputs.report }}`.replace(/\\`/g, '`') + '\n' + buildLine;
+            // Through env, not template interpolation: a backtick in the report used to
+            // terminate the literal and fail the job with a JS syntax error.
+            const report = process.env.REPORT + '\n' + buildLine;
             const title = process.env.ISSUE_TITLE;
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const body = `${report}\n\nChecked ${new Date().toISOString().slice(0,10)} by [patch-drift-canary](${runUrl}).\n\nThis is a warning, not a build failure -- releases still build from tagged upstream refs.`;
