@@ -7,34 +7,74 @@ that into a visible failure.
 """
 import json
 import pathlib
+import re
+import urllib.error
+import urllib.request
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CATALOGUE = ROOT / "pages/flasher/mc_config.json"
 OVERRIDES = ROOT / "pages/flasher2/data/catalogue-overrides.json"
 
+REMOTE_RE = re.compile(r"^(?:[a-z][a-z0-9+.-]*:)?//", re.I)
+REMOTE_TIMEOUT_S = 4
+
+
+def remote_status(url):
+    """None if the URL serves, else why not. A protocol-relative URL is fetched as https."""
+    if url.startswith("//"):
+        url = "https:" + url
+    req = urllib.request.Request(url, method="HEAD")
+    try:
+        with urllib.request.urlopen(req, timeout=REMOTE_TIMEOUT_S) as r:
+            return None if r.status < 400 else f"HTTP {r.status}"
+    except urllib.error.HTTPError as e:
+        return f"HTTP {e.code}"
+    except Exception as e:  # DNS, TLS, timeout -- offline is not a missing asset
+        return f"unreachable ({type(e).__name__})"
+
 # Kept in step with IMAGE_FILTERS in flash-plan.js.
 FILTERS = {"invert", "white", "black"}
 
 
-def main() -> int:
+def orphaned(catalogue, overrides):
+    """Override keys upstream no longer has, as (device names, maker keys)."""
+    devices = {d["name"] for d in catalogue.get("device", []) if d.get("name")}
+    makers = {d["maker"] for d in catalogue.get("device", []) if d.get("maker")}
+    return ([name for name in overrides.get("devices", {}) if name not in devices],
+            [key for key in overrides.get("makers", {}) if key not in makers])
+
+
+def orphaned_hides(catalogue, overrides):
+    """Orphans carrying hidden:true. These put a deliberately removed device back in
+    the catalogue, so they are the one override failure that is not cosmetic."""
+    dead, _ = orphaned(catalogue, overrides)
+    return [n for n in dead if overrides["devices"][n].get("hidden") is True]
+
+
+def main(check_remote=remote_status) -> int:
     catalogue = json.loads(CATALOGUE.read_text())
     overrides = json.loads(OVERRIDES.read_text())
 
-    devices = {d["name"] for d in catalogue.get("device", []) if d.get("name")}
-    makers = {d["maker"] for d in catalogue.get("device", []) if d.get("maker")}
+    dead_devices, dead_makers = orphaned(catalogue, overrides)
+    orphans = [f"device {name!r}" for name in dead_devices]
+    orphans += [f"maker {key!r}" for key in dead_makers]
 
-    orphans = [f"device {name!r}" for name in overrides.get("devices", {}) if name not in devices]
-    orphans += [f"maker {key!r}" for key in overrides.get("makers", {}) if key not in makers]
-
-    # Art is addressed relative to the override file; a dead path renders as a broken tile.
+    # Art resolves with new URL(path, base), so an override may point off-site. Local paths
+    # are stat'd, remote ones fetched; either way a dead one falls back to placeholder art.
     missing = []
     bad_filters = []
     for scope in ("makers", "devices"):
         for key, entry in overrides.get(scope, {}).items():
             for field in ("icon", "image"):
                 path = entry.get(field)
-                if path and not (OVERRIDES.parent / path).exists():
+                if not path:
+                    continue
+                if REMOTE_RE.match(path):
+                    why = check_remote(path)
+                    if why:
+                        missing.append(f"{scope[:-1]} {key!r} {field}: {path} -- {why}")
+                elif not (OVERRIDES.parent / path).exists():
                     missing.append(f"{scope[:-1]} {key!r} {field}: {path}")
             name = entry.get("filter")
             if name is not None and name not in FILTERS:
