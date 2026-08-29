@@ -459,6 +459,59 @@ jobs:
           mkdir -p "$DEST"
           cp "${{ steps.artifact.outputs.name }}" "$DEST/firmware.bin"
 
+      # Gate: boot what is about to be published and talk to it. Everything downstream --
+      # committing the vendored image, publishing the release -- is behind this, so an image
+      # that cannot reach its command loop is never shipped.
+      - name: Fetch the emulator
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.qemu_boot_check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QEMU_REPO: HeyVern/espressif-qemu
+          QEMU_TAG: v9.2.2
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgcrypt20 libpixman-1-0 libsdl2-2.0-0 zstd
+          # Which emulator this board needs is a board fact, kept with the others in
+          # variants/<board>/overrides.yaml and carried into auto_boards.json.
+          mcu=$(jq -r '.["${{ matrix.board_id }}"].qemu.mcu // empty' pages/flasher/auto_boards.json)
+          if [ -z "$mcu" ]; then
+            echo "no emulation configured for ${{ matrix.board_id }} -- boot check will skip"
+            echo "QEMU_DIR=" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          asset="${mcu}-${QEMU_TAG}-linux-x86_64.tar.zst"
+          expected=$(gh api "repos/${QEMU_REPO}/releases/tags/${QEMU_TAG}" \
+            --jq ".assets[] | select(.name==\"${asset}\") | .digest" | sed 's/^sha256://')
+          gh release download "${QEMU_TAG}" --repo "${QEMU_REPO}" -p "$asset"
+          echo "${expected}  ${asset}" | sha256sum -c -
+          tar xaf "$asset"
+          echo "QEMU_DIR=${mcu}-${QEMU_TAG}-linux-x86_64" >> "$GITHUB_ENV"
+
+      - id: boot_check
+        name: Boot the built firmware and exercise its CLI
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.qemu_boot_check
+        run: |
+          if [ -z "$QEMU_DIR" ]; then
+            echo "no emulator for this board -- skipping"
+            exit 0
+          fi
+          mkdir -p qemu-workdir
+          python3 scripts/qemu_boot_check.py \
+            --board-id "${{ matrix.board_id }}" \
+            --variant "${{ matrix.id }}" \
+            --boards-json pages/flasher/auto_boards.json \
+            --flasher-dir pages/flasher \
+            --qemu-dir "$QEMU_DIR" \
+            --workdir qemu-workdir
+
+      - name: Upload boot output on failure
+        if: failure() && steps.boot_check.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: boot-check-${{ matrix.board_id }}-${{ matrix.id }}
+          path: qemu-workdir/uart0.log
+          retention-days: 14
+
       - name: Commit vendored firmware.bin and this variant's auto_boards.json entry if changed
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
         run: |
@@ -550,6 +603,75 @@ jobs:
 
   # Runs only after every matrix combination succeeds, so a red build cannot publish.
   # Requires Settings -> Pages -> Source set to "GitHub Actions", a one-time manual step.
+  # One issue for the whole run, naming every variant that failed the gate and quoting the
+  # end of each one's console output. Filed from a single job so parallel matrix jobs cannot
+  # race and open duplicates.
+  boot-check-report:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: boot-check-*
+          path: boot-checks
+        continue-on-error: true
+
+      - id: collect
+        run: |
+          {
+            echo 'report<<REPORT_EOF'
+            for d in boot-checks/boot-check-*; do
+              [ -d "$d" ] || continue
+              name="${d#boot-checks/boot-check-}"
+              echo "### $name"
+              echo '```'
+              # The tail is where a panic or the last thing the node managed to say lands.
+              tail -n 40 "$d/uart0.log" 2>/dev/null || echo '(no console output captured)'
+              echo '```'
+            done
+            echo REPORT_EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open, update, or close the tracking issue
+        uses: actions/github-script@v9
+        env:
+          REPORT: ${{ steps.collect.outputs.report }}
+        with:
+          script: |
+            const report = (process.env.REPORT || '').trim();
+            const title = 'QEMU boot check: firmware did not answer';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const repo = { owner: context.repo.owner, repo: context.repo.repo };
+
+            const existing = (await github.rest.issues.listForRepo({
+              ...repo, state: 'open', labels: 'qemu-boot-check',
+            })).data.find(i => i.title === title);
+
+            if (report) {
+              const body = [
+                `The build gate booted these images in the emulator and they did not answer. **Nothing was published for them** -- the gate runs before the vendored image is committed and before the release step.`,
+                ``,
+                `Each is the exact binary that was just built, talked to over the emulated USB console. It is booted twice before being called a failure, so this is not a one-off flake.`,
+                ``,
+                report,
+                ``,
+                `Last seen ${new Date().toISOString().slice(0,10)} in ${runUrl}.`,
+              ].join('\n');
+              if (existing) {
+                await github.rest.issues.update({ ...repo, issue_number: existing.number, body });
+              } else {
+                await github.rest.issues.create({ ...repo, title, body, labels: ['qemu-boot-check'] });
+              }
+            } else if (existing) {
+              await github.rest.issues.createComment({ ...repo, issue_number: existing.number,
+                body: `Every variant boots and answers again as of ${runUrl} -- closing.` });
+              await github.rest.issues.update({ ...repo, issue_number: existing.number, state: 'closed' });
+            }
+
   publish-pages:
     needs: build
     # Only from the default branch, and never on a dry run. Without the ref guard a run

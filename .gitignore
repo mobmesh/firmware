@@ -19,3 +19,7 @@ TODO.md
 
 # Browser automation scratch output
 .playwright-mcp/
+
+# Superseded by the boot-check gate inside build-release.yml. Kept on disk for ad-hoc
+# runs; untracked so two workflows cannot both file issues under the same label.
+.github/workflows/qemu-boot-check.yml

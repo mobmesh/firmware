@@ -86,6 +86,28 @@ build_flags:
 # board JSON.
 partitions_override: null
 
+# How the QEMU boot check boots this board. Absent, or `enabled: false`, and the check
+# skips the board instead of failing it -- for hardware with no device model.
+#
+# globals are board wiring the emulator takes as run-time properties, so one binary per MCU
+# serves every board. The long -global form is required: the driver name contains a dot and
+# `-global a.b=c` splits at the first one, silently ignoring the setting.
+#   strap-mode  selects SPI boot; chip-specific, and the wrong value drops the ROM into
+#               download mode and nothing runs.
+#   cs-gpio     the pin the firmware drives as the radio's soft chip-select.
+#   spi-base    the SPI controller the radio hangs off. A bare Arduino SPIClass defaults to
+#               HSPI, which is SPI3 on the S3.
+qemu:
+  enabled: true
+  machine: esp32s3
+  binary: qemu-system-xtensa
+  mcu: esp32s3
+  mem: 8M           # this board has PSRAM and the app probes for it
+  globals:
+    bramble.gpio.strap-mode: 4
+    bramble.gpspi2.cs-gpio: 8
+    bramble.gpspi2.spi-base: "0x60025000"
+
 # Facts needed by the web flasher that aren't derivable from upstream (mcu,
 # flash size, etc. -- those come from upstream's boards/heltec_v4.json) or
 # from the built partitions.bin (offsets -- see scripts/generate-board-config.py).
