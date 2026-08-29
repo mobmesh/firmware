@@ -5,6 +5,18 @@
     "connectNote": "Put the board into flash mode first (hold PGM, tap RST, then release PGM), then connect over USB.",
     "postFlashNote": "Press RST once to put the board back into normal operation.",
     "partitionsOverridden": false,
+    "qemu": {
+      "enabled": true,
+      "machine": "esp32s3",
+      "binary": "qemu-system-xtensa",
+      "mcu": "esp32s3",
+      "mem": "8M",
+      "globals": {
+        "bramble.gpio.strap-mode": 4,
+        "bramble.gpspi2.cs-gpio": 8,
+        "bramble.gpspi2.spi-base": "0x60025000"
+      }
+    },
     "offsets": {
       "bootloader": "0x0",
       "partitions": "0x8000",
@@ -40,6 +52,18 @@
     "connectNote": "Put the board into flash mode first (hold BOOT, tap RESET, then release BOOT), then connect over USB.",
     "postFlashNote": "Press RESET once to put the board back into normal operation.",
     "partitionsOverridden": true,
+    "qemu": {
+      "enabled": true,
+      "machine": "esp32c3",
+      "binary": "qemu-system-riscv32",
+      "mcu": "esp32c3",
+      "mem": "",
+      "globals": {
+        "bramble.gpio.strap-mode": 8,
+        "bramble.gpspi2.cs-gpio": 6,
+        "bramble.gpspi2.spi-base": "0x60024000"
+      }
+    },
     "offsets": {
       "bootloader": "0x0",
       "partitions": "0x8000",

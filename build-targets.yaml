@@ -48,6 +48,7 @@ targets:
     vendor_flasher_assets: false
     make_latest: false
     mods: []      # extras beyond core_mods
+    # qemu_boot_check: false   # opt this role out of the emulator gate
 
   - board: xiao_c3
     role: repeater

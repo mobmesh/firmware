@@ -205,6 +205,11 @@ def cmd_boards_json(args):
         # probe the running firmware first (see flasher.js) rather than offer an
         # in-place "Update" blind.
         "partitionsOverridden": bool(overrides.get("partitions_override")),
+        # How to boot this board under emulation: the machine and binary, and the board
+        # wiring the device models take as run-time properties. Absent, or enabled: false,
+        # means the QEMU boot check skips this board rather than failing it -- for a board
+        # whose hardware there is no model for.
+        "qemu": overrides.get("qemu") or {},
         "offsets": {
             "bootloader": bootloader_offset_for_mcu(mcu),
             "partitions": PARTITION_TABLE_OFFSET,
@@ -284,6 +289,10 @@ def cmd_resolve_targets(args):
             # Optional. Raw flags appended after upstream's, so they can override
             # what the env already sets.
             "build_flags_append": t.get("build_flags_append") or [],
+            # Optional, default on. Set false for a role that cannot be exercised under
+            # emulation even though its board can -- the board-level switch lives in
+            # variants/<board>/overrides.yaml's qemu block and covers the whole board.
+            "qemu_boot_check": bool(t.get("qemu_boot_check", True)),
         })
 
     # Targets sharing an upstream_tag_prefix publish to the same shared release (see
