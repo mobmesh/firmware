@@ -89,16 +89,26 @@ class Console:
         # MeshCore's parser discards \n and completes a line only on \r.
         self.sock.sendall((command + "\r").encode())
 
-    def ask(self, command, timeout=COMMAND_TIMEOUT_SECONDS):
-        """Send a command and return its reply, or None if it never answers."""
+    def ask(self, command, timeout=COMMAND_TIMEOUT_SECONDS, quiet=False):
+        """Send a command and return its reply, or None if it never answers.
+
+        Only complete lines count. A reply arrives over TCP in whatever chunks the
+        emulator's console produces, so matching on the arrow alone can return the empty
+        string when the text after it has not landed yet.
+        """
         self.buf = ""
         self.send(command)
         deadline = time.time() + timeout
         while time.time() < deadline:
             self.drain()
-            for line in self.buf.splitlines():
+            complete, _, _ = self.buf.rpartition("\n")
+            for line in complete.splitlines():
                 if "->" in line:
-                    return line.split("->", 1)[1].strip()
+                    reply = line.split("->", 1)[1].strip()
+                    if reply:
+                        if not quiet:
+                            print(f"    {command} -> {reply}", flush=True)
+                        return reply
             time.sleep(0.2)
         return None
 
@@ -112,7 +122,7 @@ class Console:
 def wait_for_cli(console, deadline):
     """Poll until the node answers, so the check measures liveness rather than elapsed time."""
     while time.time() < deadline:
-        reply = console.ask("ver", timeout=5)
+        reply = console.ask("ver", timeout=5, quiet=True)
         if reply:
             return reply
         time.sleep(1)
@@ -153,12 +163,13 @@ def run_once(cmd, variant, mod_bits, uart_log):
         time.sleep(2)
         console = Console(CONSOLE_PORT)
         version = wait_for_cli(console, time.time() + BOOT_TIMEOUT_SECONDS)
+        if version is not None:
+            print(f"    ver -> {version}", flush=True)
         if version is None:
             failures.append(
                 f"no reply to 'ver' within {BOOT_TIMEOUT_SECONDS}s -- "
                 "the firmware did not reach its command loop")
         else:
-            print(f"ver -> {version}")
             expected = variant.get("version")
             if expected and expected not in version:
                 failures.append(f"'ver' reported {version!r}, expected it to contain {expected!r}")
@@ -176,6 +187,11 @@ def run_once(cmd, variant, mod_bits, uart_log):
             proc.kill()
 
     boot_output = uart_log.read_text(errors="replace") if uart_log.exists() else ""
+    # Always, not only on failure: a passing run's console is what makes the next failure
+    # readable, and a silent log hides a check that is asserting less than it appears to.
+    print(f"--- console ({uart_log.name}) ---")
+    print(boot_output.rstrip() or "(nothing on serial 0)")
+    print("--- end console ---", flush=True)
     for sig in CRASH_SIGNATURES:
         if sig in boot_output:
             failures.append(f"crash signature found: {sig!r}")
