@@ -1,8 +1,9 @@
 name: qemu-boot-check
 
-# Boots the shipped firmware vendored under pages/flasher/ in QEMU and watches for a crash
-# or boot loop -- the real binary, byte for byte. See scripts/qemu_boot_check.py for
-# what counts as pass/fail. heltec_v4 is Xtensa, xiao_c3 RISC-V, so the matrix pairs each.
+# Boots the shipped firmware vendored under pages/flasher/ in QEMU and holds a conversation
+# with it -- the real binary, byte for byte. The emulator models the LoRa radio, the flash and
+# the SoC's USB console, so a pass means the node reached its command loop and answered.
+# See scripts/qemu_boot_check.py for what is asked of each image.
 
 on:
   workflow_run:
@@ -11,10 +12,10 @@ on:
   workflow_dispatch:
 
 env:
-  QEMU_TAG: esp-develop-9.2.2-20260417
-  QEMU_BUILD: esp_develop_9.2.2_20260417
-  SHA256_xtensa: 0eecb2a34a5586c0e59110f77b9343b7b336e82fdb0e1a30e1dc1bab8a547e35
-  SHA256_riscv32: 547f03e04701a92cbb699f7f7d015adc1f5b5ef93cbb94c0dd9b7107e2d84e77
+  # Our build of espressif/qemu, carrying the device models these images need. Stock
+  # espressif builds have no LoRa radio, so the firmware never leaves radio_init().
+  QEMU_REPO: HeyVern/espressif-qemu
+  QEMU_TAG: v9.2.2
 
 jobs:
   boot-check:
@@ -30,33 +31,35 @@ jobs:
         variant: [repeater, room_server]
         include:
           - board: heltec_v4
-            arch: xtensa
+            mcu: esp32s3
+            binary: qemu-system-xtensa
             machine: esp32s3
             mem: 8M
           - board: xiao_c3
-            arch: riscv32
+            mcu: esp32c3
+            binary: qemu-system-riscv32
             machine: esp32c3
     steps:
       - name: Checkout this repo
         uses: actions/checkout@v7
 
-      # Espressif's build, pinned and checksum-verified; the tarball carries the boot ROMs.
-      # The apt list is the binary's DT_NEEDED entries minus glibc -- SDL2 included, which
-      # is required even headless.
-      - name: Fetch qemu-system-${{ matrix.arch }}
+      # The tarball carries the boot ROMs alongside the binary. Verified against the
+      # digest GitHub records for the asset, which it computes from what it stored.
+      - name: Fetch qemu for ${{ matrix.mcu }}
         env:
-          SHA256: ${{ matrix.arch == 'xtensa' && env.SHA256_xtensa || env.SHA256_riscv32 }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq libgcrypt20 libpixman-1-0 libsdl2-2.0-0 libslirp0
-          asset="qemu-${{ matrix.arch }}-softmmu-${QEMU_BUILD}-x86_64-linux-gnu.tar.xz"
-          curl -sSfL --retry 3 --retry-delay 5 \
-            -O "https://github.com/espressif/qemu/releases/download/${QEMU_TAG}/${asset}"
-          echo "${SHA256}  ${asset}" | sha256sum -c -
-          tar xJf "$asset"
+          sudo apt-get install -y -qq libgcrypt20 libpixman-1-0 libsdl2-2.0-0 zstd
+          asset="${{ matrix.mcu }}-${QEMU_TAG}-linux-x86_64.tar.zst"
+          expected=$(gh api "repos/${QEMU_REPO}/releases/tags/${QEMU_TAG}" \
+            --jq ".assets[] | select(.name==\"${asset}\") | .digest" | sed 's/^sha256://')
+          gh release download "${QEMU_TAG}" --repo "${QEMU_REPO}" -p "$asset"
+          echo "${expected}  ${asset}" | sha256sum -c -
+          tar xaf "$asset"
 
       - id: boot
-        name: Boot ${{ matrix.board }}/${{ matrix.variant }} and check for crash/boot loop
+        name: Boot ${{ matrix.board }}/${{ matrix.variant }} and exercise its CLI
         run: |
           mkdir -p workdir
           python3 scripts/qemu_boot_check.py \
@@ -64,10 +67,10 @@ jobs:
             --variant ${{ matrix.variant }} \
             --boards-json pages/flasher/auto_boards.json \
             --flasher-dir pages/flasher \
-            --qemu-bin qemu/bin/qemu-system-${{ matrix.arch }} \
+            --qemu-bin "${{ matrix.mcu }}-${QEMU_TAG}-linux-x86_64/${{ matrix.binary }}" \
             --machine ${{ matrix.machine }} \
             --mem "${{ matrix.mem }}" \
-            --rom-dir qemu/share/qemu \
+            --rom-dir "${{ matrix.mcu }}-${QEMU_TAG}-linux-x86_64/pc-bios" \
             --workdir workdir
 
       - name: Upload serial capture on failure
@@ -75,11 +78,11 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: qemu-boot-check-${{ matrix.board }}-${{ matrix.variant }}-serial-log
-          path: workdir/serial_capture.log
+          path: workdir/uart0.log
           retention-days: 14
 
-      # One long-lived issue per variant, and only for a real boot failure -- a broken
-      # toolchain fetch fails loudly rather than being filed as a firmware crash.
+      # One long-lived issue per variant, and only for a real failure -- a broken
+      # emulator fetch fails loudly rather than being filed against the firmware.
       - name: Open, update, or close the tracking issue
         if: always() && steps.boot.outcome != 'skipped'
         uses: actions/github-script@v9
@@ -90,7 +93,7 @@ jobs:
             const failed = process.env.FAILED === 'true';
             const board = '${{ matrix.board }}';
             const variant = '${{ matrix.variant }}';
-            const title = `[${board}/${variant}] QEMU boot check failed -- possible crash/boot loop`;
+            const title = `[${board}/${variant}] QEMU boot check failed`;
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const repo = { owner: context.repo.owner, repo: context.repo.repo };
 
@@ -100,9 +103,9 @@ jobs:
 
             if (failed) {
               const body = [
-                `The published \`${board}\`/\`${variant}\` release firmware failed the QEMU boot-loop check -- see the captured serial output, uploaded as an artifact on the run below.`,
+                `The published \`${board}\`/\`${variant}\` release firmware failed the QEMU boot check -- see the captured boot output, uploaded as an artifact on the run below.`,
                 ``,
-                `This boots the exact, unmodified release binary (no special build), so a failure here reflects the real shipped firmware, not a QEMU-testing-only artifact. Known QEMU-specific limitation: radio_init() always fails in QEMU (no real LoRa hardware) and RollbackGuard's retry-then-halt path is expected to trigger -- this check only flags *unexpected* reset reasons, panics, or an abnormally fast reset rate, not that expected retry behavior.`,
+                `This boots the exact, unmodified release binary and talks to its CLI over the emulated USB console. A pass means the node reached its command loop and answered; a failure means it did not, or answered wrongly. Which commands are asked depends on the mod bits stamped into the image.`,
                 ``,
                 `Last seen ${new Date().toISOString().slice(0,10)} in ${runUrl}.`,
               ].join('\n');
@@ -113,6 +116,6 @@ jobs:
               }
             } else if (existing) {
               await github.rest.issues.createComment({ ...repo, issue_number: existing.number,
-                body: `\`${board}\`/\`${variant}\` boots cleanly again as of ${runUrl} -- closing.` });
+                body: `\`${board}\`/\`${variant}\` boots and answers again as of ${runUrl} -- closing.` });
               await github.rest.issues.update({ ...repo, issue_number: existing.number, state: 'closed' });
             }
