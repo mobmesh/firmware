@@ -3869,6 +3869,7 @@
 					"role": "companionBle",
 					"github": {
 						"type": "companion",
+						"notice": "<article class='tertiary-container'>Please do not flash MeshCore firmware to LoRaWAN version of the t1000e, it can permantently brick the device</article>",
 						"files": {
 							"flash": "t1000e_companion_radio_ble.*?\\.zip",
 							"download": "t1000e_companion_radio_ble.*?\\.uf2"
