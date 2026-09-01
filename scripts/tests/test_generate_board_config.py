@@ -273,6 +273,22 @@ class InjectEnvTestCase(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self._run(ini_path, mods="mod-a,mod-b")
 
+    def test_generated_composition_sources_are_injected(self):
+        self._write(
+            "mods/shim/mod.yaml",
+            "name: shim\ncomposition:\n  outputs:\n"
+            "    hooks: src/helpers/ModHooks.cpp\n"
+            "    cli: src/helpers/esp32/CommonCliMods.cpp\n",
+        )
+        self._make_overrides("heltec_v4", "build_flags: {}\npartitions_override: null\n")
+        ini_path = self._write("platformio.ini", SAMPLE_INI)
+
+        self._run(ini_path, mods="shim")
+
+        result = ini_path.read_text()
+        self.assertIn("+<helpers/ModHooks.cpp>", result)
+        self.assertIn("+<helpers/esp32/CommonCliMods.cpp>", result)
+
 
 class BoardsJsonTestCase(unittest.TestCase):
     """cmd_boards_json: the per-variant postFlashCommands passthrough."""

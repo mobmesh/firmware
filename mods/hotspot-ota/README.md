@@ -18,12 +18,12 @@ The mod also adds rollback protection. After an update, the new firmware is test
 | ----- | ---- |
 | `files/src/helpers/esp32/HotspotOTA.{cpp,h}` | hotspot join, fetch, verify, flash, NTP clock set |
 | `files/src/helpers/esp32/HotspotOtaBoard.cpp` | `modBoardStartOtaFromUrl()`, reached from the CLI hook |
+| `files/src/helpers/esp32/HotspotOtaIntegration.{cpp,h}` | radio policy, loop polling, and CLI handler |
 | `files/src/helpers/esp32/RollbackGuard.{cpp,h}` | rollback protection after an update |
-| `patches/0001_hotspot-fetch-ota.patch` | the CLI commands and loop hook, in shim's two files |
 
-`files/` is copied into the upstream clone before any patch applies, so this mod's own
-source is edited directly rather than through a diff. The patch carries only what edits
-a file shim owns; it touches no upstream file at all.
+`files/` is copied into the upstream clone before composition. `mod.yaml` declares the
+integration phases, and the shim generator wires them into its aggregate sources. This mod
+has no patch and touches no upstream or shim-owned source file.
 
 The patches don't contain board-specific settings such as the GPIO pin used for the power switch or WiFi and HTTP timing values.
 

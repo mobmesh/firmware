@@ -57,10 +57,11 @@ cmd_start() {
   echo "==> replaying patches as commits on $old"
   git -C "$WORKDIR" checkout --quiet "$old"
   git -C "$WORKDIR" checkout --quiet -B mods
-  # Mod-owned source first: the patches edit files that arrive this way, so without it
-  # everything after shim fails to apply. Committed into the base rather than rebased --
-  # a file nobody else owns has nothing to merge against.
+  # Mod-owned and generated source form the patch base. Committing them before the
+  # patch series keeps files with no upstream owner out of the rebase range.
   python3 "$REPO_ROOT/scripts/generate-board-config.py" copy-src \
+    --upstream "$WORKDIR" --mods "$(mod_list)"
+  python3 "$REPO_ROOT/scripts/generate-board-config.py" compose-mods \
     --upstream "$WORKDIR" --mods "$(mod_list)"
   git -C "$WORKDIR" add -A
   git -C "$WORKDIR" commit --quiet -m "mod source"

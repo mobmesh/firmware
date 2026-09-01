@@ -1,5 +1,0 @@
-id: "0001"
-title: power-guard
-# Context dependencies only: both edit the same ModHooks.cpp and CommonCliMods.cpp
-# regions this patch inserts into. Its own source lives in files/.
-requires: ["shim/0001", "hotspot-ota/0001"]

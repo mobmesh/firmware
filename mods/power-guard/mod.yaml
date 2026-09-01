@@ -3,3 +3,13 @@
 name: power-guard
 
 env_flags: [WITH_POWER_GUARD]
+
+integration:
+  header: helpers/esp32/PowerGuardIntegration.h
+  hooks:
+    before_radio_init: powerGuardBeforeRadioInit
+    loop: powerGuardLoop
+    wants_power_saving: powerGuardWantsPowerSaving
+    cli:
+      handler: powerGuardHandleCli
+      priority: 200

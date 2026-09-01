@@ -367,10 +367,9 @@ upstream's `startOTAUpdate()` and `hotspot-ota` set it around the
 download. Since the guard sits inside `sleep()` itself, it applies no matter who asked
 for the sleep -- so a low battery cannot interrupt an update in progress.
 
-This mod therefore carries no inhibit API of its own. It hooks into
-`helpers/ModHooks.cpp` and `helpers/esp32/CommonCliMods.cpp` rather than editing
-upstream files; both come from `shim/0001`. It also declares `hotspot-ota/0001` and
-`0002` as context dependencies, since those edit the same regions.
+This mod therefore carries no inhibit API of its own. Its integration file owns the
+pre-radio, loop, power-saving, and CLI contributions. The shim generator wires those
+contributions into its aggregates without a patch or a dependency on hotspot OTA.
 
 ## Testing
 

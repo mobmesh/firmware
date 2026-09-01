@@ -9,13 +9,12 @@ no other mod built, all hooks are no-ops and the firmware behaves as upstream do
 |---|---|
 | `examples/simple_repeater/main.cpp` | `modRadioInit()`, `modLoop()`, `modWantsPowerSaving()` |
 | `examples/simple_room_server/main.cpp` | same, minus power saving |
-| `src/helpers/CommonCLI.cpp` | one dispatch line per verb handler (3) |
-| `src/helpers/CommonCLI.h` | the three `handleMod*` declarations |
+| `examples/simple_repeater/MyMesh.cpp` | `modHandleCliCommand()` |
+| `examples/simple_room_server/MyMesh.cpp` | `modHandleCliCommand()` |
 
-It ships the files those calls land in -- `helpers/ModHooks.{h,cpp}` and
-`helpers/esp32/CommonCliMods.cpp` -- from `files/`, as scaffolds that mods fill in.
-They arrive by copy rather than by patch, so they are edited directly and no upstream
-ref can change them.
+It ships `helpers/ModHooks.h` from `files/`. The selected mods' integration declarations
+generate `ModHooks.cpp` and `CommonCliMods.cpp` in the temporary upstream tree. Feature
+mods own their handlers and hook bodies rather than patching shared aggregate files.
 
 `CommonCliMods.cpp` is dispatched ahead of upstream's own chain, so a mod can match
 a longer prefix before a shorter upstream one (`start ota wan ...` before `start ota`).
@@ -23,24 +22,26 @@ a longer prefix before a shorter upstream one (`start ota wan ...` before `start
 Mods that rewrite upstream code rather than add call sites -- `timing-safety` --
 have nothing to hook and depend on nothing.
 
-## Limitation: shared hook bodies
+## Composition
 
-`ModHooks.cpp` and `CommonCliMods.cpp` are single shared files. Every mod adds its
-guarded block to the same regions, and each patch is generated against the blocks
-already present, so apply order is a total order regardless of what a mod logically
-needs.
+`mod.yaml` declares each integration header and the phases it contributes. The generator
+supports additive pre-radio and loop phases, one exclusive radio-init policy, an OR-reduced
+power-saving phase, and priority-ordered first-match CLI handlers.
 
-Consequence: `batt-saver` calls nothing in the OTA stack but declares
-`hotspot-ota/0002`, because its patch context contains `RollbackGuard::poll()`.
-Against shim alone it fails at `ModHooks.cpp:7`.
+Composition fails before compilation for missing headers or symbols, unsupported phases,
+duplicate symbols, multiple radio-init policies, or invalid aggregate destinations. The
+generated sources are deterministic and refuse to overwrite an upstream file.
 
-Decoupling this requires per-mod hook files with a registration mechanism -- weak
-symbols, or a link-time list -- instead of one shared body per hook.
+The result uses ordinary direct C++ calls. There is no runtime registry, static constructor,
+heap allocation, or linker-section behavior.
 
 ## Ordering
 
-`shim` must come first in every target's `mods:` list. CI enforces it via each
-patch's `requires:`. `scripts/tests/test_patch_ownership.py` asserts no other mod
-patches the insertion points above.
+The resolved mod order controls additive hook order. CLI priority is explicit in each
+contributing manifest. `radio_init_policy` has at most one owner.
+
+`scripts/tests/test_patch_ownership.py` asserts no other mod patches the upstream insertion
+points. `scripts/tests/test_mod_composition.py` covers phase validation, subset composition,
+ordering, output ownership, and byte-deterministic generation.
 
 **Contributes no suffix** -- must not change any released asset's filename.

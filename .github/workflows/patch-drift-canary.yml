@@ -64,10 +64,13 @@ jobs:
             sha=$(git -C probe-src rev-parse --short HEAD)
             python3 scripts/generate-board-config.py copy-src \
               --upstream probe-src --mods "$(echo $MODS | tr ' ' ',')" >/dev/null
+            python3 scripts/generate-board-config.py compose-mods \
+              --upstream probe-src --mods "$(echo $MODS | tr ' ' ',')" >/dev/null
             placed=""       # three-way relocated it unaided
             conflicted=""   # three-way left markers
             for mod in $MODS; do
               for patch in "mods/$mod/patches"/*.patch; do
+                [ -e "$patch" ] || continue
                 name="$mod/$(basename "$patch")"
                 if git -C probe-src apply --check "../$patch" 2>/dev/null; then
                   git -C probe-src apply "../$patch"

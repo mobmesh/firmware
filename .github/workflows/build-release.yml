@@ -152,6 +152,7 @@ jobs:
           IFS=',' read -ra MODS <<< "${{ join(matrix.mods, ',') }}"
           for mod in "${MODS[@]}"; do
             for patch in "mods/$mod/patches"/*.patch; do
+              [ -e "$patch" ] || continue
               id=$(basename "$patch" | cut -d'_' -f1)
               qualified_id="$mod/$id"
               sidecar="mods/$mod/patches/${id}.meta.yaml"
@@ -178,6 +179,12 @@ jobs:
           python3 scripts/generate-board-config.py copy-src \
             --upstream upstream-src --mods "${{ join(matrix.mods, ',') }}"
 
+      - name: Compose selected mod integrations
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          python3 scripts/generate-board-config.py compose-mods \
+            --upstream upstream-src --mods "${{ join(matrix.mods, ',') }}"
+
       - id: apply
         name: Apply maintained patches in order (fail loudly on drift; emit a rescue diff, never auto-merge)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
@@ -189,6 +196,7 @@ jobs:
           IFS=',' read -ra MODS <<< "${{ join(matrix.mods, ',') }}"
           for mod in "${MODS[@]}"; do
             for patch in "../mods/$mod/patches"/*.patch; do
+              [ -e "$patch" ] || continue
               name="$mod/$(basename "$patch")"
               if git apply --check "$patch" 2>/dev/null; then
                 git apply "$patch"

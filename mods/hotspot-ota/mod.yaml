@@ -9,3 +9,12 @@ env_flags: [WITH_HOTSPOT_OTA, WITH_OTA_ROLLBACK_GUARD]
 # mods/bit-registry.md before assigning the next.
 bit: 1
 image_marker: "H0TSP0T"
+
+integration:
+  header: helpers/esp32/HotspotOtaIntegration.h
+  hooks:
+    radio_init_policy: hotspotOtaRadioInit
+    loop: hotspotOtaLoop
+    cli:
+      handler: hotspotOtaHandleCli
+      priority: 100

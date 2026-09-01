@@ -120,13 +120,8 @@ class Console:
 
 
 def wait_for_cli(console, deadline):
-    """Poll until the node answers, so the check measures liveness rather than elapsed time."""
-    while time.time() < deadline:
-        reply = console.ask("ver", timeout=5, quiet=True)
-        if reply:
-            return reply
-        time.sleep(1)
-    return None
+    """Wait for one probe, avoiding queued replies that can mask the next command."""
+    return console.ask("ver", timeout=max(0, deadline - time.time()), quiet=True)
 
 
 def check_hotspot_ota(console, failures):

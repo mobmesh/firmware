@@ -10,7 +10,7 @@ The MeshCore source code itself is not stored in this repository. Instead, this 
 
 ## Available Mods
 
-Mods add features or changes to the standard MeshCore firmware. Each mod is maintained as a separate set of patches and can include its own board configuration and documentation.
+Mods add features or changes to the standard MeshCore firmware. Each mod can ship owned source, integration declarations, upstream patches, board configuration, and documentation.
 
 | Mod           | Description                                                                                                                                                                                                                   | Main Features                                                                                                                                                                                         |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -41,7 +41,7 @@ Some mods may add extra options or requirements for a traditional flasher. Check
   * `files/` mirrors the upstream directory layout and is copied into the source tree before anything is patched. This is the mod's own code -- files nothing upstream has ever seen, so there is no diff to apply and they are edited directly.
   * `patches/*.patch` carries only the edits to files this mod did not create -- the upstream MeshCore source, or a file another mod added. Each has a `.meta.yaml` sidecar declaring its dependencies.
 
-  `mod.yaml` holds facts about the mod as a whole -- its build flags and, where it has one, its image marker bit. Each mod also has its own documentation. The feature mods are `hotspot-ota`, `timing-safety` and `power-guard`; `shim` is internal plumbing that owns the hook points the others attach to.
+  `mod.yaml` holds facts about the mod as a whole -- its build flags, integration phases and, where it has one, its image marker bit. Each mod also has its own documentation. The feature mods are `hotspot-ota`, `timing-safety` and `power-guard`; `shim` is internal plumbing that owns the hook points and generated aggregates the others attach to.
 
 * `variants/<board>/` contains configuration changes that are specific to a board. This includes things like GPIO pins, timing values, and sometimes a custom partition layout. The folder structure follows the same `variants/<board>/` layout used by upstream MeshCore.
 
@@ -57,7 +57,7 @@ Some mods may add extra options or requirements for a traditional flasher. Check
 
 * `.github/workflows/build-release.yml` handles building each board and variant against the latest upstream release and publishing the results.
 
-Every mod's `files/` are copied in first, then patches are applied in numeric order within each mod. Every patch lists any other patches it depends on, and CI checks those dependencies before applying anything.
+Every mod's `files/` are copied in first, selected integration declarations generate the shim aggregates, then patches are applied in numeric order within each mod. Every patch lists any other patches it depends on, and CI checks those dependencies before applying anything.
 
 If a patch no longer applies cleanly to the current upstream version, the build fails and an issue is opened with the name of the affected patch. The system does not try to automatically merge or fix the patch.
 
@@ -86,10 +86,11 @@ A scheduled GitHub Actions run checks upstream for new release tags for each var
 When a new release is found, the workflow:
 
 1. Clones the upstream MeshCore repository at that tag.
-2. Copies each in-scope mod's own source files into the tree.
-3. Checks the patches against the board configuration.
-4. Applies the patches.
-5. Builds the firmware.
+2. Validates patch metadata and board configuration.
+3. Copies each in-scope mod's owned source into the tree.
+4. Composes the selected mod integrations.
+5. Applies the remaining upstream patches.
+6. Builds the firmware.
 
 The patch checks are important because they catch configuration changes or other upstream changes that could cause problems. If a patch no longer applies, the build stops and an issue is opened identifying the patch that failed.
 
