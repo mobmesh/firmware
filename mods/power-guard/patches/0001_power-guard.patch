@@ -1,9 +1,9 @@
 diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
-index 90710e4d..8aa61af6 100644
+index f09448b..929df8b 100644
 --- a/src/helpers/ModHooks.cpp
 +++ b/src/helpers/ModHooks.cpp
-@@ -7,7 +7,94 @@
- #include <helpers/esp32/RollbackGuard.h>
+@@ -11,7 +11,94 @@
+ #include <helpers/esp32/HotspotOTA.h>
  #endif
  
 +#ifdef WITH_POWER_GUARD
@@ -97,9 +97,9 @@ index 90710e4d..8aa61af6 100644
  #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
    SPIFFS.begin(true);   // RollbackGuard's failure counter needs it mounted before use; safe to call twice
  
-@@ -32,10 +119,17 @@ void modLoop() {
- #if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
-   RollbackGuard::poll();
+@@ -39,10 +126,17 @@ void modLoop() {
+ #if defined(ESP32) && defined(WITH_HOTSPOT_OTA)
+   HotspotOTA::poll();
  #endif
 +#ifdef WITH_POWER_GUARD
 +  power_guard.loop();
@@ -116,7 +116,7 @@ index 90710e4d..8aa61af6 100644
  
  // Reached through the concrete `board`, not a mesh::MainBoard*, so a virtual that
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index 651e2d16..f8ef25a2 100644
+index 8c26e1f..ba2feb0 100644
 --- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
 @@ -21,11 +21,104 @@

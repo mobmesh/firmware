@@ -130,7 +130,7 @@ def wait_for_cli(console, deadline):
 
 
 def check_hotspot_ota(console, failures):
-    """Read-only: ask the mod to report its A/B slot state.
+    """Read-only: ask the mod to report its service and A/B slot state.
 
     Chosen over the settings round-trips because it writes nothing. A CLI `set` persists to
     flash, which is safe here only by virtue of the image being a throwaway copy, and a
@@ -141,6 +141,12 @@ def check_hotspot_ota(console, failures):
     composed image has never taken an update, so those describe flashing history rather than
     the health of the firmware.
     """
+    reply = console.ask("get ota.status")
+    if reply is None:
+        failures.append("hotspot-ota: 'get ota.status' never answered")
+    elif "idle" not in reply:
+        failures.append(f"hotspot-ota: service was not idle after boot: {reply!r}")
+
     reply = console.ask("get ota.slot")
     if reply is None:
         failures.append("hotspot-ota: 'get ota.slot' never answered")
@@ -285,7 +291,7 @@ def main():
 
     exercised = ["ver"]
     if mod_bits & MOD_BIT_HOTSPOT_OTA:
-        exercised.append("hotspot-ota slot report")
+        exercised.append("hotspot-ota service and slot reports")
     note = " (passed on retry)" if retried else ""
     print(f"\nPASS ({args.board_id}/{args.variant}): answered {', '.join(exercised)}"
           f" (mod bits 0x{mod_bits:08x}){note}")

@@ -18,15 +18,12 @@ bool modBoardStartOtaFromUrl(const char* url, char reply[]) {
   }
   StrHelper::strncpy(cfg.url, url, sizeof(cfg.url));
 
-  modBoardInhibitSleep(true);
-  bool ok = HotspotOTA::run(cfg, reply);   // owns GPIO47 power-switch sequencing internally
-  if (ok) modBoardReboot();                // doesn't return
-  modBoardInhibitSleep(false);             // failure returns here -- re-allow sleep
-  return ok;
+  return HotspotOTA::start(cfg, reply);
 }
 
 #else
 bool modBoardStartOtaFromUrl(const char* url, char reply[]) {
-  return false; // not supported
+  strcpy(reply, "ERR: WAN OTA not supported");
+  return false;
 }
 #endif

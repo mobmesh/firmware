@@ -24,11 +24,13 @@ namespace HotspotOTA {
   bool loadConfig(HotspotOtaConfig& cfg);
   bool saveConfig(const HotspotOtaConfig& cfg);
 
-  // Joins WiFi, downloads cfg.url, verifies, flashes, reboots on success. Fills reply[] and
-  // returns false on any failure without rebooting.
-  bool run(const HotspotOtaConfig& cfg, char reply[]);
+  bool start(const HotspotOtaConfig& cfg, char reply[]);
+  bool cancel(char reply[]);
+  bool isActive();
+  void status(char reply[]);
+  void poll();
 
-  void setPower(bool on);   // manual GPIO47 control, independent of run()
+  void setPower(bool on);   // manual GPIO47 control, independent of the OTA service
   bool getPower();
 
   // Pins the whole-file hash -- RAM-only, cleared every boot. `clear` returns to the
@@ -38,8 +40,7 @@ namespace HotspotOTA {
 
   void setMarkerBypass(bool on);   // RAM-only, one-time -- see `set ota.fw.marker`
 
-  // Pre-flight versions of run()'s join/WAN-check steps -- see `ota wan join` / `ota wan check` /
-  // `ota wan leave`. run() skips its own join if already connected via alreadyConnectedTo().
+  // Pre-flight versions of the service's join/WAN-check steps.
   bool wifiConnect(char reply[]);
   void wifiDisconnect();
   bool checkWan(char reply[]);
