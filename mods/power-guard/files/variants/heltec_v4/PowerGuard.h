@@ -3,8 +3,8 @@
 // heltec_v4 power-down for power-guard's deep sleeps; the mod's policy stays
 // board-independent. A missed hold release leaves a node that transmits and is never heard.
 
-// No file-scope state here: two translation units include this, so a static would
-// become two independent copies. State belongs in ModHooks.cpp, as the boot counters do.
+// No file-scope state here: multiple translation units include this, so a static would
+// become independent copies. Runtime state belongs in the integration source.
 
 #include <Arduino.h>
 #include <SPI.h>

@@ -1,1 +1,6 @@
 name: shim
+
+composition:
+  outputs:
+    hooks: src/helpers/ModHooks.cpp
+    cli: src/helpers/esp32/CommonCliMods.cpp

@@ -24,6 +24,9 @@ Single source of truth for per-board config, split three ways:
                    loudly rather than guessing if the section or an expected
                    key can't be found, or if two mods claim the same env_flag.
 
+  - "compose-mods" validates each selected mod's integration declaration and
+                   generates the shim-owned hook and CLI aggregate sources.
+
 Requires PyYAML (pip install pyyaml).
 """
 import argparse
@@ -40,6 +43,10 @@ except ImportError:
     sys.exit("error: PyYAML is required (pip install pyyaml)")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+INTEGRATION_PHASES = {
+    "before_radio_init", "radio_init_policy", "loop", "wants_power_saving", "cli"
+}
+SYMBOL_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 # Bootloader isn't part of the partition table itself -- its flash offset is
 # a fixed constant per chip family (ESP-IDF/Arduino convention), not encoded
@@ -150,6 +157,200 @@ def load_mod_manifest(mod_name: str) -> dict:
         return {}   # optional here: it carries release facts, not build wiring
     with path.open() as f:
         return yaml.safe_load(f) or {}
+
+
+def selected_mods(value: str) -> list:
+    mods = [name.strip() for name in value.split(",") if name.strip()]
+    if len(mods) != len(set(mods)):
+        raise ValueError(f"duplicate mod in selection: {mods}")
+    return mods
+
+
+def composition_outputs(mods: list) -> dict:
+    owners = []
+    for mod_name in mods:
+        composition = load_mod_manifest(mod_name).get("composition") or {}
+        if composition:
+            owners.append((mod_name, composition.get("outputs") or {}))
+    if len(owners) != 1:
+        raise ValueError(
+            f"selected mods must provide exactly one composition output owner, found {len(owners)}"
+        )
+    owner, outputs = owners[0]
+    if set(outputs) != {"hooks", "cli"}:
+        raise ValueError(f"mod '{owner}' composition outputs must be exactly hooks and cli")
+    for name, value in outputs.items():
+        path = Path(value)
+        if path.is_absolute() or ".." in path.parts or path.suffix != ".cpp":
+            raise ValueError(f"mod '{owner}' has invalid {name} composition output: {value}")
+    if len(set(outputs.values())) != len(outputs):
+        raise ValueError(f"mod '{owner}' composition outputs must be unique")
+    return outputs
+
+
+def load_integrations(mods: list) -> list:
+    integrations = []
+    symbols = {}
+    radio_owner = None
+    for order, mod_name in enumerate(mods):
+        manifest = load_mod_manifest(mod_name)
+        if manifest.get("name") != mod_name:
+            raise ValueError(f"mods/{mod_name}/mod.yaml must declare name: {mod_name}")
+        integration = manifest.get("integration")
+        if not integration:
+            continue
+        if set(integration) != {"header", "hooks"}:
+            raise ValueError(f"mod '{mod_name}' integration must contain only header and hooks")
+
+        header = integration["header"]
+        header_path = Path(header)
+        if header_path.is_absolute() or ".." in header_path.parts or header_path.suffix != ".h":
+            raise ValueError(f"mod '{mod_name}' has invalid integration header: {header}")
+        source_header = REPO_ROOT / "mods" / mod_name / "files" / "src" / header_path
+        if not source_header.is_file():
+            raise ValueError(f"mod '{mod_name}' integration header does not exist: {source_header}")
+        header_text = source_header.read_text()
+
+        hooks = integration["hooks"] or {}
+        unknown = set(hooks) - INTEGRATION_PHASES
+        if unknown:
+            raise ValueError(f"mod '{mod_name}' declares unsupported integration phases: {sorted(unknown)}")
+
+        parsed = {"mod": mod_name, "order": order, "header": header, "hooks": {}}
+        for phase, declaration in hooks.items():
+            if phase == "cli":
+                if not isinstance(declaration, dict) or set(declaration) != {"handler", "priority"}:
+                    raise ValueError(
+                        f"mod '{mod_name}' cli integration must contain handler and priority"
+                    )
+                symbol = declaration["handler"]
+                priority = declaration["priority"]
+                if not isinstance(priority, int):
+                    raise ValueError(f"mod '{mod_name}' cli priority must be an integer")
+                parsed["hooks"][phase] = {"symbol": symbol, "priority": priority}
+            else:
+                symbol = declaration
+                parsed["hooks"][phase] = {"symbol": symbol}
+
+            if not isinstance(symbol, str) or not SYMBOL_RE.fullmatch(symbol):
+                raise ValueError(f"mod '{mod_name}' has invalid {phase} symbol: {symbol}")
+            if not re.search(r"\b" + re.escape(symbol) + r"\s*\(", header_text):
+                raise ValueError(
+                    f"mod '{mod_name}' {phase} symbol '{symbol}' is not declared in {header}"
+                )
+            if symbol in symbols:
+                raise ValueError(
+                    f"integration symbol '{symbol}' is declared by both '{symbols[symbol]}' and '{mod_name}'"
+                )
+            symbols[symbol] = mod_name
+            if phase == "radio_init_policy":
+                if radio_owner is not None:
+                    raise ValueError(
+                        f"radio_init_policy is exclusive but claimed by '{radio_owner}' and '{mod_name}'"
+                    )
+                radio_owner = mod_name
+        integrations.append(parsed)
+    return integrations
+
+
+def render_mod_hooks(integrations: list) -> str:
+    includes = "\n".join(f"#include <{item['header']}>" for item in integrations)
+    before = [item["hooks"]["before_radio_init"]["symbol"]
+              for item in integrations if "before_radio_init" in item["hooks"]]
+    radio = [item["hooks"]["radio_init_policy"]["symbol"]
+             for item in integrations if "radio_init_policy" in item["hooks"]]
+    loops = [item["hooks"]["loop"]["symbol"]
+             for item in integrations if "loop" in item["hooks"]]
+    wants = [item["hooks"]["wants_power_saving"]["symbol"]
+             for item in integrations if "wants_power_saving" in item["hooks"]]
+
+    before_calls = "\n".join(f"  {symbol}();" for symbol in before)
+    loop_calls = "\n".join(f"  {symbol}();" for symbol in loops)
+    radio_call = f"{radio[0]}(build_id)" if radio else "modBoardRadioInit()"
+    wants_expr = " || ".join(f"{symbol}()" for symbol in wants) or "false"
+    return f"""// Generated by generate-board-config.py compose-mods. Do not edit.
+#include <helpers/ModHooks.h>
+#include <target.h>
+{includes}
+
+bool modRadioInit(const char* build_id) {{
+{before_calls}
+  return {radio_call};
+}}
+
+void modLoop() {{
+{loop_calls}
+}}
+
+bool modWantsPowerSaving() {{
+  return {wants_expr};
+}}
+
+bool     modBoardRadioInit()               {{ return radio_init(); }}
+void     modBoardReboot()                  {{ board.reboot(); }}
+uint16_t modBoardBattMilliVolts()          {{ return board.getBattMilliVolts(); }}
+void     modBoardDeepSleep(uint32_t secs)  {{ board.enterDeepSleep(secs); }}
+void     modBoardInhibitSleep(bool inhibit) {{ board.setInhibitSleep(inhibit); }}
+uint32_t modClockGet()                     {{ return rtc_clock.getCurrentTime(); }}
+void     modClockSet(uint32_t epoch)       {{ rtc_clock.setCurrentTime(epoch); }}
+
+#ifdef MOBMESH_HAS_FEM_LNA
+bool modFemLnaAvailable()  {{ return board.loRaFEMControl.isLnaCanControl(); }}
+bool modFemLnaGet()        {{ return board.loRaFEMControl.isLNAEnabled(); }}
+void modFemLnaSet(bool on) {{
+  board.loRaFEMControl.setLNAEnable(on);
+  board.loRaFEMControl.setRxModeEnable();
+}}
+#else
+bool modFemLnaAvailable()  {{ return false; }}
+bool modFemLnaGet()        {{ return false; }}
+void modFemLnaSet(bool on) {{ }}
+#endif
+"""
+
+
+def render_mod_cli(integrations: list) -> str:
+    includes = "\n".join(f"#include <{item['header']}>" for item in integrations)
+    handlers = []
+    for item in integrations:
+        cli = item["hooks"].get("cli")
+        if cli:
+            handlers.append((cli["priority"], item["order"], cli["symbol"]))
+    handlers.sort(key=lambda row: (-row[0], row[1]))
+    calls = "\n".join(
+        f"  if ({symbol}(context, command, reply)) return true;" for _, _, symbol in handlers
+    )
+    return f"""// Generated by generate-board-config.py compose-mods. Do not edit.
+#include <helpers/ModHooks.h>
+{includes}
+
+bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
+                         const char* fw_version, const char* fw_build_date) {{
+  const ModCliContext context = {{sender_timestamp, fw_version, fw_build_date}};
+{calls}
+  return false;
+}}
+"""
+
+
+def cmd_compose_mods(args):
+    mods = selected_mods(args.mods)
+    outputs = composition_outputs(mods)
+    integrations = load_integrations(mods)
+    upstream = Path(args.upstream)
+    rendered = {
+        "hooks": render_mod_hooks(integrations),
+        "cli": render_mod_cli(integrations),
+    }
+    for name in ("hooks", "cli"):
+        destination = upstream / outputs[name]
+        if destination.exists():
+            raise FileExistsError(
+                f"composition would overwrite existing {destination.relative_to(upstream)}"
+            )
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(rendered[name])
+        print(f"OK: generated {destination.relative_to(upstream)}")
 
 
 def load_mod_patch_sidecars(mod_name: str) -> list:
@@ -409,7 +610,7 @@ def cmd_inject_env(args):
     board = args.board
     env = args.env
     ini_path = Path(args.platformio_ini)
-    mods = args.mods.split(",")
+    mods = selected_mods(args.mods)
     overrides = load_overrides(board)
 
     env_flag_owner = {}
@@ -428,7 +629,14 @@ def cmd_inject_env(args):
             f"+<{path.relative_to(mod_src).as_posix()}>"
             for path in sorted(mod_src.rglob("*.cpp"))
         ]}] if mod_src.is_dir() else []
-        for sidecar in declared + derived + load_mod_patch_sidecars(mod_name):
+        generated = []
+        outputs = (manifest.get("composition") or {}).get("outputs") or {}
+        for output in outputs.values():
+            path = Path(output)
+            if path.parts[:1] == ("src",) and path.suffix == ".cpp":
+                generated.append(f"+<{Path(*path.parts[1:]).as_posix()}>")
+        generated_sources = [{"build_src_filter": generated}] if generated else []
+        for sidecar in declared + derived + generated_sources + load_mod_patch_sidecars(mod_name):
             flag = sidecar.get("env_flag")
             if flag:
                 owner = env_flag_owner.get(flag)
@@ -553,6 +761,11 @@ def main():
     p_cs.add_argument("--upstream", required=True, help="path to the upstream clone's root")
     p_cs.add_argument("--mods", required=True, help="comma-separated mod names")
     p_cs.set_defaults(func=cmd_copy_src)
+
+    p_cm = sub.add_parser("compose-mods", help="generate shim aggregate sources for selected mods")
+    p_cm.add_argument("--upstream", required=True, help="path to the upstream clone's root")
+    p_cm.add_argument("--mods", required=True, help="comma-separated mod names in composition order")
+    p_cm.set_defaults(func=cmd_compose_mods)
 
     args = parser.parse_args()
     args.func(args)

@@ -5,6 +5,12 @@
 // One hook surface for every mod, so upstream's main.cpp carries one-line calls instead
 // of each mod's code inline, and two mods never edit the same region of it.
 
+struct ModCliContext {
+  uint32_t sender_timestamp;
+  const char* fw_version;
+  const char* fw_build_date;
+};
+
 bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
 void modLoop();                            // called first in loop()
 bool modWantsPowerSaving();                // OR'd with the operator's powersaving_enabled
@@ -16,6 +22,7 @@ bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
 
 // The reverse direction. Bodies name the concrete `board` and `rtc_clock`, so an
 // upstream refactor breaks this one file instead of silently unhooking a mod.
+bool     modBoardRadioInit();
 void     modBoardReboot();                     // does not return
 uint16_t modBoardBattMilliVolts();
 void     modBoardDeepSleep(uint32_t secs);     // does not return

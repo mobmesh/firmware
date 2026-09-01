@@ -4,12 +4,20 @@ Anywhere else is coupling that breaks silently when upstream refactors: on 2026-
 deleted MainBoard virtual stopped power-guard compiling while its patch still applied
 (issue #21). ALLOWED_REACHES is the exception list, and is currently empty.
 """
+import argparse
 import glob
+import importlib.util
 import os
 import re
+import tempfile
 import unittest
+from pathlib import Path
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+GENERATOR_PATH = Path(REPO_ROOT) / "scripts/generate-board-config.py"
+GENERATOR_SPEC = importlib.util.spec_from_file_location("generate_board_config_coupling", GENERATOR_PATH)
+generator = importlib.util.module_from_spec(GENERATOR_SPEC)
+GENERATOR_SPEC.loader.exec_module(generator)
 
 # Upstream objects a mod might reach through. Matched in `x->y` and `x.y` form both --
 # power-guard reaches enterDeepSleep by the global `board` and by `_board->`, so a grep
@@ -128,9 +136,10 @@ class UpstreamCouplingTestCase(unittest.TestCase):
 
     def test_the_pattern_still_matches(self):
         """Guards the regex and the source scan: the adapter reaches upstream by definition."""
-        adapter = os.path.join(REPO_ROOT, "mods", "shim", "files", "src", "helpers", "ModHooks.cpp")
-        self.assertTrue(os.path.isfile(adapter), f"shim's adapter is not at {adapter}")
-        hits = reaches_in_source(adapter, "src/helpers/ModHooks.cpp")
+        with tempfile.TemporaryDirectory() as temp:
+            generator.cmd_compose_mods(argparse.Namespace(upstream=temp, mods="shim"))
+            adapter = os.path.join(temp, "src", "helpers", "ModHooks.cpp")
+            hits = reaches_in_source(adapter, "src/helpers/ModHooks.cpp")
         self.assertTrue(hits, "regex matches nothing even in ModHooks.cpp")
 
 
