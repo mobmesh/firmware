@@ -518,7 +518,12 @@
     "parameters": [
       "`url`: HTTP(S) URL of the firmware `.bin` to download and flash"
     ],
-    "note": "Requires ota.wan.wifi to be set first (see below). Joins the configured WiFi network as a station, downloads the file, verifies it against the SHA-256 the image carries in its own final 32 bytes (or against ota.fw.sha256 when one has been pinned), confirms the download is actually a build of this project (refuses otherwise, even if the checksum matches -- catches <url> mistakenly pointing at a different, unmodified MeshCore build), and reboots on success. Does not reboot on failure. Nothing is fetched but the image itself. Three things are decided from the first 288 bytes, before the rest of the file is pulled over what may be a metered connection: - Not a build of this project -- aborts. The identifying block sits at a fixed offset, so this needs no scanning and nothing fetched from outside the file. - Built without OTA support -- aborts. The block names which mods the image actually carries, read out of the built binary rather than off the build config, so flashing a build that could never be updated again is refused rather than discovered afterwards. - Built for a different board or role -- aborts, naming both. Nothing before this could tell one board's build from another's. - Already running exactly this build -- stops and says so, rather than rewriting a partition with what is already in it. set ota.fw.marker off forces it through, which is how a deliberate re-flash over a corrupt partition still works."
+    "note": "Requires ota.wan.wifi to be set first (see below). Joins the configured WiFi network as a station, downloads the file, verifies it against the SHA-256 the image carries in its own final 32 bytes (or against ota.fw.sha256 when one has been pinned), confirms the download is actually a build of this project (refuses otherwise, even if the checksum matches -- catches <url> mistakenly pointing at a different, unmodified MeshCore build), and queues the service with an immediate OK - OTA queued response. The service reboots on success and leaves the current firmware running on failure. Nothing is fetched but the image itself. Three things are decided from the first 288 bytes, before the rest of the file is pulled over what may be a metered connection: - Not a build of this project -- aborts. The identifying block sits at a fixed offset, so this needs no scanning and nothing fetched from outside the file. - Built without OTA support -- aborts. The block names which mods the image actually carries, read out of the built binary rather than off the build config, so flashing a build that could never be updated again is refused rather than discovered afterwards. - Built for a different board or role -- aborts, naming both. Nothing before this could tell one board's build from another's. - Already running exactly this build -- stops and says so, rather than rewriting a partition with what is already in it. set ota.fw.marker off forces it through, which is how a deliberate re-flash over a corrupt partition still works."
+  },
+  {
+    "usage": "get ota.status / ota cancel",
+    "parameters": [],
+    "note": "get ota.status reports the current service state. During download it includes the byte count and total when the server supplies a content length. A failure or cancellation remains available as a terminal result until another update starts. ota cancel requests cancellation while the service is queued, joining, checking WAN connectivity, opening the URL, or downloading. Verification and partition commit are intentionally not cancellable."
   },
   {
     "usage": "start ota wan update",
@@ -559,12 +564,12 @@
     "parameters": [
       "`on` / `off`: Drives GPIO47 (the WAN power-switch control pin) directly"
     ],
-    "note": "Diagnostic and recovery command, independent of start ota wan \u2014 does not join WiFi, download, or flash anything. Use to confirm or force the rail off if state is ever in doubt (e.g. after a crash or watchdog reset mid-update)."
+    "note": "Diagnostic and recovery command, independent of start ota wan \u2014 does not join WiFi, download, or flash anything. Manual changes are refused while the OTA service is active. Use to confirm or force the rail off if state is ever in doubt (e.g. after a crash or watchdog reset)."
   },
   {
     "usage": "ota wan join / ota wan check / ota wan leave",
     "parameters": [],
-    "note": "ota wan join joins the configured WiFi network only (no WAN check, no download), returning in one quick attempt (~15s worst case) instead of start ota wan's full patient join budget (~115s). ota wan check checks WAN reachability on demand, repeatable without rejoining. ota wan leave disconnects and drops WAN power for a clean retry. A successful ota wan join lets start ota wan skip its own join step right after."
+    "note": "ota wan join joins the configured WiFi network only (no WAN check, no download), returning in one quick attempt (~15s worst case) instead of start ota wan's full patient join budget (~115s). ota wan check checks WAN reachability on demand, repeatable without rejoining. ota wan leave disconnects and drops WAN power for a clean retry. A successful ota wan join lets start ota wan skip its own join step right after. These commands refuse to interfere with an active OTA service."
   },
   {
     "usage": "get ota.slot",

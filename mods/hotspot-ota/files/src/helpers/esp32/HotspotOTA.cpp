@@ -6,6 +6,8 @@
 #include <mbedtls/sha256.h>
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <time.h>
 #include <Utils.h>                    // mesh::Utils::fromHex
 #include <helpers/TxtDataHelpers.h>   // StrHelper lives here, no standalone StrHelper.h
@@ -68,6 +70,83 @@ static bool runningMetadata(OtaMetadata& out) {
 
 static bool marker_bypass = false;   // RAM-only, one-time
 static char manual_sha256_hex[65] = {0};   // RAM-only -- see `set ota.fw.sha256`
+
+enum class OtaServiceState : uint8_t {
+  Idle,
+  Queued,
+  PoweringOn,
+  Joining,
+  CheckingWan,
+  Opening,
+  Downloading,
+  Verifying,
+  Committing,
+  Succeeded,
+  Failed,
+  Canceled
+};
+
+static portMUX_TYPE service_mux = portMUX_INITIALIZER_UNLOCKED;
+static OtaServiceState service_state = OtaServiceState::Idle;
+static HotspotOtaConfig service_config;
+static char service_sha256_hex[65] = {0};
+static char service_result[MAX_TEXT_LEN] = {0};
+static size_t service_written = 0;
+static int service_total = -1;
+static bool service_bypass_marker = false;
+static bool service_cancel_requested = false;
+static bool service_sleep_inhibited = false;
+static uint32_t service_clock_epoch = 0;
+
+static bool serviceIsActive(OtaServiceState state) {
+  return state >= OtaServiceState::Queued && state <= OtaServiceState::Committing;
+}
+
+static const char* serviceStateName(OtaServiceState state) {
+  switch (state) {
+    case OtaServiceState::Idle: return "idle";
+    case OtaServiceState::Queued: return "queued";
+    case OtaServiceState::PoweringOn: return "powering-on";
+    case OtaServiceState::Joining: return "joining";
+    case OtaServiceState::CheckingWan: return "checking-wan";
+    case OtaServiceState::Opening: return "opening";
+    case OtaServiceState::Downloading: return "downloading";
+    case OtaServiceState::Verifying: return "verifying";
+    case OtaServiceState::Committing: return "committing";
+    case OtaServiceState::Succeeded: return "succeeded";
+    case OtaServiceState::Failed: return "failed";
+    case OtaServiceState::Canceled: return "canceled";
+  }
+  return "unknown";
+}
+
+static void setServiceState(OtaServiceState state) {
+  portENTER_CRITICAL(&service_mux);
+  service_state = state;
+  portEXIT_CRITICAL(&service_mux);
+}
+
+static void setServiceProgress(size_t written, int total) {
+  portENTER_CRITICAL(&service_mux);
+  service_written = written;
+  service_total = total;
+  portEXIT_CRITICAL(&service_mux);
+}
+
+static bool serviceCancelRequested() {
+  portENTER_CRITICAL(&service_mux);
+  bool requested = service_cancel_requested;
+  portEXIT_CRITICAL(&service_mux);
+  return requested;
+}
+
+static bool advanceServiceState(OtaServiceState state) {
+  portENTER_CRITICAL(&service_mux);
+  bool canceled = service_cancel_requested;
+  if (!canceled) service_state = state;
+  portEXIT_CRITICAL(&service_mux);
+  return !canceled;
+}
 
 void HotspotOTA::setMarkerBypass(bool on) {
   marker_bypass = on;
@@ -148,17 +227,25 @@ static void syncNtpTime() {
   time_t now;
   time(&now);
   if (now > OTA_NTP_SANITY_FLOOR) {
-    modClockSet((uint32_t)now);
+    portENTER_CRITICAL(&service_mux);
+    service_clock_epoch = (uint32_t)now;
+    portEXIT_CRITICAL(&service_mux);
   }
 }
 
-// run() is unattended and can be patient; wifiConnect() runs inline in the CLI and must fail fast.
-static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int max_attempts) {
+// The service is unattended and can be patient; wifiConnect() runs inline and must fail fast.
+static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int max_attempts,
+                            bool cancellable) {
   WiFi.mode(WIFI_STA);
   for (int attempt = 0; attempt < max_attempts; attempt++) {
     WiFi.begin(ssid, pwd);
     uint32_t start = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - start < OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS) {
+      if (cancellable && serviceCancelRequested()) {
+        strcpy(reply, "ERR: canceled");
+        WiFi.disconnect(true);
+        return false;
+      }
       delay(250);
     }
     if (WiFi.status() == WL_CONNECTED) {
@@ -167,7 +254,14 @@ static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int
     }
     WiFi.disconnect(true);
     if (attempt < max_attempts - 1) {
-      delay(OTA_WIFI_JOIN_RETRY_DELAY_MS);
+      uint32_t retry_start = millis();
+      while (millis() - retry_start < OTA_WIFI_JOIN_RETRY_DELAY_MS) {
+        if (cancellable && serviceCancelRequested()) {
+          strcpy(reply, "ERR: canceled");
+          return false;
+        }
+        delay(100);
+      }
     }
   }
   strcpy(reply, "ERR: could not join hotspot WiFi");
@@ -180,12 +274,19 @@ static bool alreadyConnectedTo(const HotspotOtaConfig& cfg) {
   return WiFi.status() == WL_CONNECTED && WiFi.SSID() == cfg.ssid;
 }
 
-// Advisory only -- never gates run(); used to give a more specific error if a later step fails too.
-static bool checkWanConnectivity() {
+// Advisory only; used to give a more specific error if a later step fails too.
+static bool checkWanConnectivity(bool cancellable = false) {
   IPAddress ip;
   for (int attempt = 0; attempt < OTA_WAN_CHECK_ATTEMPTS; attempt++) {
+    if (cancellable && serviceCancelRequested()) return false;
     if (WiFi.hostByName(OTA_WAN_CHECK_HOST, ip)) return true;
-    if (attempt < OTA_WAN_CHECK_ATTEMPTS - 1) delay(OTA_WAN_CHECK_RETRY_DELAY_MS);
+    if (attempt < OTA_WAN_CHECK_ATTEMPTS - 1) {
+      uint32_t retry_start = millis();
+      while (millis() - retry_start < OTA_WAN_CHECK_RETRY_DELAY_MS) {
+        if (cancellable && serviceCancelRequested()) return false;
+        delay(100);
+      }
+    }
   }
   return false;
 }
@@ -219,30 +320,38 @@ static void drainAndClose(HTTPClient& http) {
   http.end();
 }
 
-bool HotspotOTA::run(const HotspotOtaConfig& cfg, char reply[]) {
+static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check,
+                       const char* sha256_hex, char reply[]) {
   if (cfg.ssid[0] == 0 || cfg.url[0] == 0) {
     strcpy(reply, "ERR: ota.wan.wifi not configured");
     return false;
   }
 
-  bool bypass_marker_check = marker_bypass;
-  marker_bypass = false;   // one-time
-
+  setServiceState(OtaServiceState::PoweringOn);
   pinMode(PIN_HOTSPOT_PWR, OUTPUT);
   digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // must stay HIGH throughout -- load switch, not a latch
 
   if (!alreadyConnectedTo(cfg)) {
-    if (!joinWifiStation(cfg.ssid, cfg.password, reply, OTA_WIFI_JOIN_MAX_ATTEMPTS)) {
+    setServiceState(OtaServiceState::Joining);
+    if (!joinWifiStation(cfg.ssid, cfg.password, reply, OTA_WIFI_JOIN_MAX_ATTEMPTS, true)) {
       digitalWrite(PIN_HOTSPOT_PWR, LOW);
       return false;
     }
   }
 
-  bool wan_ok = checkWanConnectivity();   // advisory only, for a better error message below
+  setServiceState(OtaServiceState::CheckingWan);
+  bool wan_ok = checkWanConnectivity(true);   // advisory only, for a better error message below
+  if (serviceCancelRequested()) {
+    strcpy(reply, "ERR: canceled");
+    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    WiFi.disconnect(true);
+    return false;
+  }
 
   uint8_t pinned[32];
-  bool have_pinned = resolvePinnedHash(manual_sha256_hex, pinned);
+  bool have_pinned = resolvePinnedHash(sha256_hex, pinned);
 
+  setServiceState(OtaServiceState::Opening);
   HTTPClient http;
   http.setTimeout(OTA_HTTP_TIMEOUT_MS);
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);   // GitHub release URLs 302 to a presigned link
@@ -254,6 +363,13 @@ bool HotspotOTA::run(const HotspotOtaConfig& cfg, char reply[]) {
   }
 
   int code = http.GET();
+  if (serviceCancelRequested()) {
+    strcpy(reply, "ERR: canceled");
+    http.end();
+    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    WiFi.disconnect(true);
+    return false;
+  }
   if (code != HTTP_CODE_OK) {
     if (!wan_ok) {
       strcpy(reply, "ERR: WiFi joined but no WAN connectivity");
@@ -287,18 +403,47 @@ bool HotspotOTA::run(const HotspotOtaConfig& cfg, char reply[]) {
   HeaderInspector header;
   bool header_judged = false;
 
+  setServiceProgress(0, len);
+  setServiceState(OtaServiceState::Downloading);
   WiFiClient* stream = http.getStreamPtr();
   uint8_t buf[1024];
   int written = 0;
+  uint32_t last_progress = millis();
   while (http.connected() && (len < 0 || written < len)) {
+    if (serviceCancelRequested()) {
+      strcpy(reply, "ERR: canceled");
+      closeNow(http);
+      Update.abort();
+      if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
+      else trailing.release();
+      digitalWrite(PIN_HOTSPOT_PWR, LOW);
+      WiFi.disconnect(true);
+      return false;
+    }
     size_t avail = stream->available();
-    if (!avail) { delay(1); continue; }
+    if (!avail) {
+      if (millis() - last_progress >= OTA_HTTP_TIMEOUT_MS) {
+        strcpy(reply, "ERR: download stalled");
+        closeNow(http);
+        Update.abort();
+        if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
+        else trailing.release();
+        digitalWrite(PIN_HOTSPOT_PWR, LOW);
+        WiFi.disconnect(true);
+        return false;
+      }
+      delay(1);
+      continue;
+    }
     int n = stream->readBytes(buf, min(avail, sizeof(buf)));
     if (n <= 0) break;
+    last_progress = millis();
     if (Update.write(buf, n) != (size_t)n) {
       strcpy(reply, "ERR: flash write failed");
       drainAndClose(http);   // network torn down before touching Update state -- see drainAndClose()
       Update.abort();
+      if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
+      else trailing.release();
       digitalWrite(PIN_HOTSPOT_PWR, LOW);
       WiFi.disconnect(true);
       return false;
@@ -310,6 +455,7 @@ bool HotspotOTA::run(const HotspotOtaConfig& cfg, char reply[]) {
     }
     header.feed(buf, n);
     written += n;
+    setServiceProgress(written, len);
 
     // Decided in the first packet: a foreign stream costs ~288 bytes, not 64 KB.
     if (!header_judged && header.complete()) {
@@ -344,7 +490,8 @@ bool HotspotOTA::run(const HotspotOtaConfig& cfg, char reply[]) {
         if (refusal != reply) strcpy(reply, refusal);
         closeNow(http);   // network torn down before touching Update state -- see drainAndClose()
         Update.abort();
-        if (!have_pinned) trailing.release();
+        if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
+        else trailing.release();
         digitalWrite(PIN_HOTSPOT_PWR, LOW);
         WiFi.disconnect(true);
         return false;
@@ -353,10 +500,21 @@ bool HotspotOTA::run(const HotspotOtaConfig& cfg, char reply[]) {
   }
   http.end();
 
+  if (!advanceServiceState(OtaServiceState::Verifying)) {
+    strcpy(reply, "ERR: canceled");
+    Update.abort();
+    if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
+    else trailing.release();
+    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    WiFi.disconnect(true);
+    return false;
+  }
+
   if (len > 0 && written != len) {
     strcpy(reply, "ERR: download incomplete");
     Update.abort();
-    if (!have_pinned) trailing.release();
+    if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
+    else trailing.release();
     digitalWrite(PIN_HOTSPOT_PWR, LOW);
     WiFi.disconnect(true);
     return false;
@@ -366,7 +524,8 @@ bool HotspotOTA::run(const HotspotOtaConfig& cfg, char reply[]) {
   if (!bypass_marker_check && !header_judged) {
     strcpy(reply, "ERR: not a hotspot ota build (truncated), would lose remote-update ability -- aborting");
     Update.abort();
-    if (!have_pinned) trailing.release();
+    if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
+    else trailing.release();
     digitalWrite(PIN_HOTSPOT_PWR, LOW);
     WiFi.disconnect(true);
     return false;
@@ -394,13 +553,150 @@ bool HotspotOTA::run(const HotspotOtaConfig& cfg, char reply[]) {
   digitalWrite(PIN_HOTSPOT_PWR, LOW);
   WiFi.disconnect(true);
 
+  setServiceState(OtaServiceState::Committing);
   if (!Update.end(true)) {   // flips boot partition pointer
     strcpy(reply, "ERR: Update.end failed");
     return false;
   }
 
-  strcpy(reply, "OK - rebooting");
-  return true;   // caller reboots
+  strcpy(reply, "OK - update installed");
+  return true;
+}
+
+static void serviceTaskMain(void*) {
+  HotspotOtaConfig cfg;
+  char sha256_hex[65];
+  bool bypass_marker_check;
+
+  portENTER_CRITICAL(&service_mux);
+  cfg = service_config;
+  memcpy(sha256_hex, service_sha256_hex, sizeof(sha256_hex));
+  bypass_marker_check = service_bypass_marker;
+  portEXIT_CRITICAL(&service_mux);
+
+  char result[MAX_TEXT_LEN] = {0};
+  bool ok = runService(cfg, bypass_marker_check, sha256_hex, result);
+  digitalWrite(PIN_HOTSPOT_PWR, LOW);
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+
+  portENTER_CRITICAL(&service_mux);
+  StrHelper::strncpy(service_result, result, sizeof(service_result));
+  service_state = ok ? OtaServiceState::Succeeded
+                     : (service_cancel_requested ? OtaServiceState::Canceled
+                                                 : OtaServiceState::Failed);
+  portEXIT_CRITICAL(&service_mux);
+  vTaskDelete(NULL);
+}
+
+bool HotspotOTA::start(const HotspotOtaConfig& cfg, char reply[]) {
+  if (cfg.ssid[0] == 0 || cfg.url[0] == 0) {
+    strcpy(reply, "ERR: ota.wan.wifi not configured");
+    return false;
+  }
+
+  portENTER_CRITICAL(&service_mux);
+  bool busy = serviceIsActive(service_state) || service_state == OtaServiceState::Succeeded;
+  if (!busy) {
+    service_config = cfg;
+    StrHelper::strncpy(service_sha256_hex, manual_sha256_hex, sizeof(service_sha256_hex));
+    service_bypass_marker = marker_bypass;
+    marker_bypass = false;
+    service_cancel_requested = false;
+    service_written = 0;
+    service_total = -1;
+    service_result[0] = 0;
+    service_state = OtaServiceState::Queued;
+    service_sleep_inhibited = true;
+  }
+  portEXIT_CRITICAL(&service_mux);
+
+  if (busy) {
+    strcpy(reply, "ERR: OTA already active");
+    return false;
+  }
+
+  modBoardInhibitSleep(true);
+  BaseType_t created = xTaskCreate(serviceTaskMain, "wan-ota", 8192, NULL, 1, NULL);
+  if (created != pdPASS) {
+    portENTER_CRITICAL(&service_mux);
+    service_state = OtaServiceState::Failed;
+    strcpy(service_result, "ERR: could not start OTA task");
+    service_sleep_inhibited = false;
+    portEXIT_CRITICAL(&service_mux);
+    modBoardInhibitSleep(false);
+    strcpy(reply, "ERR: could not start OTA task");
+    return false;
+  }
+
+  strcpy(reply, "OK - OTA queued");
+  return true;
+}
+
+bool HotspotOTA::cancel(char reply[]) {
+  portENTER_CRITICAL(&service_mux);
+  bool cancellable = service_state >= OtaServiceState::Queued
+                     && service_state <= OtaServiceState::Downloading;
+  if (cancellable) service_cancel_requested = true;
+  portEXIT_CRITICAL(&service_mux);
+
+  strcpy(reply, cancellable ? "OK - cancel requested" : "ERR: OTA is not cancellable");
+  return cancellable;
+}
+
+bool HotspotOTA::isActive() {
+  portENTER_CRITICAL(&service_mux);
+  bool active = serviceIsActive(service_state) || service_state == OtaServiceState::Succeeded;
+  portEXIT_CRITICAL(&service_mux);
+  return active;
+}
+
+void HotspotOTA::status(char reply[]) {
+  OtaServiceState state;
+  size_t written;
+  int total;
+  char result[MAX_TEXT_LEN];
+
+  portENTER_CRITICAL(&service_mux);
+  state = service_state;
+  written = service_written;
+  total = service_total;
+  memcpy(result, service_result, sizeof(result));
+  portEXIT_CRITICAL(&service_mux);
+
+  if (state == OtaServiceState::Downloading) {
+    if (total > 0) {
+      snprintf(reply, MAX_TEXT_LEN, "> %s %u/%u", serviceStateName(state),
+               (unsigned)written, (unsigned)total);
+    } else {
+      snprintf(reply, MAX_TEXT_LEN, "> %s %u bytes", serviceStateName(state), (unsigned)written);
+    }
+  } else if (result[0] != 0) {
+    snprintf(reply, MAX_TEXT_LEN, "> %s: %s", serviceStateName(state), result);
+  } else {
+    snprintf(reply, MAX_TEXT_LEN, "> %s", serviceStateName(state));
+  }
+}
+
+void HotspotOTA::poll() {
+  OtaServiceState state;
+  bool release_sleep = false;
+  uint32_t clock_epoch;
+
+  portENTER_CRITICAL(&service_mux);
+  state = service_state;
+  clock_epoch = service_clock_epoch;
+  service_clock_epoch = 0;
+  if (service_sleep_inhibited
+      && (state == OtaServiceState::Failed || state == OtaServiceState::Canceled)) {
+    service_sleep_inhibited = false;
+    release_sleep = true;
+  }
+  portEXIT_CRITICAL(&service_mux);
+
+  if (clock_epoch != 0) modClockSet(clock_epoch);
+  if (release_sleep) modBoardInhibitSleep(false);
+  if (state == OtaServiceState::Succeeded) modBoardReboot();
 }
 
 bool HotspotOTA::loadConfig(HotspotOtaConfig& cfg) {
@@ -431,6 +727,10 @@ bool HotspotOTA::getPower() {
 }
 
 bool HotspotOTA::wifiConnect(char reply[]) {
+  if (HotspotOTA::isActive()) {
+    strcpy(reply, "ERR: OTA active");
+    return false;
+  }
   HotspotOtaConfig cfg;
   HotspotOTA::loadConfig(cfg);
   if (cfg.ssid[0] == 0) {
@@ -441,7 +741,7 @@ bool HotspotOTA::wifiConnect(char reply[]) {
   pinMode(PIN_HOTSPOT_PWR, OUTPUT);
   digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // hotspot needs power before its AP exists to join
 
-  if (!joinWifiStation(cfg.ssid, cfg.password, reply, OTA_DIAG_WIFI_JOIN_ATTEMPTS)) {
+  if (!joinWifiStation(cfg.ssid, cfg.password, reply, OTA_DIAG_WIFI_JOIN_ATTEMPTS, false)) {
     digitalWrite(PIN_HOTSPOT_PWR, LOW);
     return false;
   }
@@ -451,12 +751,17 @@ bool HotspotOTA::wifiConnect(char reply[]) {
 }
 
 void HotspotOTA::wifiDisconnect() {
+  if (HotspotOTA::isActive()) return;
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
   digitalWrite(PIN_HOTSPOT_PWR, LOW);
 }
 
 bool HotspotOTA::checkWan(char reply[]) {
+  if (HotspotOTA::isActive()) {
+    strcpy(reply, "ERR: OTA active");
+    return false;
+  }
   bool ok = checkWanConnectivity();
   strcpy(reply, ok ? "WAN OK" : "WAN ERR");
   return ok;

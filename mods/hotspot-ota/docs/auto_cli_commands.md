@@ -1214,8 +1214,9 @@ every release.
 a station, downloads the file, verifies it against the SHA-256 the image carries in its own final
 32 bytes (or against `ota.fw.sha256` when one has been pinned), confirms the download is actually a
 build of this project (refuses otherwise, even if the checksum matches -- catches `<url>` mistakenly
-pointing at a different, unmodified MeshCore build), and reboots on success. Does not reboot on
-failure. Nothing is fetched but the image itself.
+pointing at a different, unmodified MeshCore build), and queues the service with an immediate
+`OK - OTA queued` response. The service reboots on success and leaves the current firmware running
+on failure. Nothing is fetched but the image itself.
 
 Three things are decided from the first 288 bytes, before the rest of the file is pulled over what
 may be a metered connection:
@@ -1231,7 +1232,22 @@ may be a metered connection:
   with what is already in it. `set ota.fw.marker off` forces it through, which is how a deliberate
   re-flash over a corrupt partition still works.
 
-**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
+**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
+
+---
+
+### Inspect or cancel a WAN OTA update
+**Usage:**
+- `get ota.status`
+- `ota cancel`
+
+**Note:** `get ota.status` reports the current service state. During download it includes the byte
+count and total when the server supplies a content length. A failure or cancellation remains
+available as a terminal result until another update starts. `ota cancel` requests cancellation
+while the service is queued, joining, checking WAN connectivity, opening the URL, or downloading.
+Verification and partition commit are intentionally not cancellable.
+
+**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
 
 ---
 
@@ -1244,7 +1260,7 @@ of one supplied on the command line. Fails with `ERR: ota.fw.url not configured`
 set. Exists to keep remote admin updates short over LoRa -- a full firmware URL can be well over 100
 characters, and `start ota wan update` is 21.
 
-**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
+**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
 
 ---
 
@@ -1259,7 +1275,7 @@ characters, and `start ota wan update` is 21.
 **Note:** Persists across firmware updates (stored separately from node prefs). Set once; does not
 need to be resupplied for future updates unless the network's credentials change.
 
-**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
+**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
 
 ---
 
@@ -1277,7 +1293,7 @@ source is not trusted. Once set it takes precedence over the image's own embedde
 ota.fw.sha256 clear` returns to that digest — do this before pointing `start ota wan` at a different
 firmware image, or a stale pin will block it.
 
-**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
+**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
 
 ---
 
@@ -1293,7 +1309,7 @@ firmware image, or a stale pin will block it.
 for this device rather than a one-time override. Overwrite to change it; there is no `clear`.
 Rejects (does not truncate) a URL longer than the field allows.
 
-**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
+**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
 
 ---
 
@@ -1311,7 +1327,7 @@ by this project's own release pipeline, for example) — not intended for routin
 the check that exists specifically to catch a mistaken `<url>`. It also forces a re-flash of a build
 the node is already running. It never bypasses the hash check, which is always enforced.
 
-**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
+**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
 
 ---
 
@@ -1324,10 +1340,10 @@ the node is already running. It never bypasses the hash check, which is always e
 - `on` / `off`: Drives GPIO47 (the WAN power-switch control pin) directly
 
 **Note:** Diagnostic and recovery command, independent of `start ota wan` — does not join WiFi,
-download, or flash anything. Use to confirm or force the rail off if state is ever in doubt (e.g.
-after a crash or watchdog reset mid-update).
+download, or flash anything. Manual changes are refused while the OTA service is active. Use to
+confirm or force the rail off if state is ever in doubt (e.g. after a crash or watchdog reset).
 
-**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
+**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
 
 ---
 
@@ -1341,9 +1357,10 @@ after a crash or watchdog reset mid-update).
 returning in one quick attempt (~15s worst case) instead of `start ota wan`'s full patient join
 budget (~115s). `ota wan check` checks WAN reachability on demand, repeatable without rejoining.
 `ota wan leave` disconnects and drops WAN power for a clean retry. A successful `ota wan join` lets
-`start ota wan` skip its own join step right after.
+`start ota wan` skip its own join step right after. These commands refuse to interfere with an
+active OTA service.
 
-**Requires:** `WITH_HOTSPOT_OTA` build flag (Heltec V4 repeater/room server only)
+**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
 
 ---
 
@@ -1371,7 +1388,7 @@ a factory/USB-only flash).
 **Note:** Confirms automatically after the confirm delay with a working radio; rejects immediately
 (rollback + reboot) if `radio_init()` fails on a probationary boot.
 
-**Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag (Heltec V4 repeater/room server only)
+**Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag on shipped ESP32 targets
 
 ---
 
@@ -1393,7 +1410,6 @@ ESP-IDF marks any newly-selected boot partition `new`, which the bootloader prom
 that boot. `get ota.slot` will report `pending` right after the swap; this is expected, not a fault,
 and confirms `valid` again after the normal ~90s confirm delay.
 
-**Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag (Heltec V4 repeater/room server only)
+**Requires:** `WITH_OTA_ROLLBACK_GUARD` build flag on shipped ESP32 targets
 
 ---
-

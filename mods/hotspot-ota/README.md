@@ -51,6 +51,8 @@ These commands are available on devices built with these patches. They can be us
 | `start ota wan <url>`                           | Connects to the configured WiFi network, downloads the firmware from `<url>`, verifies it, checks that it is actually a build from this project, and flashes it.                                                                                                              |
 | `set ota.fw.url <url>`                          | Saves a default firmware URL. This setting can only be overwritten and cannot be cleared.                                                                                                                                                                                     |
 | `start ota wan update`                          | Same as `start ota wan <url>`, but uses the saved `ota.fw.url`. If no URL has been configured, the command returns `ota.fw.url not configured`. This shorter command is useful for remote updates over LoRa, where every character matters.                                   |
+| `get ota.status`                                | Reports the current OTA service state, download progress, or the final failure/cancellation result.                                                                                                                                                                           |
+| `ota cancel`                                    | Requests cancellation while the service is queued, joining, checking connectivity, opening the URL, or downloading.                                                                                                                                                           |
 | `set ota.fw.marker <on\|off>`                   | Controls the firmware authenticity check. It is `on` by default. Setting it to `off` temporarily disables the check for the next `start ota wan` command. The setting is stored only in RAM and is turned back on after a reboot. The SHA-256 check is still always enforced. |
 | `ota wan join` / `ota wan leave`                | Connects to the configured WiFi network without downloading firmware, or disconnects and turns off the WAN power.                                                                                                                                                             |
 | `ota wan check`                                 | Checks whether the device can reach the internet after joining the WiFi network.                                                                                                                                                                                              |
@@ -97,13 +99,16 @@ This is much shorter than sending the full URL every time.
 
 ### OTA Update Timing
 
-The `start ota wan` command does not respond immediately.
-
-Unlike most CLI commands, there is no initial acknowledgment or progress message. The device first connects to WiFi, checks the connection, downloads the firmware, verifies it, and flashes it before sending a response.
+The `start ota wan` command queues the update and responds immediately with `OK - OTA queued`.
+The OTA service then connects to WiFi, downloads, verifies, and flashes in a dedicated task while
+the normal command loop remains available. Use `get ota.status` to inspect its current state or
+download byte count. Use `ota cancel` to stop it before verification begins.
 
 The whole process can take up to around two minutes.
 
-After the update finishes, the device reboots using the new firmware and starts the automatic rollback protection process.
+After a successful update, the main loop reboots into the new firmware and starts automatic
+rollback protection. A failure or cancellation leaves the current firmware running and preserves
+the terminal result in `get ota.status` for inspection.
 
 ## [Web-Based Flasher](https://tools.mobmesh.org/flasher)
 

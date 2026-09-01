@@ -1,8 +1,8 @@
 diff --git a/src/helpers/ModHooks.cpp b/src/helpers/ModHooks.cpp
-index 1fc23750..90710e4d 100644
+index 1fc2375..f09448b 100644
 --- a/src/helpers/ModHooks.cpp
 +++ b/src/helpers/ModHooks.cpp
-@@ -1,11 +1,37 @@
+@@ -1,11 +1,44 @@
  #include <helpers/ModHooks.h>
 +#include <MeshCore.h>
  #include <target.h>   // radio_init(), board, rtc_clock
@@ -10,6 +10,10 @@ index 1fc23750..90710e4d 100644
 +#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
 +#include <SPIFFS.h>
 +#include <helpers/esp32/RollbackGuard.h>
++#endif
++
++#if defined(ESP32) && defined(WITH_HOTSPOT_OTA)
++#include <helpers/esp32/HotspotOTA.h>
 +#endif
 +
  bool modRadioInit(const char* build_id) {
@@ -37,14 +41,17 @@ index 1fc23750..90710e4d 100644
 +#if defined(ESP32) && defined(WITH_OTA_ROLLBACK_GUARD)
 +  RollbackGuard::poll();
 +#endif
++#if defined(ESP32) && defined(WITH_HOTSPOT_OTA)
++  HotspotOTA::poll();
++#endif
  }
  
  bool modWantsPowerSaving() {
 diff --git a/src/helpers/esp32/CommonCliMods.cpp b/src/helpers/esp32/CommonCliMods.cpp
-index b04b6ebe..651e2d16 100644
+index b04b6eb..8c26e1f 100644
 --- a/src/helpers/esp32/CommonCliMods.cpp
 +++ b/src/helpers/esp32/CommonCliMods.cpp
-@@ -1,32 +1,172 @@
+@@ -1,32 +1,184 @@
 -// Every CLI command the mods add, dispatched from MyMesh ahead of upstream's own chain so
 -// a mod can claim a longer prefix first. Free functions, not CommonCLI members: the hook
 -// is called from a file that has no CommonCLI instance in scope.
@@ -90,28 +97,37 @@ index b04b6ebe..651e2d16 100644
 +    HotspotOTA::loadConfig(cfg);
 +    if (cfg.url[0] == 0) {
 +      strcpy(reply, "ERR: ota.fw.url not configured");
-+    } else if (!modBoardStartOtaFromUrl(cfg.url, reply)) {
-+      // reply[] already carries the specific error from HotspotOTA::run
++    } else {
++      modBoardStartOtaFromUrl(cfg.url, reply);
 +    }
 +#endif
 +  } else if (memcmp(command, "start ota wan ", 14) == 0) {
-+    if (!modBoardStartOtaFromUrl(&command[14], reply)) {
-+      // reply[] already carries the specific error from HotspotOTA::run
-+    }
++    modBoardStartOtaFromUrl(&command[14], reply);
 +#if defined(ESP_PLATFORM) && defined(WITH_HOTSPOT_OTA)
++  } else if (strcmp(command, "ota cancel") == 0) {
++    HotspotOTA::cancel(reply);
 +  } else if (memcmp(command, "ota wan join", 12) == 0) {
 +    // Pre-flight check -- joins WiFi only, so `ota wan check` can be repeated without rejoining,
 +    // and `start ota wan` skips its own join after this (see alreadyConnectedTo()).
 +    HotspotOTA::wifiConnect(reply);
 +  } else if (memcmp(command, "ota wan leave", 13) == 0) {
-+    HotspotOTA::wifiDisconnect();
-+    strcpy(reply, "OK - disconnected");
++    if (HotspotOTA::isActive()) {
++      strcpy(reply, "ERR: OTA active");
++    } else {
++      HotspotOTA::wifiDisconnect();
++      strcpy(reply, "OK - disconnected");
++    }
 +  } else if (memcmp(command, "ota wan check", 13) == 0) {
 +    // Pre-flight check -- see `ota wan join`. Assumes WiFi already joined.
 +    HotspotOTA::checkWan(reply);
 +#endif
 +#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
 +  } else if (memcmp(command, "ota slot boot ", 14) == 0) {
++#if defined(WITH_HOTSPOT_OTA)
++    if (HotspotOTA::isActive()) {
++      strcpy(reply, "ERR: OTA active");
++    } else
++#endif
 +    if (RollbackGuard::setActivePartition(command[14], reply)) {
 +      modBoardReboot();  // doesn't return
 +    }
@@ -162,8 +178,9 @@ index b04b6ebe..651e2d16 100644
 +      strcpy(reply, "OK");
 +    }
 +  } else if (memcmp(config, "ota.wan.pwr ", 12) == 0) {
-+    // Manual GPIO47 control, independent of HotspotOTA::run() -- for recovery if state is ever in doubt.
-+    if (memcmp(&config[12], "on", 2) == 0) {
++    if (HotspotOTA::isActive()) {
++      strcpy(reply, "ERR: OTA active");
++    } else if (memcmp(&config[12], "on", 2) == 0) {
 +      HotspotOTA::setPower(true);
 +      strcpy(reply, "OK");
 +    } else if (memcmp(&config[12], "off", 3) == 0) {
@@ -202,6 +219,8 @@ index b04b6ebe..651e2d16 100644
 +    sprintf(reply, "> %s", cfg.url[0] ? cfg.url : "(not set)");
 +  } else if (memcmp(config, "ota.wan.pwr", 11) == 0) {
 +    sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
++  } else if (memcmp(config, "ota.status", 10) == 0) {
++    HotspotOTA::status(reply);
 +#if defined(ESP_PLATFORM) && defined(WITH_OTA_ROLLBACK_GUARD)
 +  } else if (memcmp(config, "ota.slot", 8) == 0) {
 +    sprintf(reply, "> %s", RollbackGuard::status());
