@@ -24,12 +24,16 @@
 #   patient budget above -- 1 attempt (~15s) so it can't block the CLI.
 # OTA_WAN_CHECK_*: advisory WAN check -- cellular modems often show L2 link
 #   up before the data session negotiates.
-build_flags:
-  PIN_HOTSPOT_PWR: 47
+capabilities:
+  wifi_station: true
+  dual_ota: true
+  battery_measurement: calibrated
+  external_power_control: true
+  fem_lna_control: true
+  deep_sleep_rail_shutdown: true
 
-  # This board's FEM can gate its LNA. Upstream dropped the capability virtual from
-  # MainBoard, so the board states it here and ModHooks compiles the calls out elsewhere.
-  MOBMESH_HAS_FEM_LNA: 1
+build_values:
+  PIN_HOTSPOT_PWR: 47
 
   # Bench-measured across 3 boards; the schematic ratio (4.9) reads ~270 mV low
   # and upstream's 5.42 reads ~90 mV high. A stored `set adc.multiplier` wins over this.
@@ -133,4 +137,3 @@ flasher:
     repeater:
       - "set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin"
       - "set tx 20"
-

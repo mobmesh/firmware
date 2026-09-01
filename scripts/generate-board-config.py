@@ -18,7 +18,7 @@ Single source of truth for per-board config, split three ways:
 
   - "inject-env"  composes the env_flag/build_src_filter entries declared by
                    each of a target's mods (mods/<name>/patches/*.meta.yaml)
-                   with the board's overrides.yaml build_flags/
+                   with the board's overrides.yaml build_values/
                    partitions_override, and inserts the result directly into
                    the given [env:<name>] section of a platformio.ini. Fails
                    loudly rather than guessing if the section or an expected
@@ -37,15 +37,17 @@ import struct
 import sys
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    sys.exit("error: PyYAML is required (pip install pyyaml)")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from mobmesh_tools.model import (
+    Capability,
+    CliIntegration,
+    IntegrationPhase,
+    PartitionLayout,
+    ProjectModel,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-INTEGRATION_PHASES = {
-    "before_radio_init", "radio_init_policy", "loop", "wants_power_saving", "cli"
-}
 SYMBOL_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 # Bootloader isn't part of the partition table itself -- its flash offset is
@@ -88,7 +90,7 @@ def bootloader_offset_for_mcu(mcu: str) -> str:
     return BOOTLOADER_OFFSET_BY_MCU_PREFIX[key]
 
 
-def parse_partitions_bin(path: Path) -> dict:
+def parse_partitions_bin(path: Path) -> PartitionLayout:
     """Parse an ESP32 partition table binary, return offsets/sizes we need."""
     data = path.read_bytes()
     found = {}
@@ -112,51 +114,20 @@ def parse_partitions_bin(path: Path) -> dict:
             f"partitions.bin at {path} is missing expected partition(s): {sorted(missing)} "
             "-- expected an otadata + ota_0 + ota_1 (dual-OTA) partition scheme"
         )
-    return found
+    return PartitionLayout(
+        otadata_offset=found["otadata"],
+        app0_offset=found["app0"],
+        app0_size=found["app0_size"],
+        app1_offset=found["app1"],
+    )
 
 
-def load_overrides(board: str) -> dict:
-    path = REPO_ROOT / "variants" / board / "overrides.yaml"
-    if not path.exists():
-        raise FileNotFoundError(f"no overrides file for board '{board}': {path}")
-    with path.open() as f:
-        return yaml.safe_load(f) or {}
+def load_board_profile(board: str):
+    return ProjectModel.load_board(REPO_ROOT, board)
 
 
-def load_build_targets() -> list:
-    path = REPO_ROOT / "build-targets.yaml"
-    if not path.exists():
-        raise FileNotFoundError(f"build-targets.yaml not found: {path}")
-    with path.open() as f:
-        data = yaml.safe_load(f) or {}
-    return data.get("targets") or []
-
-
-def load_core_mods() -> list:
-    path = REPO_ROOT / "build-targets.yaml"
-    with path.open() as f:
-        data = yaml.safe_load(f) or {}
-    return data.get("core_mods") or []
-
-
-def target_mods(target: dict, core: list = None) -> list:
-    """core_mods first, then the target's own extras. Order is the apply order,
-    so a target listing a core mod again does not move or duplicate it."""
-    if core is None:
-        core = load_core_mods()
-    out = list(core)
-    for m in target.get("mods") or []:
-        if m not in out:
-            out.append(m)
-    return out
-
-
-def load_mod_manifest(mod_name: str) -> dict:
-    path = REPO_ROOT / "mods" / mod_name / "mod.yaml"
-    if not path.exists():
-        return {}   # optional here: it carries release facts, not build wiring
-    with path.open() as f:
-        return yaml.safe_load(f) or {}
+def load_mod_definition(mod_name: str):
+    return ProjectModel.load_mod(REPO_ROOT, mod_name)
 
 
 def selected_mods(value: str) -> list:
@@ -169,9 +140,9 @@ def selected_mods(value: str) -> list:
 def composition_outputs(mods: list) -> dict:
     owners = []
     for mod_name in mods:
-        composition = load_mod_manifest(mod_name).get("composition") or {}
+        composition = load_mod_definition(mod_name).composition
         if composition:
-            owners.append((mod_name, composition.get("outputs") or {}))
+            owners.append((mod_name, {"hooks": composition.hooks, "cli": composition.cli}))
     if len(owners) != 1:
         raise ValueError(
             f"selected mods must provide exactly one composition output owner, found {len(owners)}"
@@ -193,16 +164,12 @@ def load_integrations(mods: list) -> list:
     symbols = {}
     radio_owner = None
     for order, mod_name in enumerate(mods):
-        manifest = load_mod_manifest(mod_name)
-        if manifest.get("name") != mod_name:
-            raise ValueError(f"mods/{mod_name}/mod.yaml must declare name: {mod_name}")
-        integration = manifest.get("integration")
+        definition = load_mod_definition(mod_name)
+        integration = definition.integration
         if not integration:
             continue
-        if set(integration) != {"header", "hooks"}:
-            raise ValueError(f"mod '{mod_name}' integration must contain only header and hooks")
 
-        header = integration["header"]
+        header = integration.header
         header_path = Path(header)
         if header_path.is_absolute() or ".." in header_path.parts or header_path.suffix != ".h":
             raise ValueError(f"mod '{mod_name}' has invalid integration header: {header}")
@@ -211,39 +178,32 @@ def load_integrations(mods: list) -> list:
             raise ValueError(f"mod '{mod_name}' integration header does not exist: {source_header}")
         header_text = source_header.read_text()
 
-        hooks = integration["hooks"] or {}
-        unknown = set(hooks) - INTEGRATION_PHASES
-        if unknown:
-            raise ValueError(f"mod '{mod_name}' declares unsupported integration phases: {sorted(unknown)}")
-
+        hooks = integration.hooks
         parsed = {"mod": mod_name, "order": order, "header": header, "hooks": {}}
         for phase, declaration in hooks.items():
-            if phase == "cli":
-                if not isinstance(declaration, dict) or set(declaration) != {"handler", "priority"}:
-                    raise ValueError(
-                        f"mod '{mod_name}' cli integration must contain handler and priority"
-                    )
-                symbol = declaration["handler"]
-                priority = declaration["priority"]
-                if not isinstance(priority, int):
-                    raise ValueError(f"mod '{mod_name}' cli priority must be an integer")
-                parsed["hooks"][phase] = {"symbol": symbol, "priority": priority}
+            phase_name = phase.value
+            if phase is IntegrationPhase.CLI:
+                if not isinstance(declaration, CliIntegration):
+                    raise ValueError(f"mod '{mod_name}' has an invalid cli integration")
+                symbol = declaration.handler
+                priority = declaration.priority
+                parsed["hooks"][phase_name] = {"symbol": symbol, "priority": priority}
             else:
                 symbol = declaration
-                parsed["hooks"][phase] = {"symbol": symbol}
+                parsed["hooks"][phase_name] = {"symbol": symbol}
 
             if not isinstance(symbol, str) or not SYMBOL_RE.fullmatch(symbol):
-                raise ValueError(f"mod '{mod_name}' has invalid {phase} symbol: {symbol}")
+                raise ValueError(f"mod '{mod_name}' has invalid {phase_name} symbol: {symbol}")
             if not re.search(r"\b" + re.escape(symbol) + r"\s*\(", header_text):
                 raise ValueError(
-                    f"mod '{mod_name}' {phase} symbol '{symbol}' is not declared in {header}"
+                    f"mod '{mod_name}' {phase_name} symbol '{symbol}' is not declared in {header}"
                 )
             if symbol in symbols:
                 raise ValueError(
                     f"integration symbol '{symbol}' is declared by both '{symbols[symbol]}' and '{mod_name}'"
                 )
             symbols[symbol] = mod_name
-            if phase == "radio_init_policy":
+            if phase is IntegrationPhase.RADIO_INIT_POLICY:
                 if radio_owner is not None:
                     raise ValueError(
                         f"radio_init_policy is exclusive but claimed by '{radio_owner}' and '{mod_name}'"
@@ -354,15 +314,13 @@ def cmd_compose_mods(args):
 
 
 def load_mod_patch_sidecars(mod_name: str) -> list:
-    patches_dir = REPO_ROOT / "mods" / mod_name / "patches"
-    if not patches_dir.exists():
-        return []   # a mod may ship only files/
-    sidecars = sorted(patches_dir.glob("*.meta.yaml"))
-    result = []
-    for path in sidecars:
-        with path.open() as f:
-            result.append(yaml.safe_load(f) or {})
-    return result
+    return [
+        {
+            "env_flag": patch.env_flag,
+            "build_src_filter": list(patch.build_src_filter),
+        }
+        for patch in load_mod_definition(mod_name).patches
+    ]
 
 
 def load_upstream_board_json(upstream_dir: Path, board: str) -> dict:
@@ -386,7 +344,7 @@ def load_upstream_board_json(upstream_dir: Path, board: str) -> dict:
 
 
 def cmd_boards_json(args):
-    overrides = load_overrides(args.board)
+    board = load_board_profile(args.board)
     upstream = load_upstream_board_json(Path(args.upstream_dir), args.board)
     partitions = parse_partitions_bin(Path(args.partitions_bin))
 
@@ -396,28 +354,35 @@ def cmd_boards_json(args):
         raise ValueError(f"upstream boards/{args.board}.json has no build.mcu field")
 
     board_entry = {
-        "label": overrides["flasher"]["label"],
-        "connectNote": overrides["flasher"]["connect_note"],
-        "postFlashNote": overrides["flasher"]["post_flash_note"],
+        "label": board.flasher.label,
+        "connectNote": board.flasher.connect_note,
+        "postFlashNote": board.flasher.post_flash_note,
         # True when this board's partition table (variants/<board>/overrides.yaml's
         # partitions_override) differs from upstream's stock scheme -- e.g. a resized
         # spiffs partition. The web flasher uses this to know when it can't assume an
         # already-flashed device's on-flash partition table matches ours, and must
         # probe the running firmware first (see flasher.js) rather than offer an
         # in-place "Update" blind.
-        "partitionsOverridden": bool(overrides.get("partitions_override")),
+        "partitionsOverridden": bool(board.partitions_override),
         # How to boot this board under emulation: the machine and binary, and the board
         # wiring the device models take as run-time properties. Absent, or enabled: false,
         # means the QEMU boot check skips this board rather than failing it -- for a board
         # whose hardware there is no model for.
-        "qemu": overrides.get("qemu") or {},
+        "qemu": {
+            "enabled": board.qemu.enabled,
+            "machine": board.qemu.machine,
+            "binary": board.qemu.binary,
+            "mcu": board.qemu.mcu,
+            "mem": board.qemu.mem,
+            "globals": dict(board.qemu.globals),
+        },
         "offsets": {
             "bootloader": bootloader_offset_for_mcu(mcu),
             "partitions": PARTITION_TABLE_OFFSET,
-            "otadata": hex(partitions["otadata"]),
-            "app0": hex(partitions["app0"]),
-            "app1": hex(partitions["app1"]),
-            "appMaxSize": hex(partitions["app0_size"]),
+            "otadata": hex(partitions.otadata_offset),
+            "app0": hex(partitions.app0_offset),
+            "app1": hex(partitions.app1_offset),
+            "appMaxSize": hex(partitions.app0_size),
         },
     }
 
@@ -439,7 +404,7 @@ def cmd_boards_json(args):
     # commands from member-config-*.json (see flasher.js), so a region can
     # override a board default. Omitted entirely when a variant has none, which
     # flasher.js reads as an empty list.
-    post_flash = (overrides["flasher"].get("post_flash_commands") or {}).get(args.variant_id)
+    post_flash = board.flasher.post_flash_commands.get(args.variant_id)
     if post_flash:
         variant_entry["postFlashCommands"] = list(post_flash)
 
@@ -456,84 +421,36 @@ def cmd_boards_json(args):
 
 
 def cmd_resolve_targets(args):
-    targets = load_build_targets()
-    if not targets:
-        sys.exit("error: build-targets.yaml has no targets")
-
-    core = load_core_mods()
-    rows = []
-    for t in targets:
-        for field in ("board", "role", "build_env", "upstream_tag_prefix", "release_title",
-                      "asset_role_abbrev", "vendor_flasher_assets", "make_latest"):
-            if field not in t:
-                sys.exit(f"error: build-targets.yaml entry for board '{t.get('board')}' "
-                          f"role '{t.get('role')}' is missing required field '{field}'")
-
-        mods = target_mods(t, core)
-        if not mods:
-            sys.exit(f"error: build-targets.yaml entry for board '{t.get('board')}' "
-                      f"role '{t.get('role')}' resolves to no mods (set core_mods or mods)")
-
-        # Fixed element -- the mod set lives in the image's bitfield, not the name.
-        asset_basename = "_".join([t["board"], t["asset_role_abbrev"], "mobmesh"])
-
-        rows.append({
-            "id": t["role"],
-            "board_id": t["board"],
-            "build_env": t["build_env"],
-            "upstream_tag_prefix": t["upstream_tag_prefix"],
-            "release_title": t["release_title"],
-            "asset_basename": asset_basename,
-            "vendor_flasher_assets": t["vendor_flasher_assets"],
-            "make_latest": t["make_latest"],
-            "mods": mods,
-            # Optional. Raw flags appended after upstream's, so they can override
-            # what the env already sets.
-            "build_flags_append": t.get("build_flags_append") or [],
-            # Optional, default on. Set false for a role that cannot be exercised under
-            # emulation even though its board can -- the board-level switch lives in
-            # variants/<board>/overrides.yaml's qemu block and covers the whole board.
-            "qemu_boot_check": bool(t.get("qemu_boot_check", True)),
-        })
-
-    # Targets sharing an upstream_tag_prefix publish to the same shared release (see
-    # build-release.yml's release_tag), so release_title/make_latest are release-level
-    # facts, not per-target ones -- disagreement here would mean whichever job runs last
-    # silently overwrites the release's name or latest-flag.
-    by_prefix = {}
-    for row in rows:
-        by_prefix.setdefault(row["upstream_tag_prefix"], []).append(row)
-    for prefix, group in by_prefix.items():
-        for field in ("release_title", "make_latest"):
-            values = {row[field] for row in group}
-            if len(values) > 1:
-                sys.exit(
-                    f"error: build-targets.yaml targets sharing upstream_tag_prefix "
-                    f"'{prefix}' disagree on '{field}': {values} -- they publish to the same "
-                    f"release and must agree (boards: {[row['board_id'] for row in group]})"
-                )
-
-    # Exactly one target per board must vendor that board's flasher assets (bootloader/
-    # partitions/boot_app0) -- zero means the web flasher's "New device" flow silently has
-    # no data for that board (the original xiao_c3 gap); more than one is wasted duplicate
-    # work writing the same board-keyed files from different roles.
-    by_board = {}
-    for row in rows:
-        by_board.setdefault(row["board_id"], []).append(row)
-    for board, group in by_board.items():
-        vendors = [row for row in group if row["vendor_flasher_assets"]]
-        if len(vendors) != 1:
-            sys.exit(
-                f"error: board '{board}' has {len(vendors)} targets with "
-                f"vendor_flasher_assets: true (expected exactly 1): "
-                f"{[row['id'] for row in vendors]}"
-            )
-
-    output = json.dumps({"include": rows})
+    plan = ProjectModel.load(REPO_ROOT).build_plan
+    output = plan.matrix_json()
+    if args.plan_out:
+        Path(args.plan_out).write_text(json.dumps(plan.as_dict(), indent=2) + "\n")
     if args.out:
         Path(args.out).write_text(output + "\n")
     else:
         print(output)
+
+
+def cmd_project_info(args):
+    model = ProjectModel.load(REPO_ROOT)
+    if args.field == "ordered-mods":
+        values = model.ordered_mods()
+    elif args.field == "patches":
+        values = tuple(
+            str(patch.patch_path.relative_to(REPO_ROOT / "mods"))
+            for name in model.ordered_mods()
+            for patch in model.mods[name].patches
+        )
+    else:
+        values = model.upstream_pr_entries()
+    print(args.separator.join(values))
+
+
+def cmd_validate_mods(args):
+    model = ProjectModel.load(REPO_ROOT)
+    mods = selected_mods(args.mods)
+    model.validate_mod_selection(mods)
+    print("OK: mod selection and patch dependency order are valid")
 
 
 def find_section(lines: list, env: str, ini_path: Path):
@@ -589,7 +506,8 @@ def cmd_copy_src(args):
     """
     upstream = Path(args.upstream)
     copied = 0
-    for mod in [m.strip() for m in args.mods.split(",") if m.strip()]:
+    for mod in selected_mods(args.mods):
+        load_mod_definition(mod)
         src = REPO_ROOT / "mods" / mod / "files"
         if not src.is_dir():
             continue
@@ -611,7 +529,7 @@ def cmd_inject_env(args):
     env = args.env
     ini_path = Path(args.platformio_ini)
     mods = selected_mods(args.mods)
-    overrides = load_overrides(board)
+    board_profile = load_board_profile(board)
 
     env_flag_owner = {}
     env_flag_lines = []
@@ -622,16 +540,17 @@ def cmd_inject_env(args):
         # A mod that ships its own source declares its flags once, in mod.yaml, and its
         # build_src_filter is derived from what is actually under files/ rather than
         # restated by hand. Sidecars still carry both for mods that are patch-only.
-        manifest = load_mod_manifest(mod_name)
+        definition = load_mod_definition(mod_name)
         mod_src = REPO_ROOT / "mods" / mod_name / "files" / "src"
-        declared = [{"env_flag": f} for f in (manifest.get("env_flags") or [])]
+        declared = [{"env_flag": f} for f in definition.env_flags]
         derived = [{"build_src_filter": [
             f"+<{path.relative_to(mod_src).as_posix()}>"
             for path in sorted(mod_src.rglob("*.cpp"))
         ]}] if mod_src.is_dir() else []
         generated = []
-        outputs = (manifest.get("composition") or {}).get("outputs") or {}
-        for output in outputs.values():
+        composition = definition.composition
+        outputs = (composition.hooks, composition.cli) if composition else ()
+        for output in outputs:
             path = Path(output)
             if path.parts[:1] == ("src",) and path.suffix == ".cpp":
                 generated.append(f"+<{Path(*path.parts[1:]).as_posix()}>")
@@ -654,7 +573,10 @@ def cmd_inject_env(args):
                     seen_src_filter.add(entry)
 
     override_flag_lines = []
-    for key, value in (overrides.get("build_flags") or {}).items():
+    build_values = dict(board_profile.build_values)
+    if board_profile.capability(Capability.FEM_LNA_CONTROL).satisfies_requirement:
+        build_values["MOBMESH_HAS_FEM_LNA"] = 1
+    for key, value in build_values.items():
         if isinstance(value, str):
             override_flag_lines.append(f'-D {key}=\'"{value}"\'')
         else:
@@ -663,11 +585,11 @@ def cmd_inject_env(args):
     # Raw flags appended after upstream's own, so they win when both set the same
     # macro (e.g. "-UDISPLAY_CLASS"). Prepended flags cannot. Board-level first,
     # then this target's.
-    append_flag_lines = [str(f) for f in (overrides.get("build_flags_append") or [])]
+    append_flag_lines = list(board_profile.build_flags_append)
     append_flag_lines += [f.strip() for f in (getattr(args, "append_flags", "") or "").split(",") if f.strip()]
 
     all_build_flags_lines = env_flag_lines + override_flag_lines
-    partitions_override = overrides.get("partitions_override")
+    partitions_override = board_profile.partitions_override
 
     lines = ini_path.read_text().splitlines(keepends=True)
     start, end = find_section(lines, env, ini_path)
@@ -741,7 +663,17 @@ def main():
 
     p_rt = sub.add_parser("resolve-targets", help="emit the CI build matrix from build-targets.yaml")
     p_rt.add_argument("--out", help="write JSON to this file instead of stdout")
+    p_rt.add_argument("--plan-out", help="write the full resolved BuildPlan JSON to this file")
     p_rt.set_defaults(func=cmd_resolve_targets)
+
+    p_pi = sub.add_parser("project-info", help="emit a typed project-model query")
+    p_pi.add_argument("--field", choices=("ordered-mods", "patches", "upstream-prs"), required=True)
+    p_pi.add_argument("--separator", default=" ")
+    p_pi.set_defaults(func=cmd_project_info)
+
+    p_vm = sub.add_parser("validate-mods", help="validate a selected mod and patch order")
+    p_vm.add_argument("--mods", required=True, help="comma-separated mod names in application order")
+    p_vm.set_defaults(func=cmd_validate_mods)
 
     p_ie = sub.add_parser("inject-env", help="inject a target's mod + board flags into a platformio.ini env")
     p_ie.add_argument("--board", required=True)

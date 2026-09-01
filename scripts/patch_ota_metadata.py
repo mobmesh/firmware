@@ -26,6 +26,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MODS_DIR = REPO_ROOT / "mods"
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+from mobmesh_tools.model import ProjectModel, ProjectModelError
 
 RESERVED_OFFSET = 208
 RESERVED_LEN = 80
@@ -118,18 +121,15 @@ def field(value, length, name):
 
 def load_mod_registry(mods_dir=MODS_DIR):
     """Every mod that has earned a bit, by name. Absent keys mean "not detectable"."""
-    import yaml
-
     registry = {}
-    for manifest in sorted(Path(mods_dir).glob("*/mod.yaml")):
-        meta = yaml.safe_load(manifest.read_text()) or {}
-        bit, marker = meta.get("bit"), meta.get("image_marker")
-        if bit is None or marker is None:
-            continue
-        name = meta.get("name") or manifest.parent.name
-        if not isinstance(bit, int) or not 0 <= bit < 32:
-            raise ImageError(f"{manifest}: bit must be an integer 0-31, got {bit!r}")
-        registry[name] = (bit, marker.encode())
+    mods_dir = Path(mods_dir)
+    try:
+        for manifest in sorted(mods_dir.glob("*/mod.yaml")):
+            definition = ProjectModel.load_mod(mods_dir.parent, manifest.parent.name)
+            if definition.bit is not None:
+                registry[definition.name] = (definition.bit, definition.image_marker.encode())
+    except ProjectModelError as exc:
+        raise ImageError(str(exc)) from exc
     return registry
 
 

@@ -10,6 +10,10 @@ env_flags: [WITH_HOTSPOT_OTA, WITH_OTA_ROLLBACK_GUARD]
 bit: 1
 image_marker: "H0TSP0T"
 
+requirements:
+  required: [wifi_station, dual_ota]
+  optional: [external_power_control]
+
 integration:
   header: helpers/esp32/HotspotOtaIntegration.h
   hooks:

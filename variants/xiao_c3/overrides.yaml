@@ -17,7 +17,15 @@
 #   hotspot power-switch GPIO is confirmed.
 # OTA_WIFI_JOIN_*/OTA_HTTP_TIMEOUT_MS/OTA_WAN_CHECK_*: carried over from
 #   heltec_v4 as sensible starting defaults, not yet tuned for this board.
-build_flags:
+capabilities:
+  wifi_station: true
+  dual_ota: true
+  battery_measurement: unverified
+  external_power_control: unverified
+  fem_lna_control: false
+  deep_sleep_rail_shutdown: false
+
+build_values:
   PIN_HOTSPOT_PWR: 47
   OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS: 15000
   OTA_WIFI_JOIN_RETRY_DELAY_MS: 5000

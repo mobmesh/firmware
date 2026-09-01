@@ -101,7 +101,7 @@ class InvalidCompositionTestCase(unittest.TestCase):
     def test_unknown_phase_is_rejected(self):
         self.write_header("feature", "void testHook();\n")
         self.write_manifest("feature", self.integration("testHook", "unknown_phase"))
-        with self.assertRaisesRegex(ValueError, "unsupported integration phases"):
+        with self.assertRaisesRegex(ValueError, "unknown integration phase"):
             gbc.load_integrations(["feature"])
 
     def test_symbol_must_be_declared_in_header(self):

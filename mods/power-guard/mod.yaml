@@ -4,6 +4,10 @@ name: power-guard
 
 env_flags: [WITH_POWER_GUARD]
 
+requirements:
+  required: [battery_measurement]
+  optional: [fem_lna_control, deep_sleep_rail_shutdown]
+
 integration:
   header: helpers/esp32/PowerGuardIntegration.h
   hooks:

@@ -38,16 +38,9 @@ jobs:
           DRIFT=false
 
           # --- 1. do the patches still apply? -------------------------------------
-          # Every target shares one mod list today, so a single probe covers them all.
-          MODS=$(python3 -c "
-          import yaml
-          d = yaml.safe_load(open('build-targets.yaml'))
-          seen = list(d.get('core_mods') or [])
-          for x in d['targets']:
-              for m in (x.get('mods') or []):
-                  if m not in seen: seen.append(m)
-          print(' '.join(seen))
-          ")
+          # Probe the ordered union so target-specific mods are included without
+          # applying any patch more than once.
+          MODS=$(python3 scripts/generate-board-config.py project-info --field ordered-mods)
           echo "mods: $MODS"
 
           # Three-way on failure keeps the tree realistic, so one broken patch does not
@@ -125,15 +118,7 @@ jobs:
           # --- 2. has a carried upstream PR been merged? ---------------------------
           # Sidecars may declare `upstream_prs: [1972, 1349]`. A merged PR means the patch
           # carrying it wants re-review, not just a rebase.
-          PRS=$(python3 -c "
-          import glob, yaml
-          out = []
-          for f in sorted(glob.glob('mods/*/patches/*.meta.yaml')):
-              d = yaml.safe_load(open(f)) or {}
-              for pr in d.get('upstream_prs') or []:
-                  out.append(f\"{f.split('/')[1]}/{d.get('id','?')}:{pr}\")
-          print(' '.join(out))
-          ")
+          PRS=$(python3 scripts/generate-board-config.py project-info --field upstream-prs)
           for entry in $PRS; do
             patch="${entry%%:*}"; pr="${entry##*:}"
             state=$(gh api "repos/${UPSTREAM_REPO}/pulls/${pr}" \
