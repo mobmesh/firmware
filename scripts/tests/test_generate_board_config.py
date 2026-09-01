@@ -75,10 +75,18 @@ class InjectEnvTestCase(unittest.TestCase):
         return path
 
     def _make_mod(self, name: str, patches: dict):
+        self._write(f"mods/{name}/mod.yaml", f"name: {name}\n")
         for patch_id, sidecar in patches.items():
             self._write(f"mods/{name}/patches/{patch_id}.meta.yaml", sidecar)
+            self._write(f"mods/{name}/patches/{patch_id}_test.patch", "")
 
     def _make_overrides(self, board: str, content: str):
+        if "capabilities:" not in content:
+            content = "capabilities: {}\n" + content
+        if "qemu:" not in content:
+            content += "qemu:\n  enabled: false\n"
+        if "flasher:" not in content:
+            content += "flasher:\n  label: test\n  connect_note: test\n  post_flash_note: test\n"
         self._write(f"variants/{board}/overrides.yaml", content)
 
     def _run(self, ini_path: Path, board="heltec_v4", env="heltec_v4_repeater", mods="hotspot-ota",
@@ -98,7 +106,7 @@ class InjectEnvTestCase(unittest.TestCase):
             ),
         })
         self._make_overrides("heltec_v4", (
-            "build_flags:\n  PIN_HOTSPOT_PWR: 47\npartitions_override: null\n"
+            "build_values:\n  PIN_HOTSPOT_PWR: 47\npartitions_override: null\n"
         ))
         ini_path = self._write("platformio.ini", SAMPLE_INI)
 
@@ -115,7 +123,7 @@ class InjectEnvTestCase(unittest.TestCase):
 
     def _minimal_mod_and_overrides(self):
         self._make_mod("hotspot-ota", {"0001": "id: \"0001\"\ntitle: x\nrequires: []\n"})
-        self._make_overrides("heltec_v4", "build_flags: {}\npartitions_override: null\n")
+        self._make_overrides("heltec_v4", "build_values: {}\npartitions_override: null\n")
 
     def _flag_order(self, section: str, *needles):
         return [section.index(n) for n in needles]
@@ -186,7 +194,7 @@ class InjectEnvTestCase(unittest.TestCase):
         # Same mechanism, declared per-board instead of per-target.
         self._make_mod("hotspot-ota", {"0001": "id: \"0001\"\ntitle: x\nrequires: []\n"})
         self._make_overrides("heltec_v4", (
-            "build_flags: {}\nbuild_flags_append: [\"-UDISPLAY_CLASS\"]\n"
+            "build_values: {}\nbuild_flags_append: [\"-UDISPLAY_CLASS\"]\n"
             "partitions_override: null\n"
         ))
         ini_path = self._write("platformio.ini", COMMENTED_FLAGS_INI)
@@ -202,7 +210,7 @@ class InjectEnvTestCase(unittest.TestCase):
     def test_partitions_override_vendors_file_and_uses_project_relative_path(self):
         self._make_mod("hotspot-ota", {"0001": "id: \"0001\"\ntitle: x\nrequires: []\n"})
         self._make_overrides("xiao_c3", (
-            "build_flags: {}\npartitions_override: partitions_xiao_c3.csv\n"
+            "build_values: {}\npartitions_override: partitions_xiao_c3.csv\n"
         ))
         self._write("variants/xiao_c3/partitions_xiao_c3.csv", "# Name,Type,SubType,Offset,Size\n")
         # Mirrors the real layout: the target ini lives under upstream-src/variants/<board>/,
@@ -221,7 +229,7 @@ class InjectEnvTestCase(unittest.TestCase):
     def test_missing_partitions_file_hard_fails(self):
         self._make_mod("hotspot-ota", {"0001": "id: \"0001\"\ntitle: x\nrequires: []\n"})
         self._make_overrides("xiao_c3", (
-            "build_flags: {}\npartitions_override: does_not_exist.csv\n"
+            "build_values: {}\npartitions_override: does_not_exist.csv\n"
         ))
         ini_path = self._write("upstream-src/variants/xiao_c3/platformio.ini", SAMPLE_INI.replace(
             "heltec_v4", "xiao_c3"
@@ -250,7 +258,7 @@ class InjectEnvTestCase(unittest.TestCase):
 
     def test_missing_section_hard_fails(self):
         self._make_mod("hotspot-ota", {"0001": "id: \"0001\"\ntitle: x\nrequires: []\n"})
-        self._make_overrides("heltec_v4", "build_flags: {}\npartitions_override: null\n")
+        self._make_overrides("heltec_v4", "build_values: {}\npartitions_override: null\n")
         ini_path = self._write("platformio.ini", SAMPLE_INI)
 
         with self.assertRaises(SystemExit):
@@ -258,7 +266,7 @@ class InjectEnvTestCase(unittest.TestCase):
 
     def test_missing_build_flags_key_hard_fails(self):
         self._make_mod("hotspot-ota", {"0001": "id: \"0001\"\ntitle: x\nrequires: []\n"})
-        self._make_overrides("heltec_v4", "build_flags: {}\npartitions_override: null\n")
+        self._make_overrides("heltec_v4", "build_values: {}\npartitions_override: null\n")
         ini_path = self._write("platformio.ini", NO_BUILD_FLAGS_INI)
 
         with self.assertRaises(SystemExit):
@@ -267,7 +275,7 @@ class InjectEnvTestCase(unittest.TestCase):
     def test_duplicate_env_flag_across_mods_hard_fails(self):
         self._make_mod("mod-a", {"0001": "id: \"0001\"\ntitle: a\nrequires: []\nenv_flag: WITH_SAME_FLAG\n"})
         self._make_mod("mod-b", {"0001": "id: \"0001\"\ntitle: b\nrequires: []\nenv_flag: WITH_SAME_FLAG\n"})
-        self._make_overrides("heltec_v4", "build_flags: {}\npartitions_override: null\n")
+        self._make_overrides("heltec_v4", "build_values: {}\npartitions_override: null\n")
         ini_path = self._write("platformio.ini", SAMPLE_INI)
 
         with self.assertRaises(SystemExit):
@@ -280,7 +288,7 @@ class InjectEnvTestCase(unittest.TestCase):
             "    hooks: src/helpers/ModHooks.cpp\n"
             "    cli: src/helpers/esp32/CommonCliMods.cpp\n",
         )
-        self._make_overrides("heltec_v4", "build_flags: {}\npartitions_override: null\n")
+        self._make_overrides("heltec_v4", "build_values: {}\npartitions_override: null\n")
         ini_path = self._write("platformio.ini", SAMPLE_INI)
 
         self._run(ini_path, mods="shim")
@@ -344,7 +352,8 @@ class BoardsJsonTestCase(unittest.TestCase):
         return json.loads(out.read_text())["heltec_v4"]["variants"][variant_id]
 
     FLASHER_BASE = (
-        "build_flags: {}\npartitions_override: null\n"
+        "capabilities: {}\nbuild_values: {}\npartitions_override: null\n"
+        "qemu:\n  enabled: false\n"
         "flasher:\n  label: \"Heltec V4\"\n  connect_note: \"c\"\n  post_flash_note: \"p\"\n"
     )
 
@@ -397,20 +406,32 @@ class ResolveTargetsTestCase(unittest.TestCase):
         self._write(f"mods/{name}/mod.yaml", f"name: {name}\n")
 
     def _run(self, mods, core=None) -> dict:
-        head = f"core_mods: [{', '.join(core)}]\n" if core else ""
-        self._write("build-targets.yaml", head + "targets:\n" + (
+        head = f"core_mods: [{', '.join(core or [])}]\n"
+        self._write("variants/heltec_v4/overrides.yaml", (
+            "capabilities: {}\nbuild_values: {}\npartitions_override: null\n"
+            "qemu:\n  enabled: false\n"
+            "flasher:\n  label: test\n  connect_note: test\n  post_flash_note: test\n"
+        ))
+        self._write("build-targets.yaml", head + (
+            "roles:\n"
+            "  repeater:\n"
+            "    asset_role_abbrev: rep\n"
+            "    release_channel: repeater\n"
+            "release_channels:\n"
+            "  repeater:\n"
+            "    upstream_tag_prefix: repeater\n"
+            "    release_title: Repeater\n"
+            "    make_latest: true\n"
+            "targets:\n"
             "  - board: heltec_v4\n"
             "    role: repeater\n"
             "    build_env: heltec_v4_repeater\n"
-            "    upstream_tag_prefix: repeater\n"
-            "    release_title: Repeater\n"
-            "    asset_role_abbrev: rep\n"
             "    vendor_flasher_assets: true\n"
-            "    make_latest: true\n"
+            "    qemu_boot_check: false\n"
             f"    mods: [{', '.join(mods)}]\n"
         ))
         out = self.repo_root / "out.json"
-        gbc.cmd_resolve_targets(argparse.Namespace(out=str(out)))
+        gbc.cmd_resolve_targets(argparse.Namespace(out=str(out), plan_out=None))
         return json.loads(out.read_text())["include"][0]
 
     def test_asset_basename_does_not_vary_with_the_mod_set(self):
@@ -449,7 +470,7 @@ class ResolveTargetsTestCase(unittest.TestCase):
         self.assertEqual(row["mods"], ["shim", "hotspot-ota"])
 
     def test_no_mods_anywhere_is_an_error(self):
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(ValueError):
             self._run([])
 
 

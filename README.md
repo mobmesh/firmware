@@ -41,13 +41,13 @@ Some mods may add extra options or requirements for a traditional flasher. Check
   * `files/` mirrors the upstream directory layout and is copied into the source tree before anything is patched. This is the mod's own code -- files nothing upstream has ever seen, so there is no diff to apply and they are edited directly.
   * `patches/*.patch` carries only the edits to files this mod did not create -- the upstream MeshCore source, or a file another mod added. Each has a `.meta.yaml` sidecar declaring its dependencies.
 
-  `mod.yaml` holds facts about the mod as a whole -- its build flags, integration phases and, where it has one, its image marker bit. Each mod also has its own documentation. The feature mods are `hotspot-ota`, `timing-safety` and `power-guard`; `shim` is internal plumbing that owns the hook points and generated aggregates the others attach to.
+  `mod.yaml` holds facts about the mod as a whole -- its build flags, integration phases, board-capability contract and, where it has one, its image marker bit. Each mod also has its own documentation. The feature mods are `hotspot-ota`, `timing-safety` and `power-guard`; `shim` is internal plumbing that owns the hook points and generated aggregates the others attach to.
 
-* `variants/<board>/` contains configuration changes that are specific to a board. This includes things like GPIO pins, timing values, and sometimes a custom partition layout. The folder structure follows the same `variants/<board>/` layout used by upstream MeshCore.
+* `variants/<board>/` contains configuration changes that are specific to a board. Hardware capabilities are separate from build values such as GPIO pins and timing, and a board may also provide a custom partition layout. The folder structure follows the same `variants/<board>/` layout used by upstream MeshCore.
 
   We don't copy board information that MeshCore already knows about. Things like the MCU, flash size, USB IDs, and PSRAM settings are taken directly from the upstream `boards/<board>.json` file.
 
-* `scripts/generate-board-config.py` builds the final board configuration using the board's `overrides.yaml`, the board information from upstream, and the actual `partitions.bin` created during the build. This keeps us from having to manually enter the same information in multiple places.
+* `scripts/mobmesh_tools/` parses targets, boards, mods and patch sidecars into one validated project model. `scripts/generate-board-config.py` consumes that model, upstream's board information, and the actual `partitions.bin` created during the build. CI resolves the model to `BuildPlan.json` before deriving its matrix.
 
 * `scripts/rebase-patches.sh` moves the patch set onto a newer upstream ref. It is the only script here meant to be run by hand; everything else under `scripts/` and `scripts/tests/` is invoked by a workflow. Scripts a test imports are named with underscores, the rest with hyphens.
 
@@ -77,7 +77,7 @@ partition table and otadata in one file, written at offset 0 to a blank board. T
 
 Each Variant/Board pair uses its own release tag, so they are all built and released independently even when they share an upstream tag sequence (e.g. both boards' Repeater builds track `repeater-v*`).
 
-`build-targets.yaml` at the repo root is the single source of truth for which (board, role) combinations get built and which mods each one includes -- the CI matrix is generated from it, not hand-maintained. Adding support for another board is normally just adding entries there plus a `variants/<board>/overrides.yaml` file; the mod itself should not need any changes unless the new board requires something the existing mod does not support.
+`build-targets.yaml` at the repo root is the single source of truth for roles, release channels, and which (board, role) combinations get built with which mods. The CI matrix is generated from it, not hand-maintained. Adding support for another board is normally just adding entries there plus a `variants/<board>/overrides.yaml` file; the resolver rejects a mod when the board does not satisfy its required capabilities.
 
 ## How It Works
 

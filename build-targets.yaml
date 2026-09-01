@@ -1,6 +1,7 @@
 # Single source of truth for what gets built and released.
 #
-# Each entry is one (board, role) combination this project ships. `mods`
+# Roles own asset naming and release-channel selection. Release channels own tag and
+# publication facts. Each target is one (board, role) combination this project ships. `mods`
 # lists which mods/<name>/ this target includes -- every target lists every
 # mod it wants explicitly, nothing is applied by default. Board hardware
 # facts (pins, timeouts, partitions, flasher notes) live in
@@ -23,16 +24,29 @@
 # optional belongs in a target's own `mods:` list instead.
 core_mods: [shim, hotspot-ota, timing-safety]
 
+roles:
+  repeater:
+    asset_role_abbrev: rep
+    release_channel: repeater
+  room_server:
+    asset_role_abbrev: room
+    release_channel: room_server
+
+release_channels:
+  repeater:
+    upstream_tag_prefix: repeater
+    release_title: Repeater
+    make_latest: true
+  room_server:
+    upstream_tag_prefix: room-server
+    release_title: Room
+    make_latest: false
+
 targets:
   - board: heltec_v4
     role: repeater
     build_env: heltec_v4_repeater
-    upstream_tag_prefix: repeater
-    release_title: Repeater
-    asset_role_abbrev: rep
     vendor_flasher_assets: true
-    # If true, must match across all targets of this role.
-    make_latest: true
     # heltec_v4 only: its battery divider is the one that has been bench-measured.
     mods: [power-guard]
     # Headless: drops the OLED and the button's long-press power-off.
@@ -42,31 +56,18 @@ targets:
   - board: heltec_v4
     role: room_server
     build_env: heltec_v4_room_server
-    upstream_tag_prefix: room-server
-    release_title: Room
-    asset_role_abbrev: room
     vendor_flasher_assets: false
-    make_latest: false
     mods: []      # extras beyond core_mods
     # qemu_boot_check: false   # opt this role out of the emulator gate
 
   - board: xiao_c3
     role: repeater
     build_env: Xiao_C3_repeater
-    upstream_tag_prefix: repeater
-    release_title: Repeater
-    asset_role_abbrev: rep
     vendor_flasher_assets: true
-    # If true, must match across all targets of this role.
-    make_latest: true
     mods: []      # extras beyond core_mods
 
   - board: xiao_c3
     role: room_server
     build_env: Xiao_C3_room_server
-    upstream_tag_prefix: room-server
-    release_title: Room
-    asset_role_abbrev: room
     vendor_flasher_assets: false
-    make_latest: false
     mods: []      # extras beyond core_mods

@@ -23,25 +23,13 @@ STATE="$WORKDIR/.rebase-state"
 # Same order CI applies them in: mods in build-targets.yaml order (union across
 # targets, first appearance wins), then each mod's patches sorted by filename.
 mod_list() {
-  patch_list | cut -d/ -f1 | awk '!seen[$0]++' | paste -sd,
+  python3 "$REPO_ROOT/scripts/generate-board-config.py" project-info \
+    --field ordered-mods --separator ,
 }
 
 patch_list() {
-  python3 - "$REPO_ROOT" <<'PY'
-import sys, glob, os, yaml
-root = sys.argv[1]
-data = yaml.safe_load(open(os.path.join(root, "build-targets.yaml")))
-mods = list(data.get("core_mods") or [])
-for t in data["targets"]:
-    for m in (t.get("mods") or []):
-        if m not in mods:
-            mods.append(m)
-for m in mods:
-    for p in sorted(glob.glob(os.path.join(root, "mods", m, "patches", "*.patch"))):
-        # path relative to mods/, so "mods/$name" resolves and the commit subject
-        # round-trips back to the same file in `finish`
-        print(f"{m}/patches/{os.path.basename(p)}")
-PY
+  python3 "$REPO_ROOT/scripts/generate-board-config.py" project-info \
+    --field patches --separator $'\n'
 }
 
 cmd_start() {
