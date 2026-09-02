@@ -1,7 +1,7 @@
 # Single source of truth for what gets built and released.
 #
-# Roles own asset naming and release-channel selection. Release channels own tag and
-# publication facts. Each target is one (board, role) combination this project ships. `mods`
+# Roles own asset naming, upstream tag selection, and publication facts. Each target is
+# one (board, role) combination this project ships. `mods`
 # lists which mods/<name>/ this target includes -- every target lists every
 # mod it wants explicitly, nothing is applied by default. Board hardware
 # facts (pins, timeouts, partitions, flasher notes) live in
@@ -27,17 +27,11 @@ core_mods: [shim, hotspot-ota, timing-safety]
 roles:
   repeater:
     asset_role_abbrev: rep
-    release_channel: repeater
-  room_server:
-    asset_role_abbrev: room
-    release_channel: room_server
-
-release_channels:
-  repeater:
     upstream_tag_prefix: repeater
     release_title: Repeater
     make_latest: true
   room_server:
+    asset_role_abbrev: room
     upstream_tag_prefix: room-server
     release_title: Room
     make_latest: false

@@ -35,6 +35,9 @@ class CurrentProjectModelTestCase(unittest.TestCase):
     def test_build_plan_serialization_is_deterministic(self):
         self.assertEqual(self.model.build_plan.to_json(), ProjectModel.load(REPO_ROOT).build_plan.to_json())
 
+    def test_build_plan_has_no_unused_schema(self):
+        self.assertNotIn("schema", self.model.build_plan.as_dict())
+
     def test_capability_state_is_present_in_every_target(self):
         for target in self.model.build_plan.targets:
             self.assertEqual(set(target.capabilities), {
@@ -64,9 +67,6 @@ core_mods: {core_mods}
 roles:
   repeater:
     asset_role_abbrev: rep
-    release_channel: repeater
-release_channels:
-  repeater:
     upstream_tag_prefix: repeater
     release_title: Repeater
     make_latest: true
@@ -105,6 +105,27 @@ requirements:
         self.project(requirement="optional")
         plan = ProjectModel.load(self.root).build_plan
         self.assertEqual(plan.targets[0].capabilities["battery_measurement"], "unverified")
+
+    def test_calibrated_capability_is_rejected(self):
+        self.project(capability="calibrated", requirement="optional")
+        with self.assertRaisesRegex(ProjectModelError, "expected true, false, or unverified"):
+            ProjectModel.load(self.root)
+
+    def test_duplicate_tag_prefix_is_rejected(self):
+        self.project(requirement="optional")
+        path = self.root / "build-targets.yaml"
+        text = path.read_text().replace(
+            "targets:\n",
+            "  room_server:\n"
+            "    asset_role_abbrev: room\n"
+            "    upstream_tag_prefix: repeater\n"
+            "    release_title: Room\n"
+            "    make_latest: false\n"
+            "targets:\n",
+        )
+        path.write_text(text)
+        with self.assertRaisesRegex(ProjectModelError, "upstream_tag_prefix: also belongs to 'repeater'"):
+            ProjectModel.load(self.root)
 
     def test_unknown_field_reports_its_source(self):
         self.project(requirement="optional")
