@@ -360,7 +360,7 @@ def cmd_boards_json(args):
         # True when this board's partition table (variants/<board>/overrides.yaml's
         # partitions_override) differs from upstream's stock scheme -- e.g. a resized
         # spiffs partition. The web flasher uses this to know when it can't assume an
-        # already-flashed device's on-flash partition table matches ours, and must
+        # already-flashed device's on-flash partition table matches this one, and must
         # probe the running firmware first (see flasher.js) rather than offer an
         # in-place "Update" blind.
         "partitionsOverridden": bool(board.partitions_override),

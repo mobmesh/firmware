@@ -38,7 +38,7 @@ def extract_commands_from_markdown(md_file_path):
             notes_block = []
             current_block = None
 
-            # Process lines until we hit the next ## or ### or #### or end of file
+            # Process lines until the next ## or ### or #### or end of file
             while i < len(lines):
                 current = lines[i]
 
