@@ -30,7 +30,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          pip install --quiet pyyaml
+          pip install --quiet pyyaml==6.0.3
           REPORT=report.md
           EXPLAIN=explain.md
           : > "$REPORT"
@@ -180,7 +180,7 @@ jobs:
         if: steps.probe.outputs.dev_buildable == 'true'
         continue-on-error: true
         run: |
-          pip install --quiet --upgrade platformio
+          pip install --quiet platformio==6.1.19
           # FEM bypass on: it is off in every shipped build, so a default build would
           # preprocess away the code that broke.
           FLAGS="-D 'OTA_MOD_BUILD_DATE=\"canary\"' -D 'OTA_MOD_SHORT_SHA=\"canary\"' -D POWER_GUARD_AUTO_DROP_FEM_LNA=1"

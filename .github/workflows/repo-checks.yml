@@ -34,7 +34,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install what the tests import
-        run: pip install --quiet pyyaml
+        run: pip install --quiet pyyaml==6.0.3
 
       - id: run
         name: Run scripts/tests
