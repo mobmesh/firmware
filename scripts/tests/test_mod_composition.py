@@ -24,7 +24,9 @@ class RealCompositionTestCase(unittest.TestCase):
     def test_shipped_target_order_matches_existing_behavior(self):
         hooks, cli = self.compose("shim,hotspot-ota,timing-safety,power-guard")
         self.assertLess(hooks.index("hotspotOtaLoop();"), hooks.index("powerGuardLoop();"))
-        self.assertLess(cli.index("powerGuardHandleCli"), cli.index("hotspotOtaHandleCli"))
+        # hotspot-ota must reach the CLI first: power-guard consumes poweroff/shutdown
+        # unconditionally, so the OTA interlock would never see them from behind it.
+        self.assertLess(cli.index("hotspotOtaHandleCli"), cli.index("powerGuardHandleCli"))
         self.assertIn("return hotspotOtaRadioInit(build_id);", hooks)
         self.assertIn("powerGuardBeforeRadioInit();", hooks)
 

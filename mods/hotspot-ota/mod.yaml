@@ -21,4 +21,6 @@ integration:
     loop: hotspotOtaLoop
     cli:
       handler: hotspotOtaHandleCli
-      priority: 100
+      # Above power-guard's 200: the OTA interlock must see poweroff/shutdown before power-guard
+      # consumes them. With no OTA running this handler declines and dispatch continues unchanged.
+      priority: 300

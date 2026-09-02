@@ -16,6 +16,15 @@ namespace RollbackGuard {
   // valid once the confirm delay elapses. Both no-ops once done.
   void poll();
 
+  // Post-OTA probation state of the running image. `known` is false when ESP-IDF cannot report
+  // it, and callers must then fail closed rather than assume the rollback image is expendable.
+  struct ProbationState {
+    bool known;
+    bool pending;
+    uint32_t remaining_secs;
+  };
+  ProbationState probation();
+
   // Reports the firmware unhealthy. Forces rollback and reboot when this boot is pending-verify
   // (does not return); returns false otherwise so the caller falls back to its own handling.
   bool reportUnhealthy();
@@ -24,9 +33,9 @@ namespace RollbackGuard {
   // persisted cross-boot retry-with-cap, then a permanent halt. Does not return.
   void onRadioInitFailure();
 
-  // For `get ota.slot`: "Slots: A=<ver> (active, <state>) | B=<ver> (<state>)". State is pending,
-  // valid, invalid, aborted, new, or n/a; <ver> is "v?" for a slot that has never booted.
-  const char* status();
+  // For `get ota.slot`. otadata only records intent, so the inactive slot also carries
+  // esp_image_verify()'s verdict: image-ok, image-invalid, image-absent, or image-unchecked.
+  const char* status(bool verify_inactive);
 
   // For `ota slot boot <A|B>`: repoints the bootloader without touching flash. Refuses a target
   // already active, absent, or carrying no valid image. Fills reply[] either way.
