@@ -2,6 +2,7 @@
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
 #include <esp_system.h>   // esp_restart()
+#include <esp_image_format.h>   // esp_image_verify() -- bootloader_support, linked into the app
 #include <SPIFFS.h>
 
 // Long enough to catch an early crash/boot-loop; short enough not to add much to the ~2 minutes a
@@ -10,6 +11,9 @@
 
 // Cross-boot retry cap for onRadioInitFailure(). The counter lives in SPIFFS, not RTC memory,
 // which is unreliable across esp_restart() on this chip/IDF combination.
+// Spacing between confirm retries: the call writes otadata, so it must not run every loop().
+#define CONFIRM_RETRY_MS   5000
+
 #define RADIO_INIT_RESET_CAP   5
 #define RADIO_FAIL_COUNT_PATH  "/radio_fail_count"
 
@@ -19,6 +23,7 @@ extern "C" bool verifyRollbackLater() { return true; }
 
 static uint32_t boot_time_ms = 0;
 static bool confirmed_or_not_applicable = false;
+static uint32_t last_confirm_attempt_ms = 0;
 
 // begin() runs deep in MeshCore's init chain, where a SPIFFS write added enough stack depth to
 // reproduce the handleGetCmd() boot instability (987639c). Deferred to poll(), called shallower.
@@ -31,6 +36,25 @@ static bool isPendingVerify(esp_ota_img_states_t* out_state = nullptr) {
   esp_ota_get_state_partition(running, &state);
   if (out_state) *out_state = state;
   return state == ESP_OTA_IMG_PENDING_VERIFY;
+}
+
+RollbackGuard::ProbationState RollbackGuard::probation() {
+  ProbationState out = {false, false, 0};
+  const esp_partition_t* running = esp_ota_get_running_partition();
+  if (running == NULL) return out;   // known stays false -- caller refuses
+  esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;
+  if (esp_ota_get_state_partition(running, &state) != ESP_OK) return out;
+
+  out.known = true;
+  // Deliberately not consulting confirmed_or_not_applicable: a successful confirm writes otadata
+  // synchronously, so the RAM flag could only ever differ from it after a *failed* confirm.
+  out.pending = (state == ESP_OTA_IMG_PENDING_VERIFY);
+  if (out.pending) {
+    uint32_t elapsed = millis() - boot_time_ms;
+    out.remaining_secs = (elapsed >= OTA_ROLLBACK_CONFIRM_DELAY_MS)
+                         ? 0 : (OTA_ROLLBACK_CONFIRM_DELAY_MS - elapsed + 999) / 1000;
+  }
+  return out;
 }
 
 // 'A'/'B' labels for ota_0/ota_1 -- friendlier than raw partition names over a CLI.
@@ -56,6 +80,19 @@ static const char* stateLabel(esp_ota_img_states_t state) {
     case ESP_OTA_IMG_NEW: return "new";
     default: return "n/a";   // ESP_OTA_IMG_UNDEFINED -- never went through OTA (e.g. factory/USB flash)
   }
+}
+
+// A cancelled download leaves a stale recorded state over a truncated image, so otadata cannot
+// answer "could this boot?". esp_image_verify() checks header, checksum and appended SHA-256.
+static const char* imageLabel(const esp_partition_t* p) {
+  if (!p) return "image-absent";
+  esp_partition_pos_t pos = {};
+  pos.offset = p->address;
+  pos.size = p->size;
+  esp_image_metadata_t meta = {};
+  // SILENT: an invalid inactive slot is a condition this command reports, not a fault worth
+  // printing a bootloader error over on every get ota.slot.
+  return (esp_image_verify(ESP_IMAGE_VERIFY_SILENT, &pos, &meta) == ESP_OK) ? "image-ok" : "image-invalid";
 }
 
 static uint8_t readFailCount() {
@@ -115,8 +152,11 @@ void RollbackGuard::poll() {
   }
   if (confirmed_or_not_applicable) return;
   if (millis() - boot_time_ms < OTA_ROLLBACK_CONFIRM_DELAY_MS) return;
-  esp_ota_mark_app_valid_cancel_rollback();
-  confirmed_or_not_applicable = true;
+  // Retried rather than latched blindly: a failed confirm leaves otadata PENDING_VERIFY, and
+  // claiming success would hand the next OTA the only known-good image. Paced off the loop.
+  if (last_confirm_attempt_ms != 0 && millis() - last_confirm_attempt_ms < CONFIRM_RETRY_MS) return;
+  last_confirm_attempt_ms = millis();
+  if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) confirmed_or_not_applicable = true;
 }
 
 bool RollbackGuard::reportUnhealthy() {
@@ -139,8 +179,8 @@ void RollbackGuard::onRadioInitFailure() {
   while (1) ;
 }
 
-const char* RollbackGuard::status() {
-  static char buf[96];
+const char* RollbackGuard::status(bool verify_inactive) {
+  static char buf[128];
   char active_letter = partitionLetter(esp_ota_get_running_partition());
 
   const esp_partition_t* a = findPartitionByLetter('A');
@@ -153,9 +193,19 @@ const char* RollbackGuard::status() {
   readVersion('A', ver_a, sizeof(ver_a));
   readVersion('B', ver_b, sizeof(ver_b));
 
-  sprintf(buf, "Slots: A=%s (%s%s) | B=%s (%s%s)",
-          ver_a, active_letter == 'A' ? "active, " : "", stateLabel(state_a),
-          ver_b, active_letter == 'B' ? "active, " : "", stateLabel(state_b));
+  // Only the inactive slot is verified: the active one is running, so it is bootable by proof,
+  // and esp_image_verify() hashes the whole image.
+  bool b_inactive = (active_letter != 'B');
+  const char* image = !verify_inactive ? "image-unchecked"
+                                       : imageLabel(b_inactive ? b : a);
+
+  if (b_inactive) {
+    snprintf(buf, sizeof(buf), "Slots: A=%s (active, %s) | B=%s (recorded-%s, %s)",
+             ver_a, stateLabel(state_a), ver_b, stateLabel(state_b), image);
+  } else {
+    snprintf(buf, sizeof(buf), "Slots: A=%s (recorded-%s, %s) | B=%s (active, %s)",
+             ver_a, stateLabel(state_a), image, ver_b, stateLabel(state_b));
+  }
   return buf;
 }
 

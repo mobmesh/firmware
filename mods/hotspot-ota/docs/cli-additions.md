@@ -175,8 +175,8 @@ active OTA service.
 **Usage:**
 - `get ota.slot`
 
-**Returns:** `Slots: A=<ver> (active, <state>) | B=<ver> (<state>)`, or with `B` active if that's the
-running slot (`A` = `ota_0`, `B` = `ota_1`). `<ver>` is that slot's firmware version plus the short
+**Returns:** `Slots: A=<ver> (active, <state>) | B=<ver> (recorded-<state>, <image>)`, or the other
+way round if `B` is the running slot (`A` = `ota_0`, `B` = `ota_1`). `<ver>` is that slot's firmware version plus the short
 build commit hash it came from (e.g. `v1.16.0-0f11a30`) -- the hash distinguishes two slots that
 happen to share the same version number but came from different builds. Self-reported into SPIFFS
 the first time that slot actually boots -- a slot that's never booted (see `n/a` below) reports `v?`
@@ -187,10 +187,29 @@ since nothing's been recorded for it yet. The active slot's `<state>` is one of:
 - `valid`: Already confirmed, or this boot isn't the result of an OTA update in the first place.
 - `n/a`: Rollback state could not be queried for the running partition.
 
-The other (non-active) slot's `<state>` is read the same way regardless of which slot is running:
-`valid` (confirmed good), `invalid` (rejected by a previous rollback), `aborted` (an update to it
-never finished), `new` (flashed but not yet booted), or `n/a` (never involved in an OTA update, e.g.
-a factory/USB-only flash).
+The other (non-active) slot reports two independent facts, because one does not imply the other.
+
+`recorded-<state>` is what the bootloader's otadata records about it: `recorded-valid`, `invalid`
+(rejected by a previous rollback), `aborted` (an update to it never finished), `new` (flashed but
+not yet booted), or `n/a` (never involved in an OTA update, e.g. a factory/USB-only flash). This
+records what the last OTA *intended*. It is not evidence that the slot still holds a bootable image:
+a cancelled or interrupted download leaves the recorded state untouched over a truncated image.
+
+`<image>` is that evidence, read from the flash itself by `esp_image_verify()`, which checks the
+image header, the segment checksum and the appended SHA-256:
+- `image-ok`: the slot holds a complete, bootable image. This is the only fact that makes it a
+  usable rollback target.
+- `image-invalid`: the slot will not boot. Expected after a cancelled or interrupted update.
+- `image-absent`: no such partition.
+- `image-unchecked`: an update is writing that slot right now, so it was not inspected -- a torn
+  image mid-write is expected, not a fault.
+
+`recorded-valid, image-invalid` is a real and important combination: it means otadata still believes
+in an image that is no longer there. Only `image-ok` says a rollback target exists.
+
+Verification hashes the whole image, so this command costs roughly 450 ms on a Heltec V4 carrying a
+1.35 MB image, against about 20 ms for other CLI commands. Only the inactive slot is verified; the
+active one is running, which is proof enough that it boots.
 
 **Note:** Confirms automatically after the confirm delay with a working radio; rejects immediately
 (rollback + reboot) if `radio_init()` fails on a probationary boot.

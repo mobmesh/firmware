@@ -12,6 +12,7 @@
 #include <Utils.h>                    // mesh::Utils::fromHex
 #include <helpers/TxtDataHelpers.h>   // StrHelper lives here, no standalone StrHelper.h
 #include <helpers/ModHooks.h>          // modClockSet()
+#include "RollbackGuard.h"             // probation state -- see start()
 
 // The OTA_WIFI_*, OTA_HTTP_*, OTA_WAN_* and PIN_HOTSPOT_PWR values are injected as build flags
 // from variants/<board>/overrides.yaml, which carries each board's values and rationale.
@@ -595,6 +596,25 @@ bool HotspotOTA::start(const HotspotOtaConfig& cfg, char reply[]) {
     return false;
   }
 
+  // On probation the other slot holds the only known-good firmware; overwriting it trades a
+  // recoverable bad update for a brick. The reply names the retry time, so it reads as a wait.
+  RollbackGuard::ProbationState probation = RollbackGuard::probation();
+  if (!probation.known) {
+    strcpy(reply, "ERR: rollback state unavailable; OTA refused");
+    return false;
+  }
+  if (probation.pending) {
+    sprintf(reply, "ERR: firmware on probation; retry in %us", (unsigned)probation.remaining_secs);
+    return false;
+  }
+
+  // An upstream `start ota` upload owns the same flash writer and the same inactive slot, and it
+  // starts without this mod seeing it. Checked before claiming the service for ourselves.
+  if (Update.isRunning()) {
+    strcpy(reply, "ERR: an upload is already writing flash");
+    return false;
+  }
+
   portENTER_CRITICAL(&service_mux);
   bool busy = serviceIsActive(service_state) || service_state == OtaServiceState::Succeeded;
   if (!busy) {
@@ -644,11 +664,32 @@ bool HotspotOTA::cancel(char reply[]) {
   return cancellable;
 }
 
+bool HotspotOTA::flashWriteInProgress() {
+  return Update.isRunning();
+}
+
 bool HotspotOTA::isActive() {
   portENTER_CRITICAL(&service_mux);
   bool active = serviceIsActive(service_state) || service_state == OtaServiceState::Succeeded;
   portEXIT_CRITICAL(&service_mux);
   return active;
+}
+
+bool HotspotOTA::refuseWhileActive(char reply[]) {
+  portENTER_CRITICAL(&service_mux);
+  OtaServiceState state = service_state;
+  portEXIT_CRITICAL(&service_mux);
+
+  if (!serviceIsActive(state) && state != OtaServiceState::Succeeded) return false;
+
+  // Verifying and Committing are not cancellable by design, and Succeeded is past the commit.
+  bool cancellable = state >= OtaServiceState::Queued && state <= OtaServiceState::Downloading;
+  if (cancellable) {
+    strcpy(reply, "ERR: OTA active; ota cancel first");
+  } else {
+    sprintf(reply, "ERR: OTA %s; wait for it to finish", serviceStateName(state));
+  }
+  return true;
 }
 
 void HotspotOTA::status(char reply[]) {

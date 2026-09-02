@@ -29,7 +29,36 @@ void hotspotOtaLoop() {
   HotspotOTA::poll();
 }
 
+// Mirrors the shapes CommonCLI::handleCommand() accepts -- same prefix lengths, `erase` serial-only
+// -- so the interlock covers exactly the commands that would reach its destructive branch.
+static bool isDestructive(const ModCliContext& context, const char* command) {
+  if (memcmp(command, "poweroff", 8) == 0) return true;
+  if (memcmp(command, "shutdown", 8) == 0) return true;
+  if (memcmp(command, "reboot", 6) == 0) return true;
+  if (memcmp(command, "clkreboot", 9) == 0) return true;
+  if (context.sender_timestamp == 0 && strcmp(command, "erase") == 0) return true;
+  return false;
+}
+
+// Refuse only while the rollback image is at stake; otherwise the caller falls through to upstream.
+static bool refuseOtaStart(char* reply) {
+  if (HotspotOTA::refuseWhileActive(reply)) return true;
+  RollbackGuard::ProbationState probation = RollbackGuard::probation();
+  if (!probation.known) {
+    strcpy(reply, "ERR: rollback state unavailable; OTA refused");
+    return true;
+  }
+  if (probation.pending) {
+    sprintf(reply, "ERR: firmware on probation; retry in %us", (unsigned)probation.remaining_secs);
+    return true;
+  }
+  return false;
+}
+
 static bool handleCommand(const ModCliContext& context, char* command, char* reply) {
+  // A reboot, power-off or erase part-way through an OTA leaves a half-written slot behind.
+  if (isDestructive(context, command) && HotspotOTA::refuseWhileActive(reply)) return true;
+
   if (memcmp(command, "ver", 3) == 0) {
     sprintf(reply, "%s (%s) + ota (%s)", context.fw_version, context.fw_build_date,
             OTA_MOD_BUILD_DATE);
@@ -44,6 +73,9 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
     }
   } else if (memcmp(command, "start ota wan ", 14) == 0) {
     modBoardStartOtaFromUrl(&command[14], reply);
+  } else if (memcmp(command, "start ota", 9) == 0) {
+    // Upstream's own OTA path calls Update.begin(U_FLASH) -- a second writer to the same slot.
+    if (!refuseOtaStart(reply)) return false;   // idle: upstream handles it unchanged
   } else if (strcmp(command, "ota cancel") == 0) {
     HotspotOTA::cancel(reply);
   } else if (memcmp(command, "ota wan join", 12) == 0) {
@@ -136,7 +168,10 @@ static bool handleGet(char* command, char* reply) {
   } else if (memcmp(config, "ota.status", 10) == 0) {
     HotspotOTA::status(reply);
   } else if (memcmp(config, "ota.slot", 8) == 0) {
-    sprintf(reply, "> %s", RollbackGuard::status());
+    // Skip verification while either writer owns that slot -- this mod's service, or an upstream
+    // `start ota` upload. A torn image mid-write is expected, not a fault.
+    bool quiet = HotspotOTA::isActive() || HotspotOTA::flashWriteInProgress();
+    sprintf(reply, "> %s", RollbackGuard::status(!quiet));
   } else {
     return false;
   }

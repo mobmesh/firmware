@@ -27,6 +27,14 @@ namespace HotspotOTA {
   bool start(const HotspotOtaConfig& cfg, char reply[]);
   bool cancel(char reply[]);
   bool isActive();
+
+  // Interlock for destructive commands: true when the caller must refuse, with reply[] telling
+  // the operator to cancel or to wait, whichever the current state actually allows.
+  bool refuseWhileActive(char reply[]);
+
+  // True while Arduino's global Update object is mid-write -- how upstream's own `start ota` upload
+  // shows up. Not wired to the destructive-command interlock: a stalled upload would never clear.
+  bool flashWriteInProgress();
   void status(char reply[]);
   void poll();
 
