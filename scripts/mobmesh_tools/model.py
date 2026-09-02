@@ -25,12 +25,11 @@ class Capability(str, Enum):
 class CapabilityState(str, Enum):
     ABSENT = "absent"
     AVAILABLE = "available"
-    CALIBRATED = "calibrated"
     UNVERIFIED = "unverified"
 
     @property
     def satisfies_requirement(self) -> bool:
-        return self in {self.AVAILABLE, self.CALIBRATED}
+        return self is self.AVAILABLE
 
 
 class IntegrationPhase(str, Enum):
@@ -115,7 +114,7 @@ def _capability_state(path: Path, field_name: str, value: Any) -> CapabilityStat
         return CapabilityState(value)
     except (TypeError, ValueError) as exc:
         raise ProjectModelError(
-            f"{path}:{field_name}: expected true, false, calibrated, or unverified"
+            f"{path}:{field_name}: expected true, false, or unverified"
         ) from exc
 
 
@@ -213,12 +212,6 @@ class BoardProfile:
 class FirmwareRole:
     role_id: str
     asset_role_abbrev: str
-    release_channel: str
-
-
-@dataclass(frozen=True)
-class ReleaseChannel:
-    channel_id: str
     upstream_tag_prefix: str
     release_title: str
     make_latest: bool
@@ -271,13 +264,11 @@ class ResolvedTarget:
 
 @dataclass(frozen=True)
 class BuildPlan:
-    schema: int
     core_mods: tuple[str, ...]
     targets: tuple[ResolvedTarget, ...]
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "schema": self.schema,
             "core_mods": list(self.core_mods),
             "targets": [target.as_dict() for target in self.targets],
         }
@@ -294,7 +285,6 @@ class ProjectModel:
     root: Path
     core_mods: tuple[str, ...]
     roles: Mapping[str, FirmwareRole]
-    release_channels: Mapping[str, ReleaseChannel]
     targets: tuple[TargetDefinition, ...]
     boards: Mapping[str, BoardProfile]
     mods: Mapping[str, ModDefinition]
@@ -305,11 +295,10 @@ class ProjectModel:
         root = root.resolve()
         config_path = root / "build-targets.yaml"
         data = _load_yaml(config_path)
-        _keys(config_path, "root", data, {"core_mods", "roles", "release_channels", "targets"})
+        _keys(config_path, "root", data, {"core_mods", "roles", "targets"})
 
         core_mods = _strings(config_path, "core_mods", data.get("core_mods"))
         roles = cls._load_roles(config_path, data.get("roles"))
-        channels = cls._load_channels(config_path, data.get("release_channels"))
         targets = cls._load_targets(config_path, data.get("targets"))
 
         board_ids = {target.board for target in targets}
@@ -320,7 +309,7 @@ class ProjectModel:
             mod_names.update(target.mods)
         mods = {name: cls._load_mod(root, name) for name in sorted(mod_names)}
 
-        model = cls(root, core_mods, roles, channels, targets, boards, mods)
+        model = cls(root, core_mods, roles, targets, boards, mods)
         model._validate()
         model.build_plan = model._resolve()
         return model
@@ -332,29 +321,17 @@ class ProjectModel:
         for role_id, raw in data.items():
             _string(path, "roles", role_id)
             item = _mapping(path, f"roles.{role_id}", raw)
-            _keys(path, f"roles.{role_id}", item, {"asset_role_abbrev", "release_channel"})
+            _keys(path, f"roles.{role_id}", item, {
+                "asset_role_abbrev", "upstream_tag_prefix", "release_title", "make_latest"
+            })
             roles[role_id] = FirmwareRole(
                 role_id=role_id,
                 asset_role_abbrev=_string(path, f"roles.{role_id}.asset_role_abbrev", item.get("asset_role_abbrev")),
-                release_channel=_string(path, f"roles.{role_id}.release_channel", item.get("release_channel")),
+                upstream_tag_prefix=_string(path, f"roles.{role_id}.upstream_tag_prefix", item.get("upstream_tag_prefix")),
+                release_title=_string(path, f"roles.{role_id}.release_title", item.get("release_title")),
+                make_latest=_boolean(path, f"roles.{role_id}.make_latest", item.get("make_latest")),
             )
         return roles
-
-    @staticmethod
-    def _load_channels(path: Path, value: Any) -> dict[str, ReleaseChannel]:
-        data = _mapping(path, "release_channels", value)
-        channels = {}
-        for channel_id, raw in data.items():
-            _string(path, "release_channels", channel_id)
-            item = _mapping(path, f"release_channels.{channel_id}", raw)
-            _keys(path, f"release_channels.{channel_id}", item, {"upstream_tag_prefix", "release_title", "make_latest"})
-            channels[channel_id] = ReleaseChannel(
-                channel_id=channel_id,
-                upstream_tag_prefix=_string(path, f"release_channels.{channel_id}.upstream_tag_prefix", item.get("upstream_tag_prefix")),
-                release_title=_string(path, f"release_channels.{channel_id}.release_title", item.get("release_title")),
-                make_latest=_boolean(path, f"release_channels.{channel_id}.make_latest", item.get("make_latest")),
-            )
-        return channels
 
     @staticmethod
     def _load_targets(path: Path, value: Any) -> tuple[TargetDefinition, ...]:
@@ -563,18 +540,13 @@ class ProjectModel:
     def _validate(self) -> None:
         if not self.roles:
             raise ProjectModelError(f"{self.root / 'build-targets.yaml'}:roles: at least one role is required")
-        if not self.release_channels:
-            raise ProjectModelError(f"{self.root / 'build-targets.yaml'}:release_channels: at least one channel is required")
-        for role in self.roles.values():
-            if role.release_channel not in self.release_channels:
-                raise ProjectModelError(f"{self.root / 'build-targets.yaml'}:roles.{role.role_id}.release_channel: unknown channel '{role.release_channel}'")
 
         prefixes: dict[str, str] = {}
-        for channel in self.release_channels.values():
-            owner = prefixes.setdefault(channel.upstream_tag_prefix, channel.channel_id)
-            if owner != channel.channel_id:
+        for role in self.roles.values():
+            owner = prefixes.setdefault(role.upstream_tag_prefix, role.role_id)
+            if owner != role.role_id:
                 raise ProjectModelError(
-                    f"{self.root / 'build-targets.yaml'}:release_channels.{channel.channel_id}.upstream_tag_prefix: also belongs to '{owner}'"
+                    f"{self.root / 'build-targets.yaml'}:roles.{role.role_id}.upstream_tag_prefix: also belongs to '{owner}'"
                 )
 
         identities = set()
@@ -655,7 +627,6 @@ class ProjectModel:
         rows = []
         for target in self.targets:
             role = self.roles[target.role]
-            channel = self.release_channels[role.release_channel]
             board = self.boards[target.board]
             mod_names = self.resolved_mod_names(target)
             if not mod_names:
@@ -673,17 +644,17 @@ class ProjectModel:
                 board_id=target.board,
                 role=target.role,
                 build_env=target.build_env,
-                upstream_tag_prefix=channel.upstream_tag_prefix,
-                release_title=channel.release_title,
+                upstream_tag_prefix=role.upstream_tag_prefix,
+                release_title=role.release_title,
                 asset_basename=f"{target.board}_{role.asset_role_abbrev}_mobmesh",
                 vendor_flasher_assets=target.vendor_flasher_assets,
-                make_latest=channel.make_latest,
+                make_latest=role.make_latest,
                 mods=mod_names,
                 build_flags_append=target.build_flags_append,
                 qemu_boot_check=target.qemu_boot_check,
                 capabilities={capability.value: board.capability(capability).value for capability in Capability},
             ))
-        return BuildPlan(1, self.core_mods, tuple(rows))
+        return BuildPlan(self.core_mods, tuple(rows))
 
     def ordered_mods(self) -> tuple[str, ...]:
         names = list(self.core_mods)
