@@ -310,7 +310,7 @@ any single reading as approximate.
 **It never writes the saved `powersaving` setting.** That is the operator's stated
 intent, and MeshCore writes it to flash on every change. Driving it directly would
 make every low-battery transition a flash write, and a node that saved itself once
-would come back reporting `powersaving on` forever, quietly overwriting a human's
+would come back reporting `powersaving on` forever, quietly overwriting the operator's
 choice.
 
 Instead the sleep decision becomes "the operator asked for it **or** the battery is
