@@ -47,7 +47,7 @@ jobs:
       - name: Resolve build-targets.yaml into the CI build matrix
         id: resolve
         run: |
-          pip install --quiet pyyaml
+          pip install --quiet pyyaml==6.0.3
           python3 scripts/generate-board-config.py resolve-targets --plan-out BuildPlan.json
           echo "matrix=$(jq -c '{include: .targets}' BuildPlan.json)" >> "$GITHUB_OUTPUT"
 
@@ -227,7 +227,7 @@ jobs:
       - name: Inject this target's mod + board build flags into platformio.ini
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
-          pip install --quiet pyyaml
+          pip install --quiet pyyaml==6.0.3
           python3 scripts/generate-board-config.py inject-env \
             --board ${{ matrix.board_id }} \
             --env ${{ matrix.build_env }} \
@@ -245,7 +245,7 @@ jobs:
       - name: Set up PlatformIO
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
-          pip install --upgrade platformio
+          pip install platformio==6.1.19
 
       - name: Build
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
@@ -376,7 +376,7 @@ jobs:
       - name: Regenerate pages/flasher/auto_boards.json from overrides.yaml + upstream + this build's real partitions.bin
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
-          pip install --quiet pyyaml
+          pip install --quiet pyyaml==6.0.3
           python3 scripts/generate-board-config.py boards-json \
             --board ${{ matrix.board_id }} \
             --upstream-dir upstream-src \
