@@ -91,7 +91,7 @@ def bootloader_offset_for_mcu(mcu: str) -> str:
 
 
 def parse_partitions_bin(path: Path) -> PartitionLayout:
-    """Parse an ESP32 partition table binary, return offsets/sizes we need."""
+    """Parse an ESP32 partition table binary, returning the offsets and sizes used here."""
     data = path.read_bytes()
     found = {}
     for i in range(0, len(data), PARTITION_ENTRY_SIZE):
