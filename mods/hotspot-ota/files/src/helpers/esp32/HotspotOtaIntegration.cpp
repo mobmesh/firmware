@@ -8,6 +8,11 @@
 #include <helpers/esp32/HotspotOTA.h>
 #include <helpers/esp32/RollbackGuard.h>
 
+#if defined(ADMIN_PASSWORD) && !defined(DISABLE_WIFI_OTA)
+#include <AsyncElegantOTA.h>
+#include <ESPAsyncWebServer.h>
+#endif
+
 #ifndef OTA_MOD_BUILD_DATE
 #define OTA_MOD_BUILD_DATE "unknown"
 #endif
@@ -26,38 +31,72 @@ bool hotspotOtaRadioInit(const char* build_id) {
   return false;
 }
 
-// Upstream's `start ota` raises an open, unauthenticated AP, pins inhibit_sleep and never
-// stops. It keeps no handle on its web server, so dropping the AP is the only teardown
-// reachable from here.
+// Upstream's `start ota` raises the access point and web server, keeps no handle on the server and
+// never stops either. This mod owns both instead, so the listener can actually be closed.
 #define OTA_AP_DEADLINE_MS  (20UL * 60 * 1000)
 #define OTA_AP_STALL_MS     (10UL * 60 * 1000)
 
+#if defined(ADMIN_PASSWORD) && !defined(DISABLE_WIFI_OTA)
+#define OTA_AP_OWNED  1
+
+static AsyncWebServer ota_server(80);
+static char     ota_home[96];
+static bool     ap_routed = false;
 static bool     ap_up = false;
-static bool     ap_spent = false;
 static bool     ap_uploading = false;
 static uint32_t ap_started_ms = 0;
 static uint32_t ap_progress_ms = 0;
 static size_t   ap_progress_bytes = 0;
 
-static void apArm() {
-  ap_up = true;
-  ap_uploading = false;
-  ap_started_ms = millis();
-}
-
-// softAPdisconnect(true) tears the netif out from under the web server upstream left
-// running and hangs the node -- measured on a Heltec V4, silent, recoverable only by reset.
-static void apTeardown() {
-  WiFi.softAPdisconnect(false);
-  modBoardInhibitSleep(false);
-  ap_up = false;
-  ap_uploading = false;
-  ap_spent = true;
-}
-
 static uint32_t apSecondsLeft() {
   uint32_t elapsed = millis() - ap_started_ms;
   return elapsed >= OTA_AP_DEADLINE_MS ? 0 : (OTA_AP_DEADLINE_MS - elapsed) / 1000;
+}
+
+// Routes outlive a session: AsyncWebServer holds them independently of the listening socket, and
+// re-registering on each start would stack duplicate handlers.
+static void apStart(const char* id, char* reply) {
+  if (!ap_routed) {
+    sprintf(ota_home, "<H2>MeshCore node. ID: %s</H2>", id);
+    ota_server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
+      request->send(200, "text/html", ota_home);
+    });
+    ota_server.on("/log", HTTP_GET, [](AsyncWebServerRequest* request) {
+      request->send(SPIFFS, "/packet_log", "text/plain");
+    });
+    AsyncElegantOTA.setID(id);
+    AsyncElegantOTA.begin(&ota_server);
+    ap_routed = true;
+  }
+  // softAP() alone only adds AP to the current mode; a disconnected station would survive into
+  // APSTA and could reconnect under the server, exposing the unauthenticated page off-network.
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP("MeshCore-OTA", NULL);
+  ota_server.begin();
+  modBoardInhibitSleep(true);
+  ap_up = true;
+  ap_uploading = false;
+  ap_started_ms = millis();
+  sprintf(reply, "Started: http://%s/update", WiFi.softAPIP().toString().c_str());
+}
+
+// Ending the server frees the listening socket, so the port is released and a later `start ota`
+// binds again. softAPdisconnect stays in its wifi-on form; the wifi-off form hung a Heltec V4.
+static bool apTeardown() {
+  ota_server.end();
+  bool stopped = WiFi.softAPdisconnect(false);
+  modBoardInhibitSleep(false);
+  ap_up = false;
+  ap_uploading = false;
+  return stopped;
+}
+
+// The upload page and the WAN service share the flash writer, the inactive slot and the sleep
+// inhibit, and apPoll would otherwise measure a WAN download against the AP's stall deadline.
+static bool refuseWhileApUp(char* reply) {
+  if (!ap_up) return false;
+  sprintf(reply, "ERR: OTA AP up, %us left; stop ota first", (unsigned)apSecondsLeft());
+  return true;
 }
 
 static void apPoll() {
@@ -73,13 +112,22 @@ static void apPoll() {
     // A client that vanished mid-POST leaves the flash writer claimed with nothing to release it.
     Update.abort();
   } else {
-    // Cleared here, not in apArm: an upload that begins and fails leaves the tracking behind, and
+    // Cleared here, not at start: an upload that begins and fails leaves the tracking behind, and
     // the next attempt in the same session would then be measured against its stall clock.
     ap_uploading = false;
     if (millis() - ap_started_ms < OTA_AP_DEADLINE_MS) return;
   }
   apTeardown();
 }
+
+#else
+// Boards built without the WiFi OTA stack keep the commands, answering that they are unsupported.
+static const bool ap_up = false;
+static void apPoll() {}
+static bool refuseWhileApUp(char* reply) { return false; }
+static bool apTeardown() { return true; }
+static uint32_t apSecondsLeft() { return 0; }
+#endif
 
 void hotspotOtaLoop() {
   RollbackGuard::poll();
@@ -122,6 +170,7 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
             OTA_MOD_BUILD_DATE);
   } else if (memcmp(command, "start ota wan update", 21) == 0
              && (command[21] == 0 || command[21] == ' ')) {
+    if (refuseWhileApUp(reply)) return true;
     HotspotOtaConfig cfg;
     HotspotOTA::loadConfig(cfg);
     if (cfg.url[0] == 0) {
@@ -130,34 +179,37 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
       modBoardStartOtaFromUrl(cfg.url, reply);
     }
   } else if (memcmp(command, "start ota wan ", 14) == 0) {
+    if (refuseWhileApUp(reply)) return true;
     modBoardStartOtaFromUrl(&command[14], reply);
   } else if (memcmp(command, "start ota", 9) == 0) {
-    // Upstream's own OTA path calls Update.begin(U_FLASH) -- a second writer to the same slot.
+#ifdef OTA_AP_OWNED
+    // Consumed here rather than passed to upstream, which leaks its web server and cannot stop it.
     if (refuseOtaStart(reply)) return true;
-    if (ap_up) {
-      sprintf(reply, "ERR: OTA AP up, %us left; stop ota to end it", (unsigned)apSecondsLeft());
+    if (refuseWhileApUp(reply)) return true;
+    // The upload page is unauthenticated, so it stays reachable only over the access point.
+    if (WiFi.status() == WL_CONNECTED) {
+      strcpy(reply, "ERR: station connected; ota wan leave first");
       return true;
     }
-    // Upstream keeps no handle on its web server, so port 80 stays bound for the boot. A second
-    // start raises an AP with nothing serving it and still reports success.
-    if (ap_spent) {
-      strcpy(reply, "ERR: start ota already used this boot; reboot first");
-      return true;
-    }
-    apArm();
-    return false;                               // idle: upstream handles it unchanged
+    char id[48];
+    sprintf(id, "%s (%s)", context.fw_version, OTA_MOD_BUILD_DATE);
+    apStart(id, reply);
+#else
+    strcpy(reply, "ERR: WiFi OTA not supported");
+#endif
   } else if (strcmp(command, "stop ota") == 0) {
     if (!ap_up) {
       strcpy(reply, "ERR: no OTA AP running");
     } else if (Update.isRunning()) {
       strcpy(reply, "ERR: upload in progress");
     } else {
-      apTeardown();
-      strcpy(reply, "OK - OTA AP stopped");
+      strcpy(reply, apTeardown() ? "OK - OTA AP stopped"
+                                 : "ERR: AP stop failed; reboot to clear");
     }
   } else if (strcmp(command, "ota cancel") == 0) {
     HotspotOTA::cancel(reply);
   } else if (memcmp(command, "ota wan join", 12) == 0) {
+    if (refuseWhileApUp(reply)) return true;
     HotspotOTA::wifiConnect(reply);
   } else if (memcmp(command, "ota wan leave", 13) == 0) {
     if (HotspotOTA::isActive()) {
