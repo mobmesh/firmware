@@ -40,6 +40,7 @@ bool hotspotOtaRadioInit(const char* build_id) {
 #define OTA_AP_OWNED  1
 
 static AsyncWebServer ota_server(80);
+static wifi_mode_t ap_prev_mode = WIFI_OFF;
 static char     ota_home[96];
 static bool     ap_routed = false;
 static bool     ap_up = false;
@@ -70,6 +71,7 @@ static void apStart(const char* id, char* reply) {
   }
   // softAP() alone only adds AP to the current mode; a disconnected station would survive into
   // APSTA and could reconnect under the server, exposing the unauthenticated page off-network.
+  ap_prev_mode = WiFi.getMode();
   WiFi.mode(WIFI_AP);
   WiFi.softAP("MeshCore-OTA", NULL);
   ota_server.begin();
@@ -81,10 +83,12 @@ static void apStart(const char* id, char* reply) {
 }
 
 // Ending the server frees the listening socket, so the port is released and a later `start ota`
-// binds again. softAPdisconnect stays in its wifi-on form; the wifi-off form hung a Heltec V4.
+// binds again. softAPdisconnect stays in its wifi-on form -- the wifi-off form hung a Heltec V4 --
+// so the mode captured at start is restored separately, leaving no radio up that was not up before.
 static bool apTeardown() {
   ota_server.end();
   bool stopped = WiFi.softAPdisconnect(false);
+  WiFi.mode(ap_prev_mode);
   modBoardInhibitSleep(false);
   ap_up = false;
   ap_uploading = false;
