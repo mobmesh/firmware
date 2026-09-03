@@ -43,6 +43,30 @@ may be a metered connection:
 
 ---
 
+### Stop or inspect the upstream `start ota` access point
+**Usage:**
+- `stop ota`
+- `get ota.ap`
+
+**Note:** Upstream's `start ota` raises an open access point with an unauthenticated firmware
+upload page, blocks power saving, and has no stop of its own, so it stays up until the node
+reboots. This mod bounds it: the access point is dropped 20 minutes after `start ota` unless an
+upload is actively writing, and an upload that stops making progress for 10 minutes is aborted and
+the access point dropped with it. A successful upload reboots the node, so the deadline only ever
+ends an abandoned session. `stop ota` ends it on demand and is refused while an upload is writing.
+`get ota.ap` reports whether it is up and how long is left.
+
+Upstream keeps no handle on the web server it starts, so port 80 stays bound until the node
+reboots. A second `start ota` in the same boot therefore reaches a bind failure that upstream does
+not check, raising an access point with nothing serving it while still reporting success. It is
+refused here instead, with `reboot first`. Dropping the access point with `WiFi.softAPdisconnect`
+in its wifi-off form hangs the node outright, measured on a Heltec V4, so the interface is left up
+and only the access point is stopped.
+
+**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
+
+---
+
 ### Inspect or cancel a WAN OTA update
 **Usage:**
 - `get ota.status`
