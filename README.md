@@ -14,7 +14,7 @@ Mods add features or changes to the standard MeshCore firmware. Each mod can shi
 
 | Mod           | Description                                                                                                                                                                                                                   | Main Features                                                                                                                                                                                         |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`hotspot-ota`](https://github.com/mobmesh/firmware/tree/main/mods/hotspot-ota) | Adds remote firmware updates over WiFi ( or cellular hotspot) and automatic rollback protection. A device can connect to an existing WiFi network, download a firmware image, verify it, and install it without needing to be onsite with the node. | Remote OTA updates, power control of external cell modems, firmware SHA-256 verification, firmware authenticity checks, OTA slot management, automatic rollback / recovery after failed updates, automatic clock sync via NTP whenever WiFi is joined, remote updates through MeshCore CLI commands |
+| [`hotspot-ota`](https://github.com/mobmesh/firmware/tree/main/mods/hotspot-ota) | Adds remote firmware updates over WiFi ( or cellular hotspot) and automatic rollback protection. A device can connect to an existing WiFi network, download a firmware image, verify it, and install it without needing to be onsite with the node. | Remote OTA updates, power control of external cell modems, firmware SHA-256 verification, firmware authenticity checks, OTA slot management, automatic rollback / recovery after failed updates, automatic clock sync via NTP whenever WiFi is joined, remote updates through MeshCore CLI commands, downloads that run in the background so the node keeps repeating, and an update in progress that can be cancelled |
 | [`timing-safety`](https://github.com/mobmesh/firmware/tree/main/mods/timing-safety) | Small fixes for how the firmware tracks time. Keeps timers working correctly on devices that run for many weeks, and stops "time since last heard from" numbers from showing garbage right after a reboot. | Long-uptime timer fix, safer elapsed-time math across reboots |
 | [`power-guard`](https://github.com/mobmesh/firmware/tree/main/mods/power-guard) | Keeps a bad situation from becoming an unrecoverable one, and puts the battery under its own management. Brownouts happen -- a flat pack, a cold morning, a cloudy week. Left alone, a node that browns out reboots straight into a loop that burns whatever charge is left and ends in a trip up the tower. This hibernates before it gets there, retries on a widening schedule, and comes back by itself once the battery does. Beyond the standard `powersaving on` / `off` it adds `powersaving auto`, which saves power only when the battery says to, and `powersaving safe`, the brownout failsafe. It also stops a mistyped `poweroff` from ending a node permanently. | Hibernation before the bootloop threshold, automatic recovery, power saving that engages only when it's needed, thresholds set over serial or the mesh and kept across reboots, `poweroff` requires a wake time and is refused over the mesh |
 
@@ -33,33 +33,6 @@ This is not the official MeshCore flasher. It was <ins>built specifically</ins> 
 Some mods may add extra options or requirements for a traditional flasher. Check the README for the specific mod if you need more information. For example, `hotspot-ota` changes how images are assigned to a device's OTA slots to support auto-recovery — see that mod's README for details.
 
 
-
-# Behind the Curtain
-
-* `mods/<name>/` contains the different features or modifications. A mod ships code two ways:
-
-  * `files/` mirrors the upstream directory layout and is copied into the source tree before anything is patched. This is the mod's own code -- files nothing upstream has ever seen, so there is no diff to apply and they are edited directly.
-  * `patches/*.patch` carries only the edits to files this mod did not create -- the upstream MeshCore source, or a file another mod added. Each has a `.meta.yaml` sidecar declaring its dependencies.
-
-  `mod.yaml` holds facts about the mod as a whole -- its build flags, integration phases, board-capability contract and, where it has one, its image marker bit. Each mod also has its own documentation. The feature mods are `hotspot-ota`, `timing-safety` and `power-guard`; `shim` is internal plumbing that owns the hook points and generated aggregates the others attach to.
-
-* `variants/<board>/` contains configuration changes that are specific to a board. Hardware capabilities are separate from build values such as GPIO pins and timing, and a board may also provide a custom partition layout. The folder structure follows the same `variants/<board>/` layout used by upstream MeshCore.
-
-  We don't copy board information that MeshCore already knows about. Things like the MCU, flash size, USB IDs, and PSRAM settings are taken directly from the upstream `boards/<board>.json` file.
-
-* `scripts/mobmesh_tools/` parses targets, boards, mods and patch sidecars into one validated project model. `scripts/generate-board-config.py` consumes that model, upstream's board information, and the actual `partitions.bin` created during the build. CI resolves the model to `BuildPlan.json` before deriving its matrix.
-
-* `scripts/rebase-patches.sh` moves the patch set onto a newer upstream ref. It is the only script here meant to be run by hand; everything else under `scripts/` and `scripts/tests/` is invoked by a workflow. Scripts a test imports are named with underscores, the rest with hyphens.
-
-* `pages/shared/vendor/` holds third-party libraries used by more than one page, each with a `PROVENANCE.md` recording the exact release and how to re-verify it.
-
-* `pages/flasher/` contains the web-based firmware flasher and its build files. The flasher is shared by all boards and mods, so it lives at the top level instead of under `docs/`.
-
-* `.github/workflows/build-release.yml` handles building each board and variant against the latest upstream release and publishing the results.
-
-Every mod's `files/` are copied in first, selected integration declarations generate the shim aggregates, then patches are applied in numeric order within each mod. Every patch lists any other patches it depends on, and CI checks those dependencies before applying anything.
-
-If a patch no longer applies cleanly to the current upstream version, the build fails and an issue is opened with the name of the affected patch. The system does not try to automatically merge or fix the patch.
 
 ## Supported Boards 
 <sub><i>* more boards are on the way - " lookin' at you Grumpy "</sub></i>
@@ -81,26 +54,30 @@ Each Variant/Board pair uses its own release tag, so they are all built and rele
 
 ## How It Works
 
-A scheduled GitHub Actions run checks upstream for new release tags for each variant.
+Every morning a GitHub Actions run checks upstream MeshCore for new release tags, one per variant.
 
-When a new release is found, the workflow:
+When it finds one:
 
-1. Clones the upstream MeshCore repository at that tag.
-2. Validates patch metadata and board configuration.
-3. Copies each in-scope mod's owned source into the tree.
-4. Composes the selected mod integrations.
-5. Applies the remaining upstream patches.
-6. Builds the firmware.
+1. Clone upstream at that tag.
+2. Check the plan — every patch's dependencies come first, and every board can actually do what its mods ask of it.
+3. Copy in each mod's own source files.
+4. Generate the glue that wires those mods into upstream.
+5. Apply the patches, testing each one against the source before it goes in.
+6. Build.
+7. Stamp each build so the modifications it includes are identifiable in the binary itself.
+8. Boot it under emulation and confirm it comes up, on the boards set up for that.
 
-The patch checks are important because they catch configuration changes or other upstream changes that could cause problems. If a patch no longer applies, the build stops and an issue is opened identifying the patch that failed.
+**It is pass or fail, with no middle.** Every patch has to apply cleanly, the stamped image has to verify, and it has to boot. Miss any one of those and that build is dead and an issue is opened naming what broke. There is no partial build and no "close enough."
 
-After a successful build, `pages/flasher/auto_boards.json` is regenerated using the board overrides, the upstream board information, and the actual `partitions.bin` from the build. This means the flasher configuration is generated from the build itself instead of being maintained separately by hand.
+Usually the news arrives earlier than that. `patch-drift-canary` runs the same applicability check every day against upstream's development branches, so drift tends to show up before there is a release to break.
 
-The firmware `.bin` file is then published as a GitHub release. It carries its own SHA-256 and its build identity inside the image, so there is no separate checksum file to keep in step with it.
+**The flasher configures itself.** After a successful build, `pages/flasher/auto_boards.json` is regenerated from the board overrides, upstream's board information, and the actual `partitions.bin` the build produced. Nothing about it is hand-maintained.
 
-The GitHub Pages flasher is only updated after every board and variant has built successfully. This means a failed build will not result in a broken version being published.
+**The flasher waits for all of them.** It updates only after every board and variant has succeeded, so a half-finished matrix never puts a broken option in front of someone flashing a device.
 
-Builds can also be started manually from the GitHub Actions tab. You can choose a specific upstream ref or build only one variant instead of running the entire build matrix.
+The published `.bin` carries its own SHA-256 and its build identity inside the image, so there is no separate checksum file to keep in step with it.
+
+Builds can also be started by hand from the Actions tab, against a specific upstream ref or a single variant instead of the whole matrix.
 
 ## Releases
 
