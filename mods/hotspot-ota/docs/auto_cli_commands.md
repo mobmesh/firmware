@@ -1236,6 +1236,39 @@ may be a metered connection:
 
 ---
 
+### Stop or inspect the `start ota` access point
+**Usage:**
+- `stop ota`
+- `get ota.ap`
+
+**Note:** Upstream's `start ota` raises an open access point with an unauthenticated firmware upload
+page, blocks power saving, keeps no handle on the web server it starts and has no stop of its own,
+so both stay up until the node reboots. This mod handles the command itself instead, owning the
+access point and the server so they can be ended. The session is dropped 20 minutes after
+`start ota` unless an upload is actively writing, and an upload that is writing but stops making
+progress for 10 minutes is aborted and the session dropped with it. An upload that fails outright
+releases the writer, so that session ends on the 20 minute deadline instead, leaving the page up
+for a retry. A successful upload reboots the node, so the deadline only ever ends an abandoned
+session. `stop ota` ends it on demand and is refused while an upload is writing. `get ota.ap`
+reports whether it is up and how long is left.
+
+Ending the session closes the listening socket, so port 80 is released and `start ota` can be used
+again in the same boot. Already-accepted connections are dropped with the access point.
+
+The upload page has no authentication, so it is confined to the access point. `start ota` is
+refused while the station interface is connected, and `ota wan join` and both `start ota wan` forms
+are refused while the access point is up -- they also share the flash writer and the inactive slot.
+Once the session ends, WAN operations resume normally.
+
+Dropping the access point with `WiFi.softAPdisconnect` in its wifi-off form hung a Heltec V4
+outright, so only the access point is stopped there. The WiFi mode in effect before `start ota` is
+captured and restored separately, so ending a session leaves no radio up that was not up before it
+and an abandoned session costs nothing once its deadline expires.
+
+**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
+
+---
+
 ### Inspect or cancel a WAN OTA update
 **Usage:**
 - `get ota.status`
