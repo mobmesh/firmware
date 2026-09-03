@@ -68,7 +68,9 @@ are refused while the access point is up -- they also share the flash writer and
 Once the session ends, WAN operations resume normally.
 
 Dropping the access point with `WiFi.softAPdisconnect` in its wifi-off form hung a Heltec V4
-outright, so the interface is left up and only the access point is stopped.
+outright, so only the access point is stopped there. The WiFi mode in effect before `start ota` is
+captured and restored separately, so ending a session leaves no radio up that was not up before it
+and an abandoned session costs nothing once its deadline expires.
 
 **Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
 
