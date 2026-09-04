@@ -11,7 +11,7 @@
   "_regions_notes": "def merges into the existing tree rather than replacing it; 'region remove' first for a clean slate. 'region save' persists it. 'region allowf *' is what carries unscoped floods -- they match no named region, so the wildcard's flag decides, and a preserved region file could have it denied.",
 
   "commands": [
-    "set radio 910.525,62.5,7,8",
+    "set radio 910.525,62.5,7,6",
     "set advert.interval 240",
     "set flood.advert.interval 23",
     "set path.hash.mode 1",
