@@ -179,6 +179,23 @@ void RollbackGuard::onRadioInitFailure() {
   while (1) ;
 }
 
+RollbackGuard::Slots RollbackGuard::slots() {
+  Slots out;
+  out.active = partitionLetter(esp_ota_get_running_partition());
+  out.target = (out.active == 'A') ? 'B' : 'A';
+  readVersion(out.active, out.active_version, sizeof(out.active_version));
+  readVersion(out.target, out.target_version, sizeof(out.target_version));
+
+  esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;
+  const esp_partition_t* active = findPartitionByLetter(out.active);
+  if (active) esp_ota_get_state_partition(active, &state);
+  out.active_state = stateLabel(state);
+
+  const esp_partition_t* target = findPartitionByLetter(out.target);
+  out.target_size = target ? target->size : 0;
+  return out;
+}
+
 const char* RollbackGuard::status(bool verify_inactive) {
   static char buf[128];
   char active_letter = partitionLetter(esp_ota_get_running_partition());

@@ -37,6 +37,18 @@ namespace RollbackGuard {
   // esp_image_verify()'s verdict: image-ok, image-invalid, image-absent, or image-unchecked.
   const char* status(bool verify_inactive);
 
+  // For the OTA page's identity payload: the same facts `status()` renders, as data.
+  // `target` is the slot an upload would overwrite, and `target_size` its capacity.
+  struct Slots {
+    char active;
+    char target;
+    char active_version[24];
+    char target_version[24];
+    const char* active_state;
+    uint32_t target_size;
+  };
+  Slots slots();
+
   // For `ota slot boot <A|B>`: repoints the bootloader without touching flash. Refuses a target
   // already active, absent, or carrying no valid image. Fills reply[] either way.
   bool setActivePartition(char letter, char reply[]);

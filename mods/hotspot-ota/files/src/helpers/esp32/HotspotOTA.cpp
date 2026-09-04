@@ -69,6 +69,15 @@ static bool runningMetadata(OtaMetadata& out) {
   return parseMetadata(block, out);
 }
 
+bool HotspotOTA::runningMetadata(char* version, char* sha, char* role) {
+  OtaMetadata meta;
+  if (!runningMetadata(meta)) return false;
+  strcpy(version, meta.upstream_version);
+  strcpy(sha, meta.repo_sha);
+  strcpy(role, meta.board_role);
+  return true;
+}
+
 static bool marker_bypass = false;   // RAM-only, one-time
 static char manual_sha256_hex[65] = {0};   // RAM-only -- see `set ota.fw.sha256`
 

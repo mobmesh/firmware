@@ -39,6 +39,9 @@ bool hotspotOtaRadioInit(const char* build_id) {
 #define OTA_AP_DEADLINE_MS  (20UL * 60 * 1000)
 #define OTA_AP_STALL_MS     (10UL * 60 * 1000)
 // Long enough for AsyncTCP to drain the response now that the callback no longer blocks.
+#define OTA_ADVERT_MIN_GAP_MS  10000UL   // airtime is shared -- one press per ten seconds
+#define OTA_ADVERT_DELAY_MS    1500      // lets the reply leave before the radio transmits
+#define OTA_CLOCK_SANITY_FLOOR 1700000000UL   // ~Nov 2023 -- rules out a stuck or truncated epoch
 #define OTA_REBOOT_GRACE_MS 1500UL
 
 #if defined(ADMIN_PASSWORD)
@@ -47,10 +50,27 @@ bool hotspotOtaRadioInit(const char* build_id) {
 static AsyncWebServer ota_server(80);
 static wifi_mode_t ap_prev_mode = WIFI_OFF;
 static char     ota_home[96];
-static char     ota_identity[128];
+static char     ota_identity[440];
+static char     ota_id[48];
+
+// esp_image_header_t's chip_id, so the page can compare it against a selected image's header.
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+#define OTA_CHIP_ID   9
+#define OTA_CHIP_NAME "ESP32-S3"
+#elif defined(CONFIG_IDF_TARGET_ESP32C3)
+#define OTA_CHIP_ID   5
+#define OTA_CHIP_NAME "ESP32-C3"
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+#define OTA_CHIP_ID   2
+#define OTA_CHIP_NAME "ESP32-S2"
+#else
+#define OTA_CHIP_ID   0
+#define OTA_CHIP_NAME "ESP32"
+#endif
 static bool     ap_routed = false;
 static bool     ap_up = false;
 static bool     ap_uploading = false;
+static uint32_t ap_advert_ms = 0;
 static bool     ap_reboot_pending = false;
 static uint32_t ap_reboot_ms = 0;
 
@@ -85,11 +105,34 @@ static void apUploadFail(ApUpload* upload, const char* reason) {
 
 // Routes outlive a session: AsyncWebServer holds them independently of the listening socket, and
 // re-registering on each start would stack duplicate handlers.
+// Formatted per request, not once at apStart: battery voltage and probation state both move
+// while the AP is up, and a page loaded later would otherwise show the first visitor's values.
+static const char* buildIdentity() {
+  RollbackGuard::Slots sl = RollbackGuard::slots();
+  RollbackGuard::ProbationState pr = RollbackGuard::probation();
+
+  char ver[17] = "", sha[13] = "", role[25] = "";
+  HotspotOTA::runningMetadata(ver, sha, role);
+
+  const char* mac = WiFi.softAPmacAddress().c_str();
+  const char* tail = strlen(mac) > 8 ? mac + 9 : mac;   // last three octets identify the node
+
+  snprintf(ota_identity, sizeof(ota_identity),
+           "{\"nm\":\"%s\",\"id\":\"%s\",\"k\":\"%s\",\"hw\":\"%s\",\"cid\":%d,"
+           "\"mv\":%u,\"ta\":\"Slot %c\",\"tv\":\"%s\",\"ra\":\"Slot %c\",\"rv\":\"%s\","
+           "\"rt\":\"running · %s\",\"ver\":\"%s\",\"sha\":\"%s\",\"role\":\"%s\",\"cap\":%u,\"t\":%u}",
+           role[0] ? role : "MeshCore node", ota_id, tail, OTA_CHIP_NAME, OTA_CHIP_ID,
+           (unsigned)modBoardBattMilliVolts(),
+           sl.target, sl.target_version, sl.active, sl.active_version,
+           (pr.known && pr.pending) ? "on probation" : sl.active_state,
+           ver, sha, role, (unsigned)sl.target_size, (unsigned)modClockGet());
+  return ota_identity;
+}
+
 static void apStart(const char* id, char* reply) {
   if (!ap_routed) {
     sprintf(ota_home, "<H2>MeshCore node. ID: %s</H2>", id);
-    snprintf(ota_identity, sizeof(ota_identity),
-             "{\"id\": \"%s\", \"hardware\": \"ESP32\"}", id);
+    strncpy(ota_id, id, sizeof(ota_id) - 1);
     ota_server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
       request->send(200, "text/html", ota_home);
     });
@@ -99,7 +142,7 @@ static void apStart(const char* id, char* reply) {
     // Before /update: a handler also matches any path under its own, and the first registered
     // wins, so the page would otherwise answer this request with itself.
     ota_server.on("/update/identity", HTTP_GET, [](AsyncWebServerRequest* request) {
-      request->send(200, "application/json", ota_identity);
+      request->send(200, "application/json", buildIdentity());
     });
     // The upload page, served gzipped straight from flash.
     ota_server.on("/update", HTTP_GET, [](AsyncWebServerRequest* request) {
@@ -108,6 +151,30 @@ static void apStart(const char* id, char* reply) {
       resp->addHeader("Content-Encoding", "gzip");
       request->send(resp);
     });
+    // Zero-hop only: tells immediate neighbours the node is back without spending the mesh's
+    // airtime. Rate-limited here rather than in the page, which cannot enforce it.
+    ota_server.on("/update/advert", HTTP_POST, [](AsyncWebServerRequest* request) {
+      if (ap_advert_ms && millis() - ap_advert_ms < OTA_ADVERT_MIN_GAP_MS) {
+        request->send(429, "text/plain", "too soon");
+        return;
+      }
+      ap_advert_ms = millis();
+      modSendZeroHopAdvert(OTA_ADVERT_DELAY_MS);
+      request->send(200, "text/plain", "OK");
+    });
+    // Before the /update POST, for the same reason /update/identity precedes the page: a handler
+    // also matches paths under its own, and the first registered wins.
+    ota_server.on("/update/time", HTTP_POST,
+      [](AsyncWebServerRequest* request) { request->send(200, "text/plain", "OK"); }, NULL,
+      [](AsyncWebServerRequest* request, uint8_t* data, size_t len, size_t index, size_t total) {
+        char buf[16];
+        size_t n = len < sizeof(buf) - 1 ? len : sizeof(buf) - 1;
+        memcpy(buf, data, n);
+        buf[n] = 0;
+        // Same floor the NTP path uses: a plausible epoch, not a stuck or truncated one.
+        uint32_t epoch = strtoul(buf, NULL, 10);
+        if (epoch > OTA_CLOCK_SANITY_FLOOR) modClockSet(epoch);
+      });
     // Rebooting from inside the callback preempts the queued response and leaves every client
     // unable to tell a completed update from a hung one, so the reboot is deferred to apPoll().
     ota_server.on("/update", HTTP_POST,
