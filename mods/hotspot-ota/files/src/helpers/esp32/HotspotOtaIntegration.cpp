@@ -96,15 +96,17 @@ static void apStart(const char* id, char* reply) {
     ota_server.on("/log", HTTP_GET, [](AsyncWebServerRequest* request) {
       request->send(SPIFFS, "/packet_log", "text/plain");
     });
+    // Before /update: a handler also matches any path under its own, and the first registered
+    // wins, so the page would otherwise answer this request with itself.
+    ota_server.on("/update/identity", HTTP_GET, [](AsyncWebServerRequest* request) {
+      request->send(200, "application/json", ota_identity);
+    });
     // The upload page, served gzipped straight from flash.
     ota_server.on("/update", HTTP_GET, [](AsyncWebServerRequest* request) {
       AsyncWebServerResponse* resp = request->beginResponse_P(
           200, "text/html", MOBMESH_OTA_PAGE, MOBMESH_OTA_PAGE_LEN);
       resp->addHeader("Content-Encoding", "gzip");
       request->send(resp);
-    });
-    ota_server.on("/update/identity", HTTP_GET, [](AsyncWebServerRequest* request) {
-      request->send(200, "application/json", ota_identity);
     });
     // Rebooting from inside the callback preempts the queued response and leaves every client
     // unable to tell a completed update from a hung one, so the reboot is deferred to apPoll().
