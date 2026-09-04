@@ -3,6 +3,7 @@
 
 import * as flowApi from './flow.js';
 import { findAvailablePrefix, generateIdentityKeypair, extractPrefix } from './gcm-reg.js';
+import { TILE_STAGGER_MS } from './constants.js';
 import { PortSelectionRequiredError, promptForSerialPort } from './serial-port.js';
 import { ManualEntryRequiredError } from './esp32.js';
 import { FilePickerRequiredError, writeBootloaderUf2 } from './nrf52.js';
@@ -37,12 +38,14 @@ const ICONS = {
     '<path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
   upload:
     '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
+  // Diagonal corner arrows: the pair reads as one axis of movement, where the bracket
+  // corners read as a frame and sat oddly against the map's own square controls.
   expand:
-    '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>' +
-    '<path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+    '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>' +
+    '<line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
   collapse:
-    '<path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/>' +
-    '<path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/>',
+    '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/>' +
+    '<line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>',
   // The Gulf Coast Mesh mark, as it appears in mobmesh.org's own footer: five nodes
   // and the links between them.
   gcm:
@@ -205,9 +208,23 @@ function balanceTileRows(list, body) {
 
   const perRow = Math.max(1, Math.floor((available + gap) / (width + gap)));
   const count = list.childElementCount;
-  if (count <= perRow) return;
+  if (count <= perRow) {
+    staggerTiles(list, perRow);
+    return;
+  }
   const columns = Math.ceil(count / Math.ceil(count / perRow));
   list.style.maxWidth = `${columns * width + (columns - 1) * gap}px`;
+  staggerTiles(list, columns);
+}
+
+// A diagonal wave, so the grid resolves left-to-right and top-down at once rather than
+// as a typewriter. The column count is only known after the layout above, and it moves
+// with the viewport, so the delay is set here rather than from the render loop's index.
+function staggerTiles(list, columns) {
+  [...list.children].forEach((tile, i) => {
+    const wave = Math.floor(i / columns) + (i % columns);
+    tile.style.setProperty('--tile-delay', `${wave * TILE_STAGGER_MS}ms`);
+  });
 }
 
 function renderChoice(step, options) {
@@ -279,7 +296,10 @@ function renderChoice(step, options) {
     list.append(cell);
   }
   body.append(list);
+  // A board grid staggers as a wave, which needs its column count; the card pairs are
+  // one row, and a single column makes the same helper stagger them in order.
   if (layout === 'board') balanceTileRows(list, body);
+  else if (layout === 'choice') staggerTiles(list, 1);
 
   // A function lets a step offer its escape hatch on some branches and not others.
   const aside = typeof step.aside === 'function' ? step.aside(flow) : step.aside;
@@ -460,14 +480,23 @@ const NAME_STORED_BYTES = 31;
 // Never sent: the field clears on first touch, and untouched means no command.
 const PASSWORD_PLACEHOLDER = '•'.repeat(9);
 
-const MAP_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-// The same labels composited over the base, which compounds their alpha -- dark_all alone
-// renders them too dark to read. Contrast keeps the doubled halo from reading as a glow.
-const MAP_LABELS = 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png';
-const MAP_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors ' +
-  '&copy; <a href="https://carto.com/attributions">CARTO</a>';
-const MAP_HOME = [30.2, -89.0];
+// CARTO now requires a key on basemap requests. It travels in the style URL, so it is a
+// public client-side identifier, not a credential -- restrict it by domain at CARTO.
+const MAP_KEY = 'cb1_2x0t_1_75c947c7bc617ea02acd8b7a';
+// The vector style, not raster tiles: its label layers are individually addressable, which
+// is the only way to make street names arrive earlier and carry our own palette.
+const MAP_STYLE = `https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json?key=${MAP_KEY}`;
+// Dark Matter hides street names until they are nearly all that is left -- roadname_major
+// at z13, _minor not until z16. Someone siting a node reads streets well before that.
+const MAP_EARLY_ZOOM = 3;
+// MapLibre zooms continuously where Leaflet snapped to whole levels, so its defaults read
+// as slow next to the old map. Rates from maplibre's own ScrollZoomHandler.
+const MAP_WHEEL_RATE = 1 / 120;   // default 1/450
+const MAP_ZOOM_RATE = 1 / 60;     // default 1/100
+// Mobile, as `pages/shared/data/gc-locations.json` gives it. Held here rather than read
+// from that file: it is only the opening view, and a failed fetch would need a
+// hardcoded fallback anyway. The previous value sat offshore in the Gulf.
+const MAP_HOME = [30.6954, -88.0399];
 const MAP_HOME_ZOOM = 6;
 
 /**
@@ -492,6 +521,8 @@ const STATE_STYLE = { color: '#2dd1bd', weight: 1, opacity: 0.6, fillColor: '#2d
 const ZONE_SHOWN = { color: '#f9a228', weight: 2, fillColor: '#f9a228', opacity: 1, fillOpacity: 0.04 };
 // Derived, because `setStyle` merges: anything omitted here would survive the change back.
 const ZONE_HIDDEN = { ...ZONE_SHOWN, opacity: 0, fillOpacity: 0 };
+// Matches no feature, so the lit-zone layers draw nothing until one is named.
+const NO_ZONE = '\u0000none';
 
 /** `{ zone, zoneSettings }` for a point, in the shape the step's draft carries. */
 function readZone(zones, lat, lon) {
@@ -573,6 +604,7 @@ function renderLocation(step) {
     `<input type="text" class="field" id="node-name" placeholder="${roleName} name" maxlength="31" />` +
     '<span class="name-count" id="name-count" aria-hidden="true"></span>' +
     '</div>' +
+    '<p class="field-note is-quiet" id="name-keeps-id" hidden>Renaming is safe (existing mesh ID preserved)</p>' +
     '<p class="field-note is-warn" id="name-warn" hidden>fyi: this name will be clipped on radio broadcasts</p>' +
     '<div class="map-wrap">' +
     '<div class="map-frame" id="map"></div>' +
@@ -593,9 +625,12 @@ function renderLocation(step) {
     // credential being recalled. A masked typo here is only discovered on the next login.
     `<input type="text" class="field" id="admin-password" placeholder="Admin password" ` +
     `autocomplete="off" spellcheck="false" />` +
-    `<p class="field-note">Set your ${noun}\u2019s admin password</p>`;
+    `<p class="field-note" id="password-note">Set your ${noun}\u2019s admin password</p>`;
   body.append(form);
 
+  // Assigned once the button exists; every field calls it so the button's state and the
+  // hint under it are derived from the draft rather than kept in step by hand.
+  let refreshContinue = () => {};
   const nameField = form.querySelector('#node-name');
   const latField = form.querySelector('#lat');
   const lonField = form.querySelector('#lon');
@@ -603,22 +638,32 @@ function renderLocation(step) {
   for (const [id, key] of [['#height', 'heightFt'], ['#email', 'email'], ['#admin-password', 'adminPassword']]) {
     const field = form.querySelector(id);
     field.value = draft[key];
-    field.addEventListener('input', () => { draft[key] = field.value; });
+    field.addEventListener('input', () => { draft[key] = field.value; refreshContinue(); });
   }
 
   // There is no `get` for the admin password, so an Upgrade cannot show the real one and
   // cannot tell whether it changed. A placeholder says one is set; touching the field
   // clears it, and leaving it alone sends no `password` command at all.
   const passwordField = form.querySelector('#admin-password');
+  const passwordNote = form.querySelector('#password-note');
+  // The map is not a form field, so its expand control is what a validation message
+  // can focus to put the pointer in the right place.
+  const mapExpand = form.querySelector('#map-expand');
   let passwordUntouched = false;
   if (isUpgrade && !draft.adminPassword) {
     passwordField.value = PASSWORD_PLACEHOLDER;
     passwordUntouched = true;
+    // While the placeholder stands, a password is already set and the note names the
+    // field rather than instructing. The role is named twice above this line already.
+    passwordNote.textContent = 'Admin password';
     const clearOnce = () => {
       if (!passwordUntouched) return;
       passwordUntouched = false;
       passwordField.value = '';
       draft.adminPassword = '';
+      // Cleared: setting one is required again, so the note asks for it.
+      passwordNote.textContent = 'Set admin password';
+      refreshContinue();
     };
     passwordField.addEventListener('focus', clearOnce);
     passwordField.addEventListener('pointerdown', clearOnce);
@@ -646,12 +691,18 @@ function renderLocation(step) {
   const encoder = new TextEncoder();
   const counter = form.querySelector('#name-count');
   const nameWarn = form.querySelector('#name-warn');
+  // Answers the question renaming provokes, at the field that provokes it. Upgrade only:
+  // a new device has no identity to keep.
+  const nameKeepsId = form.querySelector('#name-keeps-id');
   const countName = () => {
     const used = encoder.encode(nameField.value).length;
     counter.textContent = `${used}/${NAME_BYTES}`;
     counter.classList.toggle('is-full', used === NAME_BYTES);
     counter.classList.toggle('is-over', used > NAME_BYTES);
-    nameWarn.hidden = used < NAME_BYTES + 2;
+    const clipping = used >= NAME_BYTES + 2;
+    nameWarn.hidden = !clipping;
+    // One note at a time: a warning about what was just typed outranks a standing fact.
+    nameKeepsId.hidden = !isUpgrade || clipping;
   };
   nameField.addEventListener('input', () => {
     while (encoder.encode(nameField.value).length > NAME_STORED_BYTES) {
@@ -659,15 +710,80 @@ function renderLocation(step) {
     }
     draft.name = nameField.value;
     countName();
+    refreshContinue();
   });
   countName();
 
-  const map = L.map(form.querySelector('#map'), { zoomControl: true, attributionControl: true })
-    .setView(draft.latitude != null ? [draft.latitude, draft.longitude] : MAP_HOME,
-             draft.latitude != null ? 13 : MAP_HOME_ZOOM);
-  const tiles = { maxZoom: 20, subdomains: 'abcd' };
-  L.tileLayer(MAP_TILES, { ...tiles, attribution: MAP_ATTRIBUTION }).addTo(map);
-  L.tileLayer(MAP_LABELS, { ...tiles, className: 'map-labels' }).addTo(map);
+  // GL zoom is one level off Leaflet's for the same scale, hence the -1 throughout.
+  const startCentre = draft.latitude != null ? [draft.longitude, draft.latitude]
+                                             : [MAP_HOME[1], MAP_HOME[0]];
+  const map = new maplibregl.Map({
+    container: form.querySelector('#map'),
+    style: MAP_STYLE,
+    center: startCentre,
+    zoom: (draft.latitude != null ? 13 : MAP_HOME_ZOOM) - 1,
+    maxZoom: 19,
+    attributionControl: { compact: false },
+    // Labels cross-fade over 300ms by default, which is most of why a zoom reads as still
+    // settling after the old map's had landed.
+    fadeDuration: 0,
+  });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+  map.scrollZoom.setWheelZoomRate(MAP_WHEEL_RATE);
+  map.scrollZoom.setZoomRate(MAP_ZOOM_RATE);
+  // Nothing here is a 3D map, and a stray two-finger drag that tilts it cannot be undone
+  // from the keyboard.
+  map.dragRotate.disable();
+  map.touchZoomRotate.disableRotation();
+
+  // Dark Matter's own ground is a warm grey that reads washed out against the sheet.
+  // Only the wide, flat areas are repainted: roads and labels carry the detail.
+  const GROUND = {
+    background: '#061320',                       // --bg-1
+    landcover: 'rgba(45, 209, 189, 0.03)',
+    landuse: 'rgba(255, 255, 255, 0.02)',
+    landuse_residential: 'rgba(255, 255, 255, 0.02)',
+    park_national_park: 'rgba(45, 209, 189, 0.05)',
+    park_nature_reserve: 'rgba(45, 209, 189, 0.05)',
+    water: '#0a2033',
+    water_shadow: '#08192a',
+    building: 'rgba(255, 255, 255, 0.04)',
+    'building-top': 'rgba(255, 255, 255, 0.05)',
+  };
+
+  // The style ships 27 symbol layers. Each is restyled into our palette, and the street
+  // classes are brought forward so they appear before the map is nearly useless.
+  map.on('style.load', () => {
+    for (const [id, colour] of Object.entries(GROUND)) {
+      const layer = map.getLayer(id);
+      if (!layer) continue;
+      map.setPaintProperty(id, layer.type === 'background' ? 'background-color' : 'fill-color', colour);
+    }
+    // Dark Matter draws roads for a light ground and they read as heavy here. The casings
+    // are the outlines under each road; dropping them alone recovers most of the weight.
+    for (const layer of map.getStyle().layers) {
+      if (layer.type !== 'line') continue;
+      if (/_case$/.test(layer.id)) map.setPaintProperty(layer.id, 'line-opacity', 0.25);
+      else if (/^road_|^tunnel_|^bridge_/.test(layer.id)) {
+        map.setPaintProperty(layer.id, 'line-opacity', 0.55);
+      }
+    }
+    for (const layer of map.getStyle().layers) {
+      if (layer.type !== 'symbol') continue;
+      // Water names and house numbers are clutter at every zoom this step uses.
+      if (/water|housenumber/i.test(layer.id)) {
+        map.setLayoutProperty(layer.id, 'visibility', 'none');
+        continue;
+      }
+      map.setPaintProperty(layer.id, 'text-color', '#e8f0f8');
+      map.setPaintProperty(layer.id, 'text-halo-color', 'rgba(3, 8, 15, 0.9)');
+      map.setPaintProperty(layer.id, 'text-halo-width', 1.6);
+      if (layer.id.startsWith('roadname_') || layer.id.startsWith('poi_')) {
+        map.setLayerZoomRange(layer.id, Math.max(0, (layer.minzoom ?? 0) - MAP_EARLY_ZOOM),
+                              layer.maxzoom ?? 24);
+      }
+    }
+  });
   let pin = null;
   let zones = null;
 
@@ -676,34 +792,56 @@ function renderLocation(step) {
   loadZones().then((loaded) => {
     zones = loaded;
     if (!zones) return;
-    const zoneLayers = new Map();
-    L.geoJSON(zones, {
-      // Hit-testing is done here against the same rings the pin uses, so the layers stay
-      // non-interactive and a click inside a zone still reaches the map and drops a pin.
-      interactive: false,
-      style: (feature) => (feature.properties.kind === 'zone' ? ZONE_HIDDEN : STATE_STYLE),
-      onEachFeature: (feature, layer) => {
-        if (feature.properties.kind === 'zone') zoneLayers.set(feature.properties.id, layer);
-      },
-    }).addTo(map);
+    const addZoneLayers = () => {
+      if (map.getSource('zones')) return;
+      map.addSource('zones', { type: 'geojson', data: zones });
+      // States, drawn faintly and always.
+      map.addLayer({
+        id: 'zones-state-fill', type: 'fill', source: 'zones',
+        filter: ['!=', ['get', 'kind'], 'zone'],
+        paint: { 'fill-color': STATE_STYLE.fillColor, 'fill-opacity': STATE_STYLE.fillOpacity },
+      });
+      map.addLayer({
+        id: 'zones-state-line', type: 'line', source: 'zones',
+        filter: ['!=', ['get', 'kind'], 'zone'],
+        paint: { 'line-color': STATE_STYLE.color, 'line-width': STATE_STYLE.weight,
+                 'line-opacity': STATE_STYLE.opacity },
+      });
+      // Nested zones stay invisible until the pointer is inside one — the outlines are
+      // only useful while you are choosing, and drawn always they crowd a 256px map. The
+      // filter names which single zone is lit; NO_ZONE matches nothing.
+      map.addLayer({
+        id: 'zone-lit-fill', type: 'fill', source: 'zones',
+        filter: ['==', ['get', 'id'], NO_ZONE],
+        paint: { 'fill-color': ZONE_SHOWN.fillColor, 'fill-opacity': ZONE_SHOWN.fillOpacity },
+      });
+      map.addLayer({
+        id: 'zone-lit-line', type: 'line', source: 'zones',
+        filter: ['==', ['get', 'id'], NO_ZONE],
+        paint: { 'line-color': ZONE_SHOWN.color, 'line-width': ZONE_SHOWN.weight },
+      });
+    };
+    if (map.isStyleLoaded()) addZoneLayers();
+    else map.on('load', addZoneLayers);
 
-    // Nested zones stay invisible until the pointer is inside one — the outlines are only
-    // useful while you are choosing, and drawn always they crowd a 256px map.
-    let lit = null;
+    let lit = NO_ZONE;
     const light = (code) => {
       if (code === lit) return;
-      if (lit) zoneLayers.get(lit)?.setStyle(ZONE_HIDDEN);
-      if (code) zoneLayers.get(code)?.setStyle(ZONE_SHOWN);
       lit = code;
+      if (!map.getLayer('zone-lit-fill')) return;
+      map.setFilter('zone-lit-fill', ['==', ['get', 'id'], code]);
+      map.setFilter('zone-lit-line', ['==', ['get', 'id'], code]);
     };
+    // The same ray casting the pin uses, rather than queryRenderedFeatures: a zone whose
+    // fill is filtered out is not rendered, so the GPU cannot report it.
     map.on('mousemove', (event) => {
       const hit = zones.features.find(
         (feature) => feature.properties.kind === 'zone'
-          && featureContains(feature, event.latlng.lat, event.latlng.lng)
+          && featureContains(feature, event.lngLat.lat, event.lngLat.lng)
       );
-      light(hit?.properties.id ?? null);
+      light(hit?.properties.id ?? NO_ZONE);
     });
-    map.on('mouseout', () => light(null));
+    map.on('mouseout', () => light(NO_ZONE));
 
     // A pin restored from an earlier visit predates the fetch.
     if (draft.latitude != null) {
@@ -716,19 +854,24 @@ function renderLocation(step) {
     draft.longitude = Number(lon.toFixed(6));
     latField.value = draft.latitude;
     lonField.value = draft.longitude;
-    if (pin) pin.setLatLng([draft.latitude, draft.longitude]);
+    if (pin) pin.setLngLat([draft.longitude, draft.latitude]);
     else {
-      pin = L.marker([draft.latitude, draft.longitude], { draggable: true }).addTo(map);
-      pin.on('dragend', () => { const p = pin.getLatLng(); setPoint(p.lat, p.lng, false); });
+      pin = new maplibregl.Marker({ draggable: true, color: '#f9a228' })
+        .setLngLat([draft.longitude, draft.latitude])
+        .addTo(map);
+      pin.on('dragend', () => { const p = pin.getLngLat(); setPoint(p.lat, p.lng, false); });
     }
     Object.assign(draft, readZone(zones, draft.latitude, draft.longitude));
-    if (recentre) map.setView([draft.latitude, draft.longitude], Math.max(map.getZoom(), 13));
+    if (recentre) {
+      map.jumpTo({ center: [draft.longitude, draft.latitude], zoom: Math.max(map.getZoom(), 12) });
+    }
     // Coordinates appear only once there is something to show, as GCM's does.
     coordRow.hidden = false;
     emptyNote.hidden = true;
+    refreshContinue();
   }
 
-  // Expanding hides the fields and grows the frame; Leaflet has to be told the box moved.
+  // Expanding hides the fields and grows the frame; the map has to be told the box moved.
   const stepEl = body.closest('.step');
   const toggle = form.querySelector('#map-expand');
   const setExpanded = (on) => {
@@ -738,7 +881,7 @@ function renderLocation(step) {
     toggle.title = label;
     toggle.setAttribute('aria-label', label);
     expandedMap = on ? () => setExpanded(false) : null;
-    map.invalidateSize();
+    map.resize();
   };
   toggle.addEventListener('click', () => setExpanded(!stepEl.classList.contains('is-map-expanded')));
   // A step left expanded is gone with its DOM; drop the stale closer.
@@ -746,19 +889,19 @@ function renderLocation(step) {
 
   if (draft.latitude != null) setPoint(draft.latitude, draft.longitude, false);
   map.on('click', (event) => {
-    const { lat, lng } = event.latlng;
+    const { lat, lng } = event.lngLat;
     setPoint(lat, lng, false);
     // Placing the pin is the point of expanding, so hand the form back. Recentre with it:
-    // Leaflet holds the centre while the container shrinks, which can strand an
-    // edge-of-map pin outside the small one.
+    // the centre is held while the container shrinks, which can strand an edge-of-map pin
+    // outside the small one.
     if (stepEl.classList.contains('is-map-expanded')) {
       setExpanded(false);
-      map.setView([lat, lng], map.getZoom());
+      map.jumpTo({ center: [lng, lat], zoom: map.getZoom() });
     }
   });
-  // Leaflet measures the container on creation; inside a step that was just built it is
-  // still zero-height, so the tiles come back as a grey box without this.
-  setTimeout(() => map.invalidateSize(), 0);
+  // The container is measured on creation; inside a step that was just built it is still
+  // zero-height, so the canvas comes back empty without this.
+  setTimeout(() => map.resize(), 0);
 
   const readCoords = () => {
     const lat = Number.parseFloat(latField.value);
@@ -776,32 +919,43 @@ function renderLocation(step) {
   const next = document.createElement('button');
   next.type = 'button';
   next.className = 'btn btn-primary';
-  next.textContent = 'Continue';
+  // A new device is joining the mesh, and this is the last screen before it does; an
+  // Upgrade is mid-flow and 'Continue' is still what happens.
+  next.textContent = isUpgrade ? 'Continue' : 'Join the mesh';
   // Both are required for MeshCore operation, so an empty one is never "leave it alone".
   // The password counts as set when its placeholder is still untouched on an Upgrade.
   const invalidField = () => {
-    if (!draft.name.trim()) return [nameField, 'Give this device a name.'];
+    if (!draft.name.trim()) return [nameField, `Give this ${noun} a name.`];
+    // The position is what selects the regional settings: no pin, no zone, no radio
+    // defaults to apply. The map is the field here, so the message points at it.
+    if (draft.latitude == null || draft.longitude == null) {
+      return [mapExpand, 'Click the map to set a location — it selects the regional settings.'];
+    }
     if (!passwordUntouched && !draft.adminPassword.trim()) {
       return [passwordField, 'Set an admin password.'];
     }
     return null;
   };
 
+  // Guidance, not an error: the button is disabled while this is showing, so nothing has
+  // gone wrong yet. Quiet enough to read as a caption rather than a scolding.
   const validationNote = document.createElement('p');
-  validationNote.className = 'field-note is-warn';
+  validationNote.className = 'field-note is-quiet';
   validationNote.hidden = true;
   foot.append(validationNote);
 
-  next.addEventListener('click', async () => {
+  // A disabled Continue with no reason beside it is the confusing case; the note names
+  // whatever is still outstanding, and both come from the same check.
+  refreshContinue = () => {
     const problem = invalidField();
-    if (problem) {
-      const [field, message] = problem;
-      validationNote.textContent = message;
-      validationNote.hidden = false;
-      field.focus();
-      return;
-    }
-    validationNote.hidden = true;
+    next.disabled = Boolean(problem);
+    validationNote.hidden = !problem;
+    if (problem) validationNote.textContent = problem[1];
+  };
+  refreshContinue();
+
+  next.addEventListener('click', async () => {
+    if (invalidField()) return;
     // The placeholder is not a password — send nothing rather than the bullets.
     await step.apply(flow, { ...draft, adminPassword: passwordUntouched ? '' : draft.adminPassword });
     advance();
@@ -812,16 +966,17 @@ function renderLocation(step) {
   // Tab order is name -> map -> height -> email -> password -> Continue, which the DOM
   // already gives; everything Leaflet adds inside the map is taken back out of it.
   for (const skipped of form.querySelectorAll(
-    '.leaflet-control a, .leaflet-control button, #map-expand, #lat, #lon'
+    '.maplibregl-ctrl button, #map-expand, #lat, #lon'
   )) {
     skipped.tabIndex = -1;
   }
   nameField.focus();
 
   // An Upgrade keeps the identity the node already has. Mining a new one here would only
-  // produce a key that `set prv.key` then writes over a working node's address.
+  // produce a key that `set prv.key` then writes over a working node's address. The note
+  // under the name field already says so, where the question is actually provoked.
   if (isUpgrade) {
-    identityLine.textContent = 'Keeping this device’s existing identity.';
+    identityLine.hidden = true;
   } else if (draft.identity) {
     showIdentity(draft.identity.prefix, draft.identityStatus);
   } else {

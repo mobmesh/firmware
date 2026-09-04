@@ -362,16 +362,16 @@ export const STEPS = [
     // `icon` is a name, not markup — this module stays DOM-free.
     options: () => [
       {
-        value: INSTALL.NEW,
-        label: 'New device',
-        note: 'Set up a fresh device with a clean configuration.',
-        icon: 'new-device',
-      },
-      {
         value: INSTALL.UPDATE,
         label: 'Upgrade existing',
         note: 'Install the latest firmware and keep your existing data where possible.',
         icon: 'upgrade',
+      },
+      {
+        value: INSTALL.NEW,
+        label: 'New device',
+        note: 'Set up a fresh device with a clean configuration.',
+        icon: 'new-device',
       },
     ],
     apply: (flow, value) => {

@@ -246,3 +246,7 @@ export const STOCK_RELAY_BASE = 'https://fw.mobmesh.workers.dev/fw/';
 // `matched`. Device artwork is root-relative in the manifest (`/img/…`), so it only
 // resolves against upstream's own origin — not `staticPath`, which addresses firmware.
 export const STOCK_IMAGE_BASE = 'https://flasher.meshcore.io/';
+
+// Gap between neighbouring tiles in the board grid's entry wave. 35ms settles a 12-tile
+// grid in about half a second; past ~900ms total the cascade reads as waiting.
+export const TILE_STAGGER_MS = 35;

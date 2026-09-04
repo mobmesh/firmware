@@ -295,6 +295,20 @@
   margin-inline: auto;
 }
 
+/* Option grids, where a step change otherwise reads as the same screen. `--tile-delay`
+   is set per tile by ui.js: a board grid waves diagonally and needs its column count,
+   which is only known there. The row layout stays still — it is a list, not a grid. */
+.board-tiles > .board-tile,
+.choice-grid > .choice {
+  animation: tile-rise 0.38s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: var(--tile-delay, 0ms);
+}
+
+@keyframes tile-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
 /* A logo wants no frame; the gradient plate is there to sit behind a board photo. */
 .board-tile-icon[data-noplate] {
   background: none;
@@ -340,9 +354,13 @@
   position: relative;
 }
 
-/* GCM's h-64. Leaflet needs a measured height or it renders a grey box. */
+/* Was GCM's flat h-64, which letterboxed to about 2.3:1 in this card — too little sky
+   above a pin and too little below. An aspect ratio holds the shape as the card narrows;
+   the min-height keeps it usable on a phone, where the ratio would otherwise starve it.
+   A measured height matters either way: the map renders an empty canvas without one. */
 .map-frame {
-  height: 256px;
+  aspect-ratio: 1.8;
+  min-height: 240px;
 }
 
 /* Overlay chips, borrowed from GCM: the map explains itself rather than relying on a
@@ -449,14 +467,17 @@
   font-size: 0.9rem;
 }
 
-.step-foot:has(.identity-line) {
+/* Only while the line is actually shown: `:has(.identity-line)` still matches a hidden
+   one, and space-between left-aligns a lone child, which walked the button across the
+   card on an Upgrade. Without it the foot falls back to .actions' own flex-end. */
+.step-foot:has(.identity-line:not([hidden])) {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
 }
 
-.step-foot:has(.identity-line) .actions { margin-top: 0; }
+.step-foot:has(.identity-line:not([hidden])) .actions { margin-top: 0; }
 
 /* Sits directly under its field: the negative margin cancels .location-form's gap.
    Same face and size as .identity-line -- at equal px, Inter reads larger than mono. */
@@ -618,6 +639,10 @@
 /* Advisory: the firmware stores the name, the advert is what clips. */
 .field-note.is-warn { color: var(--danger); opacity: 0.7; }
 
+/* Reassurance rather than instruction — closer to a watermark than a label, so it sits
+   back until someone goes looking for it. */
+.field-note.is-quiet { opacity: 0.5; }
+
 /* Maximise, within the card. The fields stand down rather than the map covering them, so
    nothing is hidden behind anything and the card keeps one scroll position. */
 .map-expand {
@@ -639,7 +664,12 @@
 
 .map-expand:hover { color: var(--accent); border-color: var(--hover-edge); }
 
-.step.is-map-expanded .map-frame { height: min(70vh, 620px); }
+/* The ratio governs the collapsed map; expanded, the height is the point, so the ratio
+   has to be released or the box keeps deriving its own. */
+.step.is-map-expanded .map-frame {
+  aspect-ratio: auto;
+  height: min(70vh, 620px);
+}
 .step.is-map-expanded .field,
 .step.is-map-expanded .field-row,
 .step.is-map-expanded .field-note,
@@ -647,24 +677,66 @@
 .step.is-map-expanded .identity-line,
 .step.is-map-expanded .actions { display: none; }
 
-/* The label overlay is composited over labels the base already has, so its soft casing
-   doubles too. Contrast drops the halo back while keeping the glyph solid. */
-.map-labels { filter: contrast(1.8); }
+/* The counter belongs to the name field, which is hidden here; left on its own it reads
+   as a count of something on the map. The heading introduces a form that is no longer
+   on screen, so it goes too — expanded is the map and nothing else. */
+.step.is-map-expanded .name-count { display: none; }
+.step.is-map-expanded .step-head { display: none; }
 
-/* Leaflet paints its own light chrome; pull it back to the sheet's palette. */
-.map-frame .leaflet-container { background: var(--bg-1); }
-.map-frame .leaflet-control-attribution {
-  background: rgba(6, 18, 31, 0.7);
-  color: var(--fg-muted);
-  font-size: 0.62rem;
+/* Expanded is a mode, and the only way out of it is this button — so it stops being
+   quiet chrome and says so. */
+.step.is-map-expanded .map-expand {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 14px rgba(45, 209, 189, 0.35);
 }
-.map-frame .leaflet-control-attribution a { color: var(--accent); }
-.map-frame .leaflet-bar a {
-  background: var(--bg-elevated);
+
+.step.is-map-expanded .map-expand:hover {
   color: var(--fg);
-  border-color: var(--line);
+  box-shadow: 0 0 18px rgba(45, 209, 189, 0.5);
 }
-.map-frame .leaflet-bar a:hover { background: var(--bg-1); color: var(--accent); }
+
+/* MapLibre paints its own light chrome; pull it back to the sheet's palette. Label
+   contrast is set on the style's own layers in ui.js, not with a filter over the canvas —
+   there is no composited label image to correct any more. */
+.map-frame .maplibregl-map { background: var(--bg-1); }
+.map-frame .maplibregl-canvas { outline: none; }
+
+/* Attribution sits under the hint bar rather than beside it: it has to be present for
+   CARTO's and OSM's terms, not read. Smaller, dimmer, and below .map-hint's z-index so
+   the instruction wins wherever they overlap. */
+.map-frame .maplibregl-ctrl-bottom-right,
+.map-frame .maplibregl-ctrl-bottom-left {
+  z-index: 1000;
+  margin: 0;
+  bottom: 0;
+}
+
+.map-frame .maplibregl-ctrl-attrib {
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 0.48rem;
+  line-height: 1.2;
+  /* Right padding clears .map-hint's own inset, so the credit never peeks past its end. */
+  padding: 0 10px 2px 4px;
+  opacity: 0.45;
+  margin: 0;
+}
+
+.map-frame .maplibregl-ctrl-attrib a { color: var(--fg-muted); text-decoration: none; }
+.map-frame .maplibregl-ctrl-attrib-button { display: none; }
+/* Compact mode collapses to a button; the text is wanted, so keep it expanded. */
+.map-frame .maplibregl-ctrl-attrib.maplibregl-compact-show { padding: 0 4px 1px; }
+
+.map-frame .maplibregl-ctrl-group {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+}
+.map-frame .maplibregl-ctrl-group button { background: transparent; }
+.map-frame .maplibregl-ctrl-group button:hover { background: var(--bg-1); }
+/* The control glyphs are inlined SVG on a light theme; invert rather than replace them. */
+.map-frame .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(0.9); }
 
 /* ---- Anchored back navigation ---- */
 
@@ -728,4 +800,6 @@
   .spinner { animation: none; }
   .map-empty { transition: none; }
   .choice { transition: none; }
+  .board-tiles > .board-tile,
+  .choice-grid > .choice { animation: none; }
 }

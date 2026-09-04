@@ -30,6 +30,71 @@ html, body {
   min-height: 100%;
 }
 
+/* The UA's own [hidden] rule is a plain `display: none` at the same specificity as any
+   class, so any rule setting `display` silently defeats `el.hidden = true`. Stated once
+   here rather than guarded per element, which is how it was missed. */
+[hidden] {
+  display: none !important;
+}
+
+/* Reserve the scrollbar's width whether or not one is showing, so a step that grows past
+   the viewport does not shift the page sideways as it appears.
+
+   The thumb is `--line`, the colour every border on the site already uses, so the bar reads
+   as chrome rather than decoration. Firefox honours only the two standard properties;
+   Chromium and Safari read the ::-webkit- rules, so both are written. The transparent
+   border with `background-clip` is what insets the thumb — webkit has no padding for it. */
+html {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+html::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: var(--radius-full);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background: #31527a;
+  background-clip: content-box;
+}
+
+/* Inner scrollers get the same bar. `scrollbar-color` inherits, so Firefox is already
+   covered by the rule above; the ::-webkit- pseudo-elements do not cascade and have to be
+   restated for descendants. Six panes scroll across the configurator and region map. */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: var(--radius-full);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #31527a;
+  background-clip: content-box;
+}
+
 body {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: var(--fg);
