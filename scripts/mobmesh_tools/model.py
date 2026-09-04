@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -153,6 +154,15 @@ class PatchDefinition:
         return f"{self.mod}/{self.patch_id}"
 
 
+def _ota_web_page(path: Path, value: Any) -> str | None:
+    """A mod-relative path to the HTML this mod serves in place of upstream's OTA page."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value or value.startswith("/") or ".." in Path(value).parts:
+        raise ProjectModelError(f"{path}:ota_web_page: expected a mod-relative file path")
+    return value
+
+
 @dataclass(frozen=True)
 class ModDefinition:
     name: str
@@ -164,6 +174,7 @@ class ModDefinition:
     optional_capabilities: tuple[Capability, ...]
     integration: IntegrationDefinition | None
     composition: CompositionOutputs | None
+    ota_web_page: str | None
     patches: tuple[PatchDefinition, ...]
 
 
@@ -415,7 +426,7 @@ class ProjectModel:
     def _load_mod(root: Path, name: str) -> ModDefinition:
         path = root / "mods" / name / "mod.yaml"
         data = _load_yaml(path)
-        _keys(path, "root", data, {"name", "env_flags", "bit", "image_marker", "requirements", "integration", "composition"})
+        _keys(path, "root", data, {"name", "env_flags", "bit", "image_marker", "requirements", "integration", "composition", "ota_web_page"})
         declared_name = _string(path, "name", data.get("name"))
         if declared_name != name:
             raise ProjectModelError(f"{path}:name: expected '{name}', found '{declared_name}'")
@@ -453,6 +464,7 @@ class ProjectModel:
             optional_capabilities=optional,
             integration=integration,
             composition=composition,
+            ota_web_page=_ota_web_page(path, data.get("ota_web_page")),
             patches=patches,
         )
 

@@ -8,9 +8,12 @@
 #include <helpers/esp32/HotspotOTA.h>
 #include <helpers/esp32/RollbackGuard.h>
 
-#if defined(ADMIN_PASSWORD) && !defined(DISABLE_WIFI_OTA)
-#include <AsyncElegantOTA.h>
+// DISABLE_WIFI_OTA is upstream's switch for its own `start ota`; this mod replaces that
+// implementation, so its AP is gated on the role marker alone.
+#if defined(ADMIN_PASSWORD)
 #include <ESPAsyncWebServer.h>
+// Generated at build time from mods/hotspot-ota/web/ota-page.min.html.
+#include <helpers/esp32/OtaWebPage.h>
 #endif
 
 #ifndef OTA_MOD_BUILD_DATE
@@ -35,16 +38,32 @@ bool hotspotOtaRadioInit(const char* build_id) {
 // never stops either. This mod owns both instead, so the listener can actually be closed.
 #define OTA_AP_DEADLINE_MS  (20UL * 60 * 1000)
 #define OTA_AP_STALL_MS     (10UL * 60 * 1000)
+// Long enough for AsyncTCP to drain the response now that the callback no longer blocks.
+#define OTA_REBOOT_GRACE_MS 1500UL
 
-#if defined(ADMIN_PASSWORD) && !defined(DISABLE_WIFI_OTA)
+#if defined(ADMIN_PASSWORD)
 #define OTA_AP_OWNED  1
 
 static AsyncWebServer ota_server(80);
 static wifi_mode_t ap_prev_mode = WIFI_OFF;
 static char     ota_home[96];
+static char     ota_identity[128];
 static bool     ap_routed = false;
 static bool     ap_up = false;
 static bool     ap_uploading = false;
+static bool     ap_reboot_pending = false;
+static uint32_t ap_reboot_ms = 0;
+
+// `start ota` refuses a second AP session, but not a second POST to the one already up, so each
+// request carries its own verdict and only Update.end() success may claim it.
+enum ApUploadState : uint8_t { AP_UPLOAD_WRITING, AP_UPLOAD_FAILED, AP_UPLOAD_DONE };
+struct ApUpload {
+  ApUploadState state;
+  const char* error;
+};
+// The single upload allowed to hold the flash writer; a second request is refused without
+// touching this one's state.
+static ApUpload* ap_upload_owner = NULL;
 static uint32_t ap_started_ms = 0;
 static uint32_t ap_progress_ms = 0;
 static size_t   ap_progress_bytes = 0;
@@ -54,19 +73,111 @@ static uint32_t apSecondsLeft() {
   return elapsed >= OTA_AP_DEADLINE_MS ? 0 : (OTA_AP_DEADLINE_MS - elapsed) / 1000;
 }
 
+static void apUploadRelease(ApUpload* upload) {
+  if (ap_upload_owner == upload) ap_upload_owner = NULL;
+}
+
+static void apUploadFail(ApUpload* upload, const char* reason) {
+  upload->state = AP_UPLOAD_FAILED;
+  upload->error = reason;
+  apUploadRelease(upload);
+}
+
 // Routes outlive a session: AsyncWebServer holds them independently of the listening socket, and
 // re-registering on each start would stack duplicate handlers.
 static void apStart(const char* id, char* reply) {
   if (!ap_routed) {
     sprintf(ota_home, "<H2>MeshCore node. ID: %s</H2>", id);
+    snprintf(ota_identity, sizeof(ota_identity),
+             "{\"id\": \"%s\", \"hardware\": \"ESP32\"}", id);
     ota_server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
       request->send(200, "text/html", ota_home);
     });
     ota_server.on("/log", HTTP_GET, [](AsyncWebServerRequest* request) {
       request->send(SPIFFS, "/packet_log", "text/plain");
     });
-    AsyncElegantOTA.setID(id);
-    AsyncElegantOTA.begin(&ota_server);
+    // The upload page, served gzipped straight from flash.
+    ota_server.on("/update", HTTP_GET, [](AsyncWebServerRequest* request) {
+      AsyncWebServerResponse* resp = request->beginResponse_P(
+          200, "text/html", MOBMESH_OTA_PAGE, MOBMESH_OTA_PAGE_LEN);
+      resp->addHeader("Content-Encoding", "gzip");
+      request->send(resp);
+    });
+    ota_server.on("/update/identity", HTTP_GET, [](AsyncWebServerRequest* request) {
+      request->send(200, "application/json", ota_identity);
+    });
+    // Rebooting from inside the callback preempts the queued response and leaves every client
+    // unable to tell a completed update from a hung one, so the reboot is deferred to apPoll().
+    ota_server.on("/update", HTTP_POST,
+      // The only response this request sends: answering from the chunk callback too would send
+      // two, and a rejection Update never saw would otherwise read as success and reboot.
+      [](AsyncWebServerRequest* request) {
+        // _tempObject is null when the chunk callback never ran -- a POST carrying no file part.
+        ApUpload* upload = (ApUpload*)request->_tempObject;
+        bool ok = upload && upload->state == AP_UPLOAD_DONE;
+        const char* body = ok ? "OK"
+                              : (upload && upload->error ? upload->error : "no firmware uploaded");
+        AsyncWebServerResponse* resp = request->beginResponse(ok ? 200 : 400, "text/plain", body);
+        resp->addHeader("Connection", "close");
+        request->send(resp);
+        if (ok) { ap_reboot_pending = true; ap_reboot_ms = millis(); }
+      },
+      [](AsyncWebServerRequest* request, String filename, size_t index, uint8_t* data, size_t len,
+         bool final) {
+        ApUpload* upload = (ApUpload*)request->_tempObject;
+        if (index == 0 && !upload) {
+          // Freed by the request destructor, so it must come from malloc.
+          upload = (ApUpload*)malloc(sizeof(ApUpload));
+          if (!upload) return;
+          upload->state = AP_UPLOAD_WRITING;
+          upload->error = NULL;
+          request->_tempObject = upload;
+
+          if (ap_reboot_pending) {
+            apUploadFail(upload, "reboot pending; update already installed");
+            return;
+          }
+          if (ap_upload_owner) {
+            // Refused without touching the upload that holds the writer.
+            upload->state = AP_UPLOAD_FAILED;
+            upload->error = "another upload is in progress";
+            return;
+          }
+          if (!request->hasParam("MD5", true)) {
+            apUploadFail(upload, "MD5 parameter missing");
+            return;
+          }
+          int cmd = (filename == "filesystem") ? U_SPIFFS : U_FLASH;
+          if (!Update.begin(UPDATE_SIZE_UNKNOWN, cmd)) {
+            apUploadFail(upload, "OTA could not begin");
+            return;
+          }
+          ap_upload_owner = upload;
+          // After begin(), never before: begin() clears the expected digest, so upstream's order
+          // leaves MD5 verification silently disabled.
+          if (!Update.setMD5(request->getParam("MD5", true)->value().c_str())) {
+            Update.abort();
+            apUploadFail(upload, "MD5 parameter invalid");
+            return;
+          }
+        }
+        // Chunks keep arriving after a rejection, and a refused request never owned the writer.
+        if (!upload || upload->state != AP_UPLOAD_WRITING || ap_upload_owner != upload) return;
+        if (len && Update.write(data, len) != len) {
+          Update.abort();
+          apUploadFail(upload, "OTA write failed");
+          return;
+        }
+        if (final) {
+          if (!Update.end(true)) {
+            Update.abort();
+            apUploadFail(upload, "could not end OTA");
+            return;
+          }
+          upload->state = AP_UPLOAD_DONE;
+          apUploadRelease(upload);
+        }
+      });
     ap_routed = true;
   }
   // softAP() alone only adds AP to the current mode; a disconnected station would survive into
@@ -87,6 +198,8 @@ static void apStart(const char* id, char* reply) {
 // so the mode captured at start is restored separately, leaving no radio up that was not up before.
 static bool apTeardown() {
   ota_server.end();
+  // Ending the server destroys any in-flight request, freeing the state ap_upload_owner points at.
+  ap_upload_owner = NULL;
   bool stopped = WiFi.softAPdisconnect(false);
   WiFi.mode(ap_prev_mode);
   modBoardInhibitSleep(false);
@@ -103,7 +216,16 @@ static bool refuseWhileApUp(char* reply) {
   return true;
 }
 
+// The AP upload holds the same flash writer the WAN service does, so it needs the same interlock.
+static bool refuseWhileApWriting(char* reply) {
+  if (!Update.isRunning() && !ap_reboot_pending) return false;
+  strcpy(reply, ap_reboot_pending ? "ERR: reboot pending after OTA; wait for restart"
+                                  : "ERR: OTA upload in progress");
+  return true;
+}
+
 static void apPoll() {
+  if (ap_reboot_pending && millis() - ap_reboot_ms >= OTA_REBOOT_GRACE_MS) modBoardReboot();
   if (!ap_up) return;
   if (Update.isRunning()) {
     size_t written = Update.progress();
@@ -115,6 +237,7 @@ static void apPoll() {
     if (millis() - ap_progress_ms < OTA_AP_STALL_MS) return;
     // A client that vanished mid-POST leaves the flash writer claimed with nothing to release it.
     Update.abort();
+    ap_upload_owner = NULL;
   } else {
     // Cleared here, not at start: an upload that begins and fails leaves the tracking behind, and
     // the next attempt in the same session would then be measured against its stall clock.
@@ -129,6 +252,7 @@ static void apPoll() {
 static const bool ap_up = false;
 static void apPoll() {}
 static bool refuseWhileApUp(char* reply) { return false; }
+static bool refuseWhileApWriting(char* reply) { return false; }
 static bool apTeardown() { return true; }
 static uint32_t apSecondsLeft() { return 0; }
 #endif
@@ -166,8 +290,10 @@ static bool refuseOtaStart(char* reply) {
 }
 
 static bool handleCommand(const ModCliContext& context, char* command, char* reply) {
-  // A reboot, power-off or erase part-way through an OTA leaves a half-written slot behind.
-  if (isDestructive(context, command) && HotspotOTA::refuseWhileActive(reply)) return true;
+  // A reboot, power-off or erase part-way through an OTA leaves a half-written slot behind --
+  // for the AP upload as much as the WAN download, since both drive the one flash writer.
+  if (isDestructive(context, command)
+      && (HotspotOTA::refuseWhileActive(reply) || refuseWhileApWriting(reply))) return true;
 
   if (memcmp(command, "ver", 3) == 0) {
     sprintf(reply, "%s (%s) + ota (%s)", context.fw_version, context.fw_build_date,
@@ -225,8 +351,11 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
   } else if (memcmp(command, "ota wan check", 13) == 0) {
     HotspotOTA::checkWan(reply);
   } else if (memcmp(command, "ota slot boot ", 14) == 0) {
+    // Repointing the bootloader mid-write would boot whatever the interrupted upload left behind.
     if (HotspotOTA::isActive()) {
       strcpy(reply, "ERR: OTA active");
+    } else if (refuseWhileApWriting(reply)) {
+      return true;
     } else if (RollbackGuard::setActivePartition(command[14], reply)) {
       modBoardReboot();
     }

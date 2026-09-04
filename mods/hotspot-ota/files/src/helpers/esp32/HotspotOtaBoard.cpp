@@ -4,7 +4,7 @@
 #include <helpers/esp32/HotspotOTA.h>
 
 // Same gate upstream puts around startOTAUpdate(): no WiFi stack, no URL update.
-#if defined(WITH_HOTSPOT_OTA) && defined(ADMIN_PASSWORD) && !defined(DISABLE_WIFI_OTA)
+#if defined(WITH_HOTSPOT_OTA) && defined(ADMIN_PASSWORD)
 
 #include <helpers/TxtDataHelpers.h>   // StrHelper -- there is no standalone StrHelper.h
 

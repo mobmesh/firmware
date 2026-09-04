@@ -6,6 +6,7 @@ Run: python3 scripts/tests/test_generate_board_config.py
 import argparse
 import importlib.util
 import json
+import re
 import struct
 import tempfile
 import unittest
@@ -469,6 +470,123 @@ class ResolveTargetsTestCase(unittest.TestCase):
     def test_no_mods_anywhere_is_an_error(self):
         with self.assertRaises(ValueError):
             self._run([])
+
+
+# The upstream root ini the generator reads [esp32_ota] from, plus the env line that
+# references it. Mirrors upstream's real shape: the server pin lives in one place.
+OTA_ROOT_INI = """[esp32_ota]
+lib_deps =
+  ESP32Async/ESPAsyncWebServer @ 9.9.9
+  file://arch/esp32/AsyncElegantOTA
+
+[env:unused]
+board = x
+"""
+
+OTA_ENV_INI = """[env:heltec_v4_repeater]
+board = heltec_v4
+build_flags =
+  -D MAX_NEIGHBOURS=50
+build_src_filter = foo
+lib_deps =
+  ${heltec_v4_oled.lib_deps}
+  ${esp32_ota.lib_deps}
+  bakercp/CRC32 @ ^2.0.0
+"""
+
+
+class OtaWebPageTestCase(InjectEnvTestCase):
+    """The mod serves its own OTA page, so upstream's OTA web library is left out of the build."""
+
+    PAGE = "<!doctype html><title>t</title><p>hello"
+
+    def _setup(self, board="heltec_v4", ota_web_page=True, page=True):
+        # Activation rides on the selected mod, not the board: declaring it here is what turns
+        # the replacement on for any target that composes this mod.
+        self._make_mod("hotspot-ota", {"0001": "id: \"0001\"\ntitle: x\nrequires: []\n"})
+        if ota_web_page:
+            self._write("mods/hotspot-ota/mod.yaml",
+                        "name: hotspot-ota\nota_web_page: web/ota-page.min.html\n")
+        self._make_overrides(board, "build_values: {}\n")
+        if page:
+            self._write("mods/hotspot-ota/web/ota-page.min.html", self.PAGE)
+        self._write("upstream-src/platformio.ini", OTA_ROOT_INI)
+        return self._write(f"upstream-src/variants/{board}/platformio.ini", OTA_ENV_INI)
+
+    def _header(self, ini_path):
+        return ini_path.parent.parent.parent / "src/helpers/esp32/OtaWebPage.h"
+
+    def test_page_round_trips_and_is_deterministic(self):
+        import gzip
+        page = self._write("mods/hotspot-ota/web/ota-page.min.html", self.PAGE)
+        first = gbc.render_ota_web_page(page)
+        self.assertEqual(first, gbc.render_ota_web_page(page), "output is not reproducible")
+        blob = bytes(int(b, 16) for b in re.findall(r"0x([0-9a-f]{2})", first))
+        self.assertEqual(gzip.decompress(blob).decode(), self.PAGE)
+        self.assertIn(f"MOBMESH_OTA_PAGE_LEN = {len(blob)};", first)
+
+    def test_header_is_generated_into_the_tree(self):
+        ini_path = self._setup()
+        self._run(ini_path)
+        header = self._header(ini_path)
+        self.assertTrue(header.exists(), "OtaWebPage.h was not generated")
+        self.assertIn("MOBMESH_OTA_PAGE[]", header.read_text())
+
+    def test_ota_library_is_dropped_but_server_pin_kept(self):
+        ini_path = self._setup()
+        self._run(ini_path)
+        result = ini_path.read_text()
+        self.assertIn("ESP32Async/ESPAsyncWebServer @ 9.9.9", result,
+                      "the server pin must come from upstream, not a copy in the generator")
+        self.assertNotIn("AsyncElegantOTA", result)
+        self.assertNotIn("${esp32_ota.lib_deps}", result)
+        self.assertIn("bakercp/CRC32", result)
+
+    def test_absent_key_leaves_lib_deps_alone(self):
+        ini_path = self._setup(ota_web_page=False)
+        self._run(ini_path)
+        self.assertIn("${esp32_ota.lib_deps}", ini_path.read_text())
+        self.assertFalse(self._header(ini_path).exists())
+
+    def test_missing_page_fails(self):
+        ini_path = self._setup(page=False)
+        with self.assertRaises(SystemExit):
+            self._run(ini_path)
+
+    def test_no_placeholder_to_rewrite_fails(self):
+        ini_path = self._setup()
+        ini_path.write_text(OTA_ENV_INI.replace("  ${esp32_ota.lib_deps}\n", ""))
+        with self.assertRaises(SystemExit):
+            self._run(ini_path)
+
+    def test_upstream_without_a_file_dependency_fails(self):
+        ini_path = self._setup()
+        self._write("upstream-src/platformio.ini",
+                    OTA_ROOT_INI.replace("  file://arch/esp32/AsyncElegantOTA\n", ""))
+        with self.assertRaises(SystemExit):
+            self._run(ini_path)
+
+    def test_page_path_escaping_the_mod_is_rejected(self):
+        from mobmesh_tools.model import ProjectModelError
+        for bad in ("../../etc/passwd", "/etc/passwd", ""):
+            with self.subTest(path=bad):
+                self._setup()
+                self._write("mods/hotspot-ota/mod.yaml",
+                            f"name: hotspot-ota\nota_web_page: {bad!r}\n")
+                ini_path = self.repo_root / "upstream-src/variants/heltec_v4/platformio.ini"
+                with self.assertRaises((SystemExit, ProjectModelError)):
+                    self._run(ini_path)
+
+    def test_target_without_the_mod_keeps_upstream_ota(self):
+        # The second future failure this guards: a board can no longer disable upstream's OTA
+        # while the replacement is absent, because the same selection decides both.
+        ini_path = self._setup(ota_web_page=False)
+        self._run(ini_path)
+        result = ini_path.read_text()
+        self.assertIn("${esp32_ota.lib_deps}", result)
+        self.assertNotIn("DISABLE_WIFI_OTA", result)
+        self.assertFalse(self._header(ini_path).exists())
+
 
 
 if __name__ == "__main__":

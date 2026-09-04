@@ -10,6 +10,10 @@ env_flags: [WITH_HOTSPOT_OTA, WITH_OTA_ROLLBACK_GUARD]
 bit: 1
 image_marker: "H0TSP0T"
 
+# Served in place of upstream's OTA page; the generator compiles this to a header and
+# drops upstream's OTA web library from any target selecting this mod.
+ota_web_page: web/ota-page.min.html
+
 requirements:
   required: [wifi_station, dual_ota]
   optional: [external_power_control]
