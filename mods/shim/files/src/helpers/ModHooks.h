@@ -20,8 +20,8 @@ bool modWantsPowerSaving();                // OR'd with the operator's powersavi
 bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
                          const char* fw_version, const char* fw_build_date);
 
-// The reverse direction. Bodies name the concrete `board` and `rtc_clock`, so an
-// upstream refactor breaks this one file instead of silently unhooking a mod.
+// The reverse direction. Bodies name the concrete `board`, `rtc_clock` and `the_mesh`, so
+// an upstream refactor breaks this one file instead of silently unhooking a mod.
 bool     modBoardRadioInit();
 void     modBoardReboot();                     // does not return
 uint16_t modBoardBattMilliVolts();
@@ -29,6 +29,11 @@ void     modBoardDeepSleep(uint32_t secs);     // does not return
 void     modBoardInhibitSleep(bool inhibit);
 uint32_t modClockGet();
 void     modClockSet(uint32_t epoch);
+
+// Zero-hop only: a flood advert reaches flood.max.advert hops and upstream schedules one just
+// every 47 hours, so it is not a caller's to spend. The delay lets a reply go out before the
+// radio transmits, as upstream's own `advert.zerohop` does.
+void     modSendZeroHopAdvert(int delay_millis);
 
 // FEM LNA bypass, where the board declares MOBMESH_HAS_FEM_LNA. Elsewhere the
 // query answers false and the setter does nothing.
