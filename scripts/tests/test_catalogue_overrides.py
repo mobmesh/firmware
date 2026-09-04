@@ -31,7 +31,7 @@ def run(catalogue, overrides, art=(), remote=lambda url: None):
     `remote` stands in for the network -- return a reason string to fail a URL."""
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
-        cat_path = root / "mc_config.json"
+        cat_path = root / "data" / "mc_config.json"
         ovr_path = root / "data" / "catalogue-overrides.json"
         ovr_path.parent.mkdir()
         cat_path.write_text(json.dumps(catalogue))
@@ -137,7 +137,7 @@ class TestDetection(unittest.TestCase):
 
     def test_filters_match_flash_plan(self):
         """FILTERS is hand-synced with IMAGE_FILTERS; drift makes a live filter look unknown."""
-        js = (cco.ROOT / "pages/flasher2/src/flash-plan.js").read_text()
+        js = (cco.ROOT / "pages/flasher/src/flash-plan.js").read_text()
         block = re.search(r"const IMAGE_FILTERS = \{(.*?)\};", js, re.S)
         self.assertIsNotNone(block, "IMAGE_FILTERS not found in flash-plan.js")
         self.assertEqual(set(re.findall(r"(\w+):", block.group(1))), cco.FILTERS)

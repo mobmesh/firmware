@@ -129,7 +129,8 @@ function normaliseBoard(key, raw) {
 }
 
 // Top level is board keys plus `_generated`/`_version` metadata.
-const CUSTOM_DISPLAY_FILE = 'board-display.json';
+const CUSTOM_BOARDS_FILE = 'data/auto_boards.json';
+const CUSTOM_DISPLAY_FILE = 'data/board-display.json';
 
 // Same two the shipped flasher ships; a variant with no icon renders without one.
 const CUSTOM_VARIANT_ICONS = {
@@ -138,7 +139,7 @@ const CUSTOM_VARIANT_ICONS = {
 };
 
 export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}) {
-  const res = await fetch(assetUrl(baseUrl, 'auto_boards.json'), { cache: 'no-store' });
+  const res = await fetch(assetUrl(baseUrl, CUSTOM_BOARDS_FILE), { cache: 'no-store' });
   if (!res.ok) throw new ManifestError(`Could not load auto_boards.json: HTTP ${res.status}.`);
 
   let raw;
@@ -271,8 +272,8 @@ export function buildCustomFlashPlan(source, scope) {
 // Mirrored same-origin by CI, so only firmware bytes need the relay. Upstream is volatile,
 // so nothing validates against a count or fixed set; unusable entries are dropped.
 
-export const STOCK_MANIFEST_FILE = 'mc_config.json';
-export const STOCK_RELEASES_FILE = 'mc_releases.json';
+export const STOCK_MANIFEST_FILE = 'data/mc_config.json';
+export const STOCK_RELEASES_FILE = 'data/mc_releases.json';
 export const CATALOGUE_OVERRIDES_FILE = 'catalogue-overrides.json';
 
 // An entry either carries `version` directly or a release stream plus filename patterns.

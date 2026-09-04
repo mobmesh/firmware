@@ -7,6 +7,7 @@ import { TILE_STAGGER_MS } from './constants.js';
 import { PortSelectionRequiredError, promptForSerialPort } from './serial-port.js';
 import { ManualEntryRequiredError } from './esp32.js';
 import { FilePickerRequiredError, writeBootloaderUf2 } from './nrf52.js';
+import { loadBuildInfo } from './build-info.js';
 
 const elements = {
   wizard: document.getElementById('wizard'),
@@ -1156,11 +1157,14 @@ elements.back.addEventListener('click', () => {
 const params = new URLSearchParams(location.search);
 
 flow = flowApi.createFlow({
-  manifestBase: '/pages/flasher/',
+  // Relative: `pages/` is the Pages artifact root, so an absolute '/pages/flasher/'
+  // addresses nothing there.
+  manifestBase: './',
   relayBase: params.get('relay') ?? undefined,
 });
 
 render();
+loadBuildInfo(flow.manifestBase);
 
 // Exposed so a rig script can render a step without clicking, as wireframe.js does.
 window.__ui = { get flow() { return flow; }, api: flowApi, render };

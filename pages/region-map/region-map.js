@@ -7,7 +7,7 @@
   "use strict";
 
   const REGIONS = window.GCRegions || {};
-  const ROOT_CODE = REGIONS.ROOT_CODE || "gc";
+  const ROOT_CODE = REGIONS.ROOT_CODE || "us";
   const ROOT_LABEL = REGIONS.ROOT_LABEL || "Gulf Coast";
   const STATE_NAMES = REGIONS.STATE_NAMES || {};
   const WIDER_SCOPES = REGIONS.WIDER_SCOPES || [];
@@ -69,7 +69,7 @@
     attribution: TILE_ATTRIBUTION,
   }).addTo(map);
 
-  /** Ancestor chain of a dashed code, e.g. gc-al-mob -> [gc, gc-al]. */
+  /** Ancestor chain of a dashed code, e.g. us-al-mob -> [us, us-al]. */
   function ancestorsOf(code) {
     const parts = String(code).split("-");
     const out = [];
@@ -163,8 +163,7 @@
   }
 
   function styleForState(feature) {
-    const code = feature.properties.gc_code;
-    const on = isCovered(code, selected) || isCovered(feature.properties.us_code, selected);
+    const on = isCovered(feature.properties.us_code, selected);
     return {
       color: on ? "#2dd1bd" : "#4b6785",
       weight: on ? 2 : 1,
@@ -200,7 +199,7 @@
     if (stateLayer) {
       stateLayer.eachLayer(function (layer) {
         const p = layer.feature.properties;
-        if (isCovered(p.gc_code, selected) || isCovered(p.us_code, selected)) {
+        if (isCovered(p.us_code, selected)) {
           group.push(layer);
         }
       });
@@ -245,12 +244,9 @@
       style: styleForState,
       onEachFeature: function (feature, layer) {
         const p = feature.properties;
-        layer.bindTooltip(
-          p.name + " — " + p.gc_code + " / " + p.us_code,
-          { sticky: true },
-        );
+        layer.bindTooltip(p.name + " — " + p.us_code, { sticky: true });
         layer.on("click", function () {
-          select(p.gc_code, { zoom: true });
+          select(p.us_code, { zoom: true });
         });
       },
     });

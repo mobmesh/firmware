@@ -71,7 +71,7 @@ When it finds one:
 
 Usually the news arrives earlier than that. `patch-drift-canary` runs the same applicability check every day against upstream's development branches, so drift tends to show up before there is a release to break.
 
-**The flasher configures itself.** After a successful build, `pages/flasher/auto_boards.json` is regenerated from the board overrides, upstream's board information, and the actual `partitions.bin` the build produced. Nothing about it is hand-maintained.
+**The flasher configures itself.** After a successful build, `pages/flasher/data/auto_boards.json` is regenerated from the board overrides, upstream's board information, and the actual `partitions.bin` the build produced. Nothing about it is hand-maintained.
 
 **The flasher waits for all of them.** It updates only after every board and variant has succeeded, so a half-finished matrix never puts a broken option in front of someone flashing a device.
 

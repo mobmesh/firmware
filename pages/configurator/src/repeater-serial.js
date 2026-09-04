@@ -235,7 +235,7 @@
   /**
    * Reuse an already-authorized port before prompting, so a repeater paired in
    * an earlier session reconnects without the picker. Same ladder as the
-   * flasher's connectSerial (pages/flasher/serial-utils.js).
+   * flasher's port ladder (pages/flasher/src/serial-port.js).
    * @param {{baudRate?:number, forcePicker?:boolean}} [options]
    */
   async function connect(options) {

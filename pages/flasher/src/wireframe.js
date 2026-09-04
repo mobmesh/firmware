@@ -352,7 +352,7 @@ async function start({ dryRun, family = null }) {
   // The manifests live under the shipped tool until cutover, and the
   // deployed relay rejects a localhost origin — hence the override.
   const relayBase = new URLSearchParams(location.search).get('relay') ?? undefined;
-  flow = flowApi.createFlow({ dryRun, family, manifestBase: '/pages/flasher/', relayBase });
+  flow = flowApi.createFlow({ dryRun, family, manifestBase: './', relayBase });
   log(dryRun ? `--- dry run (${family}): no hardware is touched ---` : '--- live run ---');
   renderStep();
 }

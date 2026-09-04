@@ -13,8 +13,8 @@ import urllib.request
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-CATALOGUE = ROOT / "pages/flasher/mc_config.json"
-OVERRIDES = ROOT / "pages/flasher2/data/catalogue-overrides.json"
+CATALOGUE = ROOT / "pages/flasher/data/mc_config.json"
+OVERRIDES = ROOT / "pages/flasher/data/catalogue-overrides.json"
 
 REMOTE_RE = re.compile(r"^(?:[a-z][a-z0-9+.-]*:)?//", re.I)
 REMOTE_TIMEOUT_S = 4

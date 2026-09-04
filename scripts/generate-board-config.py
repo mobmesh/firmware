@@ -7,7 +7,7 @@ Single source of truth for per-board config, split three ways:
                    variants/<board>/overrides.yaml's `flasher:` facts, and
                    partition byte offsets parsed from an actual built
                    partitions.bin (never hand-entered), into
-                   pages/flasher/auto_boards.json. Only the given board/variant
+                   pages/flasher/data/auto_boards.json. Only the given board/variant
                    entry is touched; everything else in the file is
                    preserved as-is.
 
@@ -362,7 +362,7 @@ def cmd_boards_json(args):
         # partitions_override) differs from upstream's stock scheme -- e.g. a resized
         # spiffs partition. The web flasher uses this to know when it can't assume an
         # already-flashed device's on-flash partition table matches this one, and must
-        # probe the running firmware first (see flasher.js) rather than offer an
+        # probe the running firmware first (see pages/flasher/src/flow.js) rather than offer an
         # in-place "Update" blind.
         "partitionsOverridden": bool(board.partitions_override),
         # How to boot this board under emulation: the machine and binary, and the board
@@ -402,9 +402,9 @@ def cmd_boards_json(args):
 
     # Optional per-variant CLI settings from overrides.yaml's
     # flasher.post_flash_commands. The flasher prepends these to the location
-    # commands from member-config-*.json (see flasher.js), so a region can
+    # commands from the per-area settings under pages/flasher/data/, so a region can
     # override a board default. Omitted entirely when a variant has none, which
-    # flasher.js reads as an empty list.
+    # the flasher reads as an empty list.
     post_flash = board.flasher.post_flash_commands.get(args.variant_id)
     if post_flash:
         variant_entry["postFlashCommands"] = list(post_flash)
@@ -740,7 +740,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_bj = sub.add_parser("boards-json", help="regenerate a board/variant entry in pages/flasher/auto_boards.json")
+    p_bj = sub.add_parser("boards-json", help="regenerate a board/variant entry in pages/flasher/data/auto_boards.json")
     p_bj.add_argument("--board", required=True)
     p_bj.add_argument("--upstream-dir", required=True)
     p_bj.add_argument("--partitions-bin", required=True)

@@ -8,7 +8,7 @@ MapLibre GL JS 5.6.1, BSD-3-Clause, © MapLibre contributors.
 - No build step. Unlike Leaflet's, the CSS references no image files, so the two files
   move together with nothing beside them.
 
-Used by flasher2's location step, which renders CARTO's vector basemap. Leaflet cannot
+Used by the flasher's location step, which renders CARTO's vector basemap. Leaflet cannot
 draw a vector style, and the style's label layers are individually addressable -- which
 is what lets street names arrive earlier and carry our own palette. The configurator and
 region map still use Leaflet against the raster tiles.

@@ -370,7 +370,7 @@ class BoardsJsonTestCase(unittest.TestCase):
         )
 
     def test_variant_without_commands_omits_the_key(self):
-        # flasher.js reads a missing key as an empty list, so don't emit noise.
+        # the flasher reads a missing key as an empty list, so don't emit noise.
         variant = self._run(
             self.FLASHER_BASE
             + "  post_flash_commands:\n    repeater:\n      - \"set a b\"\n",

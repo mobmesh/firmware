@@ -271,10 +271,9 @@ body {
 }
 
 /* Wizard step progress bar -- NOT decorative. Width reflects how far along
-   the actual flow the user is (see the --step-progress custom property set
-   by the small observer script in index.html, which watches #wizard's
-   .step-title text against flasher.js's real step sequence). Defaults to
-   the first step's width if that script hasn't run yet. */
+   the actual flow the user is (see the --step-progress custom property, set
+   on #wizard by src/ui.js from its position in the resolved step list).
+   Defaults to the first step's width before that runs. */
 .card::before {
   content: "";
   position: absolute;

@@ -33,12 +33,12 @@
     });
 
   const REGIONS = window.GCRegions || {};
-  const ROOT_CODE = REGIONS.ROOT_CODE || "gc";
+  const ROOT_CODE = REGIONS.ROOT_CODE || "us";
   const ROOT_LABEL = REGIONS.ROOT_LABEL || "Gulf Coast";
   const STATE_NAMES = REGIONS.STATE_NAMES || {};
   const STATE_ADJACENCY = REGIONS.STATE_ADJACENCY || {};
   const WIDER_SCOPES = REGIONS.WIDER_SCOPES || [];
-  /** Repeater-name prefix built from the location, e.g. GC-MOB-. */
+  /** Repeater-name prefix built from the location, e.g. US-MOB-. */
   const NAME_PREFIX_ROOT = ROOT_CODE.toUpperCase();
 
   const input = document.getElementById("city-search");
@@ -894,7 +894,7 @@
 
   /**
    * MeshCore requires child regions removed before parents. Scope codes are
-   * hierarchical by dash (gc-al-mob under gc-al under gc), so segment count
+   * hierarchical by dash (us-al-mob under us-al under us), so segment count
    * is the depth.
    */
   function regionHierarchyDepth(code) {
@@ -2682,7 +2682,7 @@
 
   /**
    * Preferred radio preset on load: the plan the flasher writes
-   * (pages/flasher/member-config-mobile.json, `set radio 910.525 62.5 7 8`).
+   * (pages/flasher/data/us-al-mob-settings.json, `set radio 910.525,62.5,7,6`).
    * Differs from MeshCore firmware `set radio` default (see FIRMWARE_DEFAULT_RADIO).
    */
   const DEFAULT_RADIO_PRESET_INDEX = Math.max(
@@ -5013,7 +5013,7 @@
       return [];
     }
     // Every adjacent state is a real scope here, so list them all rather than
-    // only the ones with a mapped city nearby -- gc-ms has no city of its own.
+    // only the ones with a mapped city nearby -- us-ms has no city of its own.
     return STATE_ADJACENCY[pc].slice().sort();
   }
 
@@ -5437,7 +5437,7 @@
     });
   }
 
-  const DEFAULT_LOCATION_CODE = "gc-al-mob";
+  const DEFAULT_LOCATION_CODE = "us-al-mob";
 
   function applyDefaultLocation() {
     if (!CITIES.length || getAnchor()) return;
