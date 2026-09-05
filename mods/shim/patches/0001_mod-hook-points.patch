@@ -19,29 +19,32 @@ index 7d0179f..28abd6b 100644
    }
  }
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
-index a714db6..0909307 100644
+index a714db6..675a4a0 100644
 --- a/examples/simple_repeater/main.cpp
 +++ b/examples/simple_repeater/main.cpp
-@@ -2,6 +2,7 @@
+@@ -2,6 +2,8 @@
  #include <Mesh.h>
  
  #include "MyMesh.h"
 +#include <helpers/ModHooks.h>
++#include <helpers/ModMesh.h>
  
  #ifdef DISPLAY_CLASS
    #include "UITask.h"
-@@ -18,6 +19,10 @@ SimpleMeshTables tables;
+@@ -16,7 +18,11 @@
+ StdRNG fast_rng;
+ SimpleMeshTables tables;
  
- MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
- 
+-MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
++ModMesh<MyMesh> the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
++
 +// Defined here, not in the generated hook file, which sees neither MyMesh nor the_mesh.
 +void modSendZeroHopAdvert(int delay_millis) { the_mesh.sendSelfAdvertisement(delay_millis, false); }
 +
-+
+ 
  void halt() {
    while (1) ;
- }
-@@ -60,7 +65,7 @@ void setup() {
+@@ -60,7 +66,7 @@ void setup() {
    }
  #endif
  
@@ -50,7 +53,7 @@ index a714db6..0909307 100644
      MESH_DEBUG_PRINTLN("Radio init failed!");
      halt();
    }
-@@ -123,6 +128,7 @@ void setup() {
+@@ -123,6 +129,7 @@ void setup() {
  }
  
  void loop() {
@@ -58,7 +61,7 @@ index a714db6..0909307 100644
    // Handle Serial CLI
    int len = strlen(command);
    while (Serial.available() && len < sizeof(command)-1) {
-@@ -195,7 +201,7 @@ void loop() {
+@@ -195,7 +202,7 @@ void loop() {
  #ifdef HAS_EXTERNAL_WATCHDOG
    external_watchdog.loop();
  #endif
@@ -88,29 +91,32 @@ index 546d094..3a60a72 100644
    }
  }
 diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
-index d833fff..2af9258 100644
+index d833fff..dca2816 100644
 --- a/examples/simple_room_server/main.cpp
 +++ b/examples/simple_room_server/main.cpp
-@@ -2,6 +2,7 @@
+@@ -2,6 +2,8 @@
  #include <Mesh.h>
  
  #include "MyMesh.h"
 +#include <helpers/ModHooks.h>
++#include <helpers/ModMesh.h>
  
  #ifdef ETHERNET_ENABLED
    #define ETHERNET_CLI_BANNER "MeshCore Room Server CLI"
-@@ -17,6 +18,10 @@ StdRNG fast_rng;
- SimpleMeshTables tables;
- MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
+@@ -15,7 +17,11 @@
  
+ StdRNG fast_rng;
+ SimpleMeshTables tables;
+-MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
++ModMesh<MyMesh> the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
++
 +// Defined here, not in the generated hook file, which sees neither MyMesh nor the_mesh.
 +void modSendZeroHopAdvert(int delay_millis) { the_mesh.sendSelfAdvertisement(delay_millis, false); }
 +
-+
+ 
  void halt() {
    while (1) ;
- }
-@@ -45,7 +50,7 @@ void setup() {
+@@ -45,7 +51,7 @@ void setup() {
    }
  #endif
  
@@ -119,7 +125,7 @@ index d833fff..2af9258 100644
  
    fast_rng.begin(radio_driver.getRngSeed());
  
-@@ -104,6 +109,7 @@ void setup() {
+@@ -104,6 +110,7 @@ void setup() {
  }
  
  void loop() {

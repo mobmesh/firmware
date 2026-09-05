@@ -44,6 +44,7 @@ from mobmesh_tools.model import (
     Capability,
     CliIntegration,
     IntegrationPhase,
+    MeshIntegration,
     PartitionLayout,
     ProjectModel,
 )
@@ -143,17 +144,22 @@ def composition_outputs(mods: list) -> dict:
     for mod_name in mods:
         composition = load_mod_definition(mod_name).composition
         if composition:
-            owners.append((mod_name, {"hooks": composition.hooks, "cli": composition.cli}))
+            entry = {"hooks": composition.hooks, "cli": composition.cli}
+            if composition.mesh:
+                entry["mesh"] = composition.mesh
+            owners.append((mod_name, entry))
     if len(owners) != 1:
         raise ValueError(
             f"selected mods must provide exactly one composition output owner, found {len(owners)}"
         )
     owner, outputs = owners[0]
-    if set(outputs) != {"hooks", "cli"}:
-        raise ValueError(f"mod '{owner}' composition outputs must be exactly hooks and cli")
+    if not {"hooks", "cli"} <= set(outputs) <= {"hooks", "cli", "mesh"}:
+        raise ValueError(f"mod '{owner}' composition outputs must be hooks, cli and optionally mesh")
     for name, value in outputs.items():
         path = Path(value)
-        if path.is_absolute() or ".." in path.parts or path.suffix != ".cpp":
+        # mesh is the ModMesh interposer: a header main.cpp includes, so it carries .h.
+        wanted = ".h" if name == "mesh" else ".cpp"
+        if path.is_absolute() or ".." in path.parts or path.suffix != wanted:
             raise ValueError(f"mod '{owner}' has invalid {name} composition output: {value}")
     if len(set(outputs.values())) != len(outputs):
         raise ValueError(f"mod '{owner}' composition outputs must be unique")
@@ -189,6 +195,29 @@ def load_integrations(mods: list) -> list:
                 symbol = declaration.handler
                 priority = declaration.priority
                 parsed["hooks"][phase_name] = {"symbol": symbol, "priority": priority}
+            elif phase is IntegrationPhase.MESH:
+                if not isinstance(declaration, MeshIntegration):
+                    raise ValueError(f"mod '{mod_name}' has an invalid mesh integration")
+                overrides = {"consumers": dict(declaration.consumers),
+                             "observers": dict(declaration.observers)}
+                parsed["hooks"][phase_name] = overrides
+                for kind, entries in overrides.items():
+                    for virtual, sym in entries.items():
+                        if not SYMBOL_RE.fullmatch(sym):
+                            raise ValueError(
+                                f"mod '{mod_name}' has invalid mesh.{kind}.{virtual} symbol: {sym}"
+                            )
+                        if not re.search(r"\b" + re.escape(sym) + r"\s*\(", header_text):
+                            raise ValueError(
+                                f"mod '{mod_name}' mesh symbol '{sym}' is not declared in {header}"
+                            )
+                        if sym in symbols:
+                            raise ValueError(
+                                f"integration symbol '{sym}' is declared by both "
+                                f"'{symbols[sym]}' and '{mod_name}'"
+                            )
+                        symbols[sym] = mod_name
+                continue
             else:
                 symbol = declaration
                 parsed["hooks"][phase_name] = {"symbol": symbol}
@@ -270,6 +299,70 @@ void modFemLnaSet(bool on) {{ }}
 """
 
 
+def render_mod_mesh(integrations: list) -> str:
+    """The interposer, derived from MyMesh so its overrides win dispatch. Base:: chains on."""
+    includes, consumers, observers = [], {}, {}
+    for item in integrations:
+        mesh = item["hooks"].get("mesh")
+        if not mesh:
+            continue
+        includes.append(item["header"])
+        for virtual, symbol in mesh["consumers"].items():
+            consumers.setdefault(virtual, []).append(symbol)
+        for virtual, symbol in mesh["observers"].items():
+            observers.setdefault(virtual, []).append(symbol)
+
+    SIGNATURES = {
+        "onRecvPacket":      ("mesh::DispatcherAction", "mesh::Packet* packet", "packet",
+                              "return mesh::ACTION_RELEASE;"),
+        "onControlDataRecv": ("void", "mesh::Packet* packet", "packet", "return;"),
+        "onAnonDataRecv":    ("void", "mesh::Packet* packet, const uint8_t* secret, "
+                                      "const mesh::Identity& sender, uint8_t* data, size_t len",
+                              "packet, secret, sender, data, len", "return;"),
+        "onRawDataRecv":     ("void", "mesh::Packet* packet", "packet", "return;"),
+        "onAdvertRecv":      ("void", "mesh::Packet* packet, const mesh::Identity& id, "
+                                      "uint32_t timestamp, const uint8_t* app_data, size_t app_data_len",
+                              "packet, id, timestamp, app_data, app_data_len", None),
+        "onTraceRecv":       ("void", "mesh::Packet* packet, uint32_t tag, uint32_t auth_code, "
+                                      "uint8_t flags, const uint8_t* path_snrs, "
+                                      "const uint8_t* path_hashes, uint8_t path_len",
+                              "packet, tag, auth_code, flags, path_snrs, path_hashes, path_len", None),
+    }
+
+    bodies = []
+    for virtual, symbols in sorted(consumers.items()):
+        ret, params, args, claimed = SIGNATURES[virtual]
+        # First to claim it wins and the chain stops, exactly as the CLI chain behaves.
+        calls = "\n".join(f"    if ({s}({args})) {claimed}" for s in symbols)
+        bodies.append(f"  {ret} {virtual}({params}) override {{\n{calls}\n"
+                      f"    return Base::{virtual}({args});\n  }}")
+    for virtual, symbols in sorted(observers.items()):
+        ret, params, args, _ = SIGNATURES[virtual]
+        calls = "\n".join(f"    {s}({args});" for s in symbols)
+        bodies.append(f"  {ret} {virtual}({params}) override {{\n{calls}\n"
+                      f"    Base::{virtual}({args});\n  }}")
+
+    include_lines = "\n".join(f"#include <{h}>" for h in includes)
+    override_block = "\n".join(bodies) if bodies else \
+        "  // No mod declared a mesh hook, so this adds no behaviour and no vtable entries."
+    return f"""// Generated by generate-board-config.py compose-mods. Do not edit.
+#pragma once
+
+#include <helpers/ModHooks.h>
+{include_lines}
+
+// Interposed above the example's mesh class, never below: MyMesh overrides the virtuals
+// worth intercepting, so a class inserted underneath is never reached.
+template <class Base>
+class ModMesh : public Base {{
+public:
+  using Base::Base;   // inherits the base constructor; the examples pass six arguments
+
+{override_block}
+}};
+"""
+
+
 def render_mod_cli(integrations: list) -> str:
     includes = "\n".join(f"#include <{item['header']}>" for item in integrations)
     handlers = []
@@ -303,7 +396,9 @@ def cmd_compose_mods(args):
         "hooks": render_mod_hooks(integrations),
         "cli": render_mod_cli(integrations),
     }
-    for name in ("hooks", "cli"):
+    if "mesh" in outputs:
+        rendered["mesh"] = render_mod_mesh(integrations)
+    for name in rendered:
         destination = upstream / outputs[name]
         if destination.exists():
             raise FileExistsError(

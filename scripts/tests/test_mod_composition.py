@@ -112,6 +112,64 @@ class InvalidCompositionTestCase(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "is not declared"):
             gbc.load_integrations(["feature"])
 
+    def mesh_integration(self, block, name="feature"):
+        return (
+            f"name: {name}\n"
+            "integration:\n"
+            "  header: helpers/TestIntegration.h\n"
+            "  hooks:\n"
+            "    mesh:\n" + block
+        )
+
+    def test_mesh_consumer_is_accepted_and_chains(self):
+        self.write_header("feature", "bool takePacket(mesh::Packet*);\n")
+        self.write_manifest("feature", self.mesh_integration(
+            "      consumers:\n        onRecvPacket: takePacket\n"))
+        rendered = gbc.render_mod_mesh(gbc.load_integrations(["feature"]))
+        self.assertIn("onRecvPacket", rendered)
+        self.assertIn("if (takePacket(packet)) return mesh::ACTION_RELEASE;", rendered)
+        # A consumer that declines must fall through to the class it was interposed above.
+        self.assertIn("return Base::onRecvPacket(packet);", rendered)
+
+    def test_mesh_observer_always_calls_through(self):
+        self.write_header("feature", "void sawAdvert(mesh::Packet*, const mesh::Identity&, uint32_t, const uint8_t*, size_t);\n")
+        self.write_manifest("feature", self.mesh_integration(
+            "      observers:\n        onAdvertRecv: sawAdvert\n"))
+        rendered = gbc.render_mod_mesh(gbc.load_integrations(["feature"]))
+        self.assertIn("sawAdvert(packet, id, timestamp, app_data, app_data_len);", rendered)
+        self.assertIn("Base::onAdvertRecv(", rendered)
+
+    def test_value_producing_virtual_is_rejected(self):
+        # Two mods answering getRetransmitDelay cannot both be right, so it is refused.
+        self.write_header("feature", "uint32_t pickDelay(const mesh::Packet*);\n")
+        self.write_manifest("feature", self.mesh_integration(
+            "      consumers:\n        getRetransmitDelay: pickDelay\n"))
+        with self.assertRaisesRegex(Exception, "not a consumer ModMesh knows how to override"):
+            gbc.load_integrations(["feature"])
+
+    def test_mesh_symbol_must_be_declared_in_header(self):
+        self.write_header("feature", "bool somethingElse(mesh::Packet*);\n")
+        self.write_manifest("feature", self.mesh_integration(
+            "      consumers:\n        onRecvPacket: takePacket\n"))
+        with self.assertRaisesRegex(ValueError, "is not declared"):
+            gbc.load_integrations(["feature"])
+
+    def test_two_mods_may_not_share_a_mesh_symbol(self):
+        for mod in ("first", "second"):
+            self.write_header(mod, "bool takePacket(mesh::Packet*);\n")
+            self.write_manifest(mod, self.mesh_integration(
+                "      consumers:\n        onRecvPacket: takePacket\n", name=mod))
+        with self.assertRaisesRegex(ValueError, "declared by both"):
+            gbc.load_integrations(["first", "second"])
+
+    def test_mesh_output_must_be_a_header(self):
+        self.write_manifest("shim", "name: shim\ncomposition:\n  outputs:\n"
+                            "    hooks: src/helpers/ModHooks.cpp\n"
+                            "    cli: src/helpers/esp32/CommonCliMods.cpp\n"
+                            "    mesh: src/helpers/ModMesh.cpp\n")
+        with self.assertRaisesRegex(ValueError, "invalid mesh composition output"):
+            gbc.composition_outputs(["shim"])
+
     def test_existing_output_is_not_overwritten(self):
         upstream = self.root / "upstream"
         output = upstream / "src/helpers/ModHooks.cpp"

@@ -42,6 +42,8 @@ spec.loader.exec_module(gbc)
 OUTPUTS = {
     "ModHooks.cpp": "src/helpers/ModHooks.cpp",
     "CommonCliMods.cpp": "src/helpers/esp32/CommonCliMods.cpp",
+    # Snapshotted like the other two: what it overrides decides what each packet meets.
+    "ModMesh.h": "src/helpers/ModMesh.h",
 }
 
 

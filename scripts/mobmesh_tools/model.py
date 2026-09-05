@@ -39,7 +39,15 @@ class IntegrationPhase(str, Enum):
     LOOP = "loop"
     WANTS_POWER_SAVING = "wants_power_saving"
     CLI = "cli"
+    MESH = "mesh"
 
+
+# The virtuals ModMesh may override, grouped by how several mods combine on one.
+# Value-producing virtuals are absent until a combination rule is decided.
+MESH_VIRTUALS = {
+    "consumers": {"onRecvPacket", "onControlDataRecv", "onAnonDataRecv", "onRawDataRecv"},
+    "observers": {"onAdvertRecv", "onTraceRecv"},
+}
 
 Scalar = str | int | float | bool
 
@@ -126,15 +134,27 @@ class CliIntegration:
 
 
 @dataclass(frozen=True)
+class MeshIntegration:
+    """Overrides ModMesh installs above MyMesh, keyed by the virtual each one intercepts.
+
+    A consumer returns true to claim the call and stop the chain; an observer only watches.
+    """
+    consumers: Mapping[str, str]
+    observers: Mapping[str, str]
+
+
+@dataclass(frozen=True)
 class IntegrationDefinition:
     header: str
-    hooks: Mapping[IntegrationPhase, str | CliIntegration]
+    hooks: Mapping[IntegrationPhase, str | CliIntegration | MeshIntegration]
 
 
 @dataclass(frozen=True)
 class CompositionOutputs:
     hooks: str
     cli: str
+    # The interposer sits above MyMesh, so it is a header main.cpp includes, not a .cpp.
+    mesh: str | None
 
 
 @dataclass(frozen=True)
@@ -496,6 +516,25 @@ class ProjectModel:
                 hooks[integration_phase] = CliIntegration(
                     _string(path, "integration.hooks.cli.handler", cli.get("handler")), priority
                 )
+            elif integration_phase is IntegrationPhase.MESH:
+                mesh = _mapping(path, "integration.hooks.mesh", declaration)
+                _keys(path, "integration.hooks.mesh", mesh, {"consumers", "observers"})
+                kinds = {}
+                for kind in ("consumers", "observers"):
+                    block = mesh.get(kind)
+                    if block is None:
+                        kinds[kind] = {}
+                        continue
+                    entries = _mapping(path, f"integration.hooks.mesh.{kind}", block)
+                    for virtual, symbol in entries.items():
+                        if virtual not in MESH_VIRTUALS[kind]:
+                            raise ProjectModelError(
+                                f"{path}:integration.hooks.mesh.{kind}.{virtual}: "
+                                f"not a {kind[:-1]} ModMesh knows how to override"
+                            )
+                        _string(path, f"integration.hooks.mesh.{kind}.{virtual}", symbol)
+                    kinds[kind] = dict(entries)
+                hooks[integration_phase] = MeshIntegration(kinds["consumers"], kinds["observers"])
             else:
                 hooks[integration_phase] = _string(path, f"integration.hooks.{phase}", declaration)
         return IntegrationDefinition(_string(path, "integration.header", data.get("header")), hooks)
@@ -507,10 +546,12 @@ class ProjectModel:
         data = _mapping(path, "composition", value)
         _keys(path, "composition", data, {"outputs"})
         outputs = _mapping(path, "composition.outputs", data.get("outputs"))
-        _keys(path, "composition.outputs", outputs, {"hooks", "cli"})
+        _keys(path, "composition.outputs", outputs, {"hooks", "cli", "mesh"})
+        mesh = outputs.get("mesh")
         return CompositionOutputs(
             _string(path, "composition.outputs.hooks", outputs.get("hooks")),
             _string(path, "composition.outputs.cli", outputs.get("cli")),
+            _string(path, "composition.outputs.mesh", mesh) if mesh is not None else None,
         )
 
     @staticmethod
