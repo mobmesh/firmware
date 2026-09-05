@@ -367,8 +367,8 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
   if (memcmp(command, "ver", 3) == 0) {
     sprintf(reply, "%s (%s) + ota (%s)", context.fw_version, context.fw_build_date,
             OTA_MOD_BUILD_DATE);
-  } else if (memcmp(command, "start ota wan update", 21) == 0
-             && (command[21] == 0 || command[21] == ' ')) {
+  } else if (memcmp(command, "start ota wan update", 20) == 0
+             && (command[20] == 0 || command[20] == ' ')) {
     if (refuseWhileApUp(reply)) return true;
     HotspotOtaConfig cfg;
     HotspotOTA::loadConfig(cfg);
