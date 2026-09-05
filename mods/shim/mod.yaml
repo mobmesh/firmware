@@ -4,5 +4,3 @@ composition:
   outputs:
     hooks: src/helpers/ModHooks.cpp
     cli: src/helpers/esp32/CommonCliMods.cpp
-    # Interposed above the example's mesh class by main.cpp's declaration of the_mesh.
-    mesh: src/helpers/ModMesh.h
