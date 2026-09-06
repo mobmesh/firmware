@@ -19,7 +19,8 @@
         "shim",
         "hotspot-ota",
         "timing-safety",
-        "power-guard"
+        "power-guard",
+        "temp-set"
       ],
       "build_flags_append": [
         "-UDISPLAY_CLASS"

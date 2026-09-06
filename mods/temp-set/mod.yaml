@@ -1,0 +1,20 @@
+# Mod-level facts. build_src_filter is derived from what is under files/, so the two
+# cannot drift apart.
+name: temp-set
+
+env_flags: [WITH_TEMP_SET]
+
+requirements:
+  # Nothing is required: the trialable keys upstream refuses on a board are declined at the
+  # snapshot, so one binary serves every variant.
+  optional: [fem_lna_control]
+
+integration:
+  header: helpers/esp32/TempSetIntegration.h
+  hooks:
+    loop: tempSetLoop
+    cli:
+      handler: tempSetHandleCli
+      # Below power-guard's 200: this handler claims only its own verb and must not sit
+      # between poweroff/shutdown and power-guard.
+      priority: 100

@@ -30,6 +30,16 @@ void     modBoardInhibitSleep(bool inhibit);
 uint32_t modClockGet();
 void     modClockSet(uint32_t epoch);
 
+// Straight into upstream's CLI chain, bypassing mod dispatch, so a mod can read a setting
+// back or apply one without reaching CommonCLI's protected handleGetCmd/handleSetCmd.
+// Reusing upstream's own parser is the point: validation stays in one place.
+void modCliDispatch(uint32_t sender_timestamp, char* command, char* reply);
+
+// The live tempradio trial, or false when none is running. Both of upstream's timers are
+// consulted: pending_* are untested before the 2s apply and stale after the revert, which
+// clears only the timer.
+bool modTempRadioGet(float* freq, float* bw, uint8_t* sf, uint8_t* cr);
+
 // Zero-hop only: a flood advert reaches flood.max.advert hops and upstream schedules one just
 // every 47 hours, so it is not a caller's to spend. The delay lets a reply go out before the
 // radio transmits, as upstream's own `advert.zerohop` does.

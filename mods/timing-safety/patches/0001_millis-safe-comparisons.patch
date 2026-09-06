@@ -1,5 +1,5 @@
 diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
-index 28abd6b9..153ff88b 100644
+index c2d1558..3af3f66 100644
 --- a/examples/simple_repeater/MyMesh.cpp
 +++ b/examples/simple_repeater/MyMesh.cpp
 @@ -1,6 +1,7 @@
@@ -8,9 +8,9 @@ index 28abd6b9..153ff88b 100644
  #include <algorithm>
 +#include <helpers/MillisSafe.h>
  
- /* ------------------------------ Config -------------------------------- */
- 
-@@ -353,7 +354,7 @@ int MyMesh::handleRequest(ClientInfo *sender, uint32_t sender_timestamp, uint8_t
+ // Reverse hooks that need MyMesh's own members: ModHooks.cpp sees neither _cli nor the tempradio
+ // timers, and MyMesh.h carries no patch, so state is snapshotted here instead of exposed.
+@@ -376,7 +377,7 @@ int MyMesh::handleRequest(ClientInfo *sender, uint32_t sender_timestamp, uint8_t
  #if MAX_NEIGHBOURS
          // add next neighbour to results
          auto neighbour = sorted_neighbours[index + offset];
@@ -19,7 +19,7 @@ index 28abd6b9..153ff88b 100644
          memcpy(&results_buffer[results_offset], neighbour->id.pub_key, pubkey_prefix_length); results_offset += pubkey_prefix_length;
          memcpy(&results_buffer[results_offset], &heard_seconds_ago, 4); results_offset += 4;
          memcpy(&results_buffer[results_offset], &neighbour->snr, 1); results_offset += 1;
-@@ -1119,7 +1120,7 @@ void MyMesh::formatNeighborsReply(char *reply) {
+@@ -1143,7 +1144,7 @@ void MyMesh::formatNeighborsReply(char *reply) {
      mesh::Utils::toHex(hex, neighbour->id.pub_key, 4);
  
      // add next neighbour
@@ -29,7 +29,7 @@ index 28abd6b9..153ff88b 100644
      while (*dp)
        dp++; // find end of string
 diff --git a/examples/simple_repeater/UITask.cpp b/examples/simple_repeater/UITask.cpp
-index e7225557..9b200d7a 100644
+index e722555..9b200d7 100644
 --- a/examples/simple_repeater/UITask.cpp
 +++ b/examples/simple_repeater/UITask.cpp
 @@ -2,6 +2,7 @@
@@ -67,7 +67,7 @@ index e7225557..9b200d7a 100644
      }
    }
 diff --git a/examples/simple_room_server/UITask.cpp b/examples/simple_room_server/UITask.cpp
-index 8e4c2fcf..4685a1ac 100644
+index 8e4c2fc..4685a1a 100644
 --- a/examples/simple_room_server/UITask.cpp
 +++ b/examples/simple_room_server/UITask.cpp
 @@ -1,6 +1,7 @@
