@@ -2,7 +2,7 @@
 #include <helpers/ModHooks.h>
 #include <target.h>
 #include <helpers/esp32/HotspotOtaIntegration.h>
-#include <helpers/esp32/TempSetIntegration.h>
+#include <helpers/esp32/TrySetIntegration.h>
 
 bool modRadioInit(const char* build_id) {
 
@@ -11,7 +11,7 @@ bool modRadioInit(const char* build_id) {
 
 void modLoop() {
   hotspotOtaLoop();
-  tempSetLoop();
+  trySetLoop();
 }
 
 bool modWantsPowerSaving() {

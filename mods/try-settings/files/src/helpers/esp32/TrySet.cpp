@@ -1,9 +1,9 @@
-#include <helpers/esp32/TempSet.h>
+#include <helpers/esp32/TrySet.h>
 
 #include <SPIFFS.h>
 
-#define TEMP_SET_PATH  "/tempset"
-#define TEMP_SET_MAGIC 0x54535431UL   // "TST1"
+#define TRY_SET_PATH  "/tryset"
+#define TRY_SET_MAGIC 0x54535431UL   // "TST1"
 
 // Mounted here rather than assumed: this mod does not require hotspot-ota, which is what
 // otherwise calls SPIFFS.begin() first. A second begin() on a mounted volume is a no-op.
@@ -14,16 +14,16 @@ static bool ensureMounted() {
   return mounted;
 }
 
-bool tempSetLoad(TempSetSlot& slot) {
+bool trySetLoad(TrySetSlot& slot) {
   slot.clear();
-  if (!ensureMounted() || !SPIFFS.exists(TEMP_SET_PATH)) return false;
+  if (!ensureMounted() || !SPIFFS.exists(TRY_SET_PATH)) return false;
 
-  File f = SPIFFS.open(TEMP_SET_PATH, "r");
+  File f = SPIFFS.open(TRY_SET_PATH, "r");
   if (!f) return false;
 
   uint32_t magic = 0;
   bool ok = f.read((uint8_t*)&magic, sizeof(magic)) == sizeof(magic)
-            && magic == TEMP_SET_MAGIC
+            && magic == TRY_SET_MAGIC
             && f.read((uint8_t*)&slot, sizeof(slot)) == sizeof(slot);
   f.close();
 
@@ -37,18 +37,18 @@ bool tempSetLoad(TempSetSlot& slot) {
   return true;
 }
 
-bool tempSetSave(const TempSetSlot& slot) {
+bool trySetSave(const TrySetSlot& slot) {
   if (!ensureMounted()) return false;
-  File f = SPIFFS.open(TEMP_SET_PATH, "w", true);
+  File f = SPIFFS.open(TRY_SET_PATH, "w", true);
   if (!f) return false;
 
-  uint32_t magic = TEMP_SET_MAGIC;
+  uint32_t magic = TRY_SET_MAGIC;
   bool ok = f.write((const uint8_t*)&magic, sizeof(magic)) == sizeof(magic)
             && f.write((const uint8_t*)&slot, sizeof(slot)) == sizeof(slot);
   f.close();
   return ok;
 }
 
-void tempSetErase() {
-  if (ensureMounted() && SPIFFS.exists(TEMP_SET_PATH)) SPIFFS.remove(TEMP_SET_PATH);
+void trySetErase() {
+  if (ensureMounted() && SPIFFS.exists(TRY_SET_PATH)) SPIFFS.remove(TRY_SET_PATH);
 }

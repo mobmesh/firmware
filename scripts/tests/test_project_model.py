@@ -28,9 +28,9 @@ class CurrentProjectModelTestCase(unittest.TestCase):
         self.assertEqual(rows[("heltec_v4", "repeater")].asset_basename, "heltec_v4_rep_mobmesh")
         self.assertEqual(rows[("xiao_c3", "room_server")].asset_basename, "xiao_c3_room_mobmesh")
         self.assertEqual(rows[("heltec_v4", "repeater")].mods,
-                         ("shim", "hotspot-ota", "timing-safety", "temp-set", "power-guard"))
+                         ("shim", "hotspot-ota", "timing-safety", "try-settings", "power-guard"))
         self.assertEqual(rows[("xiao_c3", "repeater")].mods,
-                         ("shim", "hotspot-ota", "timing-safety", "temp-set"))
+                         ("shim", "hotspot-ota", "timing-safety", "try-settings"))
 
     def test_build_plan_serialization_is_deterministic(self):
         self.assertEqual(self.model.build_plan.to_json(), ProjectModel.load(REPO_ROOT).build_plan.to_json())

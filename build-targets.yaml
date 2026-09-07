@@ -22,7 +22,7 @@
 # Applied to every target, in this order, before any target-specific mods below.
 # Keep entries here only while they genuinely ship everywhere -- a mod that becomes
 # optional belongs in a target's own `mods:` list instead.
-core_mods: [shim, hotspot-ota, timing-safety, temp-set]
+core_mods: [shim, hotspot-ota, timing-safety, try-settings]
 
 roles:
   repeater:

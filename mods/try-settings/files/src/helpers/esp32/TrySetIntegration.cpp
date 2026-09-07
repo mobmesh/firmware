@@ -1,16 +1,16 @@
-#include <helpers/esp32/TempSetIntegration.h>
+#include <helpers/esp32/TrySetIntegration.h>
 
 #include <Arduino.h>
-#include <helpers/esp32/TempSet.h>
+#include <helpers/esp32/TrySet.h>
 
 // Seconds, not minutes: `set` takes values, not durations. The floor exists because the radio
 // proxy converts to minutes, and anything shorter would floor to a zero upstream rejects.
-#define TEMP_SET_MIN_SECS 60
-#define TEMP_SET_MAX_SECS 86400UL
+#define TRY_SET_MIN_SECS 60
+#define TRY_SET_MAX_SECS 86400UL
 
 // Keys that can make a node unreachable, or that can only be judged on site. An allowlist:
 // a key earns its place by being one of those, not by being settable.
-static const char* const TEMP_SET_KEYS[] = {
+static const char* const TRY_SET_KEYS[] = {
   // Gain and power: nothing temporary exists for these at all.
   "tx",
   "radio.rxgain",
@@ -29,12 +29,12 @@ static const char* const TEMP_SET_KEYS[] = {
   nullptr,
 };
 
-static TempSetSlot slot;
+static TrySetSlot slot;
 static bool booted = false;
 
 static bool keyAllowed(const char* key) {
-  for (int i = 0; TEMP_SET_KEYS[i]; i++) {
-    if (strcmp(key, TEMP_SET_KEYS[i]) == 0) return true;
+  for (int i = 0; TRY_SET_KEYS[i]; i++) {
+    if (strcmp(key, TRY_SET_KEYS[i]) == 0) return true;
   }
   return false;
 }
@@ -62,14 +62,14 @@ static bool cliSet(const char* key, const char* value, char* rep, size_t rep_len
   return strncmp(rep, "OK", 2) == 0;
 }
 
-static void restore(const TempSetSlot& s) {
+static void restore(const TrySetSlot& s) {
   char rep[192];
   cliSet(s.key, s.snapshot, rep, sizeof(rep));
 }
 
 static void clearSlot() {
   slot.clear();
-  tempSetErase();
+  trySetErase();
 }
 
 // A live tempradio trial is upstream's to own; formatting its params back into set-args is all
@@ -95,7 +95,7 @@ static void startKey(uint32_t secs, const char* key, const char* value, char* re
     return;
   }
   if (slot.active()) {
-    sprintf(reply, "Error: %s trial running -- tempset keep|revert", slot.key);
+    sprintf(reply, "Error: %s trial running -- tryset keep|revert", slot.key);
     return;
   }
 
@@ -120,24 +120,24 @@ static void startKey(uint32_t secs, const char* key, const char* value, char* re
   strncpy(slot.snapshot, snapshot, sizeof(slot.snapshot) - 1);
   strncpy(slot.trial, value, sizeof(slot.trial) - 1);
   slot.expires_at = modClockGet() + secs;
-  tempSetSave(slot);
+  trySetSave(slot);
 
-  sprintf(reply, "OK - tempset %us (reverts unless kept)", (unsigned)secs);
+  sprintf(reply, "OK - tryset %us (reverts unless kept)", (unsigned)secs);
 }
 
 static void handleStart(const char* args, char* reply) {
   const char* p = args;
   while (*p >= '0' && *p <= '9') p++;
   if (p == args || *p != ' ') {
-    strcpy(reply, "Error: usage tempset <secs> <key> <value>");
+    strcpy(reply, "Error: usage tryset <secs> <key> <value>");
     return;
   }
   uint32_t secs = (uint32_t)atol(args);
-  if (secs < TEMP_SET_MIN_SECS) {
+  if (secs < TRY_SET_MIN_SECS) {
     strcpy(reply, "Error: minimum 60s");
     return;
   }
-  if (secs > TEMP_SET_MAX_SECS) {
+  if (secs > TRY_SET_MAX_SECS) {
     strcpy(reply, "Error: maximum 86400s");
     return;
   }
@@ -145,7 +145,7 @@ static void handleStart(const char* args, char* reply) {
   while (*p == ' ') p++;
   const char* sp = strchr(p, ' ');
   if (!sp) {
-    strcpy(reply, "Error: usage tempset <secs> <key> <value>");
+    strcpy(reply, "Error: usage tryset <secs> <key> <value>");
     return;
   }
   char key[24];
@@ -226,12 +226,12 @@ static void handleGet(char* reply) {
   strcpy(reply, "(none)");
 }
 
-void tempSetLoop() {
+void trySetLoop() {
   if (!booted) {
     booted = true;
     // A slot that survived a reboot is not resumed: an unscheduled restart is most likely a
     // brownout, and a brownout leaves the RTC deadline it was counting against unverifiable.
-    if (tempSetLoad(slot)) {
+    if (trySetLoad(slot)) {
       restore(slot);
       clearSlot();
     }
@@ -243,15 +243,15 @@ void tempSetLoop() {
   clearSlot();
 }
 
-bool tempSetHandleCli(const ModCliContext& context, char* command, char* reply) {
-  if (memcmp(command, "get tempset", 11) == 0 && (command[11] == 0 || command[11] == ' ')) {
+bool trySetHandleCli(const ModCliContext& context, char* command, char* reply) {
+  if (memcmp(command, "get tryset", 10) == 0 && (command[10] == 0 || command[10] == ' ')) {
     handleGet(reply);
     return true;
   }
-  if (memcmp(command, "tempset", 7) != 0) return false;
-  if (command[7] != 0 && command[7] != ' ') return false;
+  if (memcmp(command, "tryset", 6) != 0) return false;
+  if (command[6] != 0 && command[6] != ' ') return false;
 
-  const char* args = command[7] == 0 ? "" : command + 8;
+  const char* args = command[6] == 0 ? "" : command + 7;
   while (*args == ' ') args++;
 
   if (memcmp(args, "keep", 4) == 0 && (args[4] == 0 || args[4] == ' ')) {

@@ -3,3 +3,7 @@ title: mod-hook-points
 requires: []
 # No env_flag -- the hook bodies are unconditional, and no-ops until a mod fills them.
 # build_src_filter is derived from files/, not restated here.
+# Not a fix this patch carries ahead of merge -- #3358 would add `try` inside CommonCLI,
+# making try-settings and the two hooks it needs redundant. Tracked here because a
+# patch-less mod has nowhere to declare one.
+upstream_prs: [3358]

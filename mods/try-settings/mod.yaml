@@ -1,8 +1,8 @@
 # Mod-level facts. build_src_filter is derived from what is under files/, so the two
 # cannot drift apart.
-name: temp-set
+name: try-settings
 
-env_flags: [WITH_TEMP_SET]
+env_flags: [WITH_TRY_SETTINGS]
 
 requirements:
   # Nothing is required: the trialable keys upstream refuses on a board are declined at the
@@ -10,11 +10,11 @@ requirements:
   optional: [fem_lna_control]
 
 integration:
-  header: helpers/esp32/TempSetIntegration.h
+  header: helpers/esp32/TrySetIntegration.h
   hooks:
-    loop: tempSetLoop
+    loop: trySetLoop
     cli:
-      handler: tempSetHandleCli
+      handler: trySetHandleCli
       # Below power-guard's 200: this handler claims only its own verb and must not sit
       # between poweroff/shutdown and power-guard.
       priority: 100
