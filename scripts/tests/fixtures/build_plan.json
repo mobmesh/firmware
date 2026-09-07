@@ -2,7 +2,8 @@
   "core_mods": [
     "shim",
     "hotspot-ota",
-    "timing-safety"
+    "timing-safety",
+    "temp-set"
   ],
   "targets": [
     {
@@ -19,8 +20,8 @@
         "shim",
         "hotspot-ota",
         "timing-safety",
-        "power-guard",
-        "temp-set"
+        "temp-set",
+        "power-guard"
       ],
       "build_flags_append": [
         "-UDISPLAY_CLASS"
@@ -48,7 +49,8 @@
       "mods": [
         "shim",
         "hotspot-ota",
-        "timing-safety"
+        "timing-safety",
+        "temp-set"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -74,7 +76,8 @@
       "mods": [
         "shim",
         "hotspot-ota",
-        "timing-safety"
+        "timing-safety",
+        "temp-set"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -100,7 +103,8 @@
       "mods": [
         "shim",
         "hotspot-ota",
-        "timing-safety"
+        "timing-safety",
+        "temp-set"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,

@@ -2,22 +2,20 @@
 #include <helpers/ModHooks.h>
 #include <target.h>
 #include <helpers/esp32/HotspotOtaIntegration.h>
-#include <helpers/esp32/PowerGuardIntegration.h>
 #include <helpers/esp32/TempSetIntegration.h>
 
 bool modRadioInit(const char* build_id) {
-  powerGuardBeforeRadioInit();
+
   return hotspotOtaRadioInit(build_id);
 }
 
 void modLoop() {
   hotspotOtaLoop();
-  powerGuardLoop();
   tempSetLoop();
 }
 
 bool modWantsPowerSaving() {
-  return powerGuardWantsPowerSaving();
+  return false;
 }
 
 bool     modBoardRadioInit()               { return radio_init(); }
