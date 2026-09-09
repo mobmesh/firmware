@@ -9,7 +9,9 @@
 
 **Parameters:**
 - `secs`: how long to keep the trial value (60-86400)
-- `key`: one of `tx`, `radio.rxgain`, `radio.fem.rxgain`, `radio.fem.txgain`, `radio`
+- `key`: one of `tx`, `radio.rxgain`, `radio.fem.rxgain`, `radio.fem.txgain`, `int.thresh`,
+  `cad`, `agc.reset.interval`, `flood.max`, `flood.max.unscoped`, `flood.max.advert`,
+  `repeat`, `dutycycle`, or `radio` for the proxy
 - `value`: the same value `set <key>` would take
 
 **Examples:**
@@ -18,7 +20,10 @@
 - `tryset 300 radio 915.0,250,11,5` -- proxied to `tempradio`, kept with `tryset keep`
 
 **Notes:**
-- One trial at a time. Start a second and it is refused, naming the one already running.
+- One trial at a time, across both mechanisms. A `radio` trial and a key trial cannot overlap;
+  starting either while the other runs is refused, naming the one already running.
+- `radio` trials take whole minutes, since `tempradio` counts in minutes. A duration that is
+  not a multiple of 60 is refused rather than silently floored.
 - A reboot restores the original and clears the trial; a countdown is never resumed.
 - `radio` trials are upstream's `tempradio` underneath, so they revert on its timer and touch no
   prefs. `tryset keep` reads the params off the live trial rather than re-typing them.

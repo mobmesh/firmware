@@ -18,7 +18,16 @@ config. This mod covers what `tempradio` does not.
 
 ## Keys
 
-`tx`, `radio.rxgain`, `radio.fem.rxgain`, `radio.fem.txgain`, and `radio` via the proxy.
+Gain and power, where nothing temporary exists otherwise:
+`tx`, `radio.rxgain`, `radio.fem.rxgain`, `radio.fem.txgain`.
+
+Site RF, which `Dispatcher::loop()` re-reads so a trial takes hold within a calibration tick:
+`int.thresh`, `cad`, `agc.reset.interval`.
+
+Strand risk -- these can cut a node off from the far mesh while it still answers up close:
+`flood.max`, `flood.max.unscoped`, `flood.max.advert`, `repeat`, `dutycycle`.
+
+Plus `radio` via the proxy, which is upstream's `tempradio` underneath.
 
 An allowlist, not a denylist: a key earns its place by affecting whether the node can be
 reached, or by being site-dependent enough that it has to be judged where the node lives.
