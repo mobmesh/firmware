@@ -1,29 +1,7 @@
-# Override-only board config for heltec_v4.
-#
-# This is NOT a copy of upstream MeshCore's boards/heltec_v4.json or
-# variants/heltec_v4/platformio.ini -- it holds ONLY the facts specific to
-# features THIS project adds on top of upstream (see mods/*/patches/). Every
-# other board fact (mcu, flash size, USB hwids, psram, default partition
-# scheme) is read directly from upstream at generation time by
-# scripts/generate-board-config.py -- never duplicated here.
-#
-# The path variants/heltec_v4/ mirrors upstream's own variants/<name>/ naming
-# by design, so the mapping from "which upstream variant does this override"
-# is the directory path itself, not a hand-written reference field.
+# Override-only board config for heltec_v4: only what this project adds on top of upstream.
+# Every other board fact is read from upstream at generation time by scripts/generate-board-config.py.
+# The directory name is the mapping to upstream's own variants/<name>/, so there is no reference field.
 
-# Build flags injected into this board's variant platformio.ini envs,
-# following upstream's own -D PIN_XXX=nn idiom (see e.g. PIN_GPS_RX,
-# PIN_VEXT_EN in upstream's variants/heltec_v4/platformio.ini). Consumed by
-# mods/hotspot-ota's HotspotOTA.cpp as plain macros -- no separate header.
-#
-# PIN_HOTSPOT_PWR: confirmed clean on Heltec V4.3.1 (GPIO48 = fallback).
-# OTA_WIFI_JOIN_*: hotspot WiFi can take up to ~60s to appear after
-#   PIN_HOTSPOT_PWR is asserted (cellular modem boot). 6 attempts x 15s +
-#   5x5s between = ~115s worst case, comfortably past that.
-# OTA_DIAG_WIFI_JOIN_ATTEMPTS: `ota wan join` uses this instead of the full
-#   patient budget above -- 1 attempt (~15s) so it can't block the CLI.
-# OTA_WAN_CHECK_*: advisory WAN check -- cellular modems often show L2 link
-#   up before the data session negotiates.
 capabilities:
   wifi_station: true
   dual_ota: true
@@ -32,43 +10,43 @@ capabilities:
   fem_lna_control: true
   deep_sleep_rail_shutdown: true
 
+# Injected into this board's variant platformio.ini envs, upstream's own -D PIN_XXX=nn idiom.
 build_values:
-  PIN_HOTSPOT_PWR: 47
+  PIN_HOTSPOT_PWR: 47   # confirmed clean on Heltec V4.3.1 (GPIO48 = fallback)
 
   # Bench-measured across 3 boards; the schematic ratio (4.9) reads ~270 mV low
   # and upstream's 5.42 reads ~90 mV high. A stored `set adc.multiplier` wins over this.
   ADC_MULTIPLIER: 5.32
+
+  # Hotspot WiFi can take ~60s to appear after PIN_HOTSPOT_PWR (modem boot);
+  # 6 x 15s + 5 x 5s is ~115s, comfortably past that.
   OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS: 15000
   OTA_WIFI_JOIN_RETRY_DELAY_MS: 5000
   OTA_WIFI_JOIN_MAX_ATTEMPTS: 6
   OTA_HTTP_TIMEOUT_MS: 20000
-  OTA_DIAG_WIFI_JOIN_ATTEMPTS: 1
+  OTA_DIAG_WIFI_JOIN_ATTEMPTS: 1   # `ota wan join` -- one attempt, so it can't block the CLI
+  # Advisory: cellular modems often show L2 link up before the data session negotiates.
   OTA_WAN_CHECK_ATTEMPTS: 3
   OTA_WAN_CHECK_RETRY_DELAY_MS: 10000
 
-# mods/power-guard. All in gauge millivolts, highest to lowest -- the ordering is
-# the contract; see that mod's README for the ladder.
+# mods/power-guard. Gauge millivolts, highest to lowest -- the ordering is the contract;
+# see that mod's README for the ladder.
 #
-# Automatic power saving -- `powersaving auto`. Gap must stay wide: sleeping sheds
-# load and raises the reading.
+# `powersaving auto`. Gap must stay wide: sleeping sheds load and raises the reading.
   POWER_GUARD_AUTO_OFF_MV: 3600   # release saving at or above
   POWER_GUARD_AUTO_ON_MV: 3300    # engage saving at or below
 
-# Return to service. Sits below AUTO_ON_MV so power saving gets a chance to extend
-# runtime before the node stops entirely. The safe rung's CLI ceiling derives from
-# this, so anything that leaves service can always come back.
+# Return to service. Below AUTO_ON_MV so saving gets a chance first; the safe rung's CLI
+# ceiling derives from this, so anything that leaves service can always come back.
   POWER_GUARD_RESUME_MV: 3150
 
-# Leaving service -- `powersaving safe`. Goes before a brownout does, so a solar pack
-# keeps the reserve that lets it climb back. The CLI ceiling derives from RESUME_MV
-# above, so there is nothing here to keep in step with it.
+# Leaving service -- `powersaving safe`. Goes before a brownout does, so a solar pack keeps
+# the reserve that lets it climb back.
   POWER_GUARD_SAFE_MV: 2800       # 0 disables; ~2.97 V at the pins on this board
-  POWER_GUARD_SAFE_FLOOR_MV: 2500 # CLI floor; ~100 mV over this board's measured
-                                  # ~2400 boot floor, so the rung can still fire
+  POWER_GUARD_SAFE_FLOOR_MV: 2500 # CLI floor; ~100 mV over this board's measured boot floor
   POWER_GUARD_SAFE_SECS: 60       # first wait only; the boot check backs off after
 
-# Sampling. Together these are the debounce window -- 3 x 60 s -- which is what
-# stops a transmit's voltage sag from being read as a flat pack. Shared by both rungs.
+# Debounce window, 3 x 60 s -- what stops a transmit's sag reading as a flat pack.
   POWER_GUARD_SAMPLE_INTERVAL_MS: 60000
   POWER_GUARD_CONSECUTIVE_SAMPLES: 3
 
@@ -79,28 +57,16 @@ build_values:
   POWER_GUARD_POWEROFF_MIN_SECS: 60           # `poweroff <secs>` bounds; 0 is always refused
   POWER_GUARD_POWEROFF_MAX_SECS: 86400
 
-# Optional: only set when a board's default partition scheme (from upstream's
-# boards/<name>.json) doesn't leave enough OTA slot room for this project's
-# added features. Not needed for heltec_v4 today. When set to a filename (e.g.
-# "custom_partitions.csv"), `scripts/generate-board-config.py inject-env` writes a
-# `board_build.partitions = <name>.csv` line into that board's env -- but
-# vendoring the actual CSV file into the upstream tree is done
-# by that same patch's own diff (as a new file, exactly like HotspotOTA.cpp
-# is added today), not by this script. This never touches upstream's own
-# board JSON.
+# Set only when upstream's default scheme leaves too little OTA slot room. A filename here makes
+# inject-env write `board_build.partitions`; vendoring the CSV is the mod patch's own job.
 partitions_override: null
 
-# How the QEMU boot check boots this board. Absent, or `enabled: false`, and the check
-# skips the board instead of failing it -- for hardware with no device model.
-#
-# globals are board wiring the emulator takes as run-time properties, so one binary per MCU
-# serves every board. The long -global form is required: the driver name contains a dot and
-# `-global a.b=c` splits at the first one, silently ignoring the setting.
-#   strap-mode  selects SPI boot; chip-specific, and the wrong value drops the ROM into
-#               download mode and nothing runs.
+# How the QEMU boot check boots this board; absent or disabled and the check skips it.
+# globals are board wiring passed as run-time properties. The long -global form is required:
+# `-global a.b=c` splits at the first dot and silently ignores the setting.
+#   strap-mode  selects SPI boot; the wrong value drops the ROM into download mode.
 #   cs-gpio     the pin the firmware drives as the radio's soft chip-select.
-#   spi-base    the SPI controller the radio hangs off. A bare Arduino SPIClass defaults to
-#               HSPI, which is SPI3 on the S3.
+#   spi-base    the SPI controller the radio hangs off (SPIClass defaults to HSPI = SPI3 here).
 qemu:
   enabled: true
   machine: esp32s3
@@ -112,27 +78,17 @@ qemu:
     bramble.gpspi2.cs-gpio: 8
     bramble.gpspi2.spi-base: "0x60025000"
 
-# Facts needed by the web flasher that aren't derivable from upstream (mcu,
-# flash size, etc. -- those come from upstream's boards/heltec_v4.json) or
-# from the built partitions.bin (offsets -- see scripts/generate-board-config.py).
-# This is the only other hand-maintained source for pages/flasher/data/auto_boards.json.
+# Web flasher facts not derivable from upstream or from the built partitions.bin. The only other
+# hand-maintained source for pages/flasher/data/auto_boards.json.
 flasher:
   label: "Heltec V4"
   connect_note: "Put the board into flash mode first (hold PGM, tap RST, then release PGM), then connect over USB."
   post_flash_note: "Press RST once to put the board back into normal operation."
 
-  # CLI settings sent over serial after a flash, keyed by variant id. These run
-  # before the location settings from member-config-*.json, so a region can
-  # override a board default rather than the other way round. A variant with no
-  # entry here simply gets none. Don't put `reboot` in the list -- the flasher
-  # sends it raw after the whole chain (routing it through sendCommand would
-  # block waiting on a reply the device never sends).
-  #
-  # ota.fw.url is where `ota wan` pulls an update from, so it must point at
-  # this exact board+variant's image, not a generic path.
-  #
-  # Not seeded here: `powersaving on` -- light sleep with no serial wake source,
-  # so commands after it are silently dropped. Enable at commissioning instead.
+  # Sent over serial after a flash, before the location settings from member-config-*.json, so a
+  # region can override a board default. No `reboot` here -- the flasher sends that raw afterwards.
+  # ota.fw.url must point at this exact board+variant's image, not a generic path.
+  # Not seeded: `powersaving on` -- light sleep has no serial wake source, so later commands drop.
   post_flash_commands:
     repeater:
       - "set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin"

@@ -1,27 +1,14 @@
-# Single source of truth for what gets built and released.
+# Single source of truth for what gets built and released: which (board, role) combinations
+# exist and what goes into each. Board hardware facts live in variants/<board>/overrides.yaml.
 #
-# Roles own asset naming, upstream tag selection, and publication facts. Each target is
-# one (board, role) combination this project ships. `mods`
-# lists which mods/<name>/ this target includes -- every target lists every
-# mod it wants explicitly, nothing is applied by default. Board hardware
-# facts (pins, timeouts, partitions, flasher notes) live in
-# variants/<board>/overrides.yaml, not here; this file only decides what
-# combinations exist and which features go into each one.
+# Every target lists every mod it wants -- nothing is applied by default except core_mods.
+# asset_basename isn't here; resolve-targets computes it as <board>_<role_abbrev>_mobmesh.
 #
-# asset_basename is not listed here -- it's computed by
-# `scripts/generate-board-config.py resolve-targets` as
-# <board>_<asset_role_abbrev>_mobmesh -- a label, not a mod inventory.
-#
-# vendor_flasher_assets: exactly one target per BOARD should be true. It controls
-# whether this target's build vendors that board's bootloader.bin/partitions.bin/
-# boot_app0.bin into pages/flasher/<board>/ for the web flasher's "New device" (full
-# erase) flow. These files are NOT shared/generic across boards or roles -- each
-# board's partition table (see variants/<board>/overrides.yaml's partitions_override)
-# is different, so they're always sourced fresh from THIS target's own build output,
-# never copied from another board or reused across runs.
+# vendor_flasher_assets: exactly one target per BOARD, since each board's bootloader.bin/
+# partitions.bin/boot_app0.bin are partition-table specific and never shared between boards.
+
 # Applied to every target, in this order, before any target-specific mods below.
-# Keep entries here only while they genuinely ship everywhere -- a mod that becomes
-# optional belongs in a target's own `mods:` list instead.
+# A mod that stops shipping everywhere belongs in a target's own `mods:` list instead.
 core_mods: [shim, hotspot-ota, timing-safety, try-settings]
 
 roles:
