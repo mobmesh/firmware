@@ -1,0 +1,26 @@
+#pragma once
+
+#if !defined(SYNC_SETTINGS_WITH_REGION) && \
+    !defined(SYNC_SETTINGS_WITHOUT_REGION)
+#define SYNC_SETTINGS_WITH_REGION 1
+#endif
+
+#if !defined(SYNC_SETTINGS_WITH_POLICY) && \
+    !defined(SYNC_SETTINGS_WITHOUT_POLICY)
+#define SYNC_SETTINGS_WITH_POLICY 1
+#endif
+
+#ifndef SYNC_SETTINGS_WITH_REGION
+#define SYNC_SETTINGS_WITH_REGION 0
+#endif
+
+#ifndef SYNC_SETTINGS_WITH_POLICY
+#define SYNC_SETTINGS_WITH_POLICY 0
+#endif
+
+#if !SYNC_SETTINGS_WITH_REGION && !SYNC_SETTINGS_WITH_POLICY
+#error "sync-settings requires at least one dataset"
+#endif
+
+#define SYNC_SETTINGS_DATASET_COUNT \
+  (SYNC_SETTINGS_WITH_REGION + SYNC_SETTINGS_WITH_POLICY)

@@ -1,6 +1,10 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
+
+class RegionMap;
+namespace mesh { class Packet; }
 
 // One hook surface for every mod, so upstream's main.cpp carries one-line calls instead
 // of each mod's code inline, and two mods never edit the same region of it.
@@ -14,6 +18,26 @@ struct ModCliContext {
 bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
 void modLoop();                            // called first in loop()
 bool modWantsPowerSaving();                // OR'd with the operator's powersaving_enabled
+
+struct ModRegionMatch {
+  uint8_t state;
+  uint8_t key[16];
+};
+
+enum {
+  MOD_REGION_NONE,
+  MOD_REGION_ALLOW,
+  MOD_REGION_DENY,
+};
+
+bool modResolveRegion(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out);
+bool modResolveRegionName(const char* name, ModRegionMatch* out);
+bool modRegionNameForKey(const uint8_t key[16], char* out, size_t capacity);
+int modExportRegions(RegionMap* base, char* out, size_t capacity,
+                     uint8_t excluded_flags);
+void modObserveRecv(const mesh::Packet* packet, bool accepted,
+                    const uint8_t scope_key[16]);
+void modObserveTx(uint32_t packet_id, bool succeeded);
 
 // Every mod CLI command, dispatched from MyMesh before upstream's own chain runs. Version
 // and build date are passed because only the call site can see the example's macros.
@@ -34,6 +58,28 @@ void     modClockSet(uint32_t epoch);
 // back or apply one without reaching CommonCLI's protected handleGetCmd/handleSetCmd.
 // Reusing upstream's own parser is the point: validation stays in one place.
 void modCliDispatch(uint32_t sender_timestamp, char* command, char* reply);
+
+struct ModPolicyValues {
+  uint8_t flood_max;
+  uint8_t flood_max_unscoped;
+  uint8_t flood_max_advert;
+  uint8_t advert_interval;
+  uint8_t flood_advert_interval;
+  uint8_t path_hash_mode;
+  uint8_t loop_detect;
+  uint8_t multi_acks;
+  float airtime_factor;
+  float tx_delay_factor;
+  uint8_t agc_reset_interval;
+};
+
+bool modPolicyRead(ModPolicyValues* out);
+
+bool modPublisherKey(uint8_t out[32]);
+bool modSignDetached(const uint8_t* data, size_t len, uint8_t signature[64]);
+bool modSendGroup(const uint8_t* secret, uint8_t hash, const uint8_t* data,
+                  size_t len, bool scoped, const uint8_t scope_key[16],
+                  uint32_t* packet_id);
 
 // The live tempradio trial, or false when none is running. Both of upstream's timers are
 // consulted: pending_* are untested before the 2s apply and stale after the revert, which

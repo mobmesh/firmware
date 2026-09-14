@@ -1,0 +1,15 @@
+name: sync-settings
+
+env_flags: [WITH_SYNC_SETTINGS]
+
+integration:
+  header: helpers/sync_settings/SyncIntegration.h
+  hooks:
+    loop: syncLoop
+    route: syncRoute
+    region_export: syncExportRegions
+    recv: syncRecv
+    tx: syncTx
+    cli:
+      handler: syncCli
+      priority: 50

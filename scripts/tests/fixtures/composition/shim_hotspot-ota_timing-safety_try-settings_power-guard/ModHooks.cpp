@@ -16,6 +16,19 @@ void modLoop() {
   powerGuardLoop();
 }
 
+bool modResolveRegion(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out) {
+  return false;
+}
+
+int modExportRegions(RegionMap* base, char* out, size_t capacity,
+                     uint8_t excluded_flags) {
+  return -1;
+}
+
+void modObserveRecv(const mesh::Packet*, bool, const uint8_t*) {}
+
+void modObserveTx(uint32_t, bool) {}
+
 bool modWantsPowerSaving() {
   return powerGuardWantsPowerSaving();
 }

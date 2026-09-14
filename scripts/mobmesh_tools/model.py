@@ -37,6 +37,10 @@ class IntegrationPhase(str, Enum):
     BEFORE_RADIO_INIT = "before_radio_init"
     RADIO_INIT_POLICY = "radio_init_policy"
     LOOP = "loop"
+    ROUTE = "route"
+    REGION_EXPORT = "region_export"
+    RECV = "recv"
+    TX = "tx"
     WANTS_POWER_SAVING = "wants_power_saving"
     CLI = "cli"
 
