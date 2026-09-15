@@ -28,7 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 MODS_DIR = REPO_ROOT / "mods"
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from mobmesh_tools.model import ProjectModel, ProjectModelError
+from project_config import ProjectModel, ProjectModelError
 
 RESERVED_OFFSET = 208
 RESERVED_LEN = 80

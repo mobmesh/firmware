@@ -40,7 +40,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from mobmesh_tools.model import (
+from project_config import (
     Capability,
     CliIntegration,
     IntegrationPhase,

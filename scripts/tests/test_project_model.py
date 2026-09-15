@@ -6,7 +6,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from mobmesh_tools.model import ProjectModel, ProjectModelError
+from project_config import ProjectModel, ProjectModelError
 
 
 class CurrentProjectModelTestCase(unittest.TestCase):

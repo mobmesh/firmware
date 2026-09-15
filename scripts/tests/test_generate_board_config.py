@@ -567,7 +567,7 @@ class OtaWebPageTestCase(InjectEnvTestCase):
             self._run(ini_path)
 
     def test_page_path_escaping_the_mod_is_rejected(self):
-        from mobmesh_tools.model import ProjectModelError
+        from project_config import ProjectModelError
         for bad in ("../../etc/passwd", "/etc/passwd", ""):
             with self.subTest(path=bad):
                 self._setup()
