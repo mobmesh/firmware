@@ -1423,7 +1423,7 @@ static bool publisherCommand(char* command, char* reply) {
 static void listRegions(const char* arg, char* reply) {
   uint8_t offset;
   if (!parseOffset(arg, offset) || offset > regions.count()) {
-    strcpy(reply, "Err - syntax: sync.region list [offset]");
+    strcpy(reply, "Err - syntax: sync.region [offset]");
     return;
   }
   size_t used = 0;
@@ -2097,14 +2097,9 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   }
 #endif
 #if SYNC_SETTINGS_WITH_REGION
-  if (strcmp(command, "sync.region list") == 0) {
+  if (strcmp(command, "sync.region") == 0) {
     if (!overlay_ready) strcpy(reply, "Err - storage");
     else listRegions(nullptr, reply);
-    return true;
-  }
-  if (strncmp(command, "sync.region list ", 17) == 0) {
-    if (!overlay_ready) strcpy(reply, "Err - storage");
-    else listRegions(command + 17, reply);
     return true;
   }
   static const char define[] = "sync.region def";
@@ -2233,6 +2228,13 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   }
 #endif
   if (scheduleCommand(command, reply)) return true;
+#if SYNC_SETTINGS_WITH_REGION
+  if (strncmp(command, "sync.region ", 12) == 0) {
+    if (!overlay_ready) strcpy(reply, "Err - storage");
+    else listRegions(command + 12, reply);
+    return true;
+  }
+#endif
   return false;
 }
 
