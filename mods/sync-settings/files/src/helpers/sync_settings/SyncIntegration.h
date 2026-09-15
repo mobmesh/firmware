@@ -8,17 +8,6 @@ struct ModRegionMatch;
 namespace mesh { class Packet; }
 struct ModCliContext;
 
-namespace mobmesh {
-namespace sync {
-
-bool installRegions(const uint8_t* data, size_t len);
-void enableRegions(bool enabled);
-bool regionsEnabled();
-bool storageReady();
-
-}  // namespace sync
-}  // namespace mobmesh
-
 bool syncRoute(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out);
 int syncExportRegions(RegionMap* base, char* out, size_t capacity,
                       uint8_t excluded_flags);

@@ -28,13 +28,13 @@ namespace sync {
 
 static Inbox inbox;
 static bool booted;
-static bool ready;
 static bool config_ready;
 static bool enabled;
 static bool overlay_ready;
 static bool policy_recovery_ready;
 #if SYNC_SETTINGS_WITH_REGION
 static Regions regions;
+static uint8_t saved_region_digest[DIGEST_LEN];
 #endif
 static bool region_state_ready;
 static bool region_receive_ready;
@@ -235,22 +235,22 @@ static void makeKey(const uint8_t* name, uint8_t len, uint8_t out[16], void*) {
   sha.finalize(out, 16);
 }
 
-bool installRegions(const uint8_t* data, size_t len) {
-  return regions.replace(data, len, makeKey, nullptr) == REGION_OK;
+static void refreshRegionDirty() {
+  uint8_t digest[DIGEST_LEN];
+  hash(regions.data(), regions.size(), digest, nullptr);
+  dirty = memcmp(digest, saved_region_digest, sizeof(digest)) != 0;
 }
 
-void enableRegions(bool value) {
-  enabled = value && overlay_ready && region_state_ready;
+static void savedRegions(const uint8_t* data, size_t len) {
+  hash(data, len, saved_region_digest, nullptr);
+  refreshRegionDirty();
 }
 
-bool regionsEnabled() { return enabled; }
-
-bool storageReady() { return ready; }
-#else
-bool installRegions(const uint8_t*, size_t) { return false; }
-void enableRegions(bool) {}
-bool regionsEnabled() { return false; }
-bool storageReady() { return ready; }
+static bool installRegions(const uint8_t* data, size_t len) {
+  if (regions.replace(data, len, makeKey, nullptr) != REGION_OK) return false;
+  refreshRegionDirty();
+  return true;
+}
 #endif
 
 static bool loadConfig(uint8_t* scratch) {
@@ -274,6 +274,7 @@ static bool loadRegions(uint8_t* scratch) {
                                STORE_MAX, hash, regionsValid, nullptr);
   if (result == PAIR_ABSENT) {
     regions.clear();
+    savedRegions(regions.data(), regions.size());
     memset(&region_record, 0, sizeof(region_record));
     overlay_degraded = false;
     return true;
@@ -286,6 +287,7 @@ static bool loadRegions(uint8_t* scratch) {
       !installRegions(value.regions, value.regions_len)) return false;
   region_record = value;
   region_record.regions = nullptr;
+  savedRegions(value.regions, value.regions_len);
   return true;
 }
 #endif
@@ -304,16 +306,6 @@ static bool loadPublishers(uint8_t* scratch) {
          readPublishers(pair.record.payload, pair.record.payload_len,
                         publishers) == STORE_OK;
 }
-
-#if SYNC_SETTINGS_WITH_REGION
-static bool storedRegionsValid(uint8_t* scratch, bool& degraded) {
-  PairView pair;
-  PairResult result = readPair(pairIO(REGION_PATHS), STORE_REGIONS, pair, scratch,
-                               STORE_MAX, hash, regionsValid, nullptr);
-  degraded = result == PAIR_OK && pair.degraded;
-  return result == PAIR_ABSENT || result == PAIR_OK;
-}
-#endif
 
 static bool loadState(PairPaths& paths, uint8_t type, DatasetState& state,
                       uint8_t* scratch) {
@@ -403,7 +395,10 @@ static bool saveRegions(uint8_t* scratch) {
   PairView pair;
   bool ok = buildPair(pairIO(REGION_PATHS), STORE_REGIONS, pair, scratch, STORE_MAX,
                       hash, regionsValid, buildRegionPayload, nullptr) == PAIR_OK;
-  if (ok) overlay_degraded = false;
+  if (ok) {
+    overlay_degraded = false;
+    savedRegions(regions.data(), regions.size());
+  }
   return ok;
 }
 
@@ -412,7 +407,10 @@ static bool saveRegionRecord(const RegionRecord& value, uint8_t* scratch) {
   bool ok = buildPair(pairIO(REGION_PATHS), STORE_REGIONS, pair, scratch, STORE_MAX,
                       hash, regionsValid, buildRegionRecordPayload,
                       const_cast<RegionRecord*>(&value)) == PAIR_OK;
-  if (ok) overlay_degraded = false;
+  if (ok) {
+    overlay_degraded = false;
+    savedRegions(value.regions, value.regions_len);
+  }
   return ok;
 }
 #endif
@@ -949,14 +947,6 @@ static void boot() {
 #if SYNC_SETTINGS_WITH_POLICY
   if (policy_state_ready && !settleGuard(POLICY, scratch)) policy_state_ready = false;
 #endif
-  ready = config_ready && trust_ready
-#if SYNC_SETTINGS_WITH_REGION
-          && overlay_ready && region_state_ready
-#endif
-#if SYNC_SETTINGS_WITH_POLICY
-          && policy_state_ready && policy_recovery_ready
-#endif
-          ;
 #if SYNC_SETTINGS_WITH_REGION
   enabled = overlay_ready && region_state_ready && region_state.enabled;
 #endif
@@ -964,12 +954,12 @@ static void boot() {
   for (uint8_t i = 0; i < SYNC_SETTINGS_DATASET_COUNT; ++i) housekeeping_at[i] = millis();
 }
 
-static bool setEnabled(bool region, bool value, bool defer_off) {
+static const char* enableError(bool region, bool value) {
 #if !SYNC_SETTINGS_WITH_REGION
-  if (region) return false;
+  if (region) return "Err - unsupported dataset";
 #endif
 #if !SYNC_SETTINGS_WITH_POLICY
-  if (!region) return false;
+  if (!region) return "Err - unsupported dataset";
 #endif
   bool state_ready = region ? region_state_ready
                             : policy_state_ready
@@ -977,18 +967,23 @@ static bool setEnabled(bool region, bool value, bool defer_off) {
                               && policy_recovery_ready
 #endif
                               ;
-  if (!state_ready ||
-      (value && (!config_ready || !trust_ready || config.channel_len == 0 ||
+  if (!state_ready) return "Err - dataset storage";
+  if (!value) return nullptr;
+  if (!config_ready) return "Err - configuration storage";
+  if (!trust_ready) return "Err - publisher storage";
+  if (config.channel_len == 0) return "Err - channel not set";
 #if SYNC_SETTINGS_WITH_REGION
-                 (region && (!overlay_ready || !region_receive_ready)) ||
+  if (region && !overlay_ready) return "Err - overlay storage";
+  if (region && !region_receive_ready) return "Err - region receipt unresolved";
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
-                 (!region && policy_recovery.phase != RECOVERY_IDLE)))) {
-#else
-                 false))) {
+  if (!region && policy_recovery.phase != RECOVERY_IDLE) return "Err - policy recovering";
 #endif
-    return false;
-  }
+  return nullptr;
+}
+
+static bool setEnabled(bool region, bool value, bool defer_off) {
+  if (enableError(region, value) != nullptr) return false;
   Temp scratch(STORE_MAX);
   uint8_t dataset = region ? REGION : POLICY;
   DatasetState next = stateFor(dataset);
@@ -1386,22 +1381,27 @@ static void listRegions(const char* arg, char* reply) {
   }
   size_t used = 0;
   reply[0] = 0;
-  for (uint8_t i = offset; i < regions.count(); ++i) {
+  uint8_t i = offset;
+  for (; i < regions.count(); ++i) {
     RegionView entry;
     regions.get(i, entry);
     RegionView parent;
+    char item[2 * REGION_NAME_MAX + 10];
     int n = entry.parent == 0
-          ? snprintf(reply + used, 160 - used, "%s%.*s%s", used ? " " : "",
+          ? snprintf(item, sizeof(item), "%s%.*s%s", used ? " " : "",
                      entry.name_len, (const char*)entry.name, entry.denied ? "" : " F")
           : (regions.get((uint8_t)(entry.parent - 1), parent),
-             snprintf(reply + used, 160 - used, "%s%.*s (%.*s)%s", used ? " " : "",
+             snprintf(item, sizeof(item), "%s%.*s (%.*s)%s", used ? " " : "",
                       entry.name_len, (const char*)entry.name,
                       parent.name_len, (const char*)parent.name,
                       entry.denied ? "" : " F"));
-    if (n < 0 || (size_t)n >= 160 - used) break;
+    size_t reserve = i + 1 < regions.count() ? 9 : 1;
+    if (n < 0 || (size_t)n >= sizeof(item) || (size_t)n + reserve > 160 - used) break;
+    memcpy(reply + used, item, (size_t)n + 1);
     used += (size_t)n;
   }
-  if (used == 0) strcpy(reply, "empty");
+  if (i < regions.count()) snprintf(reply + used, 160 - used, " next %u", i);
+  else if (used == 0) strcpy(reply, "empty");
 }
 #endif
 
@@ -1431,7 +1431,8 @@ static bool setChannel(const char* value, char* reply) {
       policy_state.enabled ||
 #endif
       false) {
-    strcpy(reply, "Err - sync must be off");
+    snprintf(reply, 160, "Err - sync must be off; channel %s",
+             config.channel_len ? config.channel : "unset");
     return true;
   }
   if (
@@ -1479,8 +1480,8 @@ static bool setSchedule(bool region, bool interval, const char* value, char* rep
   const char* dataset = region ? "region" : "policy";
   const char* field = interval ? "interval" : "duration";
   if (!parseUnit(value, suffix, low, high, parsed)) {
-    snprintf(reply, 160, "Err - syntax: set sync.%s.publish.%s <%u-%u>%c",
-             dataset, field, low, high, suffix);
+    snprintf(reply, 160, "Err - syntax: set sync.%s.publish.%s <N>%c; N=%u..%u",
+             dataset, field, suffix, low, high);
     return true;
   }
 
@@ -1644,7 +1645,6 @@ static bool regionEditCommand(const ModCliContext& context, char* command,
   } else if (!installRegions(candidate, len)) {
     strcpy(reply, "Err - invalid overlay");
   } else {
-    dirty = true;
     strcpy(reply, "OK");
   }
   return true;
@@ -1675,7 +1675,7 @@ static bool scheduleCommand(char* command, char* reply) {
         return true;
       }
       const DatasetState& state = stateFor(entry.region ? REGION : POLICY);
-      snprintf(reply, 160, "%u%c",
+      snprintf(reply, 160, "> %u%c",
                entry.interval ? state.interval_hours : state.duration_days,
                entry.interval ? 'h' : 'd');
       return true;
@@ -1688,8 +1688,6 @@ static bool scheduleCommand(char* command, char* reply) {
   }
   return false;
 }
-
-static bool parseOffset(const char* text, uint8_t& out);
 
 static bool append(char* reply, size_t& at, const char* format, ...) {
   if (at >= 160) return false;
@@ -1886,13 +1884,13 @@ static void status(uint8_t dataset, char* reply) {
     ModPolicyValues value;
     if (modPolicyRead(&value) &&
         !append(reply, at,
-                " policy %u/%u/%u adv %u/%u path %u loop %u ack %u af %.6g tx %.6g agc %u",
+                " policy flood %u/%u/%u adv %um/%uh path %u loop %u ack %u af %.6g tx %.6g agc %us",
                 value.flood_max, value.flood_max_unscoped,
-                value.flood_max_advert, value.advert_interval,
+                value.flood_max_advert, (unsigned)value.advert_interval * 2u,
                 value.flood_advert_interval, value.path_hash_mode,
                 value.loop_detect, value.multi_acks,
                 (double)value.airtime_factor, (double)value.tx_delay_factor,
-                value.agc_reset_interval)) goto overflow;
+                (unsigned)value.agc_reset_interval * 4u)) goto overflow;
 #endif
   }
   return;
@@ -2009,8 +2007,7 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   if (publishCommand(command, reply)) return true;
   if (strcmp(command, "get sync.channel") == 0) {
     if (!config_ready) strcpy(reply, "Err - storage");
-    else if (config.channel_len == 0) strcpy(reply, "unset");
-    else memcpy(reply, config.channel, config.channel_len + 1);
+    else snprintf(reply, 160, "> %s", config.channel_len ? config.channel : "unset");
     return true;
   }
   if (strncmp(command, "set sync.channel", 16) == 0) {
@@ -2020,7 +2017,9 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   if (strcmp(command, "sync.region on") == 0 ||
       strcmp(command, "sync.region off") == 0) {
     bool on = command[12] == 'o' && command[13] == 'n';
-    if (!setEnabled(true, on, !on)) strcpy(reply, "Err - storage or channel");
+    const char* error = enableError(true, on);
+    if (error != nullptr) strcpy(reply, error);
+    else if (!setEnabled(true, on, !on)) strcpy(reply, "Err - storage");
     else strcpy(reply, "OK");
     return true;
   }
@@ -2029,7 +2028,9 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   if (strcmp(command, "sync.policy on") == 0 ||
       strcmp(command, "sync.policy off") == 0) {
     bool on = command[12] == 'o' && command[13] == 'n';
-    if (!setEnabled(false, on, false)) strcpy(reply, "Err - storage or channel");
+    const char* error = enableError(false, on);
+    if (error != nullptr) strcpy(reply, error);
+    else if (!setEnabled(false, on, false)) strcpy(reply, "Err - storage");
     else strcpy(reply, "OK");
     return true;
   }
@@ -2065,7 +2066,6 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
       } else if (result != REGION_OK) editError(result, define, reply);
       else if (!installRegions(candidate, len)) strcpy(reply, "Err - invalid overlay");
       else {
-        dirty = true;
         strcpy(reply, "OK");
       }
     }
@@ -2088,7 +2088,6 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
       else strcpy(reply, "OK - accepted; save required");
     } else if (!installRegions(candidate, len)) strcpy(reply, "Err - invalid overlay");
     else {
-      dirty = true;
       strcpy(reply, "OK - save required");
     }
     return true;
@@ -2106,9 +2105,8 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   }
   if (strcmp(command, "sync.region reload") == 0) {
     Temp scratch(STORE_MAX);
-    bool degraded = false;
     if (pending_edit.kind != EDIT_NONE) strcpy(reply, "Err - busy");
-    else if (!overlay_ready || !storedRegionsValid(scratch, degraded)) {
+    else if (!overlay_ready) {
       strcpy(reply, "Err - storage");
     }
     else if (receiver.campaign(REGION).state != RECEIVE_IDLE) {
@@ -2116,7 +2114,7 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
     }
     else if (context.sender_timestamp != 0) {
       if (!deferReload(scratch)) strcpy(reply, "Err - storage or memory");
-      else strcpy(reply, degraded ? "OK - accepted; degraded storage" : "OK - accepted");
+      else strcpy(reply, pending_edit.degraded ? "OK - accepted; degraded storage" : "OK - accepted");
     }
     else if (!loadRegions(scratch)) strcpy(reply, "Err - storage");
     else {
@@ -2305,9 +2303,9 @@ void syncLoop() {
   if (mobmesh::sync::pending_edit.kind != mobmesh::sync::EDIT_NONE) {
     mobmesh::sync::PendingEdit& edit = mobmesh::sync::pending_edit;
     if (mobmesh::sync::installRegions(edit.data, edit.len)) {
-      mobmesh::sync::dirty = edit.kind != mobmesh::sync::EDIT_RELOAD;
       if (edit.kind == mobmesh::sync::EDIT_RELOAD) {
         mobmesh::sync::overlay_degraded = edit.degraded;
+        mobmesh::sync::savedRegions(edit.data, edit.len);
       }
     }
     free(edit.data);

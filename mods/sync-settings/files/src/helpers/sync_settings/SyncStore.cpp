@@ -127,8 +127,8 @@ PairResult readPair(const PairIO& io, uint8_t type, PairView& out,
 
   bool valid[2] = {};
   uint32_t sequence[2] = {};
+  StoreView view;
   for (uint8_t slot = 0; slot < 2; ++slot) {
-    StoreView view;
     valid[slot] = present[slot] && validSlot(io, slot, type, scratch, capacity,
                                             view, hash, validate, context);
     if (valid[slot]) sequence[slot] = view.sequence;
@@ -142,45 +142,11 @@ PairResult readPair(const PairIO& io, uint8_t type, PairView& out,
     winner = order == SERIAL_BEFORE ? 1 : 0;
   }
 
-  StoreView view;
-  if (!validSlot(io, winner, type, scratch, capacity, view,
+  if (winner == 0 && !validSlot(io, winner, type, scratch, capacity, view,
                  hash, validate, context)) return PAIR_FAULT;
   out.slot = winner;
   out.degraded = (present[0] && !valid[0]) || (present[1] && !valid[1]);
   out.record = view;
-  return PAIR_OK;
-}
-
-PairResult writePair(const PairIO& io, uint8_t type, const uint8_t* payload,
-                     uint16_t payload_len, PairView& out, uint8_t* scratch,
-                     size_t capacity, HashFn hash,
-                     PayloadFn validate, void* context) {
-  if (io.write == nullptr) return PAIR_FAULT;
-
-  PairView current;
-  PairResult found = readPair(io, type, current, scratch, capacity,
-                              hash, validate, context);
-  if (found != PAIR_OK && found != PAIR_ABSENT) return found;
-
-  uint8_t target = found == PAIR_OK ? (uint8_t)(current.slot ^ 1) : 0;
-  uint32_t sequence = found == PAIR_OK ? nextSequence(current.record.sequence) : 1;
-  uint8_t expected[STORE_DIGEST_LEN];
-  hash(payload, payload_len, expected, context);
-  size_t len = writeStore(type, sequence, payload, payload_len, scratch,
-                          capacity, hash, context);
-  if (len == 0 || !io.write(target, scratch, len, io.context)) return PAIR_FAULT;
-
-  StoreView verified;
-  if (!validSlot(io, target, type, scratch, capacity, verified,
-                 hash, validate, context)) return PAIR_FAULT;
-  uint8_t actual[STORE_DIGEST_LEN];
-  hash(verified.payload, verified.payload_len, actual, context);
-  if (verified.sequence != sequence || verified.payload_len != payload_len ||
-      memcmp(actual, expected, sizeof(actual)) != 0) return PAIR_FAULT;
-
-  out.slot = target;
-  out.degraded = false;
-  out.record = verified;
   return PAIR_OK;
 }
 

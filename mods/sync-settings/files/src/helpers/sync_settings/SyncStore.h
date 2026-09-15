@@ -180,10 +180,6 @@ size_t writeStore(uint8_t type, uint32_t sequence, const uint8_t* payload,
 PairResult readPair(const PairIO& io, uint8_t type, PairView& out,
                     uint8_t* scratch, size_t capacity, HashFn hash,
                     PayloadFn validate, void* context);
-PairResult writePair(const PairIO& io, uint8_t type, const uint8_t* payload,
-                     uint16_t payload_len, PairView& out, uint8_t* scratch,
-                     size_t capacity, HashFn hash,
-                     PayloadFn validate, void* context);
 PairResult buildPair(const PairIO& io, uint8_t type, PairView& out,
                      uint8_t* scratch, size_t capacity, HashFn hash,
                      PayloadFn validate, PayloadBuildFn build, void* context);
