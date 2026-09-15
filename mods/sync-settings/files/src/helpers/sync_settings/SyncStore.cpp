@@ -155,17 +155,17 @@ PairResult buildPair(const PairIO& io, uint8_t type, PairView& out,
                      PayloadFn validate, PayloadBuildFn build, void* context) {
   if (io.write == nullptr || scratch == nullptr || capacity < STORE_MAX ||
       build == nullptr) return PAIR_FAULT;
-
   PairView current;
   PairResult found = readPair(io, type, current, scratch, capacity,
                               hash, validate, context);
   if (found != PAIR_OK && found != PAIR_ABSENT) return found;
-
   uint8_t target = found == PAIR_OK ? (uint8_t)(current.slot ^ 1) : 0;
   uint32_t sequence = found == PAIR_OK ? nextSequence(current.record.sequence) : 1;
   uint8_t* payload = scratch + STORE_HEADER_LEN;
   size_t payload_len = build(payload, capacity - STORE_OVERHEAD, context);
-  if (payload_len == 0 || payload_len > 0xffffu) return PAIR_FAULT;
+  if (hash == nullptr || payload_len == 0 ||
+      payload_len > capacity - STORE_OVERHEAD ||
+      payload_len > STORE_MAX - STORE_OVERHEAD) return PAIR_FAULT;
 
   uint8_t expected[STORE_DIGEST_LEN];
   hash(payload, payload_len, expected, context);

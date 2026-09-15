@@ -192,6 +192,11 @@ int writeRegionList(const Regions& overlay, const RegionSource& base,
   size_t at = 0;
   out[0] = 0;
 
+  if (base.wildcard) {
+    static const uint8_t star = '*';
+    appendName(out, capacity, at, &star, 1);
+  }
+
   for (uint8_t i = 0; i < overlay.count(); ++i) {
     RegionView entry;
     if (!overlay.get(i, entry) || entry.denied ||
@@ -201,10 +206,6 @@ int writeRegionList(const Regions& overlay, const RegionSource& base,
     appendName(out, capacity, at, entry.name, entry.name_len);
   }
 
-  if (base.wildcard) {
-    static const uint8_t star = '*';
-    appendName(out, capacity, at, &star, 1);
-  }
   for (uint8_t i = 0; i < base.count; ++i) {
     RegionView entry;
     if (!base.get(i, entry, base.context) || entry.denied) continue;

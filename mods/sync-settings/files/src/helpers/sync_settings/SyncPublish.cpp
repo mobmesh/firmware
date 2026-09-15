@@ -92,6 +92,7 @@ bool Transmitter::abort(uint8_t dataset,
   state->abort_next = now;
   state->retry_at = now;
   state->abort_deadline = now + ABORT_DEADLINE_MS;
+  state->finish_failures = 0;
   return true;
 }
 
@@ -179,7 +180,7 @@ void Transmitter::sendAbort(TxState& state, uint32_t now) {
         ops_.finish(state.dataset, ending, state.abort_sent, ops_.context)) {
       clear(state);
     } else {
-      state.retry_at = now + TX_RETRY_MS;
+      state.retry_at = now + storageRetryDelay(state.finish_failures);
     }
     return;
   }
@@ -225,7 +226,7 @@ void Transmitter::tick(uint32_t now) {
       if (ops_.finish != nullptr &&
           ops_.finish(state.dataset, state.sign_failed ? TX_SIGN_FAILED : TX_QUIET,
                       0, ops_.context)) clear(state);
-      else state.retry_at = now + TX_RETRY_MS;
+      else state.retry_at = now + storageRetryDelay(state.finish_failures);
     }
   }
   TxState* state = choose(now);

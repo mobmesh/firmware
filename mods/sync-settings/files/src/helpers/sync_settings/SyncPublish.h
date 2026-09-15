@@ -8,6 +8,12 @@ namespace sync {
 
 static const uint32_t TX_WAIT_MS = 60000;
 static const uint32_t TX_RETRY_MS = 2000;
+static const uint32_t STORAGE_RETRY_MAX_MS = 900000;
+inline uint32_t storageRetryDelay(uint8_t& failures) {
+  if (failures < 10) ++failures;
+  uint32_t delay = TX_RETRY_MS << (failures - 1);
+  return delay < STORAGE_RETRY_MAX_MS ? delay : STORAGE_RETRY_MAX_MS;
+}
 static const uint8_t TX_ATTEMPTS = 3;
 static const uint32_t FLOOD_WAIT_BASE_MS = 500;
 static const uint8_t FLOOD_WAIT_FACTOR = 16;
@@ -69,6 +75,7 @@ struct TxState {
   uint8_t frame;
   uint8_t attempts;
   bool sign_failed;
+  uint8_t finish_failures;
   uint32_t started;
   uint32_t retry_at;
   bool in_flight;

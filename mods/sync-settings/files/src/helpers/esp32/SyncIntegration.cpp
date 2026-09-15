@@ -66,13 +66,17 @@ static PendingEdit pending_edit;
 #endif
 static Config config;
 static Publishers publishers;
-enum ReportReason : uint8_t { REPORT_NONE, REPORT_SIGN, REPORT_APPLY, REPORT_RESTORED };
+enum ReportReason : uint8_t {
+  REPORT_NONE, REPORT_SIGN, REPORT_APPLY, REPORT_RESTORED,
+  REPORT_SETTLEMENT, REPORT_APPLIED,
+};
 struct RuntimeReport {
   uint32_t generation;
   ReportReason reason;
 };
 static RuntimeReport runtime_report[SYNC_SETTINGS_DATASET_COUNT];
 static uint32_t housekeeping_at[SYNC_SETTINGS_DATASET_COUNT];
+static uint8_t housekeeping_failures[SYNC_SETTINGS_DATASET_COUNT];
 static RuntimeReport& reportFor(uint8_t dataset) {
   return runtime_report[dataset == REGION ? 0 : SYNC_SETTINGS_WITH_REGION];
 }
@@ -84,6 +88,10 @@ static DatasetState policy_state;
 #endif
 #if SYNC_SETTINGS_WITH_REGION
 static RegionRecord region_record;
+static bool regionSettlementPending() {
+  return region_record.receipt &&
+         serialOrder(region_record.receipt_id, region_state.settled_receipt) == SERIAL_AFTER;
+}
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
 static PolicyRecovery policy_recovery;
@@ -148,6 +156,8 @@ static bool fileExists(uint8_t slot, void* context) {
 static bool fileRead(uint8_t slot, uint8_t* out, size_t capacity,
                      size_t& len, void* context) {
   PairPaths* paths = static_cast<PairPaths*>(context);
+  len = 0;
+  if (!fileExists(slot, context)) return false;
   File file = SPIFFS.open(paths->path[slot], "r");
   if (!file) return false;
   len = file.size();
@@ -158,7 +168,8 @@ static bool fileRead(uint8_t slot, uint8_t* out, size_t capacity,
 
 static bool fileWrite(uint8_t slot, const uint8_t* data, size_t len, void* context) {
   PairPaths* paths = static_cast<PairPaths*>(context);
-  File file = SPIFFS.open(paths->path[slot], "w", true);
+  bool present = fileExists(slot, context);
+  File file = SPIFFS.open(paths->path[slot], "w", !present);
   if (!file) return false;
   bool ok = file.write(data, len) == len;
   file.close();
@@ -253,10 +264,18 @@ static bool installRegions(const uint8_t* data, size_t len) {
 }
 #endif
 
+static PairResult loadPair(PairPaths& paths, uint8_t type, PairView& pair,
+                           uint8_t* scratch, PayloadFn validate) {
+  PairResult result = readPair(pairIO(paths), type, pair, scratch, STORE_MAX,
+                               hash, validate, nullptr);
+  if (result == PAIR_OK && pair.degraded &&
+      SPIFFS.remove(paths.path[pair.slot ^ 1])) pair.degraded = false;
+  return result;
+}
+
 static bool loadConfig(uint8_t* scratch) {
   PairView pair;
-  PairResult result = readPair(pairIO(CONFIG_PATHS), STORE_CONFIG, pair, scratch,
-                               STORE_MAX, hash, configValid, nullptr);
+  PairResult result = loadPair(CONFIG_PATHS, STORE_CONFIG, pair, scratch, configValid);
   if (result == PAIR_ABSENT) {
     memset(&config, 0, sizeof(config));
     config_degraded = false;
@@ -270,8 +289,7 @@ static bool loadConfig(uint8_t* scratch) {
 #if SYNC_SETTINGS_WITH_REGION
 static bool loadRegions(uint8_t* scratch) {
   PairView pair;
-  PairResult result = readPair(pairIO(REGION_PATHS), STORE_REGIONS, pair, scratch,
-                               STORE_MAX, hash, regionsValid, nullptr);
+  PairResult result = loadPair(REGION_PATHS, STORE_REGIONS, pair, scratch, regionsValid);
   if (result == PAIR_ABSENT) {
     regions.clear();
     savedRegions(regions.data(), regions.size());
@@ -294,8 +312,7 @@ static bool loadRegions(uint8_t* scratch) {
 
 static bool loadPublishers(uint8_t* scratch) {
   PairView pair;
-  PairResult result = readPair(pairIO(PUBLISHER_PATHS), STORE_PUBLISHERS, pair,
-                               scratch, STORE_MAX, hash, publishersValid, nullptr);
+  PairResult result = loadPair(PUBLISHER_PATHS, STORE_PUBLISHERS, pair, scratch, publishersValid);
   if (result == PAIR_ABSENT) {
     defaultPublishers(publishers);
     trust_degraded = false;
@@ -310,8 +327,7 @@ static bool loadPublishers(uint8_t* scratch) {
 static bool loadState(PairPaths& paths, uint8_t type, DatasetState& state,
                       uint8_t* scratch) {
   PairView pair;
-  PairResult result = readPair(pairIO(paths), type,
-                               pair, scratch, STORE_MAX, hash, stateValid, nullptr);
+  PairResult result = loadPair(paths, type, pair, scratch, stateValid);
   if (result == PAIR_ABSENT) {
     defaultState(state);
     if (type == STORE_REGION_STATE) region_state_degraded = false;
@@ -520,9 +536,8 @@ static bool txFinish(uint8_t dataset, TxEnd ending, uint8_t notices, void*) {
 #if SYNC_SETTINGS_WITH_POLICY
 static bool loadRecovery(uint8_t* scratch) {
   PairView pair;
-  PairResult result = readPair(pairIO(POLICY_RECOVERY_PATHS),
-                               STORE_POLICY_RECOVERY, pair, scratch,
-                               STORE_MAX, hash, recoveryValid, nullptr);
+  PairResult result = loadPair(POLICY_RECOVERY_PATHS, STORE_POLICY_RECOVERY,
+                               pair, scratch, recoveryValid);
   if (result == PAIR_ABSENT) {
     memset(&policy_recovery, 0, sizeof(policy_recovery));
     recovery_degraded = false;
@@ -755,13 +770,15 @@ static bool applyCampaign(uint8_t dataset, const Campaign& campaign,
   }
   region_record = record;
   region_record.regions = nullptr;
+  region_receive_ready = false;
+  if (!installRegions(campaign.data, campaign.data_len)) return false;
   next.settled_receipt = receipt;
   if (!saveState(REGION_STATE_PATHS, STORE_REGION_STATE, next, scratch)) {
-    region_receive_ready = false;
-    return false;
+    reportFor(dataset) = {campaign.generation, REPORT_SETTLEMENT};
+    next = region_state;
+    return true;
   }
-  if (!installRegions(campaign.data, campaign.data_len)) return false;
-  dirty = false;
+  region_receive_ready = true;
   return true;
 #else
   (void)dataset;
@@ -866,6 +883,10 @@ static bool settleRegionReceipt(uint8_t* scratch) {
   next.settled_receipt = region_record.receipt_id;
   if (!saveState(REGION_STATE_PATHS, STORE_REGION_STATE, next, scratch)) return false;
   region_state = next;
+  if (reportFor(REGION).reason == REPORT_SETTLEMENT &&
+      reportFor(REGION).generation == region_record.generation) {
+    reportFor(REGION).reason = REPORT_APPLIED;
+  }
   return true;
 }
 #endif
@@ -967,8 +988,8 @@ static const char* enableError(bool region, bool value) {
                               && policy_recovery_ready
 #endif
                               ;
-  if (!state_ready) return "Err - dataset storage";
   if (!value) return nullptr;
+  if (!state_ready) return "Err - dataset storage";
   if (!config_ready) return "Err - configuration storage";
   if (!trust_ready) return "Err - publisher storage";
   if (config.channel_len == 0) return "Err - channel not set";
@@ -984,8 +1005,22 @@ static const char* enableError(bool region, bool value) {
 
 static bool setEnabled(bool region, bool value, bool defer_off) {
   if (enableError(region, value) != nullptr) return false;
-  Temp scratch(STORE_MAX);
   uint8_t dataset = region ? REGION : POLICY;
+  if (!value) {
+    stateFor(dataset).enabled = false;
+#if SYNC_SETTINGS_WITH_REGION
+    if (region) {
+      if (defer_off) disable_pending = true;
+      else {
+        disable_pending = false;
+        enabled = false;
+      }
+    }
+#endif
+    receiver.cancel(dataset);
+    if (region ? !region_state_ready : !policy_state_ready) return false;
+  }
+  Temp scratch(STORE_MAX);
   DatasetState next = stateFor(dataset);
   next.enabled = value;
   PairPaths& paths = region ? REGION_STATE_PATHS : POLICY_STATE_PATHS;
@@ -995,7 +1030,10 @@ static bool setEnabled(bool region, bool value, bool defer_off) {
 #if SYNC_SETTINGS_WITH_REGION
     region_state = next;
     if (!value && defer_off) disable_pending = true;
-    else enabled = value;
+    else {
+      disable_pending = false;
+      enabled = value;
+    }
 #endif
   } else {
 #if SYNC_SETTINGS_WITH_POLICY
@@ -1059,6 +1097,17 @@ static bool publishRoute(const char* input, bool& scoped, uint8_t key[16]) {
   }
   if (base.state != MOD_REGION_ALLOW) return false;
   memcpy(key, base.key, 16);
+  return true;
+}
+
+static bool nextGeneration(const DatasetState& current, const uint8_t publisher[32],
+                            uint32_t now, bool reset, uint32_t& generation) {
+  generation = now;
+  if (reset || current.local_generation == 0 ||
+      memcmp(current.local_key, publisher, sizeof(current.local_key)) != 0) return true;
+  if (current.local_generation == 0xffffffffu) return false;
+  uint32_t next = current.local_generation + 1;
+  if (next > generation) generation = next;
   return true;
 }
 
@@ -1168,16 +1217,11 @@ static bool publish(uint8_t dataset, const char* route, const char* channel,
     strcpy(reply, "Err - identity");
     return true;
   }
-  uint32_t generation = now;
-  if (current.local_generation != 0 &&
-      memcmp(current.local_key, publisher, sizeof(publisher)) == 0) {
-    if (current.local_generation == 0xffffffffu) {
-      free(data);
-      strcpy(reply, "Err - generation exhausted");
-      return true;
-    }
-    uint32_t next = current.local_generation + 1;
-    if (next > generation) generation = next;
+  uint32_t generation;
+  if (!nextGeneration(current, publisher, now, reset, generation)) {
+    free(data);
+    strcpy(reply, "Err - generation exhausted");
+    return true;
   }
 
   Manifest manifest = {};
@@ -1324,6 +1368,9 @@ static bool publisherCommand(char* command, char* reply) {
     return true;
   }
   if (!trust_ready || publishers.pending_forget != 0 ||
+#if SYNC_SETTINGS_WITH_REGION
+      (action == PUBLISHER_FORGET && regionSettlementPending()) ||
+#endif
 #if SYNC_SETTINGS_WITH_POLICY
       (action == PUBLISHER_FORGET &&
        policy_recovery.phase != RECOVERY_IDLE)
@@ -1547,8 +1594,7 @@ static bool deferEdit(EditKind kind, const uint8_t* data, uint16_t len,
 
 static bool deferReload(uint8_t* scratch) {
   PairView pair;
-  PairResult result = readPair(pairIO(REGION_PATHS), STORE_REGIONS, pair, scratch,
-                               STORE_MAX, hash, regionsValid, nullptr);
+  PairResult result = loadPair(REGION_PATHS, STORE_REGIONS, pair, scratch, regionsValid);
   if (result == PAIR_ABSENT) {
     const uint8_t empty[] = {0};
     return deferEdit(EDIT_RELOAD, empty, sizeof(empty));
@@ -1728,28 +1774,31 @@ static bool expireRuntime(uint8_t dataset) {
 static void maintainState(uint8_t dataset, uint32_t now) {
   uint8_t slot = dataset == REGION ? 0 : SYNC_SETTINGS_WITH_REGION;
   if ((int32_t)(now - housekeeping_at[slot]) < 0) return;
-  housekeeping_at[slot] = now + TX_RETRY_MS;
+  bool ok = true;
 #if SYNC_SETTINGS_WITH_REGION
   if (dataset == REGION) {
     if (region_state_ready && trust_ready && replayKnown(region_state) &&
         (!overlay_ready || !region_receive_ready)) {
       Temp scratch(STORE_MAX);
-      overlay_ready = loadRegions(scratch);
+      if (!overlay_ready) overlay_ready = loadRegions(scratch);
       region_receive_ready = overlay_ready && settleRegionReceipt(scratch);
+      ok = region_receive_ready;
     }
-    if (region_state_ready) expireRuntime(dataset);
-    return;
+    if (region_state_ready) ok = expireRuntime(dataset) && ok;
   }
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
-  if (policy_state_ready && policy_recovery_ready) {
+  if (dataset == POLICY && policy_state_ready && policy_recovery_ready) {
     if (policy_recovery.phase != RECOVERY_IDLE) {
       Temp scratch(STORE_MAX);
-      recoverPolicy(scratch);
+      ok = recoverPolicy(scratch);
     }
-    expireRuntime(dataset);
+    ok = expireRuntime(dataset) && ok;
   }
 #endif
+  if (ok) housekeeping_failures[slot] = 0;
+  housekeeping_at[slot] = now + (ok ? TX_RETRY_MS :
+                                storageRetryDelay(housekeeping_failures[slot]));
 }
 
 static uint8_t bitCount(uint16_t value) {
@@ -1859,6 +1908,11 @@ static void status(uint8_t dataset, char* reply) {
   }
   if (has_route && !append(reply, at, " region %s", route)) goto overflow;
   if (!append(reply, at, " channel %s", channel)) goto overflow;
+  if ((housekeeping_failures[dataset == REGION ? 0 : SYNC_SETTINGS_WITH_REGION] != 0 ||
+       (outbound != nullptr && outbound->finish_failures != 0)) &&
+      !append(reply, at, clockSane(modClockGet()) ? " storage retry" : " clock unavailable")) {
+    goto overflow;
+  }
   if (state.enabled && (!config_ready || !trust_ready) &&
       !append(reply, at, " receive fault storage")) goto overflow;
 #if SYNC_SETTINGS_WITH_REGION
@@ -1928,6 +1982,8 @@ static bool reportCommand(uint8_t dataset, const char* page_text, char* reply) {
   else snprintf(reply, 160, "%u/%u gen %lu %s", page, count,
                 (unsigned long)notice.generation,
                 notice.reason == REPORT_SIGN ? "publication signing failed" :
+                notice.reason == REPORT_SETTLEMENT ? "applied; replay settlement pending" :
+                notice.reason == REPORT_APPLIED ? "applied; replay settled" :
                 notice.reason == REPORT_RESTORED ? "application failed; prior policy restored" :
                                                   "application failed; campaign released");
   return true;
@@ -1998,6 +2054,7 @@ static bool abortCommand(uint8_t dataset, char* reply) {
   return true;
 }
 
+
 static bool handleCli(const ModCliContext& context, char* command, char* reply) {
 #if !SYNC_SETTINGS_WITH_REGION
   (void)context;
@@ -2019,7 +2076,9 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
     bool on = command[12] == 'o' && command[13] == 'n';
     const char* error = enableError(true, on);
     if (error != nullptr) strcpy(reply, error);
-    else if (!setEnabled(true, on, !on)) strcpy(reply, "Err - storage");
+    else if (!setEnabled(true, on, !on)) {
+      strcpy(reply, on ? "Err - storage" : "OK - off until reboot; storage failed");
+    }
     else strcpy(reply, "OK");
     return true;
   }
@@ -2030,7 +2089,9 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
     bool on = command[12] == 'o' && command[13] == 'n';
     const char* error = enableError(false, on);
     if (error != nullptr) strcpy(reply, error);
-    else if (!setEnabled(false, on, false)) strcpy(reply, "Err - storage");
+    else if (!setEnabled(false, on, false)) {
+      strcpy(reply, on ? "Err - storage" : "OK - off until reboot; storage failed");
+    }
     else strcpy(reply, "OK");
     return true;
   }
@@ -2095,6 +2156,7 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   if (strcmp(command, "sync.region save") == 0) {
     Temp scratch(STORE_MAX);
     if (pending_edit.kind != EDIT_NONE) strcpy(reply, "Err - busy");
+    else if (regionSettlementPending()) strcpy(reply, "Err - receipt settlement pending");
     else if (!overlay_ready || !saveRegions(scratch)) strcpy(reply, "Err - storage");
     else {
       memset(&region_record, 0, sizeof(region_record));
@@ -2106,6 +2168,7 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   if (strcmp(command, "sync.region reload") == 0) {
     Temp scratch(STORE_MAX);
     if (pending_edit.kind != EDIT_NONE) strcpy(reply, "Err - busy");
+    else if (regionSettlementPending()) strcpy(reply, "Err - receipt settlement pending");
     else if (!overlay_ready) {
       strcpy(reply, "Err - storage");
     }
