@@ -90,12 +90,13 @@ static bool txSign(const uint8_t* data, size_t len, uint8_t signature[64], void*
 }
 
 static bool txSend(const uint8_t* frame, size_t len, bool scoped,
-                   const uint8_t key[16], uint32_t& id, void*) {
+                   const uint8_t key[16], uint32_t& id,
+                   uint32_t& airtime_ms, void*) {
   uint8_t payload[3 + FRAME_MAX];
   size_t payload_len = writeCarrier(frame, len, payload, sizeof(payload));
   return payload_len != 0 &&
          modSendGroup(CARRIER_KEY, CARRIER_HASH, payload, payload_len,
-                      scoped, key, &id);
+                      scoped, key, &id, &airtime_ms);
 }
 
 static void txFree(uint8_t* data, void*) { free(data); }

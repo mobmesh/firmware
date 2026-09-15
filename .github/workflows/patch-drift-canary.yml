@@ -17,6 +17,7 @@ permissions:
 env:
   UPSTREAM_REPO: meshcore-dev/MeshCore
   ISSUE_TITLE: "Patch drift against upstream branches"
+  CANARY_EXTRA_MODS: sync-settings
 
 jobs:
   canary:
@@ -40,7 +41,9 @@ jobs:
           # --- 1. do the patches still apply? -------------------------------------
           # Probe the ordered union so target-specific mods are included without
           # applying any patch more than once.
-          MODS=$(python3 scripts/generate-board-config.py project-info --field ordered-mods)
+          MODS=$(printf '%s\n' \
+            "$(python3 scripts/generate-board-config.py project-info --field ordered-mods)" \
+            "$CANARY_EXTRA_MODS" | tr ' ' '\n' | awk 'NF && !seen[$0]++' | xargs)
           echo "mods: $MODS"
 
           # Three-way on failure keeps the tree realistic, so one broken patch does not
@@ -173,8 +176,9 @@ jobs:
 
       # Applying and compiling are different questions. On 2026-08-27 power-guard applied
       # cleanly against dev and would not have built: upstream had deleted the FEM virtual
-      # it called. A failure counts as drift only if the same ref builds vanilla, so that
-      # runs as a control rather than reporting upstream's own broken days as drift.
+      # it called. Build the widest composition for each upstream role because shim bridges
+      # are implemented separately in both. A failure counts as drift only if that same role
+      # builds vanilla, so upstream's own broken days are not reported as patch drift.
       - id: buildcheck
         name: Build the patched tree against dev
         if: steps.probe.outputs.dev_buildable == 'true'
@@ -184,28 +188,42 @@ jobs:
           # FEM bypass on: it is off in every shipped build, so a default build would
           # preprocess away the code that broke.
           FLAGS="-D 'OTA_MOD_BUILD_DATE=\"canary\"' -D 'OTA_MOD_SHORT_SHA=\"canary\"' -D POWER_GUARD_AUTO_DROP_FEM_LNA=1"
-          # The target carrying the most mods, so one build covers the widest surface.
-          SPEC=$(python3 scripts/generate-board-config.py resolve-targets | python3 -c "
-          import json, sys
-          t = max(json.load(sys.stdin)['include'], key=lambda x: len(x['mods']))
-          print('|'.join([','.join(t['mods']), t['board_id'], t['build_env']]))
+          SPECS=$(python3 scripts/generate-board-config.py resolve-targets | python3 -c "
+          import json, os, sys
+          targets = json.load(sys.stdin)['include']
+          extras = os.environ.get('CANARY_EXTRA_MODS', '').split()
+          for role in sorted({t['role'] for t in targets}):
+              t = max((x for x in targets if x['role'] == role), key=lambda x: len(x['mods']))
+              mods = list(dict.fromkeys(t['mods'] + extras))
+              print('|'.join([','.join(mods), t['board_id'], t['build_env']]))
           ")
-          mods=${SPEC%%|*}; rest=${SPEC#*|}; board=${rest%%|*}; env=${rest##*|}
-          python3 scripts/generate-board-config.py inject-env \
-            --board "$board" --env "$env" \
-            --platformio-ini "dev-src/variants/$board/platformio.ini" --mods "$mods"
-          if (cd dev-src && PLATFORMIO_BUILD_FLAGS="$FLAGS" pio run -e "$env" > ../patched.log 2>&1); then
+          FAILED=""
+          for SPEC in $SPECS; do
+            mods=${SPEC%%|*}; rest=${SPEC#*|}; board=${rest%%|*}; env=${rest##*|}
+            python3 scripts/generate-board-config.py inject-env \
+              --board "$board" --env "$env" \
+              --platformio-ini "dev-src/variants/$board/platformio.ini" --mods "$mods"
+            if ! (cd dev-src && PLATFORMIO_BUILD_FLAGS="$FLAGS" pio run -e "$env" > "../patched-$env.log" 2>&1); then
+              tail -30 "patched-$env.log"
+              FAILED="$FAILED $SPEC"
+            fi
+          done
+          if [ -z "$FAILED" ]; then
             echo "verdict=ok" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          tail -30 ../patched.log 2>/dev/null || tail -30 patched.log
           rm -rf vanilla-src
           git clone --quiet --branch dev "https://github.com/${UPSTREAM_REPO}.git" vanilla-src
-          if (cd vanilla-src && pio run -e "$env" > ../vanilla.log 2>&1); then
-            echo "verdict=patches" >> "$GITHUB_OUTPUT"
-          else
-            echo "verdict=upstream" >> "$GITHUB_OUTPUT"
-          fi
+          VERDICT=upstream
+          for SPEC in $FAILED; do
+            rest=${SPEC#*|}; env=${rest##*|}
+            if (cd vanilla-src && pio run -e "$env" > "../vanilla-$env.log" 2>&1); then
+              VERDICT=patches
+            else
+              tail -30 "vanilla-$env.log"
+            fi
+          done
+          echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
 
       # One long-lived tracking issue rather than a new one per day.
       - name: Open, update, or close the tracking issue

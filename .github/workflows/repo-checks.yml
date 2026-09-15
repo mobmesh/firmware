@@ -15,6 +15,7 @@ on:
       - 'mods/**/mod.yaml'
       - 'build-targets.yaml'
       - 'variants/**/overrides.yaml'
+      - '.github/workflows/patch-drift-canary.yml'
       - '.github/workflows/repo-checks.yml'
   workflow_dispatch:
 

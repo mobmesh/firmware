@@ -92,6 +92,18 @@ def reaches(patch_path):
     return out
 
 
+def added_source(patch_path):
+    """Added source lines grouped by their upstream target."""
+    out, target = {}, None
+    with open(patch_path, encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith("+++ b/"):
+                target = line[6:].strip()
+            elif line.startswith("+") and not line.startswith("+++") and target:
+                out.setdefault(target, []).append(line[1:])
+    return {target: "".join(lines) for target, lines in out.items()}
+
+
 def survey():
     """Every non-adapter reach a mod makes, from its patches and from its own source.
 
@@ -141,6 +153,36 @@ class UpstreamCouplingTestCase(unittest.TestCase):
             adapter = os.path.join(temp, "src", "helpers", "ModHooks.cpp")
             hits = reaches_in_source(adapter, "src/helpers/ModHooks.cpp")
         self.assertTrue(hits, "regex matches nothing even in ModHooks.cpp")
+
+    def test_group_send_reports_upstream_airtime_in_both_roles(self):
+        header = Path(REPO_ROOT, "mods/shim/files/src/helpers/ModHooks.h").read_text()
+        self.assertRegex(
+            header,
+            r"modSendGroup\([^;]+uint32_t\* packet_id, uint32_t\* airtime_ms\);",
+        )
+
+        patch = Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
+        source = added_source(patch)
+        for role in ("simple_repeater", "simple_room_server"):
+            target = f"examples/{role}/MyMesh.cpp"
+            self.assertIn(target, source)
+            self.assertRegex(
+                source[target],
+                re.compile(
+                    r"bool modSendGroup\(.*?uint32_t\* packet_id, uint32_t\* airtime_ms\)"
+                    r".*?sendFlood(?:Scoped)?\([^;]+;.*?"
+                    r"\*airtime_ms = radio_driver\.getEstAirtimeFor"
+                    r"\(packet->getRawLength\(\)\);",
+                    re.DOTALL,
+                ),
+                f"{target} no longer returns the configured packet's upstream airtime",
+            )
+
+    def test_drift_canary_builds_sync_settings_for_both_roles(self):
+        workflow = Path(REPO_ROOT, ".github/workflows/patch-drift-canary.yml").read_text()
+        self.assertIn("CANARY_EXTRA_MODS: sync-settings", workflow)
+        self.assertIn("for role in sorted({t['role'] for t in targets})", workflow)
+        self.assertIn("t['mods'] + extras", workflow)
 
 
 if __name__ == "__main__":

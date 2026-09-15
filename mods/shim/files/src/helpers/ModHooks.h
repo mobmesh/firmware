@@ -79,7 +79,7 @@ bool modPublisherKey(uint8_t out[32]);
 bool modSignDetached(const uint8_t* data, size_t len, uint8_t signature[64]);
 bool modSendGroup(const uint8_t* secret, uint8_t hash, const uint8_t* data,
                   size_t len, bool scoped, const uint8_t scope_key[16],
-                  uint32_t* packet_id);
+                  uint32_t* packet_id, uint32_t* airtime_ms);
 
 // The live tempradio trial, or false when none is running. Both of upstream's timers are
 // consulted: pending_* are untested before the 2s apply and stale after the revert, which

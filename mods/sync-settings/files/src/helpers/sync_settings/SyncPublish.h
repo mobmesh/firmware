@@ -9,6 +9,8 @@ namespace sync {
 static const uint32_t TX_WAIT_MS = 60000;
 static const uint32_t TX_RETRY_MS = 2000;
 static const uint8_t TX_ATTEMPTS = 3;
+static const uint32_t FLOOD_WAIT_BASE_MS = 500;
+static const uint8_t FLOOD_WAIT_FACTOR = 16;
 static const uint32_t ABORT_INTERVAL_MS = 30000;
 static const uint32_t ABORT_DEADLINE_MS = 300000;
 
@@ -21,7 +23,8 @@ enum TxEnd : uint8_t {
 typedef bool (*TxSignFn)(const uint8_t* data, size_t len,
                          uint8_t signature[SIGNATURE_LEN], void* context);
 typedef bool (*TxSendFn)(const uint8_t* frame, size_t len, bool scoped,
-                         const uint8_t key[16], uint32_t& id, void* context);
+                         const uint8_t key[16], uint32_t& id,
+                         uint32_t& airtime_ms, void* context);
 typedef void (*TxFreeFn)(uint8_t* data, void* context);
 typedef bool (*TxEndFn)(uint8_t dataset, TxEnd ending,
                         uint8_t notices, void* context);
@@ -70,6 +73,7 @@ struct TxState {
   bool abort_flight;
   uint32_t packet_id;
   uint32_t sent_at;
+  uint32_t flight_airtime;
   uint8_t abort_frame[ABORT_LEN];
   uint8_t abort_sent;
   uint32_t abort_next;

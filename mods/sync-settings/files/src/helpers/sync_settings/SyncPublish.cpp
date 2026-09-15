@@ -110,7 +110,8 @@ TxState* Transmitter::choose(uint32_t now) {
   uint32_t due = 0;
   for (uint8_t i = 0; i < SYNC_SETTINGS_DATASET_COUNT; ++i) {
     TxState& state = slot_[i];
-    if (!state.active || state.rounds_done >= state.rounds) continue;
+    if (!state.active || state.rounds_done >= state.rounds ||
+        !reached(now, state.retry_at)) continue;
     uint32_t nominal = state.started + (uint32_t)state.rounds_done *
                        state.interval_hours * 3600000u;
     if (!reached(now, nominal)) continue;
@@ -147,12 +148,15 @@ void Transmitter::send(TxState& state, uint32_t now) {
     len += SIGNATURE_LEN;
   }
   uint32_t id = 0;
+  uint32_t airtime = 0;
   if (ops_.send != nullptr &&
-      ops_.send(frame, len, state.scoped, state.key, id, ops_.context)) {
+      ops_.send(frame, len, state.scoped, state.key, id, airtime,
+                ops_.context)) {
     state.in_flight = true;
     state.abort_flight = false;
     state.packet_id = id;
     state.sent_at = now;
+    state.flight_airtime = airtime;
   } else if (++state.attempts >= TX_ATTEMPTS) {
     advance(state);
   } else {
@@ -171,13 +175,15 @@ void Transmitter::sendAbort(TxState& state, uint32_t now) {
   }
   if (!reached(now, state.abort_next)) return;
   uint32_t id = 0;
+  uint32_t airtime = 0;
   if (ops_.send != nullptr &&
       ops_.send(state.abort_frame, sizeof(state.abort_frame), state.scoped,
-                state.key, id, ops_.context)) {
+                state.key, id, airtime, ops_.context)) {
     state.in_flight = true;
     state.abort_flight = true;
     state.packet_id = id;
     state.sent_at = now;
+    state.flight_airtime = airtime;
   } else {
     state.abort_next = now + TX_RETRY_MS;
   }
@@ -225,6 +231,10 @@ void Transmitter::complete(uint32_t id, bool success, uint32_t now) {
       state.abort_next = success ? now + ABORT_INTERVAL_MS : now;
     } else {
       advance(state);
+      if (success) {
+        state.retry_at = now + FLOOD_WAIT_BASE_MS +
+                         (uint32_t)FLOOD_WAIT_FACTOR * state.flight_airtime;
+      }
     }
     return;
   }
