@@ -116,6 +116,7 @@ WireResult match(const ChunkView& chunk, const Manifest& manifest, uint16_t& off
 uint8_t chunkCount(uint16_t data_len);
 uint8_t chunkLength(uint8_t index, uint16_t data_len, uint8_t chunks);
 bool validChannel(const uint8_t* channel, uint8_t len);
+bool normalizeChannel(const char* value, char out[CHANNEL_MAX + 1]);
 bool validPolicyPayload(const uint8_t* data, size_t len);
 bool readPolicyPayload(const uint8_t data[POLICY_DATA_LEN], PolicyProfile& out);
 bool writePolicyPayload(const PolicyProfile& profile,

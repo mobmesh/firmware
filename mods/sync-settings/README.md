@@ -137,7 +137,7 @@ Available through serial and authenticated remote admin CLI.
 | Command | Purpose |
 | --- | --- |
 | `get sync.channel` | Show receive channel. |
-| `set sync.channel <channel>` | Save channel. Both sync features must be off and inbound/recovery work idle. |
+| `set sync.channel <channel>` | Save channel: 1–16 letters, digits, `-` or `_`; uppercase becomes lowercase. Both sync features must be off and inbound/recovery work idle. |
 | `sync.publisher list [offset]` | List trusted keys; zero-based offset, up to two per reply. |
 | `sync.publisher add <full-public-key>` | Trust a publisher for regions and policy. |
 | `sync.publisher remove <full-public-key>` | Revoke trust and cancel its inbound work; keep replay history. |

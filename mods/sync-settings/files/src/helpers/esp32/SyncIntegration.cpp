@@ -1133,12 +1133,13 @@ static bool publish(uint8_t dataset, const char* route, const char* channel,
     strcpy(reply, "Err - busy");
     return true;
   }
-  size_t channel_len = channel == nullptr ? 0 : strlen(channel);
-  if (channel_len == 0 || channel_len > CHANNEL_MAX ||
-      !validChannel((const uint8_t*)channel, (uint8_t)channel_len)) {
-    strcpy(reply, "Err - invalid channel");
+  char normalized[CHANNEL_MAX + 1];
+  if (!normalizeChannel(channel, normalized)) {
+    strcpy(reply, "Err - channel: 1-16 letters, digits, - or _");
     return true;
   }
+  channel = normalized;
+  size_t channel_len = strlen(channel);
   bool scoped;
   uint8_t route_key[16];
   if (!publishRoute(route, scoped, route_key)) {
@@ -1453,12 +1454,13 @@ static void listRegions(const char* arg, char* reply) {
 #endif
 
 static bool setChannel(const char* value, char* reply) {
-  size_t len = value == nullptr ? 0 : strlen(value);
-  if (len == 0 || len > CHANNEL_MAX || strchr(value, ' ') != nullptr ||
-      !validChannel((const uint8_t*)value, (uint8_t)len)) {
-    strcpy(reply, "Err - syntax: set sync.channel <channel>");
+  char normalized[CHANNEL_MAX + 1];
+  if (!normalizeChannel(value, normalized)) {
+    strcpy(reply, "Err - syntax: set sync.channel <channel>; 1-16 letters, digits, - or _");
     return true;
   }
+  value = normalized;
+  size_t len = strlen(value);
   if (!config_ready || !trust_ready ||
 #if SYNC_SETTINGS_WITH_REGION
       !region_state_ready ||

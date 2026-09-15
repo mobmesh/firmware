@@ -38,22 +38,29 @@ static bool knownDataset(uint8_t dataset) {
 }
 
 static bool channelChar(char c) {
-  return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
-}
-
-static bool channelEdge(char c) {
-  return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+  return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
 }
 
 bool validChannel(const uint8_t* channel, uint8_t len) {
-  if (channel == nullptr || len == 0 || len > CHANNEL_MAX ||
-      !channelEdge((char)channel[0]) || !channelEdge((char)channel[len - 1])) {
+  if (channel == nullptr || len == 0 || len > CHANNEL_MAX) {
     return false;
   }
   for (uint8_t i = 0; i < len; ++i) {
     if (!channelChar((char)channel[i])) return false;
   }
   return true;
+}
+
+bool normalizeChannel(const char* value, char out[CHANNEL_MAX + 1]) {
+  if (value == nullptr || out == nullptr) return false;
+  size_t len = 0;
+  while (len < CHANNEL_MAX && value[len] != 0) {
+    char c = value[len];
+    out[len++] = c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c;
+  }
+  bool fits = value[len] == 0;
+  out[len] = 0;
+  return fits && validChannel((const uint8_t*)out, (uint8_t)len);
 }
 
 static float policyFloat(const uint8_t* data) {
@@ -172,12 +179,8 @@ WireResult readManifest(const uint8_t* frame, size_t len, Manifest& out) {
 
   size_t channel_len = 0;
   while (channel_len < CHANNEL_MAX && frame[11 + channel_len] != 0) ++channel_len;
-  if (channel_len == 0 || !channelEdge((char)frame[11]) ||
-      !channelEdge((char)frame[10 + channel_len])) {
+  if (!validChannel(frame + 11, (uint8_t)channel_len)) {
     return WIRE_MALFORMED;
-  }
-  for (size_t i = 0; i < channel_len; ++i) {
-    if (!channelChar((char)frame[11 + i])) return WIRE_MALFORMED;
   }
   for (size_t i = channel_len; i < CHANNEL_MAX; ++i) {
     if (frame[11 + i] != 0) return WIRE_MALFORMED;

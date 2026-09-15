@@ -29,7 +29,7 @@ targets:
     build_env: heltec_v4_repeater
     vendor_flasher_assets: true
     # heltec_v4 only: its battery divider is the one that has been bench-measured.
-    mods: [power-guard]
+    mods: [power-guard, sync-settings]
     # Headless: drops the OLED and the button's long-press power-off.
     # Joined form -- PlatformIO splits "-U FOO" into a bare -U.
     build_flags_append: ["-UDISPLAY_CLASS"]
@@ -45,7 +45,7 @@ targets:
     role: repeater
     build_env: Xiao_C3_repeater
     vendor_flasher_assets: true
-    mods: []      # extras beyond core_mods
+    mods: [sync-settings]
 
   - board: xiao_c3
     role: room_server
