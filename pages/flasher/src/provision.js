@@ -11,6 +11,7 @@ import {
 } from './constants.js';
 import { parseRadio, startCliSession } from './cli-session.js';
 import { acquireUsableSerialPort, closeSerialPortQuietly } from './serial-port.js';
+import { resolveSettings } from './settings.js';
 
 // The firmware answers a failed command in prose. There is no status code, so this is the
 // only signal available; a false negative shows a warning, it never fails the flash.
@@ -158,11 +159,11 @@ export function buildProvisionCommands(state) {
   // here collides with name or position. Re-asserted on every path so a drifted node is
   // corrected — except `set radio`, which is dropped when the device already reports
   // those exact parameters, because sending it is what forces the reboot below.
-  for (const command of state.zoneCommands ?? []) {
+  for (const command of resolveSettings(state.zoneCommands ?? [], state.flashedMods ?? 0)) {
     if (command.startsWith('set radio ') && radioCommandMatches(command, existing?.radio)) {
       continue;
     }
-    steps.push({ command, label: 'Applying regional settings' });
+    steps.push({ command, label: 'Applying regional settings', stopOnFailure: state.flashedMods != null });
   }
 
   const name = trimmed(state.nodeName);
@@ -246,6 +247,10 @@ export async function sendProvisionCommands(port, commands, { onStatus, onProgre
       if (!ok) onStatus?.(`${step.command} → ${answer}`);
       results.push({ command: step.command, answer, ok });
       onProgress?.((index + 1) / commands.length);
+      if (!ok && step.stopOnFailure) {
+        onStatus?.('Regional setup stopped after a rejected command.');
+        break;
+      }
     }
   } finally {
     await session.close();

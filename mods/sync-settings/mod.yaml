@@ -1,4 +1,6 @@
 name: sync-settings
+bit: 2
+image_marker: "set sync.channel"
 
 env_flags: [WITH_SYNC_SETTINGS]
 

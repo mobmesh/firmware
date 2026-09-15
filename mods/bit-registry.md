@@ -10,7 +10,8 @@ that script's module docstring describes the block it sits in.
 | --- | --- | --- | --- | --- |
 | 0 | `0x00000001` | *unassigned* | | |
 | 1 | `0x00000002` | `hotspot-ota` | `H0TSP0T` | the OTA download, to refuse an image that could not itself be updated |
-| 2–31 | | *unassigned* | | |
+| 2 | `0x00000004` | `sync-settings` | `set sync.channel` | the flasher's regional command selection |
+| 3–31 | | *unassigned* | | |
 
 ## Rules
 

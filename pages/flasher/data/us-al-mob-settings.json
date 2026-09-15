@@ -7,8 +7,9 @@
   "_units": "advert.interval: minutes (60-240). flood.advert.interval: hours (3-168). agc.reset.interval: seconds, rounded down to a multiple of 4. Both intervals take 0 to disable.",
   "_radio": "Sets freq/bw/sf/cr together, COMMA-separated -- spaces parse as one field and the command is rejected. Out-of-range is rejected, not clamped. Needs a reboot, which the flasher sends itself after the list.",
   "_regions": "def walks a cursor from the wildcard *: a bare token creates a child and moves onto it, 'name|jump' creates a child then jumps elsewhere. Cursor resets to * per command. 160 chars max per line.",
-  "_regions_tree": "The def line above builds: us > (us-gc, us-southeast, us-south, us-east, us-al, us-ms, us-fl); us-al > (us-al-mob, us-al-fhp, us-al-guf); us-fl > us-fl-pns. 139 chars of the 160 limit. Provisional -- the naming convention is not settled.",
-  "_regions_notes": "def merges into the existing tree rather than replacing it; 'region remove' first for a clean slate. 'region save' persists it. 'region allowf *' is what carries unscoped floods -- they match no named region, so the wildcard's flag decides, and a preserved region file could have it denied.",
+  "_firmware_commands": "if_mod selects then/else commands using metadata captured from the Enhanced MeshCore+ application at flash time. Stock firmware uses else. Sync builds seed and save the overlay without enabling reception; native region def * does not erase preserved named entries.",
+  "_regions_tree": "Either def branch builds: us > (us-gc, us-southeast, us-south, us-east, us-al, us-ms, us-fl); us-al > (us-al-mob, us-al-fhp, us-al-guf); us-fl > us-fl-pns. Both command variants fit the 160-byte CLI buffer. Provisional -- the naming convention is not settled.",
+  "_regions_notes": "Sync firmware saves the independent overlay; other firmware seeds native regions. Native def merges rather than replacing existing entries, and def * alone does not clear them. Both branches preserve local entries on upgrades. region allowf * enables unscoped flooding; region save persists native state.",
 
   "commands": [
     "set radio 910.525,62.5,7,6",
@@ -19,7 +20,16 @@
     "set agc.reset.interval 4",
     "set multi.acks 1",
 
-    "region def us us-gc|us us-southeast|us us-south|us us-east|us us-al us-al-mob|us-al us-al-fhp|us-al us-al-guf|us us-ms|us us-fl us-fl-pns|*",
+    {
+      "if_mod": "sync-settings",
+      "then": [
+        "sync.region def us us-gc|us us-southeast|us us-south|us us-east|us us-al us-al-mob|us-al us-al-fhp|us-al us-al-guf|us us-ms|us us-fl us-fl-pns",
+        "sync.region save"
+      ],
+      "else": [
+        "region def us us-gc|us us-southeast|us us-south|us us-east|us us-al us-al-mob|us-al us-al-fhp|us-al us-al-guf|us us-ms|us us-fl us-fl-pns"
+      ]
+    },
     "region allowf *",
     "region save"
   ]

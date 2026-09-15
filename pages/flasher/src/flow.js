@@ -10,6 +10,7 @@ import * as plans from './flash-plan.js';
 import { partitionTablesMatch } from './partitions.js';
 import { buildProvisionCommands, provisionDevice } from './provision.js';
 import { STOCK_RELAY_BASE } from './constants.js';
+import { flashedModBits, resolveSettings } from './settings.js';
 
 /** Which half of the mesh a node is for. Chosen early so the role list stays short. */
 export const USAGE = { INFRASTRUCTURE: 'infrastructure', CLIENT: 'client' };
@@ -725,16 +726,23 @@ export const STEPS = [
     applies: () => true,
     async run(flow, { onStatus, onProgress }) {
       const s = flow.state;
+      s.flashedMods = null;
       await buildPlan(flow, onStatus);
+      const enhanced = s.source === SOURCE.ENHANCED;
+      const plan = s.plan;
+      const modBits = enhanced ? flashedModBits(plan) : 0;
+      resolveSettings(s.zoneCommands ?? [], modBits);
+      if (enhanced) onStatus(`firmware mods: 0x${modBits.toString(16).padStart(8, '0')}`);
       if (flow.dryRun) {
         onStatus(`dry run — would write a ${s.plan.engine} plan, eraseAll=${s.plan.eraseAll}`);
         s.result = { dryRun: true };
+        s.flashedMods = enhanced ? modBits : null;
         return;
       }
 
       if (s.plan.engine === 'esptool') {
         const startedAt = performance.now();
-        const written = await esp32.executeFlashPlan(s.session, s.plan, { onProgress, onStatus });
+        const written = await esp32.executeFlashPlan(s.session, plan, { onProgress, onStatus });
         onStatus(`write took ${((performance.now() - startedAt) / 1000).toFixed(1)}s`);
         if (s.plan.preserveFs && s.evidence) {
           const restored = await esp32.restoreFilesystem(
@@ -746,6 +754,7 @@ export const STEPS = [
         }
         await esp32.returnToApplication(s.session, { onStatus });
         s.result = written;
+        s.flashedMods = enhanced ? modBits : null;
         return;
       }
 
@@ -908,9 +917,7 @@ async function loadZoneCommands(file) {
     const res = await fetch(new URL(`../data/${file}`, import.meta.url), { cache: 'no-store' });
     if (!res.ok) return [];
     const doc = await res.json();
-    return (doc.commands ?? []).filter(
-      (command) => typeof command === 'string' && !command.startsWith('_')
-    );
+    return doc.commands ?? [];
   } catch (error) {
     console.warn(`[flow] No regional settings in ${file}:`, error);
     return [];
