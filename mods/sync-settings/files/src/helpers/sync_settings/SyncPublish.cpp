@@ -64,6 +64,7 @@ bool Transmitter::begin(const TxStart& start, uint32_t now) {
   state->rounds = (uint8_t)(((uint16_t)start.duration_days * 24u) /
                             start.interval_hours + 1u);
   state->started = now;
+  state->retry_at = now;
   return true;
 }
 
@@ -89,6 +90,7 @@ bool Transmitter::abort(uint8_t dataset,
   memcpy(state->abort_frame, notice, sizeof(notice));
   state->aborting = true;
   state->abort_next = now;
+  state->retry_at = now;
   state->abort_deadline = now + ABORT_DEADLINE_MS;
   return true;
 }
@@ -142,7 +144,12 @@ void Transmitter::send(TxState& state, uint32_t now) {
                            state.data + offset, bytes, frame, sizeof(frame));
     if (len == 0 || ops_.sign == nullptr ||
         !ops_.sign(frame, len, frame + len, ops_.context)) {
-      advance(state);
+      state.retry_at = now + TX_RETRY_MS;
+      if (++state.attempts >= TX_ATTEMPTS) {
+        state.sign_failed = true;
+        state.round_open = false;
+        state.rounds_done = state.rounds;
+      }
       return;
     }
     len += SIGNATURE_LEN;
@@ -166,10 +173,13 @@ void Transmitter::send(TxState& state, uint32_t now) {
 
 void Transmitter::sendAbort(TxState& state, uint32_t now) {
   if (state.abort_sent >= 2 || reached(now, state.abort_deadline)) {
+    if (!reached(now, state.retry_at)) return;
     TxEnd ending = state.abort_sent >= 2 ? TX_ABORTED : TX_ABORT_FAILED;
     if (ops_.finish != nullptr &&
         ops_.finish(state.dataset, ending, state.abort_sent, ops_.context)) {
       clear(state);
+    } else {
+      state.retry_at = now + TX_RETRY_MS;
     }
     return;
   }
@@ -198,17 +208,24 @@ void Transmitter::tick(uint32_t now) {
     else advance(state);
   }
   for (uint8_t i = 0; i < SYNC_SETTINGS_DATASET_COUNT; ++i) {
-    if (slot_[i].aborting) {
-      if (!slot_[i].in_flight) sendAbort(slot_[i], now);
-      return;
-    }
+    if (slot_[i].in_flight) return;
+  }
+  for (uint8_t i = 0; i < SYNC_SETTINGS_DATASET_COUNT; ++i) {
+    TxState& state = slot_[i];
+    if (!state.aborting) continue;
+    bool terminal = state.abort_sent >= 2 || reached(now, state.abort_deadline);
+    if (!reached(now, terminal ? state.retry_at : state.abort_next)) continue;
+    sendAbort(state, now);
+    if (state.in_flight) return;
   }
   for (uint8_t i = 0; i < SYNC_SETTINGS_DATASET_COUNT; ++i) {
     TxState& state = slot_[i];
     if (state.active && state.rounds_done >= state.rounds && !state.in_flight) {
+      if (!reached(now, state.retry_at)) continue;
       if (ops_.finish != nullptr &&
-          ops_.finish(state.dataset, TX_QUIET, 0, ops_.context)) clear(state);
-      return;
+          ops_.finish(state.dataset, state.sign_failed ? TX_SIGN_FAILED : TX_QUIET,
+                      0, ops_.context)) clear(state);
+      else state.retry_at = now + TX_RETRY_MS;
     }
   }
   TxState* state = choose(now);

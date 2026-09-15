@@ -18,6 +18,7 @@ enum TxEnd : uint8_t {
   TX_QUIET,
   TX_ABORTED,
   TX_ABORT_FAILED,
+  TX_SIGN_FAILED,
 };
 
 typedef bool (*TxSignFn)(const uint8_t* data, size_t len,
@@ -67,6 +68,7 @@ struct TxState {
   bool round_open;
   uint8_t frame;
   uint8_t attempts;
+  bool sign_failed;
   uint32_t started;
   uint32_t retry_at;
   bool in_flight;

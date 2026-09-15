@@ -19,6 +19,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef MOD_WITH_TX_HOOKS
+#error "sync-settings requires transmit completion hooks"
+#endif
+
 namespace mobmesh {
 namespace sync {
 
@@ -33,6 +37,7 @@ static bool policy_recovery_ready;
 static Regions regions;
 #endif
 static bool region_state_ready;
+static bool region_receive_ready;
 static bool policy_state_ready;
 static bool trust_ready;
 static bool config_degraded;
@@ -53,12 +58,24 @@ enum EditKind : uint8_t {
 };
 struct PendingEdit {
   EditKind kind;
-  char name[REGION_NAME_MAX + 1];
+  uint8_t* data;
+  uint16_t len;
+  bool degraded;
 };
 static PendingEdit pending_edit;
 #endif
 static Config config;
 static Publishers publishers;
+enum ReportReason : uint8_t { REPORT_NONE, REPORT_SIGN, REPORT_APPLY, REPORT_RESTORED };
+struct RuntimeReport {
+  uint32_t generation;
+  ReportReason reason;
+};
+static RuntimeReport runtime_report[SYNC_SETTINGS_DATASET_COUNT];
+static uint32_t housekeeping_at[SYNC_SETTINGS_DATASET_COUNT];
+static RuntimeReport& reportFor(uint8_t dataset) {
+  return runtime_report[dataset == REGION ? 0 : SYNC_SETTINGS_WITH_REGION];
+}
 #if SYNC_SETTINGS_WITH_REGION
 static DatasetState region_state;
 #endif
@@ -469,7 +486,8 @@ static bool guardExpired(const DatasetState& state, uint32_t now) {
 
 static bool txFinish(uint8_t dataset, TxEnd ending, uint8_t notices, void*) {
   DatasetState next = stateFor(dataset);
-  if (ending == TX_QUIET) {
+  if (ending == TX_QUIET || ending == TX_SIGN_FAILED) {
+    if (next.guard == GUARD_IDLE) return true;
     next.guard = GUARD_QUIET;
   } else {
     uint32_t generation = next.guard_generation;
@@ -495,6 +513,9 @@ static bool txFinish(uint8_t dataset, TxEnd ending, uint8_t notices, void*) {
   Temp scratch(STORE_MAX);
   if (!saveState(statePaths(dataset), stateType(dataset), next, scratch)) return false;
   stateFor(dataset) = next;
+  if (ending == TX_SIGN_FAILED) {
+    reportFor(dataset) = {next.guard_generation, REPORT_SIGN};
+  }
   return true;
 }
 
@@ -516,16 +537,23 @@ static bool loadRecovery(uint8_t* scratch) {
 }
 #endif
 
+#if SYNC_SETTINGS_WITH_POLICY
+static bool readNativePolicy(uint8_t out[POLICY_DATA_LEN]);
+#endif
+
 static bool acceptsCampaign(uint8_t dataset, const char* channel, void*) {
   if (!config_ready || !trust_ready || config.channel_len == 0) return false;
   if (channel != nullptr && strcmp(channel, config.channel) != 0) return false;
   if (transmitter().active(dataset) || transmitter().aborting(dataset)) return false;
 #if SYNC_SETTINGS_WITH_REGION
-  if (dataset == REGION) return region_state_ready && region_state.enabled;
+  if (dataset == REGION) return overlay_ready && region_state_ready &&
+                                region_receive_ready && region_state.enabled;
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
+  uint8_t current[POLICY_DATA_LEN];
   return dataset == POLICY && policy_state_ready && policy_recovery_ready &&
-         policy_state.enabled;
+         policy_recovery.phase == RECOVERY_IDLE && policy_state.enabled &&
+         readNativePolicy(current);
 #else
   return false;
 #endif
@@ -657,7 +685,7 @@ static bool restorePolicy(uint8_t* scratch) {
 static bool recoverPolicy(uint8_t* scratch) {
   if (policy_recovery.phase == RECOVERY_IDLE) return true;
   uint8_t current[POLICY_DATA_LEN];
-  if (!readNativePolicy(current)) return false;
+  if (!readNativePolicy(current)) return restorePolicy(scratch);
   bool target = memcmp(current, policy_recovery.target, sizeof(current)) == 0;
   bool prior = memcmp(current, policy_recovery.prior, sizeof(current)) == 0;
 
@@ -699,6 +727,11 @@ static bool applyCampaign(uint8_t dataset, const Campaign& campaign,
     memcpy(recovery.prior, prior, sizeof(recovery.prior));
     memcpy(recovery.target, campaign.data, sizeof(recovery.target));
     if (!saveRecovery(recovery, scratch) || !recoverPolicy(scratch)) return false;
+    uint8_t actual[POLICY_DATA_LEN];
+    if (!readNativePolicy(actual) ||
+        memcmp(actual, campaign.data, sizeof(actual)) != 0) {
+      reportFor(dataset) = {campaign.generation, REPORT_RESTORED};
+    }
     next = policy_state;
     return true;
   }
@@ -718,12 +751,18 @@ static bool applyCampaign(uint8_t dataset, const Campaign& campaign,
   record.regions_len = campaign.data_len;
 
   Temp scratch(STORE_MAX);
-  if (!saveRegionRecord(record, scratch)) return false;
-  next.settled_receipt = receipt;
-  if (!saveState(REGION_STATE_PATHS, STORE_REGION_STATE, next, scratch)) return false;
-  if (!installRegions(campaign.data, campaign.data_len)) return false;
+  if (!saveRegionRecord(record, scratch)) {
+    overlay_ready = false;
+    return false;
+  }
   region_record = record;
   region_record.regions = nullptr;
+  next.settled_receipt = receipt;
+  if (!saveState(REGION_STATE_PATHS, STORE_REGION_STATE, next, scratch)) {
+    region_receive_ready = false;
+    return false;
+  }
+  if (!installRegions(campaign.data, campaign.data_len)) return false;
   dirty = false;
   return true;
 #else
@@ -807,6 +846,13 @@ static bool publisherKnown(uint16_t id) {
   return false;
 }
 
+static bool replayKnown(const DatasetState& state) {
+  for (uint8_t i = 0; i < state.replay_count; ++i) {
+    if (!publisherKnown(state.replay[i].publisher_id)) return false;
+  }
+  return true;
+}
+
 #if SYNC_SETTINGS_WITH_REGION
 static bool settleRegionReceipt(uint8_t* scratch) {
   if (!region_record.receipt) return true;
@@ -870,6 +916,15 @@ static void boot() {
   policy_recovery_ready = loadRecovery(scratch);
 #endif
   trust_ready = loadPublishers(scratch);
+#if SYNC_SETTINGS_WITH_REGION
+  region_receive_ready = region_state_ready &&
+                         (!trust_ready || replayKnown(region_state));
+#endif
+#if SYNC_SETTINGS_WITH_POLICY
+  if (trust_ready && policy_state_ready && !replayKnown(policy_state)) {
+    policy_state_ready = false;
+  }
+#endif
 #if SYNC_SETTINGS_WITH_POLICY
   if (trust_ready && policy_recovery_ready &&
       publishers.pending_forget != 0 &&
@@ -879,8 +934,7 @@ static void boot() {
   } else if (trust_ready && publishers.pending_forget != 0) {
     trust_ready = finishForget(scratch);
   }
-  if (policy_state_ready && policy_recovery_ready &&
-      !recoverPolicy(scratch)) policy_recovery_ready = false;
+  if (policy_state_ready && policy_recovery_ready) recoverPolicy(scratch);
 #else
   if (trust_ready && publishers.pending_forget != 0) {
     trust_ready = finishForget(scratch);
@@ -888,10 +942,9 @@ static void boot() {
 #endif
 #if SYNC_SETTINGS_WITH_REGION
   if (overlay_ready && region_state_ready && !settleRegionReceipt(scratch)) {
-    overlay_ready = false;
-    region_state_ready = false;
+    region_receive_ready = false;
   }
-  if (region_state_ready && !settleGuard(REGION, scratch)) region_state_ready = false;
+  if (region_state_ready && !settleGuard(REGION, scratch)) region_receive_ready = false;
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
   if (policy_state_ready && !settleGuard(POLICY, scratch)) policy_state_ready = false;
@@ -908,6 +961,7 @@ static void boot() {
   enabled = overlay_ready && region_state_ready && region_state.enabled;
 #endif
   booted = true;
+  for (uint8_t i = 0; i < SYNC_SETTINGS_DATASET_COUNT; ++i) housekeeping_at[i] = millis();
 }
 
 static bool setEnabled(bool region, bool value, bool defer_off) {
@@ -926,7 +980,7 @@ static bool setEnabled(bool region, bool value, bool defer_off) {
   if (!state_ready ||
       (value && (!config_ready || !trust_ready || config.channel_len == 0 ||
 #if SYNC_SETTINGS_WITH_REGION
-                 (region && !overlay_ready) ||
+                 (region && (!overlay_ready || !region_receive_ready)) ||
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
                  (!region && policy_recovery.phase != RECOVERY_IDLE)))) {
@@ -1023,6 +1077,9 @@ static bool publish(uint8_t dataset, const char* route, const char* channel,
                                             policy_recovery.phase == RECOVERY_IDLE
 #endif
                                          ;
+#if SYNC_SETTINGS_WITH_REGION
+  if (dataset == REGION) state_ready = state_ready && overlay_ready && region_receive_ready;
+#endif
   if (!state_ready) {
     strcpy(reply, "Err - storage");
     return true;
@@ -1097,6 +1154,18 @@ static bool publish(uint8_t dataset, const char* route, const char* channel,
     strcpy(reply, "Err - invalid dataset");
     return true;
   }
+#if SYNC_SETTINGS_WITH_POLICY
+  if (dataset == POLICY) {
+    PolicyProfile decoded;
+    uint8_t fresh[POLICY_DATA_LEN];
+    if (!readPolicyPayload(data, decoded) || !readNativePolicy(fresh) ||
+        memcmp(data, fresh, sizeof(fresh)) != 0) {
+      free(data);
+      strcpy(reply, "Err - policy changed or invalid");
+      return true;
+    }
+  }
+#endif
 
   uint8_t publisher[32];
   if (!modPublisherKey(publisher)) {
@@ -1461,32 +1530,33 @@ static RegionResult buildEdit(EditKind kind, const char* name,
   return REGION_MALFORMED;
 }
 
-static bool applyEdit(EditKind kind, const char* name) {
-  if (kind == EDIT_RELOAD) {
-    Temp scratch(STORE_MAX);
-    if (!loadRegions(scratch)) return false;
-    dirty = false;
-    return true;
-  }
-  Temp candidate(REGION_DATA_MAX);
-  if (!candidate) return false;
-  uint16_t len;
-  if (buildEdit(kind, name, candidate, len) != REGION_OK ||
-      !installRegions(candidate, len)) return false;
-  dirty = true;
+static bool deferEdit(EditKind kind, const uint8_t* data, uint16_t len,
+                      bool degraded = false) {
+  if (pending_edit.kind != EDIT_NONE || data == nullptr || len == 0 ||
+      len > REGION_DATA_MAX) return false;
+  uint8_t* owned = static_cast<uint8_t*>(malloc(len));
+  if (owned == nullptr) return false;
+  memcpy(owned, data, len);
+  pending_edit.kind = kind;
+  pending_edit.data = owned;
+  pending_edit.len = len;
+  pending_edit.degraded = degraded;
   return true;
 }
 
-static bool deferEdit(EditKind kind, const char* name) {
-  if (pending_edit.kind != EDIT_NONE) return false;
-  pending_edit.kind = kind;
-  pending_edit.name[0] = 0;
-  if (name != nullptr) {
-    size_t len = strnlen(name, REGION_NAME_MAX + 1);
-    if (len > REGION_NAME_MAX) return false;
-    memcpy(pending_edit.name, name, len + 1);
+static bool deferReload(uint8_t* scratch) {
+  PairView pair;
+  PairResult result = readPair(pairIO(REGION_PATHS), STORE_REGIONS, pair, scratch,
+                               STORE_MAX, hash, regionsValid, nullptr);
+  if (result == PAIR_ABSENT) {
+    const uint8_t empty[] = {0};
+    return deferEdit(EDIT_RELOAD, empty, sizeof(empty));
   }
-  return true;
+  RegionRecord record;
+  return result == PAIR_OK &&
+         readRegionRecord(pair.record.payload, pair.record.payload_len, record,
+                           hash, nullptr) == STORE_OK &&
+         deferEdit(EDIT_RELOAD, record.regions, record.regions_len, pair.degraded);
 }
 
 static void editError(RegionResult result, const char* syntax, char* reply) {
@@ -1569,8 +1639,8 @@ static bool regionEditCommand(const ModCliContext& context, char* command,
 
   bool remote_destructive = context.sender_timestamp != 0 && kind != EDIT_NONE;
   if (remote_destructive) {
-    if (!deferEdit(kind, part[0])) strcpy(reply, "Err - busy");
-    else strcpy(reply, "OK");
+    if (!deferEdit(kind, candidate, len)) strcpy(reply, "Err - busy or memory");
+    else strcpy(reply, "OK - accepted; save required");
   } else if (!installRegions(candidate, len)) {
     strcpy(reply, "Err - invalid overlay");
   } else {
@@ -1633,6 +1703,7 @@ static bool append(char* reply, size_t& at, const char* format, ...) {
 }
 
 static bool expireRuntime(uint8_t dataset) {
+  if (transmitter().active(dataset) || transmitter().aborting(dataset)) return true;
   DatasetState next = stateFor(dataset);
   uint32_t now = modClockGet();
   bool changed = false;
@@ -1654,6 +1725,33 @@ static bool expireRuntime(uint8_t dataset) {
   if (!saveState(statePaths(dataset), stateType(dataset), next, scratch)) return false;
   stateFor(dataset) = next;
   return true;
+}
+
+static void maintainState(uint8_t dataset, uint32_t now) {
+  uint8_t slot = dataset == REGION ? 0 : SYNC_SETTINGS_WITH_REGION;
+  if ((int32_t)(now - housekeeping_at[slot]) < 0) return;
+  housekeeping_at[slot] = now + TX_RETRY_MS;
+#if SYNC_SETTINGS_WITH_REGION
+  if (dataset == REGION) {
+    if (region_state_ready && trust_ready && replayKnown(region_state) &&
+        (!overlay_ready || !region_receive_ready)) {
+      Temp scratch(STORE_MAX);
+      overlay_ready = loadRegions(scratch);
+      region_receive_ready = overlay_ready && settleRegionReceipt(scratch);
+    }
+    if (region_state_ready) expireRuntime(dataset);
+    return;
+  }
+#endif
+#if SYNC_SETTINGS_WITH_POLICY
+  if (policy_state_ready && policy_recovery_ready) {
+    if (policy_recovery.phase != RECOVERY_IDLE) {
+      Temp scratch(STORE_MAX);
+      recoverPolicy(scratch);
+    }
+    expireRuntime(dataset);
+  }
+#endif
 }
 
 static uint8_t bitCount(uint16_t value) {
@@ -1699,7 +1797,7 @@ static void status(uint8_t dataset, char* reply) {
                             || recovery_degraded
 #endif
                   );
-  if (!state_ready || !expireRuntime(dataset)) {
+  if (!state_ready) {
     strcpy(reply, "fault storage");
     return;
   }
@@ -1765,10 +1863,18 @@ static void status(uint8_t dataset, char* reply) {
   if (!append(reply, at, " channel %s", channel)) goto overflow;
   if (state.enabled && (!config_ready || !trust_ready) &&
       !append(reply, at, " receive fault storage")) goto overflow;
+#if SYNC_SETTINGS_WITH_REGION
+  if (region && state.enabled && !region_receive_ready &&
+      !append(reply, at, " receive fault state")) goto overflow;
+#endif
   if (state.enabled && config_ready && trust_ready && config.channel_len == 0 &&
       !append(reply, at, " receive unavailable")) goto overflow;
   if (degraded && !append(reply, at, " storage degraded")) goto overflow;
-  if (state.warning_reason != 0 && !append(reply, at, " reports:1")) goto overflow;
+  {
+    uint8_t count = (state.warning_reason != 0) +
+                    (reportFor(dataset).reason != REPORT_NONE);
+    if (count != 0 && !append(reply, at, " reports:%u", count)) goto overflow;
+  }
 
   if (!region && outbound == nullptr && inbound.state == RECEIVE_IDLE &&
 #if SYNC_SETTINGS_WITH_POLICY
@@ -1807,18 +1913,25 @@ static bool reportCommand(uint8_t dataset, const char* page_text, char* reply) {
                                          && policy_recovery_ready
 #endif
                                          ;
-  if (!state_ready || !expireRuntime(dataset)) {
+  if (!state_ready) {
     strcpy(reply, "Err - storage");
     return true;
   }
   const DatasetState& state = stateFor(dataset);
-  if (state.warning_reason == 0) strcpy(reply, "Err - no reports");
-  else if (page != 1) strcpy(reply, "Err - page range");
-  else snprintf(reply, 160,
+  const RuntimeReport& notice = reportFor(dataset);
+  uint8_t count = (state.warning_reason != 0) + (notice.reason != REPORT_NONE);
+  if (count == 0) strcpy(reply, "Err - no reports");
+  else if (page > count) strcpy(reply, "Err - page range");
+  else if (state.warning_reason != 0 && page == 1) snprintf(reply, 160,
                 "1/1 abort gen %lu notices %u reason deadline at %lu until %lu",
                 (unsigned long)state.warning_generation, state.abort_sent,
                 (unsigned long)state.warning_time,
                 (unsigned long)state.warning_expiry);
+  else snprintf(reply, 160, "%u/%u gen %lu %s", page, count,
+                (unsigned long)notice.generation,
+                notice.reason == REPORT_SIGN ? "publication signing failed" :
+                notice.reason == REPORT_RESTORED ? "application failed; prior policy restored" :
+                                                  "application failed; campaign released");
   return true;
 }
 
@@ -1866,8 +1979,14 @@ static bool abortCommand(uint8_t dataset, char* reply) {
     strcpy(reply, "Err - busy");
     return true;
   }
-  if (transmitter().active(dataset)) {
-    DatasetState& state = stateFor(dataset);
+  DatasetState& state = stateFor(dataset);
+  if (transmitter().active(dataset) || state.guard != GUARD_IDLE) {
+    uint8_t identity[32];
+    if (!modPublisherKey(identity) ||
+        memcmp(identity, state.local_key, sizeof(identity)) != 0) {
+      strcpy(reply, "Err - publisher identity changed");
+      return true;
+    }
     if (!transmitter().abort(dataset, state.manifest_hash,
                              state.route_kind != 0, state.route_key, millis())) {
       strcpy(reply, "Err - abort");
@@ -1876,20 +1995,8 @@ static bool abortCommand(uint8_t dataset, char* reply) {
     }
     return true;
   }
-  DatasetState& state = stateFor(dataset);
-  bool guarded = state.guard != GUARD_IDLE;
-  if (guarded) {
-    DatasetState next = state;
-    clearGuard(next);
-    Temp scratch(STORE_MAX);
-    if (!saveState(statePaths(dataset), stateType(dataset), next, scratch)) {
-      strcpy(reply, "Err - storage");
-      return true;
-    }
-    state = next;
-  }
   ReceiveResult result = receiver.cancel(dataset);
-  strcpy(reply, guarded || result == RECEIVE_OK ? "OK" : "Err - no campaign");
+  strcpy(reply, result == RECEIVE_OK ? "OK" : "Err - no campaign");
   return true;
 }
 
@@ -1977,8 +2084,8 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
     else if (pending_edit.kind != EDIT_NONE) strcpy(reply, "Err - busy");
     else if (result != REGION_OK) strcpy(reply, "Err - invalid overlay");
     else if (context.sender_timestamp != 0) {
-      if (!deferEdit(EDIT_CLEAR, nullptr)) strcpy(reply, "Err - busy");
-      else strcpy(reply, "OK - save required");
+      if (!deferEdit(EDIT_CLEAR, candidate, len)) strcpy(reply, "Err - busy or memory");
+      else strcpy(reply, "OK - accepted; save required");
     } else if (!installRegions(candidate, len)) strcpy(reply, "Err - invalid overlay");
     else {
       dirty = true;
@@ -1988,7 +2095,8 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   }
   if (strcmp(command, "sync.region save") == 0) {
     Temp scratch(STORE_MAX);
-    if (!overlay_ready || !saveRegions(scratch)) strcpy(reply, "Err - storage");
+    if (pending_edit.kind != EDIT_NONE) strcpy(reply, "Err - busy");
+    else if (!overlay_ready || !saveRegions(scratch)) strcpy(reply, "Err - storage");
     else {
       memset(&region_record, 0, sizeof(region_record));
       dirty = false;
@@ -1999,15 +2107,16 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   if (strcmp(command, "sync.region reload") == 0) {
     Temp scratch(STORE_MAX);
     bool degraded = false;
-    if (!overlay_ready || !storedRegionsValid(scratch, degraded)) {
+    if (pending_edit.kind != EDIT_NONE) strcpy(reply, "Err - busy");
+    else if (!overlay_ready || !storedRegionsValid(scratch, degraded)) {
       strcpy(reply, "Err - storage");
     }
     else if (receiver.campaign(REGION).state != RECEIVE_IDLE) {
       strcpy(reply, "Err - busy");
     }
     else if (context.sender_timestamp != 0) {
-      if (!deferEdit(EDIT_RELOAD, nullptr)) strcpy(reply, "Err - busy");
-      else strcpy(reply, degraded ? "OK - degraded storage" : "OK");
+      if (!deferReload(scratch)) strcpy(reply, "Err - storage or memory");
+      else strcpy(reply, degraded ? "OK - accepted; degraded storage" : "OK - accepted");
     }
     else if (!loadRegions(scratch)) strcpy(reply, "Err - storage");
     else {
@@ -2188,6 +2297,23 @@ void syncRecv(const mesh::Packet* packet, bool accepted,
 
 void syncLoop() {
   if (!mobmesh::sync::booted) mobmesh::sync::boot();
+#if SYNC_SETTINGS_WITH_REGION
+  if (mobmesh::sync::disable_pending) {
+    mobmesh::sync::enabled = false;
+    mobmesh::sync::disable_pending = false;
+  }
+  if (mobmesh::sync::pending_edit.kind != mobmesh::sync::EDIT_NONE) {
+    mobmesh::sync::PendingEdit& edit = mobmesh::sync::pending_edit;
+    if (mobmesh::sync::installRegions(edit.data, edit.len)) {
+      mobmesh::sync::dirty = edit.kind != mobmesh::sync::EDIT_RELOAD;
+      if (edit.kind == mobmesh::sync::EDIT_RELOAD) {
+        mobmesh::sync::overlay_degraded = edit.degraded;
+      }
+    }
+    free(edit.data);
+    edit = {};
+  }
+#endif
   const mobmesh::sync::InboxFrame* frame = mobmesh::sync::inbox.front();
   if (frame != nullptr) {
     mobmesh::sync::receiver.take(frame->data, frame->len, millis(), modClockGet(),
@@ -2196,7 +2322,10 @@ void syncLoop() {
       uint8_t dataset = frame->data[4];
       if (mobmesh::sync::receiver.campaign(dataset).state ==
           mobmesh::sync::RECEIVE_STAGED) {
-        mobmesh::sync::receiver.finish(dataset);
+        uint32_t generation = mobmesh::sync::receiver.campaign(dataset).generation;
+        if (mobmesh::sync::receiver.finish(dataset) != mobmesh::sync::RECEIVE_OK) {
+          mobmesh::sync::reportFor(dataset) = {generation, mobmesh::sync::REPORT_APPLY};
+        }
       }
     }
     mobmesh::sync::inbox.drop();
@@ -2204,15 +2333,10 @@ void syncLoop() {
   mobmesh::sync::receiver.tick(millis());
   mobmesh::sync::transmitter().tick(millis());
 #if SYNC_SETTINGS_WITH_REGION
-  if (mobmesh::sync::disable_pending) {
-    mobmesh::sync::enabled = false;
-    mobmesh::sync::disable_pending = false;
-  }
-  if (mobmesh::sync::pending_edit.kind != mobmesh::sync::EDIT_NONE) {
-    mobmesh::sync::EditKind kind = mobmesh::sync::pending_edit.kind;
-    mobmesh::sync::pending_edit.kind = mobmesh::sync::EDIT_NONE;
-    mobmesh::sync::applyEdit(kind, mobmesh::sync::pending_edit.name);
-  }
+  mobmesh::sync::maintainState(mobmesh::sync::REGION, millis());
+#endif
+#if SYNC_SETTINGS_WITH_POLICY
+  mobmesh::sync::maintainState(mobmesh::sync::POLICY, millis());
 #endif
 }
 

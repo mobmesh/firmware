@@ -199,7 +199,7 @@ PairResult buildPair(const PairIO& io, uint8_t type, PairView& out,
   uint32_t sequence = found == PAIR_OK ? nextSequence(current.record.sequence) : 1;
   uint8_t* payload = scratch + STORE_HEADER_LEN;
   size_t payload_len = build(payload, capacity - STORE_OVERHEAD, context);
-  if (payload_len > 0xffffu) return PAIR_FAULT;
+  if (payload_len == 0 || payload_len > 0xffffu) return PAIR_FAULT;
 
   uint8_t expected[STORE_DIGEST_LEN];
   hash(payload, payload_len, expected, context);

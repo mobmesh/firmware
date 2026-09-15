@@ -266,7 +266,7 @@ ReceiveResult Receiver::abort(const uint8_t* frame, size_t len) {
 void Receiver::tick(uint32_t now_ms) {
   for (uint8_t i = 0; i < SYNC_SETTINGS_DATASET_COUNT; ++i) {
     Campaign& active = campaign_[i];
-    if (active.state == RECEIVE_ACTIVE &&
+    if (active.state != RECEIVE_IDLE &&
         (int32_t)(now_ms - active.deadline) >= 0) clear(active);
   }
 }
@@ -297,9 +297,13 @@ ReceiveResult Receiver::finish(uint8_t dataset) {
   DatasetState next = *state_[slot];
   if (active.reset) {
     if (setPublisherReplay(next, active.publisher_id, active.generation,
-                           active.digest) != STORE_OK) return RECEIVE_STORAGE;
+                           active.digest) != STORE_OK) {
+      clear(active);
+      return RECEIVE_STORAGE;
+    }
   }
   if (ops_.apply == nullptr || !ops_.apply(dataset, active, next, ops_.context)) {
+    clear(active);
     return RECEIVE_STORAGE;
   }
   *state_[slot] = next;

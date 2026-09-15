@@ -97,7 +97,8 @@ bool readPolicyPayload(const uint8_t data[POLICY_DATA_LEN], PolicyProfile& out) 
 
 bool writePolicyPayload(const PolicyProfile& profile,
                         uint8_t out[POLICY_DATA_LEN]) {
-  if (out == nullptr || sizeof(float) != 4) return false;
+  if (out == nullptr || sizeof(float) != 4 || profile.path_mode > 2 ||
+      profile.loop_detect > 3) return false;
   memset(out, 0, POLICY_DATA_LEN);
   out[0] = profile.flood_max;
   out[1] = profile.flood_unscoped;

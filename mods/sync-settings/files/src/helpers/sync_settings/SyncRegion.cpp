@@ -241,6 +241,7 @@ static RegionResult loadNodes(const Regions& regions, EditNode nodes[REGION_MAX]
 static int8_t nodeByName(const EditNode nodes[REGION_MAX], uint8_t count,
                          const char* name) {
   if (name == nullptr) return -1;
+  if (*name == '#') ++name;
   size_t len = strnlen(name, REGION_NAME_MAX + 1);
   if (len == 0 || len > REGION_NAME_MAX) return -1;
   for (uint8_t i = 0; i < count; ++i) {
@@ -248,21 +249,6 @@ static int8_t nodeByName(const EditNode nodes[REGION_MAX], uint8_t count,
         memcmp(nodes[i].name, name, len) == 0) return (int8_t)i;
   }
   return -1;
-}
-
-static int8_t nodeByPrefix(const EditNode nodes[REGION_MAX], uint8_t count,
-                           const char* name) {
-  if (name == nullptr) return -1;
-  size_t len = strnlen(name, REGION_NAME_MAX + 1);
-  if (len == 0 || len > REGION_NAME_MAX) return -1;
-  int8_t partial = -1;
-  for (uint8_t i = 0; i < count; ++i) {
-    if (nodes[i].removed || nodes[i].name_len < len ||
-        memcmp(nodes[i].name, name, len) != 0) continue;
-    if (nodes[i].name_len == len) return (int8_t)i;
-    partial = (int8_t)i;
-  }
-  return partial;
 }
 
 static bool emitNodes(const EditNode nodes[REGION_MAX], uint8_t count, int8_t parent,
@@ -308,9 +294,10 @@ RegionResult putRegion(const Regions& regions, const char* name, const char* par
   RegionResult result = loadNodes(regions, nodes, count);
   if (result != REGION_OK) return result;
 
+  if (name != nullptr && *name == '#') ++name;
   size_t name_len = name == nullptr ? 0 : strnlen(name, REGION_NAME_MAX + 1);
   if (name_len == 0 || name_len > REGION_NAME_MAX) return REGION_NAME;
-  int8_t parent_index = parent == nullptr ? -1 : nodeByPrefix(nodes, count, parent);
+  int8_t parent_index = parent == nullptr ? -1 : nodeByName(nodes, count, parent);
   if (parent != nullptr && parent_index < 0) return REGION_HIERARCHY;
 
   int8_t target = nodeByName(nodes, count, name);
@@ -333,7 +320,7 @@ RegionResult setRegionFlood(const Regions& regions, const char* name, bool allow
   uint8_t count;
   RegionResult result = loadNodes(regions, nodes, count);
   if (result != REGION_OK) return result;
-  int8_t target = nodeByPrefix(nodes, count, name);
+  int8_t target = nodeByName(nodes, count, name);
   if (target < 0) return REGION_NAME;
   nodes[target].denied = !allow;
   return encodeNodes(nodes, count, out, capacity, len);
@@ -370,6 +357,7 @@ RegionResult defineRegions(const Regions& regions, char* definition,
     char* name = definition;
     while (*definition != 0 && *definition != ' ') ++definition;
     if (*definition != 0) *definition++ = 0;
+    if (*name == '#') ++name;
 
     char* jump = nullptr;
     for (char* p = name; *p != 0; ++p) {
@@ -396,7 +384,7 @@ RegionResult defineRegions(const Regions& regions, char* definition,
     nodes[target].denied = false;
     if (jump == nullptr) cursor = target;
     else {
-      cursor = nodeByPrefix(nodes, count, jump);
+      cursor = nodeByName(nodes, count, jump);
       if (cursor < 0) return REGION_HIERARCHY;
     }
     any = true;
