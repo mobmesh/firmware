@@ -55,6 +55,14 @@ class RealCompositionTestCase(unittest.TestCase):
                 hooks, _ = self.compose(mods)
                 self.assertIn("void modBeforeDeepSleep() {\n" + body + "}\n", hooks)
 
+    def test_poweroff_falls_back_to_a_refusal_after_every_mod(self):
+        for mods in ("shim,timing-safety", "shim,hotspot-ota,timing-safety,power-guard"):
+            with self.subTest(mods=mods):
+                _, cli = self.compose(mods)
+                refusal = cli.index('"ERR: poweroff not available in this build"')
+                self.assertLess(cli.rfind("HandleCli(context, command, reply)"), refusal)
+                self.assertLess(refusal, cli.index("  return false;\n}"))
+
     def test_generation_is_byte_deterministic(self):
         first = self.compose("shim,hotspot-ota,timing-safety,power-guard")
         second = self.compose("shim,hotspot-ota,timing-safety,power-guard")

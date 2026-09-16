@@ -361,6 +361,15 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
   if (isDestructive(context, command)
       && (HotspotOTA::refuseWhileActive(reply) || refuseWhileApWriting(reply))) return true;
 
+  // Any reset while pending verify rolls back, and a timed sleep is a reset.
+  if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
+    RollbackGuard::ProbationState probation = RollbackGuard::probation();
+    if (probation.pending) {
+      sprintf(reply, "ERR: firmware on probation; retry in %us", (unsigned)probation.remaining_secs);
+      return true;
+    }
+  }
+
   if (memcmp(command, "ver", 3) == 0) {
     sprintf(reply, "%s (%s) + ota (%s)", context.fw_version, context.fw_build_date,
             OTA_MOD_BUILD_DATE);

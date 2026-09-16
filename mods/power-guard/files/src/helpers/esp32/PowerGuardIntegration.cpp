@@ -24,10 +24,15 @@
 #ifndef POWER_GUARD_POWEROFF_MAX_SECS
 #define POWER_GUARD_POWEROFF_MAX_SECS 86400
 #endif
+#ifndef POWER_GUARD_POWEROFF_GRACE_MS
+#define POWER_GUARD_POWEROFF_GRACE_MS 5000
+#endif
 
 static PowerGuardPolicy power_guard;
 RTC_DATA_ATTR static uint32_t boot_pwr_check_magic;
 RTC_DATA_ATTR static uint32_t boot_pwr_check_fails;
+static uint32_t poweroff_secs = 0;
+static uint32_t poweroff_at_ms = 0;
 
 static void bootPowerCheck() {
 #ifdef POWER_GUARD_HAS_POWERDOWN
@@ -76,7 +81,17 @@ void powerGuardBeforeRadioInit() {
   bootPowerCheck();
 }
 
+static void powerOffNow(uint32_t secs) {
+#ifdef POWER_GUARD_HAS_POWERDOWN
+  powerGuardDownPostRadio();
+#endif
+  modBoardDeepSleep(secs);
+}
+
 void powerGuardLoop() {
+  if (poweroff_secs != 0 && millis() - poweroff_at_ms >= POWER_GUARD_POWEROFF_GRACE_MS) {
+    powerOffNow(poweroff_secs);
+  }
   power_guard.loop();
 }
 
@@ -164,21 +179,21 @@ bool powerGuardHandleCli(const ModCliContext& context, char* command, char* repl
 
   const char* arg = command + 8;
   uint32_t secs = *arg == ' ' ? (uint32_t)atol(arg + 1) : 0;
-  if (context.sender_timestamp != 0) {
-    strcpy(reply, "ERR: poweroff is serial-only");
-  } else if (secs < POWER_GUARD_POWEROFF_MIN_SECS || secs > POWER_GUARD_POWEROFF_MAX_SECS) {
+  if (secs < POWER_GUARD_POWEROFF_MIN_SECS || secs > POWER_GUARD_POWEROFF_MAX_SECS) {
     sprintf(reply, "ERR: usage: poweroff <secs> (%u-%u)",
             (unsigned)POWER_GUARD_POWEROFF_MIN_SECS,
             (unsigned)POWER_GUARD_POWEROFF_MAX_SECS);
-  } else {
-    Serial.printf("OK - deep sleep %us (%uh%um), then reboots\n",
-                  (unsigned)secs, (unsigned)(secs / 3600),
-                  (unsigned)((secs % 3600) / 60));
-    Serial.flush();
-#ifdef POWER_GUARD_HAS_POWERDOWN
-    powerGuardDownPostRadio();
-#endif
-    modBoardDeepSleep(secs);
+    return true;
   }
+  sprintf(reply, "OK - deep sleep %us (%uh%um), then wakes",
+          (unsigned)secs, (unsigned)(secs / 3600), (unsigned)((secs % 3600) / 60));
+  if (context.sender_timestamp != 0) {
+    poweroff_secs = secs;   // deferred so the reply leaves the radio first
+    poweroff_at_ms = millis();
+    return true;
+  }
+  Serial.println(reply);
+  Serial.flush();
+  powerOffNow(secs);
   return true;
 }

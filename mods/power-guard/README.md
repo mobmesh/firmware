@@ -43,7 +43,7 @@ Values are gauge millivolts, not volts at the pins.
 <tr><td><code>powersaving auto</code></td><td>Show state, active flag, and transition count.</td></tr>
 <tr><td><code>powersaving auto on|off</code></td><td>Toggle automatic power saving.</td></tr>
 <tr><th colspan="2" align="left">🔌 Power</th></tr>
-<tr><td><code>poweroff &lt;secs&gt;</code></td><td>Deep sleep, then reboot. Serial only.</td></tr>
+<tr><td><code>poweroff &lt;secs&gt;</code></td><td>Deep sleep for 60 to 86400 seconds, then wake. Works over the mesh too.</td></tr>
 <tr><th colspan="2" align="left">📊 Remote stats</th></tr>
 <tr><td><code>stats-core</code></td><td>Battery, uptime, errors, queue length.</td></tr>
 <tr><td><code>stats-radio</code></td><td>Noise floor, RSSI/SNR, airtime.</td></tr>
@@ -51,8 +51,9 @@ Values are gauge millivolts, not volts at the pins.
 </tbody>
 </table>
 
-Upstream's `poweroff` never wakes and is reachable over the mesh; this replaces it with
-a serial-only version that requires a wake time and refuses a bare invocation.
+Upstream's `poweroff` never wakes. This replaces it with a version that requires a wake time
+and refuses a bare `poweroff`. Over the mesh, the reply goes out first and the node sleeps
+5 seconds later. Builds without this mod refuse `poweroff` altogether.
 
 The three `stats-` commands are upstream's own, gated to serial there. This mod forwards
 them when they arrive over the mesh, so a remote operator can read a battery level without

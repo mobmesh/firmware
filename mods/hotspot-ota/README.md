@@ -272,6 +272,8 @@ flowchart TD
 
 - **Works after either update path:** local `start ota` or remote `start ota wan`.
 - **No extra hardware.** It uses ESP-IDF's built-in app rollback.
+- **No accidental rollback.** `poweroff` is refused during probation, since sleeping then
+  would roll back a good update.
 - **No reboot loops.** A radio failure with no recent update gets a few quick retries, then the
   node deep-sleeps and tries again on each wake, backing off to once every 15 minutes.
 
