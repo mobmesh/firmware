@@ -245,9 +245,12 @@ def render_mod_hooks(integrations: list) -> str:
            for item in integrations if "tx" in item["hooks"]]
     wants = [item["hooks"]["wants_power_saving"]["symbol"]
              for item in integrations if "wants_power_saving" in item["hooks"]]
+    sleeps = [item["hooks"]["before_deep_sleep"]["symbol"]
+              for item in integrations if "before_deep_sleep" in item["hooks"]]
 
     before_calls = "\n".join(f"  {symbol}();" for symbol in before)
     loop_calls = "\n".join(f"  {symbol}();" for symbol in loops)
+    sleep_calls = "".join(f"  {symbol}();\n" for symbol in sleeps)
     radio_call = f"{radio[0]}(build_id)" if radio else "modBoardRadioInit()"
     route_call = f"{routes[0]}(packet, base, out)" if routes else "false"
     region_export_call = (
@@ -298,6 +301,9 @@ int modExportRegions(RegionMap* base, char* out, size_t capacity,
 bool modWantsPowerSaving() {{
   return {wants_expr};
 }}
+
+void modBeforeDeepSleep() {{
+{sleep_calls}}}
 
 bool     modBoardRadioInit()               {{ return radio_init(); }}
 void     modBoardReboot()                  {{ board.reboot(); }}

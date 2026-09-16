@@ -28,6 +28,9 @@ build_values:
   # Advisory: cellular modems often show L2 link up before the data session negotiates.
   OTA_WAN_CHECK_ATTEMPTS: 3
   OTA_WAN_CHECK_RETRY_DELAY_MS: 10000
+  # Radio-failure sleep: doubles from the start value until it reaches the ceiling.
+  OTA_RADIO_FAIL_SLEEP_START_SECS: 60
+  OTA_RADIO_FAIL_SLEEP_MAX_SECS: 900
 
 # mods/power-guard. Gauge millivolts, highest to lowest -- the ordering is the contract;
 # see that mod's README for the ladder.

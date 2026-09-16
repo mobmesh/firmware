@@ -21,6 +21,9 @@ build_values:
   OTA_DIAG_WIFI_JOIN_ATTEMPTS: 1
   OTA_WAN_CHECK_ATTEMPTS: 3
   OTA_WAN_CHECK_RETRY_DELAY_MS: 10000
+  # Radio-failure sleep: doubles from the start value until it reaches the ceiling.
+  OTA_RADIO_FAIL_SLEEP_START_SECS: 60
+  OTA_RADIO_FAIL_SLEEP_MAX_SECS: 900
 
 # Stock 4MB scheme leaves too little OTA app-slot room for hotspot-ota. This shrinks
 # spiffs/coredump to give both slots 0x1D0000, summing to exactly 4MB.

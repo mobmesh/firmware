@@ -40,6 +40,10 @@ bool modWantsPowerSaving() {
   return powerGuardWantsPowerSaving();
 }
 
+void modBeforeDeepSleep() {
+  powerGuardBeforeDeepSleep();
+}
+
 bool     modBoardRadioInit()               { return radio_init(); }
 void     modBoardReboot()                  { board.reboot(); }
 uint16_t modBoardBattMilliVolts()          { return board.getBattMilliVolts(); }

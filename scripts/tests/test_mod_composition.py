@@ -43,6 +43,18 @@ class RealCompositionTestCase(unittest.TestCase):
         self.assertNotIn("hotspotOta", power_hooks + power_cli)
         self.assertIn("return modBoardRadioInit();", power_hooks)
 
+    def test_before_deep_sleep_lists_only_selected_mods(self):
+        expected = {
+            "shim,hotspot-ota,timing-safety,power-guard": "  powerGuardBeforeDeepSleep();\n",
+            "shim,hotspot-ota,timing-safety": "",
+            "shim,timing-safety,power-guard": "  powerGuardBeforeDeepSleep();\n",
+            "shim,timing-safety": "",
+        }
+        for mods, body in expected.items():
+            with self.subTest(mods=mods):
+                hooks, _ = self.compose(mods)
+                self.assertIn("void modBeforeDeepSleep() {\n" + body + "}\n", hooks)
+
     def test_generation_is_byte_deterministic(self):
         first = self.compose("shim,hotspot-ota,timing-safety,power-guard")
         second = self.compose("shim,hotspot-ota,timing-safety,power-guard")

@@ -4,6 +4,7 @@
 #include <esp_system.h>   // esp_restart()
 #include <esp_image_format.h>   // esp_image_verify() -- bootloader_support, linked into the app
 #include <SPIFFS.h>
+#include <helpers/ModHooks.h>
 
 // Long enough to catch an early crash/boot-loop; short enough not to add much to the ~2 minutes a
 // hotspot-fetch update can already take.
@@ -15,6 +16,12 @@
 
 #define RADIO_INIT_RESET_CAP   5
 #define RADIO_FAIL_COUNT_PATH  "/radio_fail_count"
+#ifndef OTA_RADIO_FAIL_SLEEP_START_SECS
+#define OTA_RADIO_FAIL_SLEEP_START_SECS  60
+#endif
+#ifndef OTA_RADIO_FAIL_SLEEP_MAX_SECS
+#define OTA_RADIO_FAIL_SLEEP_MAX_SECS    900
+#endif
 
 // Arduino confirms inside initArduino(), before setup() and too early to judge; this defers to
 // RollbackGuard. extern "C" because the weak symbol it replaces is declared in a .c file.
@@ -169,13 +176,20 @@ void RollbackGuard::onRadioInitFailure() {
   // Not on probation -- transient or genuine radio failure unrelated to any update. Retry with cap
   // instead of hanging forever on the first attempt.
   uint8_t count = readFailCount();
+  if (count < 255) writeFailCount(count + 1);
   if (count < RADIO_INIT_RESET_CAP) {
-    writeFailCount(count + 1);
     esp_restart();   // does not return
   }
 
-  // Cap exhausted -- same terminal behavior as before this feature existed.
-  while (1) ;
+  // Cap exhausted -- one retry per wake, backing off, until begin() clears the count.
+  uint32_t shift = count - RADIO_INIT_RESET_CAP;
+  uint32_t secs = OTA_RADIO_FAIL_SLEEP_MAX_SECS;
+  if (shift < 16) secs = OTA_RADIO_FAIL_SLEEP_START_SECS << shift;
+  if (secs > OTA_RADIO_FAIL_SLEEP_MAX_SECS) secs = OTA_RADIO_FAIL_SLEEP_MAX_SECS;
+  Serial.printf("radio init failed %u times -- deep sleep %us\n", (unsigned)count + 1, (unsigned)secs);
+  Serial.flush();
+  modBeforeDeepSleep();
+  modBoardDeepSleep(secs);   // does not return
 }
 
 RollbackGuard::Slots RollbackGuard::slots() {

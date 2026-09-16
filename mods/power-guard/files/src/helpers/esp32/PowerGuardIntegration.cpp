@@ -84,6 +84,12 @@ bool powerGuardWantsPowerSaving() {
   return power_guard.isActive();
 }
 
+void powerGuardBeforeDeepSleep() {
+#ifdef POWER_GUARD_HAS_POWERDOWN
+  powerGuardDownPreRadio();   // self-contained SPI, so it works whether or not radio_init() began the bus
+#endif
+}
+
 static bool isStatsCommand(const char* command) {
   static const char* const names[] = { "stats-core", "stats-radio", "stats-packets" };
   for (const char* name : names) {
