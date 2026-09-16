@@ -40,8 +40,16 @@ Values are gauge millivolts, not volts at the pins.
 
     poweroff <secs>               deep sleep, then reboot
 
+    stats-core                    battery, uptime, errors, queue length
+    stats-radio                   noise floor, RSSI/SNR, airtime
+    stats-packets                 packet counters
+
 Upstream's `poweroff` never wakes and is reachable over the mesh; this replaces it with
 a serial-only version that requires a wake time and refuses a bare invocation.
+
+The three `stats-` commands are upstream's own, gated to serial there. This mod forwards
+them when they arrive over the mesh, so a remote operator can read a battery level without
+a site visit. The remote CLI path is already authenticated and the replies only read state.
 
 It also rebases the clock after a brownout, which upstream leaves scrambled until NTP
 or a battery pull corrects it.

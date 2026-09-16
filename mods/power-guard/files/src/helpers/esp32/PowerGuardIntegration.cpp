@@ -84,6 +84,15 @@ bool powerGuardWantsPowerSaving() {
   return power_guard.isActive();
 }
 
+static bool isStatsCommand(const char* command) {
+  static const char* const names[] = { "stats-core", "stats-radio", "stats-packets" };
+  for (const char* name : names) {
+    size_t len = strlen(name);
+    if (memcmp(command, name, len) == 0 && (command[len] == 0 || command[len] == ' ')) return true;
+  }
+  return false;
+}
+
 bool powerGuardHandleCli(const ModCliContext& context, char* command, char* reply) {
   if (memcmp(command, "powersaving safe.mv ", 20) == 0) {
     uint32_t mv = (uint32_t)atol(command + 20);
@@ -133,6 +142,13 @@ bool powerGuardHandleCli(const ModCliContext& context, char* command, char* repl
     } else {
       strcpy(reply, "ERR: usage: powersaving auto [on|off]");
     }
+    return true;
+  }
+
+  // Upstream serial-gates the stats commands; re-dispatching with timestamp 0 clears that
+  // gate. Safe remotely: the mesh CLI path is authenticated and these replies are read-only.
+  if (context.sender_timestamp != 0 && isStatsCommand(command)) {
+    modCliDispatch(0, command, reply);
     return true;
   }
 
