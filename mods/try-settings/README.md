@@ -8,13 +8,21 @@ MeshCore itself already owns the radio-parameter case: its `tempradio` applies `
 reverts on its own timer, and writes nothing to prefs, so a reboot mid-trial restores the saved
 config. This mod covers what `tempradio` does not.
 
-## Commands
+## CLI Commands
 
-    tryset <secs> <key> <value>    snapshot, apply, start the clock (60s minimum, 86400s max)
-    tryset <secs> radio f,bw,sf,cr proxied to MeshCore's own tempradio
-    tryset keep                    commit the running trial
-    tryset revert                  put it back now
-    get tryset                     what is running, and for how long
+<table>
+<thead><tr><th align="left">Command</th><th align="left">What it does</th></tr></thead>
+<tbody>
+<tr><th colspan="2" align="left">🧪 Start a trial</th></tr>
+<tr><td><code>tryset &lt;secs&gt; &lt;key&gt; &lt;value&gt;</code></td><td>Snapshot, apply, and start the clock (60s minimum, 86400s maximum).</td></tr>
+<tr><td><code>tryset &lt;secs&gt; radio f,bw,sf,cr</code></td><td>Proxied to MeshCore's own <code>tempradio</code>.</td></tr>
+<tr><th colspan="2" align="left">✅ Finish a trial</th></tr>
+<tr><td><code>tryset keep</code></td><td>Commit the running trial.</td></tr>
+<tr><td><code>tryset revert</code></td><td>Put it back now.</td></tr>
+<tr><th colspan="2" align="left">🔎 Status</th></tr>
+<tr><td><code>get tryset</code></td><td>What is running, and for how long.</td></tr>
+</tbody>
+</table>
 
 ## Keys
 

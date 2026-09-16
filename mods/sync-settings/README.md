@@ -127,21 +127,52 @@ Consumer already applied -> keep applied update; no rollback
 
 Abort notices can be lost. Unconfirmed transmission completion leaves a warning.
 
-## CLI commands
+## CLI Commands
 
 Available through serial and authenticated remote admin CLI.
-`[argument]` means optional; `<argument>` means required.
+`[argument]` means optional; `<argument>` means required. In the publishing rows, replace
+`<dataset>` with `region` or `policy`.
+
+<table>
+<thead><tr><th align="left">Command</th><th align="left">What it does</th></tr></thead>
+<tbody>
+<tr><th colspan="2" align="left">📡 Channel and publishers</th></tr>
+<tr><td><code>get sync.channel</code></td><td>Show receive channel.</td></tr>
+<tr><td><code>set sync.channel &lt;channel&gt;</code></td><td>Save channel: 1–16 letters, digits, <code>-</code> or <code>_</code>; uppercase becomes lowercase. Both sync features must be off and inbound/recovery work idle.</td></tr>
+<tr><td><code>sync.publisher list [offset]</code></td><td>List trusted keys; zero-based offset, up to two per reply.</td></tr>
+<tr><td><code>sync.publisher add &lt;full-public-key&gt;</code></td><td>Trust a publisher for regions and policy.</td></tr>
+<tr><td><code>sync.publisher remove &lt;full-public-key&gt;</code></td><td>Revoke trust and cancel its inbound work; keep replay history.</td></tr>
+<tr><td><code>sync.publisher forget &lt;full-public-key&gt;</code></td><td>After removal, erase its record and both replay histories.</td></tr>
+<tr><th colspan="2" align="left">🗺️ Region list: native-style</th></tr>
+<tr><td><code>sync.region [offset]</code></td><td>Show RAM entries; follow <code>next &lt;offset&gt;</code> for more. Offsets start at zero; <code>F</code> means flood-enabled.</td></tr>
+<tr><td><code>sync.region put &lt;name&gt; [&lt;parent&gt;]</code></td><td>Add/update a flood-enabled entry. Parent must exist; omission means top level.</td></tr>
+<tr><td><code>sync.region def &lt;token&gt; [&lt;token&gt; ...]</code></td><td>Define a hierarchy using compact MeshCore-style notation.</td></tr>
+<tr><td><code>sync.region allowf &lt;name&gt;</code></td><td>Allow flooding for an existing entry.</td></tr>
+<tr><td><code>sync.region denyf &lt;name&gt;</code></td><td>Deny flooding for an existing entry.</td></tr>
+<tr><td><code>sync.region remove &lt;name&gt;</code></td><td>Remove an entry; remove children first.</td></tr>
+<tr><td><code>sync.region save</code></td><td>Save RAM edits; warns about incoming overwrites while sync is on.</td></tr>
+<tr><th colspan="2" align="left">🔄 Region list: sync-specific</th></tr>
+<tr><td><code>sync.region on</code></td><td>Enable overlay use and incoming region updates. Requires a channel.</td></tr>
+<tr><td><code>sync.region off</code></td><td>Use native regions only; cancel inbound reception.</td></tr>
+<tr><td><code>sync.region clear</code></td><td>Empty the RAM list; <code>save</code> makes it permanent.</td></tr>
+<tr><td><code>sync.region reload</code></td><td>Discard RAM edits and reload the saved list.</td></tr>
+<tr><th colspan="2" align="left">📥 Policy reception</th></tr>
+<tr><td><code>sync.policy on</code></td><td>Accept policy updates. Requires a channel.</td></tr>
+<tr><td><code>sync.policy off</code></td><td>Stop accepting updates; keep already-applied settings.</td></tr>
+<tr><th colspan="2" align="left">📤 Publishing and monitoring</th></tr>
+<tr><td><code>sync.&lt;dataset&gt; publish &lt;region|*&gt; &lt;channel&gt;</code></td><td>Capture and broadcast repeated updates.</td></tr>
+<tr><td><code>sync.&lt;dataset&gt; publish.reset &lt;region|*&gt; &lt;channel&gt;</code></td><td>Recovery publication for an incorrectly far-ahead generation history; eligibility checks still apply.</td></tr>
+<tr><td><code>sync.&lt;dataset&gt; publish.abort</code></td><td>Abort outbound work/guard; otherwise cancel inbound reception. No rollback or history erasure.</td></tr>
+<tr><td><code>sync.&lt;dataset&gt; publish.status</code></td><td>Show activity, channel, progress, and relevant warnings/storage state.</td></tr>
+<tr><td><code>sync.&lt;dataset&gt; publish.report &lt;page&gt;</code></td><td>Read outcomes/warnings; pages start at 1.</td></tr>
+<tr><td><code>get sync.&lt;dataset&gt;.publish.interval</code></td><td>Show round interval.</td></tr>
+<tr><td><code>set sync.&lt;dataset&gt;.publish.interval &lt;N&gt;h</code></td><td>Save interval: 3–24 hours. Example: <code>12h</code>.</td></tr>
+<tr><td><code>get sync.&lt;dataset&gt;.publish.duration</code></td><td>Show publication window.</td></tr>
+<tr><td><code>set sync.&lt;dataset&gt;.publish.duration &lt;N&gt;d</code></td><td>Save duration: 1–4 days. Example: <code>3d</code>.</td></tr>
+</tbody>
+</table>
 
 ### Channel and publishers
-
-| Command | Purpose |
-| --- | --- |
-| `get sync.channel` | Show receive channel. |
-| `set sync.channel <channel>` | Save channel: 1–16 letters, digits, `-` or `_`; uppercase becomes lowercase. Both sync features must be off and inbound/recovery work idle. |
-| `sync.publisher list [offset]` | List trusted keys; zero-based offset, up to two per reply. |
-| `sync.publisher add <full-public-key>` | Trust a publisher for regions and policy. |
-| `sync.publisher remove <full-public-key>` | Revoke trust and cancel its inbound work; keep replay history. |
-| `sync.publisher forget <full-public-key>` | After removal, erase its record and both replay histories. |
 
 - **Public key:** complete 64-character hexadecimal key.
 - **Channel:** 1–16 lowercase letters, digits, or hyphens; no leading/trailing hyphen.
@@ -152,27 +183,6 @@ Available through serial and authenticated remote admin CLI.
 
 `sync.region` mirrors MeshCore's native `region` command but targets the sync
 overlay records. The native list stays separate and unchanged.
-
-**Native-style commands**
-
-| Command | Purpose |
-| --- | --- |
-| `sync.region [offset]` | Show RAM entries; follow `next <offset>` for more. Offsets start at zero; `F` means flood-enabled. |
-| `sync.region put <name> [<parent>]` | Add/update a flood-enabled entry. Parent must exist; omission means top level. |
-| `sync.region def <token> [<token> ...]` | Define a hierarchy using compact MeshCore-style notation. |
-| `sync.region allowf <name>` | Allow flooding for an existing entry. |
-| `sync.region denyf <name>` | Deny flooding for an existing entry. |
-| `sync.region remove <name>` | Remove an entry; remove children first. |
-| `sync.region save` | Save RAM edits; warns about incoming overwrites while sync is on. |
-
-**Sync-specific additions**
-
-| Command | Purpose |
-| --- | --- |
-| `sync.region on` | Enable overlay use and incoming region updates. Requires a channel. |
-| `sync.region off` | Use native regions only; cancel inbound reception. |
-| `sync.region clear` | Empty the RAM list; `save` makes it permanent. |
-| `sync.region reload` | Discard RAM edits and reload the saved list. |
 
 - **Edits are RAM-only until `save`.** Accepted mesh updates save automatically.
 - While sync is on, edits affect routing and incoming updates can replace them.
@@ -191,11 +201,6 @@ Each token descends a level; `|us` selects `us` as the next parent. Comma also w
 
 ### Policy reception
 
-| Command | Purpose |
-| --- | --- |
-| `sync.policy on` | Accept policy updates. Requires a channel. |
-| `sync.policy off` | Stop accepting updates; keep already-applied settings. |
-
 Policy publishes the current values of these native settings:
 
 ```text
@@ -206,20 +211,6 @@ txdelay                agc.reset.interval
 ```
 
 ### Publishing and monitoring
-
-Replace `<dataset>` with `region` or `policy`:
-
-| Command | Purpose |
-| --- | --- |
-| `sync.<dataset> publish <region\|*> <channel>` | Capture and broadcast repeated updates. |
-| `sync.<dataset> publish.reset <region\|*> <channel>` | Recovery publication for an incorrectly far-ahead generation history; eligibility checks still apply. |
-| `sync.<dataset> publish.abort` | Abort outbound work/guard; otherwise cancel inbound reception. No rollback or history erasure. |
-| `sync.<dataset> publish.status` | Show activity, channel, progress, and relevant warnings/storage state. |
-| `sync.<dataset> publish.report <page>` | Read outcomes/warnings; pages start at 1. |
-| `get sync.<dataset>.publish.interval` | Show round interval. |
-| `set sync.<dataset>.publish.interval <N>h` | Save interval: 3–24 hours. Example: `12h`. |
-| `get sync.<dataset>.publish.duration` | Show publication window. |
-| `set sync.<dataset>.publish.duration <N>d` | Save duration: 1–4 days. Example: `3d`. |
 
 - Initial schedule: `12h` over `3d` = seven rounds, starting immediately.
 - Regions and policy have independent campaigns and schedules.
