@@ -25,7 +25,7 @@ The mod also adds rollback protection. After an update, the new firmware is test
 integration phases, and the shim generator wires them into its aggregate sources. This mod
 has no patch and touches no upstream or shim-owned source file.
 
-The patches don't contain board-specific settings such as the GPIO pin used for the power switch or WiFi and HTTP timing values.
+Board-specific settings like the power-switch GPIO and the WiFi and HTTP timings aren't in the mod's code.
 
 Those settings come from each board's `variants/<board>/overrides.yaml` file and are passed into the build as `-D` flags. See the root README for more information about how board configuration works.
 
@@ -41,7 +41,7 @@ Rollback protection and clock sync need no extra hardware. Only the hotspot powe
 
 ## CLI Commands
 
-These commands are available on devices built with these patches. They can be used alongside the standard MeshCore CLI commands.
+These commands are available on devices built with this mod. They can be used alongside the standard MeshCore CLI commands.
 
 | Command                                         | Description                                                                                                                                                                                                                                                                   |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

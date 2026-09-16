@@ -1,60 +1,51 @@
-# shim - Hook Points for Everything Else
+# shim - Mod Hooks for MeshCore Upstream
 
-Owns every place a patch reaches into upstream to get called. Not a feature: with
-no other mod built, all hooks are no-ops and the firmware behaves as upstream does.
+Most mods need upstream MeshCore to call their code at the right moment: at startup,
+on every pass of the main loop, when a CLI command comes in, and so on. Rather than
+have every mod patch upstream on its own, `shim` adds those call points once and
+every other mod plugs into them.
 
-## What it owns
+On its own, shim does nothing. Build it with no other mods and you get firmware that
+behaves just like upstream.
 
-| Upstream file | Insertion |
-|---|---|
-| `examples/simple_repeater/main.cpp` | `modRadioInit()`, `modLoop()`, `modWantsPowerSaving()` |
-| `examples/simple_room_server/main.cpp` | same, minus power saving |
-| `examples/simple_repeater/MyMesh.cpp` | CLI dispatch, region resolution/export, receive observation, transmit completion |
-| `examples/simple_room_server/MyMesh.cpp` | Same hooks; native room-server forwarding policy remains unchanged |
+## What it touches
 
-It ships `helpers/ModHooks.h` from `files/`. The selected mods' integration declarations
-generate `ModHooks.cpp` and `CommonCliMods.cpp` in the temporary upstream tree. Feature
-mods own their handlers and hook bodies rather than patching shared aggregate files.
+A single patch adds the call points to the repeater's and room server's `main.cpp`
+and `MyMesh.cpp`. That's the only place any mod reaches into upstream code, and a
+test makes sure it stays that way.
 
-`CommonCliMods.cpp` is dispatched ahead of upstream's own chain, so a mod can match
-a longer prefix before a shorter upstream one (`start ota wan ...` before `start ota`).
+`timing-safety` is the exception: it fixes upstream code directly instead of adding
+anything, so it doesn't need shim.
 
-Mods that rewrite upstream code rather than add call sites -- `timing-safety` --
-have nothing to hook and depend on nothing.
+## Keeping up with upstream
 
-## Composition
+Since shim's patch is the one place mods touch upstream, it's also where upstream
+changes bite first. `patch-drift-canary` checks it every day, before a release ever
+shows up:
 
-`mod.yaml` declares each integration header and the phases it contributes. The generator
-supports additive pre-radio and loop phases, one exclusive radio-init policy, an OR-reduced
-power-saving phase, and priority-ordered first-match CLI handlers. Region routing
-and region export each have one exclusive owner; receive and transmit observation
-call every selected contributor in composition order. Without an owner, routing
-and export defer to upstream and observation hooks do nothing.
+- **Does it still apply?** The patch is tried against upstream's `main` and `dev`
+  branches. If it doesn't fit, the report shows where the code moved and whether git
+  could place it on its own or someone needs to step in.
+- **Does it still build?** Applying cleanly isn't enough, since upstream could rename
+  or remove something shim calls. So the patched `dev` tree also gets compiled, with
+  the most mods each role ships.
+- **Is it still needed?** Key upstream PRs are watched for a merge. Once one lands,
+  the shim hooks it would replace get a second look.
 
-`MOD_WITH_TX_HOOKS` is emitted once by `inject-env` when any selected mod declares
-transmit observation. It enables packet-identity tracking and completion forwarding
-in both roles. Group transmission refuses without tracking; `sync-settings` also
-rejects a build missing this flag.
+Any of these opens an issue. Release builds run the same apply check, and a failure
+there stops the build.
 
-The reverse hooks expose public identity, detached signing, policy reads, CLI
-dispatch, and upstream group transmission. Private identity bytes do not cross
-the hook boundary. Encryption, packet queueing, radio access, and airtime estimation
-remain upstream operations.
+## How mods plug in
 
-Composition fails before compilation for missing headers or symbols, unsupported phases,
-duplicate symbols, multiple radio-init policies, or invalid aggregate destinations. The
-generated sources are deterministic and refuse to overwrite an upstream file.
+Each mod lists the call points it wants in its `mod.yaml`. At build time, shim reads
+those lists and generates the code that connects everything. The mods you pick decide
+what gets wired in and in what order.
 
-The result uses ordinary direct C++ calls. There is no runtime registry, static constructor,
-heap allocation, or linker-section behavior.
+A few ground rules:
 
-## Ordering
-
-The resolved mod order controls additive hook order. CLI priority is explicit in each
-contributing manifest. `radio_init_policy` has at most one owner.
-
-`scripts/tests/test_patch_ownership.py` asserts no other mod patches the upstream insertion
-points. `scripts/tests/test_mod_composition.py` covers phase validation, subset composition,
-ordering, output ownership, and byte-deterministic generation.
-
-**Contributes no suffix** -- must not change any released asset's filename.
+- **CLI commands:** mods get first look, ahead of upstream's own commands.
+- **One owner:** some jobs, like radio setup or region handling, can only belong to one mod.
+- **No surprises at runtime:** a mix of mods that doesn't fit together fails the build,
+  not the node.
+- **Keys stay put:** mods can ask the firmware to sign things, but they never see its
+  private key.
