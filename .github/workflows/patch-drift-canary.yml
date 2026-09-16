@@ -39,16 +39,14 @@ jobs:
           DRIFT=false
 
           # --- 1. do the patches still apply? -------------------------------------
-          # Probe the ordered union so target-specific mods are included without
-          # applying any patch more than once.
+          # The ordered union, so target-specific mods are included without applying
+          # any patch twice.
           MODS=$(printf '%s\n' \
             "$(python3 scripts/generate-board-config.py project-info --field ordered-mods)" \
             "$CANARY_EXTRA_MODS" | tr ' ' '\n' | awk 'NF && !seen[$0]++' | xargs)
           echo "mods: $MODS"
 
-          # Three-way on failure keeps the tree realistic, so one broken patch does not
-          # cascade into every later one. Conflicts resolve to upstream's side: the patch
-          # side drags the old base's code back in and the tree stops being dev at all.
+          # Conflicts resolve to upstream's side, or the patch drags the old base back in.
           # Never --depth 1: three-way silently degrades without the preimage blobs.
           for ref in main dev; do
             rm -rf probe-src
@@ -72,8 +70,8 @@ jobs:
                   git -C probe-src apply "../$patch"
                   continue
                 fi
-                # Explained before three-way touches anything: the point is where upstream
-                # put the code, which a half-merged tree no longer shows.
+                # Before three-way touches anything: a half-merged tree no longer shows
+                # where upstream put the code.
                 base=$(git -C probe-src describe --tags --abbrev=0 --match 'repeater-v*' 2>/dev/null || true)
                 {
                   echo "<details><summary><code>$name</code> -- what moved</summary>"
@@ -155,8 +153,7 @@ jobs:
 
           # --- 4. does upstream still sleep the radio the way power-guard assumes? --
           # power-guard's poweroff relies on radio_driver.powerOff() reaching the SX1262's
-          # sleep. Losing that means higher current through a hibernation, not a stranded
-          # node, so warn rather than fail. Goes quiet if no target builds the mod.
+          # sleep. Losing it costs current through a hibernation, not the node: warn only.
           if [ -d probe-src ] && echo " $MODS " | grep -q " power-guard "; then
             if grep -qE 'sleep\(false\)' \
               probe-src/src/helpers/radiolib/CustomSX1262Wrapper.h 2>/dev/null; then
@@ -174,11 +171,9 @@ jobs:
           { echo 'report<<REPORT_EOF'; cat "$REPORT"; echo 'REPORT_EOF'; } >> "$GITHUB_OUTPUT"
           cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
 
-      # Applying and compiling are different questions. On 2026-08-27 power-guard applied
-      # cleanly against dev and would not have built: upstream had deleted the FEM virtual
-      # it called. Build the widest composition for each upstream role because shim bridges
-      # are implemented separately in both. A failure counts as drift only if that same role
-      # builds vanilla, so upstream's own broken days are not reported as patch drift.
+      # Applying and compiling are different questions: a patch can apply against a tree
+      # that has deleted the virtual it calls. The widest composition per upstream role,
+      # since shim bridges are implemented separately in both. Drift only if vanilla builds.
       - id: buildcheck
         name: Build the patched tree against dev
         if: steps.probe.outputs.dev_buildable == 'true'

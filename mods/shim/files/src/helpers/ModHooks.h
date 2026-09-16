@@ -54,9 +54,8 @@ void     modBoardInhibitSleep(bool inhibit);
 uint32_t modClockGet();
 void     modClockSet(uint32_t epoch);
 
-// Straight into upstream's CLI chain, bypassing mod dispatch, so a mod can read a setting
-// back or apply one without reaching CommonCLI's protected handleGetCmd/handleSetCmd.
-// Reusing upstream's own parser is the point: validation stays in one place.
+// Straight into upstream's CLI chain, bypassing mod dispatch, so validation stays in
+// upstream's own parser rather than reaching its protected handleGetCmd/handleSetCmd.
 void modCliDispatch(uint32_t sender_timestamp, char* command, char* reply);
 
 struct ModPolicyValues {
@@ -81,14 +80,12 @@ bool modSendGroup(const uint8_t* secret, uint8_t hash, const uint8_t* data,
                   size_t len, bool scoped, const uint8_t scope_key[16],
                   uint32_t* packet_id, uint32_t* airtime_ms);
 
-// The live tempradio trial, or false when none is running. Both of upstream's timers are
-// consulted: pending_* are untested before the 2s apply and stale after the revert, which
-// clears only the timer.
+// The live tempradio trial, or false when none runs. Both timers are consulted: pending_*
+// are untested before the 2s apply and stale after the revert, which clears only the timer.
 bool modTempRadioGet(float* freq, float* bw, uint8_t* sf, uint8_t* cr);
 
-// Zero-hop only: a flood advert reaches flood.max.advert hops and upstream schedules one just
-// every 47 hours, so it is not a caller's to spend. The delay lets a reply go out before the
-// radio transmits, as upstream's own `advert.zerohop` does.
+// Zero-hop only: upstream schedules a flood advert every 47 hours, so it is not a caller's
+// to spend. The delay lets a reply go out before the radio transmits.
 void     modSendZeroHopAdvert(int delay_millis);
 
 // FEM LNA bypass, where the board declares MOBMESH_HAS_FEM_LNA. Elsewhere the

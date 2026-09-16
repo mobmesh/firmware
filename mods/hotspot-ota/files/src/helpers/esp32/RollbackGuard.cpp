@@ -9,9 +9,8 @@
 // hotspot-fetch update can already take.
 #define OTA_ROLLBACK_CONFIRM_DELAY_MS   90000
 
-// Cross-boot retry cap for onRadioInitFailure(). The counter lives in SPIFFS, not RTC memory,
-// which is unreliable across esp_restart() on this chip/IDF combination.
-// Spacing between confirm retries: the call writes otadata, so it must not run every loop().
+// The counter lives in SPIFFS, not RTC memory, which is unreliable across esp_restart().
+// Confirm retries are spaced because the call writes otadata.
 #define CONFIRM_RETRY_MS   5000
 
 #define RADIO_INIT_RESET_CAP   5

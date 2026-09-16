@@ -182,9 +182,8 @@ export async function readNodeConfig(port, { timeoutMs = CLI_COMMAND_TIMEOUT_MS 
     }
   };
   try {
-    // `ver` first, at the probe timeout, as the liveness gate. Silence here means no CLI
-    // at all (a T1, a bootloader, a factory-fresh board) and the reads below would each
-    // burn the full command timeout proving the same thing — 15 s to learn nothing.
+    // `ver` at the probe timeout is the liveness gate: silence means no CLI at all, and
+    // each read below would burn its full timeout proving the same thing.
     const version = await read('ver', CLI_PROBE_TIMEOUT_MS);
     if (version === null) return { version: null, name: null, latitude: null, longitude: null };
 
@@ -193,9 +192,8 @@ export async function readNodeConfig(port, { timeoutMs = CLI_COMMAND_TIMEOUT_MS 
     // float32 on the device, so a value read back is not textually what was written.
     const latitude = numberOrNull(await read('get lat'));
     const longitude = numberOrNull(await read('get lon'));
-    // One call returns all four fields `set radio` writes, and `set radio` is one of only
-    // three commands the firmware says needs a reboot — so this read is what decides
-    // whether an upgrade has to restart a working node.
+    // One call returns all four fields `set radio` writes, so this read decides whether
+    // an upgrade has to restart a working node.
     const radio = parseRadio(await read('get radio'));
     return { version, name, latitude, longitude, radio };
   } finally {

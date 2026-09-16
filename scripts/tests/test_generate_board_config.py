@@ -578,8 +578,8 @@ class OtaWebPageTestCase(InjectEnvTestCase):
                     self._run(ini_path)
 
     def test_target_without_the_mod_keeps_upstream_ota(self):
-        # The second future failure this guards: a board can no longer disable upstream's OTA
-        # while the replacement is absent, because the same selection decides both.
+        # A board cannot disable upstream's OTA while the replacement is absent, because
+        # the same selection decides both.
         ini_path = self._setup(ota_web_page=False)
         self._run(ini_path)
         result = ini_path.read_text()

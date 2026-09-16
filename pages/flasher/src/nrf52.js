@@ -34,9 +34,8 @@ export async function loadDfuApi() {
   return loadedApi;
 }
 
-// Mirrors `PortSelectionRequiredError`: `showSaveFilePicker()` needs a fresh click, so a
-// step that calls it from `run()` (no gesture) must throw this instead — the UI answers it
-// with a checkpoint button, whose click is what actually calls the picker.
+// `showSaveFilePicker()` needs a fresh click, so a step calling it from `run()` throws
+// this instead and the UI answers with a checkpoint button.
 export class FilePickerRequiredError extends Error {
   constructor(prompt, { bytes, suggestedName }) {
     super(prompt);
@@ -130,9 +129,8 @@ export async function writeBootloaderUf2(appPort, bytes, suggestedName, { onStat
   if (typeof window === 'undefined' || !window.showSaveFilePicker) {
     throw new Error('This browser cannot write to the UF2 drive directly — use Chrome or Edge.');
   }
-  // The picker must be the first thing called here — any await ahead of it risks the
-  // browser deciding the click's user activation has lapsed, which can fail the call
-  // silently rather than throwing something a caller could act on.
+  // First call in the function: any await ahead of it risks the click's user activation
+  // lapsing, which fails silently rather than throwing.
   const handle = await window.showSaveFilePicker({
     suggestedName,
     types: [{ description: 'UF2 firmware', accept: { 'application/octet-stream': ['.uf2'] } }],
@@ -180,9 +178,8 @@ export async function executeDfuPlan(port, plan, { onProgress, onStatus } = {}) 
   const { Dfu } = await loadDfuApi();
   let target = port;
 
-  // Order is load-bearing: the erase package clears the filesystem, then the firmware goes
-  // back. The bootloader is a guided pre-flash step now, never a stage here — see
-  // nrf52-bootloader-plan.md.
+  // Order is load-bearing: the erase package clears the filesystem, then the firmware
+  // goes back.
   const stages = [];
   if (plan.erasePackage) stages.push({ package: plan.erasePackage, label: 'Erasing the device…' });
   stages.push({ package: plan.package, label: 'Writing firmware…' });

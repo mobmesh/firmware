@@ -218,9 +218,8 @@ function balanceTileRows(list, body) {
   staggerTiles(list, columns);
 }
 
-// A diagonal wave, so the grid resolves left-to-right and top-down at once rather than
-// as a typewriter. The column count is only known after the layout above, and it moves
-// with the viewport, so the delay is set here rather than from the render loop's index.
+// The column count is only known after the layout above and moves with the viewport, so
+// the delay is set here rather than from the render loop's index.
 function staggerTiles(list, columns) {
   [...list.children].forEach((tile, i) => {
     const wave = Math.floor(i / columns) + (i % columns);
@@ -471,9 +470,8 @@ function renderError(error, retry) {
 
 // --- location (GCM's node-config screen) --------------------------------------------
 
-// region-map's own basemap: already dark, already attributed, already vendored.
-// The advert budget, minus the zone's name prefix. Advisory, not a cap: measured on a
-// Heltec v4, the firmware stores 31 bytes either way and only the advert clips.
+// The advert budget, minus the zone's name prefix. Advisory, not a cap: the firmware
+// stores 31 bytes either way and only the advert clips.
 const NAME_BYTES = 20;
 const NAME_STORED_BYTES = 31;
 
@@ -494,9 +492,8 @@ const MAP_EARLY_ZOOM = 3;
 // as slow next to the old map. Rates from maplibre's own ScrollZoomHandler.
 const MAP_WHEEL_RATE = 1 / 120;   // default 1/450
 const MAP_ZOOM_RATE = 1 / 60;     // default 1/100
-// Mobile, as `pages/shared/data/gc-locations.json` gives it. Held here rather than read
-// from that file: it is only the opening view, and a failed fetch would need a
-// hardcoded fallback anyway. The previous value sat offshore in the Gulf.
+// Mobile. Held here rather than fetched: it is only the opening view, and a failed fetch
+// would need a hardcoded fallback anyway.
 const MAP_HOME = [30.6954, -88.0399];
 const MAP_HOME_ZOOM = 6;
 
@@ -808,9 +805,8 @@ function renderLocation(step) {
         paint: { 'line-color': STATE_STYLE.color, 'line-width': STATE_STYLE.weight,
                  'line-opacity': STATE_STYLE.opacity },
       });
-      // Nested zones stay invisible until the pointer is inside one — the outlines are
-      // only useful while you are choosing, and drawn always they crowd a 256px map. The
-      // filter names which single zone is lit; NO_ZONE matches nothing.
+      // Drawn always, nested outlines crowd a 256px map. The filter names the single lit
+      // zone; NO_ZONE matches nothing.
       map.addLayer({
         id: 'zone-lit-fill', type: 'fill', source: 'zones',
         filter: ['==', ['get', 'id'], NO_ZONE],
@@ -892,9 +888,8 @@ function renderLocation(step) {
   map.on('click', (event) => {
     const { lat, lng } = event.lngLat;
     setPoint(lat, lng, false);
-    // Placing the pin is the point of expanding, so hand the form back. Recentre with it:
-    // the centre is held while the container shrinks, which can strand an edge-of-map pin
-    // outside the small one.
+    // Recentre on the way back: the centre is held while the container shrinks, which can
+    // strand an edge-of-map pin outside the small one.
     if (stepEl.classList.contains('is-map-expanded')) {
       setExpanded(false);
       map.jumpTo({ center: [lng, lat], zoom: map.getZoom() });
@@ -973,9 +968,8 @@ function renderLocation(step) {
   }
   nameField.focus();
 
-  // An Upgrade keeps the identity the node already has. Mining a new one here would only
-  // produce a key that `set prv.key` then writes over a working node's address. The note
-  // under the name field already says so, where the question is actually provoked.
+  // An Upgrade keeps the node's existing identity: mining one here would only produce a
+  // key that `set prv.key` writes over a working node's address.
   if (isUpgrade) {
     identityLine.hidden = true;
   } else if (draft.identity) {

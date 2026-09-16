@@ -98,17 +98,15 @@ function degrees(value) {
   return Number.isFinite(value) ? Number(value.toFixed(5)) : null;
 }
 
-// The device stores positions as float32, so what it reads back is never textually what
-// was written — measured on a P1: `set lon -89.01235` reads back `-89.0123519`. Comparing
-// at float32 precision is exact, where any decimal tolerance would be a guess.
+// Positions are stored as float32, so a read-back is never textually what was written:
+// `set lon -89.01235` returns `-89.0123519`. Compare at float32 precision, not by tolerance.
 function sameDegrees(a, b) {
   if (a === null || b === null) return false;
   return Math.fround(a) === Math.fround(b);
 }
 
-// The only three the firmware answers "reboot to apply" to — CommonCLI.cpp, lines 518, 602
-// and 716. Everything else savePrefs() and takes effect at once, so a list without one of
-// these needs no restart. `set freq` is here for completeness; our zone files use `radio`.
+// The only three the firmware answers "reboot to apply" to. Everything else savePrefs()
+// and takes effect at once.
 const NEEDS_REBOOT = /^set (radio|freq|prv\.key) /;
 
 // `set radio <freq>,<bw>,<sf>,<cr>` against what `get radio` reported. Frequency and
@@ -138,10 +136,8 @@ export function buildProvisionCommands(state) {
   // that answered nothing, in which case everything below counts as changed.
   const existing = state.existingConfig ?? null;
 
-  // Every path, every role: a device that has been unpowered comes up with a bogus clock,
-  // and this is the one moment we are certainly talking to it. Forward-only in the
-  // firmware — it answers "cannot go backwards" rather than rewinding a good clock — so
-  // it is safe to send unconditionally. Also the post-flash liveness check, being first.
+  // An unpowered device comes up with a bogus clock. Forward-only in the firmware, so it
+  // is safe unconditionally, and being first it doubles as the liveness check.
   steps.push({
     command: `time ${Math.floor(Date.now() / 1000)}`,
     label: 'Setting the clock',
@@ -155,10 +151,8 @@ export function buildProvisionCommands(state) {
     steps.push({ command, label: 'Applying board defaults' });
   }
 
-  // Then the regional set for the node's zone. Radio and interval settings, so nothing
-  // here collides with name or position. Re-asserted on every path so a drifted node is
-  // corrected — except `set radio`, which is dropped when the device already reports
-  // those exact parameters, because sending it is what forces the reboot below.
+  // Re-asserted on every path so a drifted node is corrected, except `set radio` when the
+  // device already reports those parameters -- sending it is what forces the reboot below.
   for (const command of resolveSettings(state.zoneCommands ?? [], state.flashedMods ?? 0)) {
     if (command.startsWith('set radio ') && radioCommandMatches(command, existing?.radio)) {
       continue;
@@ -191,9 +185,8 @@ export function buildProvisionCommands(state) {
     steps.push({ command: `set prv.key ${privateKey}`, label: 'Installing the node identity' });
   }
 
-  // No reply is sent — see auto_cli_commands.md. Keyed on what the firmware actually says needs
-  // one: everything else saves and applies at once, so restarting a working node for a
-  // name change or an interval is a cost with nothing bought.
+  // No reply is sent. Keyed on what the firmware says needs a restart: everything else
+  // saves and applies at once.
   if (steps.some((step) => NEEDS_REBOOT.test(step.command))) {
     steps.push({ command: 'reboot', label: 'Restarting the device', awaitReply: false });
   }

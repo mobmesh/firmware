@@ -8,7 +8,7 @@ on:
   push:
     paths:
       # Narrow on purpose: the tests read patches, mod manifests and the build config,
-      # not prose. `mods/**` fired on a markdown edit under mods/*/docs/ on 2026-08-26.
+      # not prose. A bare `mods/**` fires on markdown edits under mods/*/docs/.
       - 'scripts/**'
       - 'mods/**/patches/**'
       - 'mods/**/files/**'

@@ -30,20 +30,15 @@ html, body {
   min-height: 100%;
 }
 
-/* The UA's own [hidden] rule is a plain `display: none` at the same specificity as any
-   class, so any rule setting `display` silently defeats `el.hidden = true`. Stated once
-   here rather than guarded per element, which is how it was missed. */
+/* The UA's [hidden] rule is a plain `display: none` at class specificity, so any rule
+   setting `display` silently defeats `el.hidden = true`. */
 [hidden] {
   display: none !important;
 }
 
-/* Reserve the scrollbar's width whether or not one is showing, so a step that grows past
-   the viewport does not shift the page sideways as it appears.
-
-   The thumb is `--line`, the colour every border on the site already uses, so the bar reads
-   as chrome rather than decoration. Firefox honours only the two standard properties;
-   Chromium and Safari read the ::-webkit- rules, so both are written. The transparent
-   border with `background-clip` is what insets the thumb — webkit has no padding for it. */
+/* Reserved whether or not a bar shows, so a step growing past the viewport does not
+   shift the page sideways. Firefox reads the standard properties, webkit the pseudo-
+   elements, and the transparent border with `background-clip` is what insets the thumb. */
 html {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
@@ -71,9 +66,8 @@ html::-webkit-scrollbar-thumb:hover {
   background-clip: content-box;
 }
 
-/* Inner scrollers get the same bar. `scrollbar-color` inherits, so Firefox is already
-   covered by the rule above; the ::-webkit- pseudo-elements do not cascade and have to be
-   restated for descendants. Six panes scroll across the configurator and region map. */
+/* `scrollbar-color` inherits, so Firefox is covered above; the ::-webkit- pseudo-
+   elements do not cascade and must be restated for descendants. */
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -270,10 +264,8 @@ body {
   overflow: hidden;
 }
 
-/* Wizard step progress bar -- NOT decorative. Width reflects how far along
-   the actual flow the user is (see the --step-progress custom property, set
-   on #wizard by src/ui.js from its position in the resolved step list).
-   Defaults to the first step's width before that runs. */
+/* Not decorative: width is --step-progress, set on #wizard by src/ui.js from the
+   position in the resolved step list. Defaults to the first step before that runs. */
 .card::before {
   content: "";
   position: absolute;
@@ -293,9 +285,8 @@ body {
   animation: bar-shimmer 8s linear infinite;
 }
 
-/* Static 1px top edge accent -- teal at center, fading to the card's normal
-   border color at each end. Sits under the progress bar (::before, z-index
-   1) wherever the two overlap. */
+/* Static 1px top edge accent. Sits under the progress bar (::before, z-index 1)
+   wherever the two overlap. */
 .card::after {
   content: "";
   position: absolute;
@@ -307,11 +298,8 @@ body {
   background: linear-gradient(90deg, var(--line), var(--accent), var(--line));
 }
 
-/* Idle shimmer -- a highlight streak travels across the (otherwise static)
-   fill, so the bar reads as "alive" even while width isn't changing. Back to
-   linear/wrap (not alternate), but the wrap is held off: travels for the
-   first 4s, then sits at the end position for the next 4s before jumping
-   back to the start on the next loop. */
+/* Linear/wrap, not alternate, with the wrap held off: travels for the first 4s, sits
+   at the end for the next 4s, then jumps back to the start on the next loop. */
 @keyframes bar-shimmer {
   0%   { background-position: -50% 0, 0 0; }
   50%  { background-position: 150% 0, 0 0; }
@@ -513,10 +501,8 @@ button.btn {
   transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-/* Glossy sheen, lit from the upper-left -- a background layer, not a
-   pseudo-element, so it never sits in the paint order above the button's
-   own text (an absolutely-positioned ::before does, regardless of DOM
-   order, since it's a positioned box; a background layer can't). */
+/* A background layer, not a pseudo-element: an absolutely-positioned ::before paints
+   above the button's own text regardless of DOM order. */
 .btn-primary {
   background-image:
     radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02) 40%, transparent 62%),

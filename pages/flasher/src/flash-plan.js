@@ -184,9 +184,8 @@ export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}
   return { baseUrl, version: raw._version ?? null, boards, displays, variantIcons };
 }
 
-// The image's own SHA-256 is its last 32 bytes, so nothing is fetched. Header byte 23 says
-// the digest is there -- a build setting, not a format guarantee -- and an image carrying
-// none returns null so the UI says unverified. A mismatch raises: bad bytes are never written.
+// The image's own SHA-256 is its last 32 bytes. Header byte 23 says the digest is there --
+// a build setting, not a format guarantee -- so an image carrying none returns null.
 async function verifyEmbeddedDigest(bytes, label) {
   if (bytes.length < 56 || bytes[0] !== 0xe9 || bytes[23] !== 1) return null;
 
@@ -376,9 +375,8 @@ function overrideAsset(base, path) {
   return base && path ? new URL(path, base).href : null;
 }
 
-// Named rather than free-form CSS: an override file should not be able to put arbitrary
-// filter syntax into a style attribute. `brightness(0)` flattens art of any colour to a
-// silhouette, which `invert(1)` then turns white.
+// Named rather than free-form: an override file must not put arbitrary filter syntax in a
+// style attribute. `brightness(0)` flattens art to a silhouette, `invert(1)` turns it white.
 const IMAGE_FILTERS = {
   invert: 'invert(1)',
   white: 'brightness(0) invert(1)',
@@ -528,9 +526,8 @@ function selectStockFile(device, entry, version, wipe) {
   );
 }
 
-// Stage one, the peer of `loadCustomFirmwareSource`. Bytes come through the relay. Upstream
-// builds carry no MobMesh metadata but are still ESP32 images, so the appended digest is
-// checked where one is present and `verify` stays null where it is not.
+// Upstream builds carry no MobMesh metadata but are still ESP32 images, so the appended
+// digest is checked where present and `verify` stays null where it is not.
 export async function loadStockFirmwareSource(
   manifest,
   { deviceName, firmwareIndex = 0, version, wipe = false },
@@ -594,10 +591,8 @@ export function buildStockFlashPlan(source, { partitions = [] } = {}) {
     return createFlashPlan({
       engine: 'dfu',
       package: new Blob([bytes]),
-      // The bootloader is a guided pre-flash step now (nrf52-bootloader-plan.md), never a
-      // DFU stage: the .zip route stages every payload in the app region and destroys it.
-      // The wipe. `Dfu`'s own `eraseBeforeUpdate` clears the application region the write
-      // is about to overwrite anyway, so `eraseAll` stays false and this carries it.
+      // `Dfu`'s own `eraseBeforeUpdate` already clears the application region the write
+      // overwrites, so `eraseAll` stays false and this carries the wipe.
       erasePackage: eraseBytes ? new Blob([eraseBytes]) : null,
       // Filesystem preservation is custom-path-only, and DFU cannot read flash back regardless.
       preserveFs: false,

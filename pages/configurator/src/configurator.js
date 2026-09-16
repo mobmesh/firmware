@@ -4865,9 +4865,7 @@
     const defLines = buildOrderedRegionDefLines(needed, homeCityRow);
     const lines = [];
 
-    // Drop named regions that were on the device at last read but are no
-    // longer selected (Allow/Deny) and not required as ancestors. Children
-    // before parents — MeshCore removeRegion fails if children remain.
+    // Children before parents: MeshCore removeRegion fails while children remain.
     const toRemove = [];
     if (deviceNamedRegionsFromRead && deviceNamedRegionsFromRead.size) {
       deviceNamedRegionsFromRead.forEach(function (code) {
@@ -4896,9 +4894,8 @@
       lines.push(line);
     });
 
-    // region def sets flood-allowed (flags = 0). Skip redundant allowf for
-    // named regions. Wildcard * is not created by def — still needs allowf/denyf.
-    // Deny rows still need region denyf (def would leave them allowed).
+    // region def sets flood-allowed (flags = 0), so named allows need no allowf.
+    // It never creates the wildcard, and never denies: both still need allowf/denyf.
     if (allowUntagged) {
       lines.push("region allowf *");
     }

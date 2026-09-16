@@ -38,7 +38,7 @@ bool hotspotOtaRadioInit(const char* build_id) {
 // never stops either. This mod owns both instead, so the listener can actually be closed.
 #define OTA_AP_DEADLINE_MS  (20UL * 60 * 1000)
 #define OTA_AP_STALL_MS     (10UL * 60 * 1000)
-// Long enough for AsyncTCP to drain the response now that the callback no longer blocks.
+// Long enough for AsyncTCP to drain the response.
 #define OTA_ADVERT_MIN_GAP_MS  10000UL   // airtime is shared -- one press per ten seconds
 #define OTA_ADVERT_DELAY_MS    1500      // lets the reply leave before the radio transmits
 #define OTA_CLOCK_SANITY_FLOOR 1700000000UL   // ~Nov 2023 -- rules out a stuck or truncated epoch
@@ -103,10 +103,8 @@ static void apUploadFail(ApUpload* upload, const char* reason) {
   apUploadRelease(upload);
 }
 
-// Routes outlive a session: AsyncWebServer holds them independently of the listening socket, and
-// re-registering on each start would stack duplicate handlers.
-// Formatted per request, not once at apStart: battery voltage and probation state both move
-// while the AP is up, and a page loaded later would otherwise show the first visitor's values.
+// Formatted per request, not once at apStart: battery voltage and probation state both
+// move while the AP is up.
 static const char* buildIdentity() {
   RollbackGuard::Slots sl = RollbackGuard::slots();
   RollbackGuard::ProbationState pr = RollbackGuard::probation();
@@ -262,9 +260,8 @@ static void apStart(const char* id, char* reply) {
   sprintf(reply, "Started: http://%s/update", WiFi.softAPIP().toString().c_str());
 }
 
-// Ending the server frees the listening socket, so the port is released and a later `start ota`
-// binds again. softAPdisconnect stays in its wifi-on form -- the wifi-off form hung a Heltec V4 --
-// so the mode captured at start is restored separately, leaving no radio up that was not up before.
+// softAPdisconnect stays in its wifi-on form: the wifi-off form hangs a Heltec V4, so the
+// mode captured at start is restored separately.
 static bool apTeardown() {
   ota_server.end();
   // Ending the server destroys any in-flight request, freeing the state ap_upload_owner points at.

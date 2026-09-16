@@ -85,10 +85,8 @@ flasher:
   connect_note: "Put the board into flash mode first (hold PGM, tap RST, then release PGM), then connect over USB."
   post_flash_note: "Press RST once to put the board back into normal operation."
 
-  # Sent over serial after a flash, before the location settings from member-config-*.json, so a
-  # region can override a board default. No `reboot` here -- the flasher sends that raw afterwards.
-  # ota.fw.url must point at this exact board+variant's image, not a generic path.
-  # Not seeded: `powersaving on` -- light sleep has no serial wake source, so later commands drop.
+  # Sent after a flash, before the location settings, so a region can override a board
+  # default. Never `powersaving on`: light sleep has no serial wake, so later commands drop.
   post_flash_commands:
     repeater:
       - "set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin"

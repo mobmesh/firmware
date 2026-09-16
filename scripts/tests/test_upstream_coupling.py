@@ -19,9 +19,8 @@ GENERATOR_SPEC = importlib.util.spec_from_file_location("generate_board_config_c
 generator = importlib.util.module_from_spec(GENERATOR_SPEC)
 GENERATOR_SPEC.loader.exec_module(generator)
 
-# Upstream objects a mod might reach through. Matched in `x->y` and `x.y` form both --
-# power-guard reaches enterDeepSleep by the global `board` and by `_board->`, so a grep
-# for the arrow form alone sees half the surface.
+# Matched in `x->y` and `x.y` form both: power-guard reaches enterDeepSleep by the global
+# `board` and by `_board->`, so the arrow form alone sees half the surface.
 HOLDERS = ["board", "_board", "prefs", "_prefs", "callbacks", "_callbacks",
            "rtc_clock", "radio_driver", "sensors", r"getRTCClock\(\)"]
 
@@ -30,9 +29,8 @@ CALL_RE = re.compile(
 )
 COMMENT_RE = re.compile(r"//.*$|/\*.*?\*/", re.DOTALL)
 
-# Reaching upstream is the job of these files, not a violation in them. ModHooks is the
-# adapter; variants/ is board mechanism, which conventions.md puts on the hardware side
-# of the line deliberately. Any mod may add a body to either.
+# Reaching upstream is the job of these files, not a violation in them: ModHooks is the
+# adapter, variants/ is board mechanism. Any mod may add a body to either.
 ADAPTER_FILES = {"src/helpers/ModHooks.cpp", "src/helpers/ModHooks.h"}
 
 
@@ -40,11 +38,6 @@ def is_adapter(path):
     return path in ADAPTER_FILES or path.startswith("variants/")
 
 
-# The two reaches that stay. CommonCLICallbacks is the CLI's own accessor for its own
-# strings, reached from inside a CommonCLI method body -- a free hook cannot see `_callbacks`
-# without inventing a global, and the interface exists to be called from exactly here.
-# Empty since the CLI hook moved to MyMesh: the `ver` branch takes the version and build
-# date as arguments from the call site, so nothing reaches CommonCLI's callbacks any more.
 ALLOWED_REACHES = set()
 
 

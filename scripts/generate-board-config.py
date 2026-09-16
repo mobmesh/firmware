@@ -51,9 +51,8 @@ from project_config import (
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SYMBOL_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-# Bootloader isn't part of the partition table itself -- its flash offset is
-# a fixed constant per chip family (ESP-IDF/Arduino convention), not encoded
-# in partitions.bin.
+# The bootloader offset is a fixed per-chip-family constant, not encoded in
+# partitions.bin.
 BOOTLOADER_OFFSET_BY_MCU_PREFIX = {
     "esp32": "0x1000",     # original ESP32 only
     "esp32s2": "0x0",
@@ -383,10 +382,8 @@ def load_upstream_board_json(upstream_dir: Path, board: str) -> dict:
         with path.open() as f:
             return json.load(f)
 
-    # Not every board upstream builds actually ships a boards/<name>.json -- xiao_c3 has a
-    # working variants/xiao_c3/ but no such file. Fall back to a copy of this chip's
-    # PlatformIO board manifest vendored in this repo (see variants/<board>/board.json's
-    # own _source_note for provenance) rather than failing outright.
+    # Not every board upstream builds ships a boards/<name>.json -- xiao_c3 has none.
+    # Fall back to the vendored copy rather than failing outright.
     fallback_path = REPO_ROOT / "variants" / board / "board.json"
     if fallback_path.exists():
         with fallback_path.open() as f:
@@ -411,17 +408,11 @@ def cmd_boards_json(args):
         "label": board.flasher.label,
         "connectNote": board.flasher.connect_note,
         "postFlashNote": board.flasher.post_flash_note,
-        # True when this board's partition table (variants/<board>/overrides.yaml's
-        # partitions_override) differs from upstream's stock scheme -- e.g. a resized
-        # spiffs partition. The web flasher uses this to know when it can't assume an
-        # already-flashed device's on-flash partition table matches this one, and must
-        # probe the running firmware first (see pages/flasher/src/flow.js) rather than offer an
-        # in-place "Update" blind.
+        # True when this board's table differs from upstream's stock scheme, so the web
+        # flasher must probe a flashed device rather than offer an in-place Update blind.
         "partitionsOverridden": bool(board.partitions_override),
-        # How to boot this board under emulation: the machine and binary, and the board
-        # wiring the device models take as run-time properties. Absent, or enabled: false,
-        # means the QEMU boot check skips this board rather than failing it -- for a board
-        # whose hardware there is no model for.
+        # Absent, or enabled: false, means the QEMU boot check skips this board rather
+        # than failing it -- for hardware there is no device model for.
         "qemu": {
             "enabled": board.qemu.enabled,
             "machine": board.qemu.machine,
@@ -453,11 +444,8 @@ def cmd_boards_json(args):
         "firmwareFile": args.firmware_file,
     }
 
-    # Optional per-variant CLI settings from overrides.yaml's
-    # flasher.post_flash_commands. The flasher prepends these to the location
-    # commands from the per-area settings under pages/flasher/data/, so a region can
-    # override a board default. Omitted entirely when a variant has none, which
-    # the flasher reads as an empty list.
+    # The flasher prepends these to the per-area location commands, so a region can
+    # override a board default. Omitted entirely when a variant has none.
     post_flash = board.flasher.post_flash_commands.get(args.variant_id)
     if post_flash:
         variant_entry["postFlashCommands"] = list(post_flash)
@@ -642,9 +630,8 @@ def cmd_inject_env(args):
     seen_src_filter = set()
 
     for mod_name in mods:
-        # A mod that ships its own source declares its flags once, in mod.yaml, and its
-        # build_src_filter is derived from what is actually under files/ rather than
-        # restated by hand. Sidecars still carry both for mods that are patch-only.
+        # build_src_filter is derived from what is under files/, never restated by hand.
+        # Sidecars still carry both for mods that are patch-only.
         definition = load_mod_definition(mod_name)
         mod_src = REPO_ROOT / "mods" / mod_name / "files" / "src"
         declared = [{"env_flag": f} for f in definition.env_flags]
@@ -687,9 +674,8 @@ def cmd_inject_env(args):
         else:
             override_flag_lines.append(f"-D {key}={value}")
 
-    # Raw flags appended after upstream's own, so they win when both set the same
-    # macro (e.g. "-UDISPLAY_CLASS"). Prepended flags cannot. Board-level first,
-    # then this target's.
+    # Appended after upstream's own so they win when both set the same macro
+    # (e.g. "-UDISPLAY_CLASS"); prepended flags cannot.
     append_flag_lines = list(board_profile.build_flags_append)
     append_flag_lines += [f.strip() for f in (getattr(args, "append_flags", "") or "").split(",") if f.strip()]
 
@@ -719,18 +705,16 @@ def cmd_inject_env(args):
                 f"error: [env:{env}] in {ini_path} already has a board_build.partitions line "
                 "-- refusing to insert a duplicate"
             )
-        # The CSV lives in this repo (variants/<board>/), not in the freshly-cloned upstream
-        # tree -- vendor it in before the build, since board_build.partitions is meaningless
-        # if PlatformIO can't actually find the file at build time.
+        # The CSV lives in this repo, not the freshly-cloned upstream tree: vendor it in
+        # before the build or PlatformIO cannot find it.
         src_csv = REPO_ROOT / "variants" / board / partitions_override
         if not src_csv.exists():
             sys.exit(f"error: partitions_override '{partitions_override}' for board '{board}' "
                       f"not found at {src_csv}")
         dest_csv = ini_path.parent / partitions_override
         shutil.copy(src_csv, dest_csv)
-        # board_build.partitions resolves relative to the PlatformIO project root (where `pio
-        # run` is invoked), not relative to this variant's own platformio.ini -- so the injected
-        # value must include the variants/<board>/ prefix, not just the bare filename.
+        # board_build.partitions resolves against the PlatformIO project root, not this
+        # variant's platformio.ini, so the value needs the variants/<board>/ prefix.
         project_relative_path = f"variants/{board}/{partitions_override}"
         section_lines[bf_idx:bf_idx] = [f"board_build.partitions = {project_relative_path}\n"]
         bf_idx += 1
