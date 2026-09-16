@@ -88,17 +88,17 @@ Before publishing:
 ### Normal publication
 
 ```text
-Publisher -> Repeater A -> Repeater B -> Consumer C ->  Repeater D -> ...
- capture      relay          relay         relay          relay
- sign                                      subscribed?
- send                                      collect ->
-                                           verify -> 
-                                           save -> 
-                                           activate
+Publisher -> Repeater A -> Repeater B -> Subscriber C ->  Repeater D -> ...
+ capture      relay          relay        relay            relay
+ sign                                     subscribed?
+ send                                     collect ->
+                                          verify -> 
+                                          save -> 
+                                          activate
 ```
 
 - Repeaters can relay updates without subscribing or trusting the publisher.
-- Only publishers and consumers need firmware with `sync-settings`; all intermediate repeaters can run stock MeshCore.
+- Only publishers and subscribers need firmware with `sync-settings`; all intermediate repeaters can run stock MeshCore.
 - Consumers also pass traffic onward when local forwarding rules allow it.
 - Relaying still follows local forwarding rules; denied routes can stop a flood.
 - The old overlay stays active until the complete replacement is ready.
