@@ -4604,8 +4604,6 @@
     ["set ota.wan.wifi ", "Set OTA WiFi credentials: ssid,password"],
     ["get ota.wan.pwr", "Get the WAN power switch state"],
     ["set ota.wan.pwr ", "Set the WAN power switch (on|off)"],
-    ["set ota.fw.sha256 ", "Set the firmware SHA-256 (RAM only)"],
-    ["set ota.fw.sha256 clear", "Clear the firmware SHA-256"],
     ["set ota.fw.marker ", "Marker check for the next OTA (on|off)"],
     ["get ota.slot", "Show OTA slots and rollback state"],
     ["ota slot boot ", "Boot into OTA slot A or B"],

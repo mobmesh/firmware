@@ -9,7 +9,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <time.h>
-#include <Utils.h>                    // mesh::Utils::fromHex
 #include <helpers/TxtDataHelpers.h>   // StrHelper lives here, no standalone StrHelper.h
 #include <helpers/ModHooks.h>          // modClockSet()
 #include "RollbackGuard.h"             // probation state -- see start()
@@ -79,7 +78,6 @@ bool HotspotOTA::runningMetadata(char* version, char* sha, char* role) {
 }
 
 static bool marker_bypass = false;   // RAM-only, one-time
-static char manual_sha256_hex[65] = {0};   // RAM-only -- see `set ota.fw.sha256`
 
 enum class OtaServiceState : uint8_t {
   Idle,
@@ -99,7 +97,6 @@ enum class OtaServiceState : uint8_t {
 static portMUX_TYPE service_mux = portMUX_INITIALIZER_UNLOCKED;
 static OtaServiceState service_state = OtaServiceState::Idle;
 static HotspotOtaConfig service_config;
-static char service_sha256_hex[65] = {0};
 static char service_result[MAX_TEXT_LEN] = {0};
 static size_t service_written = 0;
 static int service_total = -1;
@@ -160,14 +157,6 @@ static bool advanceServiceState(OtaServiceState state) {
 
 void HotspotOTA::setMarkerBypass(bool on) {
   marker_bypass = on;
-}
-
-void HotspotOTA::setSha256Hex(const char* hex) {
-  StrHelper::strncpy(manual_sha256_hex, hex, sizeof(manual_sha256_hex));
-}
-
-const char* HotspotOTA::getSha256Hex() {
-  return manual_sha256_hex;
 }
 
 // Collects just enough of the stream to read the metadata block, then stops caring.
@@ -309,12 +298,6 @@ static void closeNow(HTTPClient& http) {
   http.end();
 }
 
-// The only hash that does not come from the same server as the image, so this path stays.
-static bool resolvePinnedHash(const char* manual_hex, uint8_t expect[32]) {
-  if (manual_hex[0] == 0) return false;
-  return mesh::Utils::fromHex(expect, 32, manual_hex);
-}
-
 // Drains then closes, BEFORE Update.abort() at every abort site -- hardware testing showed the
 // order matters. Bounded by OTA_HTTP_TIMEOUT_MS, so a server that stops sending cannot hang it.
 static void drainAndClose(HTTPClient& http) {
@@ -330,8 +313,7 @@ static void drainAndClose(HTTPClient& http) {
   http.end();
 }
 
-static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check,
-                       const char* sha256_hex, char reply[]) {
+static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, char reply[]) {
   if (cfg.ssid[0] == 0 || cfg.url[0] == 0) {
     strcpy(reply, "ERR: ota.wan.wifi not configured");
     return false;
@@ -357,9 +339,6 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check,
     WiFi.disconnect(true);
     return false;
   }
-
-  uint8_t pinned[32];
-  bool have_pinned = resolvePinnedHash(sha256_hex, pinned);
 
   setServiceState(OtaServiceState::Opening);
   HTTPClient http;
@@ -401,15 +380,8 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check,
     return false;
   }
 
-  // A pin covers the whole file, the embedded digest all but its own 32 bytes. One or the other.
-  mbedtls_sha256_context pinned_ctx;
   TrailingDigest trailing;
-  if (have_pinned) {
-    mbedtls_sha256_init(&pinned_ctx);
-    mbedtls_sha256_starts(&pinned_ctx, 0);
-  } else {
-    trailing.begin();
-  }
+  trailing.begin();
   HeaderInspector header;
   bool header_judged = false;
 
@@ -424,8 +396,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check,
       strcpy(reply, "ERR: canceled");
       closeNow(http);
       Update.abort();
-      if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
-      else trailing.release();
+      trailing.release();
       digitalWrite(PIN_HOTSPOT_PWR, LOW);
       WiFi.disconnect(true);
       return false;
@@ -436,8 +407,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check,
         strcpy(reply, "ERR: download stalled");
         closeNow(http);
         Update.abort();
-        if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
-        else trailing.release();
+        trailing.release();
         digitalWrite(PIN_HOTSPOT_PWR, LOW);
         WiFi.disconnect(true);
         return false;
@@ -452,17 +422,12 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check,
       strcpy(reply, "ERR: flash write failed");
       drainAndClose(http);   // network torn down before touching Update state -- see drainAndClose()
       Update.abort();
-      if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
-      else trailing.release();
+      trailing.release();
       digitalWrite(PIN_HOTSPOT_PWR, LOW);
       WiFi.disconnect(true);
       return false;
     }
-    if (have_pinned) {
-      mbedtls_sha256_update(&pinned_ctx, buf, n);
-    } else {
-      trailing.feed(buf, n);
-    }
+    trailing.feed(buf, n);
     header.feed(buf, n);
     written += n;
     setServiceProgress(written, len);
@@ -500,8 +465,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check,
         if (refusal != reply) strcpy(reply, refusal);
         closeNow(http);   // network torn down before touching Update state -- see drainAndClose()
         Update.abort();
-        if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
-        else trailing.release();
+        trailing.release();
         digitalWrite(PIN_HOTSPOT_PWR, LOW);
         WiFi.disconnect(true);
         return false;
@@ -513,8 +477,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check,
   if (!advanceServiceState(OtaServiceState::Verifying)) {
     strcpy(reply, "ERR: canceled");
     Update.abort();
-    if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
-    else trailing.release();
+    trailing.release();
     digitalWrite(PIN_HOTSPOT_PWR, LOW);
     WiFi.disconnect(true);
     return false;
@@ -523,8 +486,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check,
   if (len > 0 && written != len) {
     strcpy(reply, "ERR: download incomplete");
     Update.abort();
-    if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
-    else trailing.release();
+    trailing.release();
     digitalWrite(PIN_HOTSPOT_PWR, LOW);
     WiFi.disconnect(true);
     return false;
@@ -534,23 +496,14 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check,
   if (!bypass_marker_check && !header_judged) {
     strcpy(reply, "ERR: not a hotspot ota build (truncated), would lose remote-update ability -- aborting");
     Update.abort();
-    if (have_pinned) mbedtls_sha256_free(&pinned_ctx);
-    else trailing.release();
+    trailing.release();
     digitalWrite(PIN_HOTSPOT_PWR, LOW);
     WiFi.disconnect(true);
     return false;
   }
 
-  bool hash_ok;
-  if (have_pinned) {
-    uint8_t digest[32];
-    mbedtls_sha256_finish(&pinned_ctx, digest);
-    mbedtls_sha256_free(&pinned_ctx);
-    hash_ok = memcmp(digest, pinned, 32) == 0;
-  } else {
-    hash_ok = trailing.matches();
-    trailing.release();
-  }
+  bool hash_ok = trailing.matches();
+  trailing.release();
   if (!hash_ok) {
     strcpy(reply, "ERR: SHA-256 mismatch");
     Update.abort();
@@ -575,17 +528,15 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check,
 
 static void serviceTaskMain(void*) {
   HotspotOtaConfig cfg;
-  char sha256_hex[65];
   bool bypass_marker_check;
 
   portENTER_CRITICAL(&service_mux);
   cfg = service_config;
-  memcpy(sha256_hex, service_sha256_hex, sizeof(sha256_hex));
   bypass_marker_check = service_bypass_marker;
   portEXIT_CRITICAL(&service_mux);
 
   char result[MAX_TEXT_LEN] = {0};
-  bool ok = runService(cfg, bypass_marker_check, sha256_hex, result);
+  bool ok = runService(cfg, bypass_marker_check, result);
   digitalWrite(PIN_HOTSPOT_PWR, LOW);
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
@@ -628,7 +579,6 @@ bool HotspotOTA::start(const HotspotOtaConfig& cfg, char reply[]) {
   bool busy = serviceIsActive(service_state) || service_state == OtaServiceState::Succeeded;
   if (!busy) {
     service_config = cfg;
-    StrHelper::strncpy(service_sha256_hex, manual_sha256_hex, sizeof(service_sha256_hex));
     service_bypass_marker = marker_bypass;
     marker_bypass = false;
     service_cancel_requested = false;

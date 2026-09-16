@@ -1212,7 +1212,7 @@ every release.
 
 **Note:** Requires `ota.wan.wifi` to be set first (see below). Joins the configured WiFi network as
 a station, downloads the file, verifies it against the SHA-256 the image carries in its own final
-32 bytes (or against `ota.fw.sha256` when one has been pinned), confirms the download is actually a
+32 bytes, confirms the download is actually a
 build of this project (refuses otherwise, even if the checksum matches -- catches `<url>` mistakenly
 pointing at a different, unmodified MeshCore build), and queues the service with an immediate
 `OK - OTA queued` response. The service reboots on success and leaves the current firmware running
@@ -1312,24 +1312,6 @@ need to be resupplied for future updates unless the network's credentials change
 
 ---
 
-#### View or change the manually-supplied firmware hash used by `start ota wan`
-**Usage:**
-- `set ota.fw.sha256 <hex>`
-- `set ota.fw.sha256 clear`
-
-**Parameters:**
-- `hex`: 64-character lowercase hex SHA-256 digest of the target firmware `.bin`
-
-**Note:** RAM-only — cleared on every boot, never persisted. Pinning a hash here is the only
-integrity check that does not come from the same host as the image, so it is what to use when the
-source is not trusted. Once set it takes precedence over the image's own embedded digest. `set
-ota.fw.sha256 clear` returns to that digest — do this before pointing `start ota wan` at a different
-firmware image, or a stale pin will block it.
-
-**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
-
----
-
 #### View or change the default URL used by `start ota wan update`
 **Usage:**
 - `get ota.fw.url`
@@ -1338,7 +1320,7 @@ firmware image, or a stale pin will block it.
 **Parameters:**
 - `url`: HTTP(S) URL of the firmware `.bin` to download and flash
 
-**Note:** Persisted — unlike `ota.fw.sha256`/`ota.fw.marker`, this names a stable download location
+**Note:** Persisted — unlike `ota.fw.marker`, this names a stable download location
 for this device rather than a one-time override. Overwrite to change it; there is no `clear`.
 Rejects (does not truncate) a URL longer than the field allows.
 

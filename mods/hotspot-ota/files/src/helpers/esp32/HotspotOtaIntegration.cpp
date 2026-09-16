@@ -446,9 +446,6 @@ static bool handleSet(char* command, char* reply) {
     } else {
       strcpy(reply, "ERR: expected <ssid>,<password>");
     }
-  } else if (memcmp(config, "ota.fw.sha256 ", 14) == 0) {
-    HotspotOTA::setSha256Hex(memcmp(&config[14], "clear", 5) == 0 ? "" : &config[14]);
-    strcpy(reply, "OK");
   } else if (memcmp(config, "ota.fw.url ", 11) == 0) {
     HotspotOtaConfig cfg;
     HotspotOTA::loadConfig(cfg);

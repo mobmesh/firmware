@@ -2,8 +2,7 @@
 #include <Arduino.h>
 #include <helpers/BaseChatMesh.h>   // MAX_TEXT_LEN
 
-// Persisted separately from NodePrefs, its own SPIFFS file. sha256_hex is deliberately not a
-// member here -- it's RAM-only (see setSha256Hex()/getSha256Hex()), not persisted with the rest.
+// Persisted separately from NodePrefs, its own SPIFFS file.
 struct HotspotOtaConfig {
   char ssid[32];
   char password[64];
@@ -40,11 +39,6 @@ namespace HotspotOTA {
 
   void setPower(bool on);   // manual GPIO47 control, independent of the OTA service
   bool getPower();
-
-  // Pins the whole-file hash -- RAM-only, cleared every boot. `clear` returns to the
-  // image's own embedded digest.
-  void setSha256Hex(const char* hex);
-  const char* getSha256Hex();
 
   void setMarkerBypass(bool on);   // RAM-only, one-time -- see `set ota.fw.marker`
 

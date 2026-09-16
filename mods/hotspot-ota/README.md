@@ -46,8 +46,6 @@ These commands are available on devices built with this mod. They can be used al
 | Command                                         | Description                                                                                                                                                                                                                                                                   |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `set ota.wan.wifi <ssid>,<password>`            | Saves the WiFi network and password that will be used for future updates. The settings survive firmware updates, so you only need to set them once.                                                                                                                           |
-| `set ota.fw.sha256 <hex>`                       | Sets the expected SHA-256 checksum for the next firmware download. This takes priority over a checksum downloaded automatically. The value is kept in RAM and is cleared after every reboot.                                                                                  |
-| `set ota.fw.sha256 clear`                       | Clears a manually configured checksum so the automatically downloaded checksum can be used again.                                                                                                                                                                             |
 | `start ota wan <url>`                           | Connects to the configured WiFi network, downloads the firmware from `<url>`, verifies it, checks that it is actually a build from this project, and flashes it.                                                                                                              |
 | `set ota.fw.url <url>`                          | Saves a default firmware URL. This setting can only be overwritten and cannot be cleared.                                                                                                                                                                                     |
 | `start ota wan update`                          | Same as `start ota wan <url>`, but uses the saved `ota.fw.url`. If no URL has been configured, the command returns `ota.fw.url not configured`. This shorter command is useful for remote updates over LoRa, where every character matters.                                   |
@@ -69,7 +67,7 @@ set ota.wan.wifi MyHotspot,hunter2
 start ota wan https://example.com/firmware/heltec_v4_repeater-v1.16.0.bin
 ```
 
-The firmware is verified against a SHA-256 the image carries in its own final 32 bytes, so nothing is fetched but the image. You only need to set a checksum manually when the firmware comes from a source you do not trust to serve it honestly.
+The firmware is verified against a SHA-256 the image carries in its own final 32 bytes, so nothing is fetched but the image.
 
 For complete details about these commands, see `docs/cli-additions.md`. The standard MeshCore CLI commands are documented in the upstream `docs/cli_commands.md`.
 
