@@ -163,6 +163,23 @@ jobs:
             fi
           fi
 
+          # --- 5. does upstream still serial-gate the stats commands? ---------------
+          # power-guard forwards these over the mesh by re-dispatching with timestamp 0.
+          # A rename, a removal, or a second gate breaks that silently: no patch conflicts
+          # and the tree still compiles, so only a grep catches it.
+          if [ -d probe-src ] && echo " $MODS " | grep -q " power-guard "; then
+            for cmd in stats-core stats-radio stats-packets; do
+              len=${#cmd}
+              if grep -qE "sender_timestamp == 0 && memcmp\\(command, \"$cmd\", $len\\)" \
+                probe-src/src/helpers/CommonCLI.cpp 2>/dev/null; then
+                echo "- upstream still serial-gates \`$cmd\` on \`sender_timestamp == 0\`; power-guard's remote forward relies on it" >> "$REPORT"
+              else
+                DRIFT=true
+                echo "- upstream's \`$cmd\` serial gate changed shape -- power-guard may forward a command that no longer exists, or one that is now blocked for another reason (see mods/power-guard/README.md)" >> "$REPORT"
+              fi
+            done
+          fi
+
           echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"
           # Appended, not merged into $REPORT: the explanations are collapsed detail under
           # the summary lines, and only exist when something failed.
