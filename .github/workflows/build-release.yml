@@ -455,7 +455,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           QEMU_REPO: HeyVern/espressif-qemu
-          QEMU_TAG: v9.2.2
+          QEMU_TAG: v9.2.2-2
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libgcrypt20 libpixman-1-0 libsdl2-2.0-0 zstd
