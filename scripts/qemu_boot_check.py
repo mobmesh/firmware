@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
 # Boots a real, unmodified release firmware image in QEMU and holds a conversation with it.
+# A pass means the node answered: absence of a crash is not a pass, since an image that
+# never executes an application instruction produces no crash either.
 #
-# A pass means the node came up and answered: the emulator models the LoRa radio, the flash
-# and the SoC's USB console, so the firmware reaches loop() and serves its CLI exactly as it
-# does on hardware. Absence of a crash is not a pass -- an image that never executes an
-# application instruction produces no crash either.
-#
-# Which commands run depends on the image. The mod bit register (mods/bit-registry.md) says
-# which mods were built in, so a mod's CLI is only exercised when its bit is set.
-#
-# The image under test is never opened for writing: booting a node writes to its flash --
-# SPIFFS, NVS, the identity it generates on first boot -- so QEMU is always pointed at a
-# freshly composed copy in the workdir. The vendored artifacts are hashed before and after
-# to prove it.
+# The mod bit register says which mods were built in, so a mod's CLI is only exercised when
+# its bit is set. QEMU is always pointed at a freshly composed copy, never the image under
+# test: booting a node writes SPIFFS, NVS and a first-boot identity to its flash.
 
 import argparse
 import hashlib

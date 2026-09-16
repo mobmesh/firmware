@@ -1,11 +1,9 @@
-# Single source of truth for what gets built and released: which (board, role) combinations
-# exist and what goes into each. Board hardware facts live in variants/<board>/overrides.yaml.
+# What gets built and released. Board hardware facts live in variants/<board>/overrides.yaml,
+# and resolve-targets computes asset_basename as <board>_<role_abbrev>_mobmesh.
 #
-# Every target lists every mod it wants -- nothing is applied by default except core_mods.
-# asset_basename isn't here; resolve-targets computes it as <board>_<role_abbrev>_mobmesh.
-#
-# vendor_flasher_assets: exactly one target per BOARD, since each board's bootloader.bin/
-# partitions.bin/boot_app0.bin are partition-table specific and never shared between boards.
+# Every target lists every mod it wants; nothing applies by default except core_mods.
+# vendor_flasher_assets: exactly one target per BOARD, since bootloader.bin, partitions.bin
+# and boot_app0.bin are partition-table specific and never shared between boards.
 
 # Applied to every target, in this order, before any target-specific mods below.
 # A mod that stops shipping everywhere belongs in a target's own `mods:` list instead.

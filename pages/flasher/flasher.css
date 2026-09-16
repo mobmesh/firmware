@@ -1,7 +1,5 @@
-/* flasher.css
-   Components the shared sheet does not have yet. Kept separate only while the
-   design language is being settled — it folds into shared/style.css at cutover,
-   so nothing here may redefine a shared token. */
+/* Components the shared sheet does not have yet.
+   Nothing here may redefine a shared token. */
 
 :root {
   /* A floor, not a ceiling: short steps pad out to it, long ones grow past rather

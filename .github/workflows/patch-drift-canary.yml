@@ -1,8 +1,7 @@
 # Early warning for patch drift. Never builds, never publishes.
 #
-# build-release only notices drift when upstream tags a release, which is the worst moment
-# to find out, so this probes upstream's moving branches daily. It also flags patches that
-# have stopped being needed -- one duplicating a merged upstream fix still applies cleanly.
+# build-release only notices drift when upstream tags a release, so this probes the moving
+# branches daily. It also flags patches duplicating a merged fix, which still apply cleanly.
 name: patch-drift-canary
 
 on:

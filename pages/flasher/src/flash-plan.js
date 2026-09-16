@@ -349,9 +349,8 @@ function absoluteStockAsset(path) {
 }
 
 /**
- * Corrections we maintain over upstream's catalogue: maker display names and logos,
- * device artwork, and `hidden`. Absent or unreadable applies nothing — an override file
- * is a nicety and must never cost a user their flash.
+ * Corrections over upstream's catalogue. Absent or unreadable applies nothing: an
+ * override file must never cost a user their flash.
  */
 async function loadCatalogueOverrides() {
   try {
@@ -468,9 +467,8 @@ const OTAFIX_NOTICES = new Set(['otafixNeeded', 'otafixRecommended']);
 const OTAFIX_VERSION_RE = /OTAFIX(\d+(?:\.\d+)*)/i;
 
 /**
- * True when a `get bootloader.ver` answer already carries OTAFIX >= 2.2 — the gate's "skip,
- * already fine" reading. A missing or unparsable answer returns false: "cannot tell" means
- * offer the update, never skip on silence.
+ * True when the answer already carries OTAFIX >= 2.2. Missing or unparsable returns
+ * false: "cannot tell" offers the update rather than skipping on silence.
  */
 export function bootloaderAlreadyCurrent(answer) {
   const match = OTAFIX_VERSION_RE.exec(answer ?? '');
@@ -480,10 +478,8 @@ export function bootloaderAlreadyCurrent(answer) {
 }
 
 /**
- * The bootloader UF2 for a device, or null when upstream flags no notice or ships no file
- * (Muzi Works R1 Neo: notice with no bootloader files at all — deliberate null, not a miss).
- * Throws on more than one `.uf2` candidate (Xiao nRF52 WIO's `_ble`/`_ble_sense` pair) rather
- * than guessing, since a wrong pick writes another board's bootloader.
+ * Null when upstream flags no notice or ships no file. Throws on more than one `.uf2`
+ * candidate rather than guessing: a wrong pick writes another board's bootloader.
  */
 export function resolveBootloaderUpdate(device, entry) {
   if (!OTAFIX_NOTICES.has(entry?.notice)) return null;
@@ -697,10 +693,9 @@ export async function readUploadedFirmware(file) {
   return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()), blob: file };
 }
 
-/** The nRF52 package must parse before hardware is touched, not mid-transfer. */
 /**
- * Nordic legacy DFU update modes. `dfu.js` defines only `application`; the transport
- * underneath takes all four. Unverified on hardware beyond `application`.
+ * Nordic legacy DFU update modes. `dfu.js` defines only `application`, though the
+ * transport takes all four. Unverified on hardware beyond `application`.
  */
 export const DFU_UPDATE_MODES = {
   softdevice: 1,

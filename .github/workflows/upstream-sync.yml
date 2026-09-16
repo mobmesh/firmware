@@ -1,9 +1,7 @@
-# Daily pull of the mirrored upstream files. Never builds, never publishes; Pages
-# deployment stays manual, so every change here is reviewed before it goes live.
+# Daily pull of the mirrored upstream files. Never builds, never publishes.
 #
-# mc_config has no version tag and moves fast, so the job validates shape, never counts. It
-# names firmware by stream and pattern, so /releases is mirrored with it or the pair goes
-# out of step.
+# mc_config has no version tag and moves fast, so the job validates shape, never counts.
+# It names firmware by stream and pattern, so /releases must be mirrored with it.
 name: upstream-sync
 
 on:

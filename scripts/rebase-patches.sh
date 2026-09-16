@@ -2,10 +2,9 @@
 #
 # Rebase mods/*/patches/*.patch from one upstream ref onto another.
 #
-# Hand-editing 30+ hunks across a dozen files is how this used to go. Instead we
-# replay each patch as a commit on the OLD ref -- where it applies by definition --
-# and let git's three-way merge machinery move the commits to the NEW ref. Conflicts
-# then arrive as normal rebase conflicts with real context, not as "does not apply".
+# Each patch is replayed as a commit on the OLD ref, where it applies by definition, and
+# git's three-way merge moves the commits to the NEW ref. Conflicts then arrive as normal
+# rebase conflicts with real context rather than "does not apply".
 #
 #   ./scripts/rebase-patches.sh start repeater-v1.16.0 repeater-v1.17.0
 #     ... resolve conflicts, git -C <workdir> rebase --continue, repeat ...

@@ -45,9 +45,8 @@
   }
 
   /**
-   * Commands that reboot / wipe / enter modes that drop the USB link.
-   * After these we clear local connection state so the UI cannot pretend
-   * the previous session is still live.
+   * Commands that drop the USB link. Local connection state is cleared after these so
+   * the UI cannot pretend the previous session is still live.
    */
   function expectsDeviceDisconnect(line) {
     const cmd = String(line || "")
@@ -233,9 +232,8 @@
   }
 
   /**
-   * Reuse an already-authorized port before prompting, so a repeater paired in
-   * an earlier session reconnects without the picker. Same ladder as the
-   * flasher's port ladder (pages/flasher/src/serial-port.js).
+   * Reuse an already-authorized port before prompting, so a repeater paired in an
+   * earlier session reconnects without the picker.
    * @param {{baudRate?:number, forcePicker?:boolean}} [options]
    */
   async function connect(options) {

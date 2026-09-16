@@ -93,13 +93,9 @@ async function reacquireAfterTransition(before, heldPort, { prompt, onStatus, re
 }
 
 /**
- * Everything the CLI can tell us before a DFU transition, in one session: the bootloader
- * version the OTAFIX gate reads, and the settings the Upgrade path pre-fills from. DFU
- * serves no CLI, so this is the only window for either.
- *
- * Takes a closed port and returns it closed, like esp32's `resolveEsp32Mode`. Returns
- * `{ bootloaderVersion, config }`, both nullable — silence is "cannot tell", never
- * evidence that a device lacks a bootloader.
+ * Everything the CLI can tell us in one session before a DFU transition, which serves
+ * no CLI. Takes a closed port and returns it closed; both fields are nullable, and
+ * silence is "cannot tell", never evidence that a device lacks a bootloader.
  */
 export async function readAppState(port) {
   await port.open({ baudRate: CLI_BAUD_RATE });
@@ -116,14 +112,10 @@ export async function readAppState(port) {
 }
 
 /**
- * Writes a bootloader UF2 to the mounted drive via the file-system picker, then waits for
- * the device to come back as the application on USB. The bootloader boots the app once the
- * write lands — measured on a SenseCAP P1, never over DFU. `w.close()` throwing is normal:
- * the board reboots as the last block lands and the drive unmounts before close() settles.
- *
- * Must be called from a real click — `showSaveFilePicker()` needs a fresh user gesture, so
- * this cannot be called from a step's `run()` directly. Throw `FilePickerRequiredError`
- * there instead; the UI calls this from the checkpoint button it renders in response.
+ * Writes a bootloader UF2 to the mounted drive, then waits for the device to return as
+ * the application on USB. `w.close()` throwing is normal: the board reboots as the last
+ * block lands. Must be called from a real click -- throw `FilePickerRequiredError` from
+ * a step's `run()` instead.
  */
 export async function writeBootloaderUf2(appPort, bytes, suggestedName, { onStatus } = {}) {
   if (typeof window === 'undefined' || !window.showSaveFilePicker) {

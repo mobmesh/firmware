@@ -1,17 +1,13 @@
 /**
- * Gulf Coast region model: scope codes, names, adjacency, and the data-path helper.
- *
- * Mirrors the `region def` tree the flasher writes (pages/flasher/data/us-al-mob-settings.json):
+ * Gulf Coast region model, mirroring the `region def` tree the flasher writes
+ * (pages/flasher/data/us-al-mob-settings.json):
  *   us -> us-gc, us-southeast, us-south, us-east   (wider scopes, no geometry)
  *   us -> us-al -> us-al-mob, us-al-fhp, us-al-guf
  *         us-fl -> us-fl-pns
  *         us-ms
  *         us-la -> us-la-lft, us-la-msy
  *
- * us-la and its cities are ahead of the flasher's tree, which defines no
- * Louisiana node yet.
- *
- * Exposed as window.GCRegions (plain globals, no bundler needed).
+ * us-la and its cities run ahead of that tree, which defines no Louisiana node yet.
  * Data resolves relative to this file, not the page that loads it.
  */
 (function (global) {

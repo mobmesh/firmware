@@ -164,12 +164,9 @@ function stripGetMarker(answer) {
 }
 
 /**
- * The device's current name, position and admin-password presence, for pre-filling the
- * Upgrade path rather than overwriting what is already on the node. Read while the
- * application is still running — no transport serves this once the engine is entered.
- *
- * Every field is independently nullable: a device that answers nothing (the T1, a
- * factory-fresh board, Meshtastic) must degrade to blank fields, never fail the flow.
+ * Pre-fills the Upgrade path rather than overwriting what is on the node. Read while the
+ * application still runs, since no transport serves this once the engine is entered.
+ * Every field is independently nullable: a silent device degrades to blank fields.
  */
 export async function readNodeConfig(port, { timeoutMs = CLI_COMMAND_TIMEOUT_MS } = {}) {
   const session = startCliSession(port);

@@ -1,7 +1,6 @@
 /**
- * Region map: the GulfCoastMesh scope tree drawn over state areas and the
- * mapped repeater cities. Scope codes and places come from the configurator's
- * data so the two pages never disagree.
+ * The GulfCoastMesh scope tree drawn over state areas and mapped repeater cities. Scope
+ * codes and places come from the configurator's data so the two pages never disagree.
  */
 (function () {
   "use strict";
