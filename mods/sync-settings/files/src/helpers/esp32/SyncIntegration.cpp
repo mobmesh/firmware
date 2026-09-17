@@ -2529,10 +2529,19 @@ void syncLoop() {
 #endif
   const mobmesh::sync::InboxFrame* frame = mobmesh::sync::inbox.front();
   if (frame != nullptr) {
-    mobmesh::sync::receiver.take(frame->data, frame->len, millis(), modClockGet(),
-                                 frame->scoped, frame->key);
+    uint32_t taken_generation = 0;
+    if (frame->len > 4) {
+      taken_generation = mobmesh::sync::receiver.campaign(frame->data[4]).generation;
+    }
+    mobmesh::sync::ReceiveResult taken =
+        mobmesh::sync::receiver.take(frame->data, frame->len, millis(), modClockGet(),
+                                     frame->scoped, frame->key);
     if (frame->len > 4) {
       uint8_t dataset = frame->data[4];
+      // A payload that arrived whole and still would not decode is worth reporting.
+      if (taken == mobmesh::sync::RECEIVE_DECODE) {
+        mobmesh::sync::reportFor(dataset) = {taken_generation, mobmesh::sync::REPORT_DECODE};
+      }
       if (mobmesh::sync::receiver.campaign(dataset).state ==
           mobmesh::sync::RECEIVE_STAGED) {
         uint32_t generation = mobmesh::sync::receiver.campaign(dataset).generation;
