@@ -68,7 +68,7 @@ static Config config;
 static Publishers publishers;
 enum ReportReason : uint8_t {
   REPORT_NONE, REPORT_SIGN, REPORT_APPLY, REPORT_RESTORED,
-  REPORT_SETTLEMENT, REPORT_APPLIED,
+  REPORT_SETTLEMENT, REPORT_APPLIED, REPORT_DECODE,
 };
 struct RuntimeReport {
   uint32_t generation;
@@ -1986,6 +1986,7 @@ static bool reportCommand(uint8_t dataset, const char* page_text, char* reply) {
                 notice.reason == REPORT_SIGN ? "publication signing failed" :
                 notice.reason == REPORT_SETTLEMENT ? "applied; replay settlement pending" :
                 notice.reason == REPORT_APPLIED ? "applied; replay settled" :
+                notice.reason == REPORT_DECODE ? "compressed payload could not be decoded" :
                 notice.reason == REPORT_RESTORED ? "application failed; prior policy restored" :
                                                   "application failed; campaign released");
   return true;

@@ -45,6 +45,7 @@ enum ReceiveResult : uint8_t {
   RECEIVE_STORAGE,
   RECEIVE_MALFORMED,
   RECEIVE_INCOMPLETE,
+  RECEIVE_DECODE,
 };
 
 enum ReceiveState : uint8_t {
@@ -83,6 +84,7 @@ struct ReceiveOps {
 
 struct Campaign {
   uint8_t state;
+  uint8_t format;
   uint8_t publisher_key[32];
   uint16_t publisher_id;
   uint32_t generation;

@@ -138,6 +138,9 @@ ReceiveResult Receiver::manifest(const uint8_t* frame, size_t len,
   if (slot >= SYNC_SETTINGS_DATASET_COUNT || state_[slot] == nullptr ||
       !ops_.accepts(value.dataset, value.channel, ops_.context)) return RECEIVE_DISABLED;
 
+  // A compressed payload is unusable without a decompressor, so refuse it before locking.
+  if (value.format == FORMAT_DEFLATE && ops_.inflate == nullptr) return RECEIVE_DECODE;
+
   uint8_t manifest_hash[DIGEST_LEN];
   if (ops_.hash == nullptr) return RECEIVE_STORAGE;
   ops_.hash(frame, len, manifest_hash, ops_.context);
@@ -181,6 +184,7 @@ ReceiveResult Receiver::manifest(const uint8_t* frame, size_t len,
   }
 
   active.state = RECEIVE_ACTIVE;
+  active.format = value.format;
   memcpy(active.publisher_key, publisher->key, sizeof(active.publisher_key));
   active.publisher_id = publisher->id;
   active.generation = value.generation;
