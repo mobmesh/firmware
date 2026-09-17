@@ -815,6 +815,84 @@ static bool inflatePayload(const uint8_t* in, size_t in_len, uint8_t* out,
 }
 #endif
 
+#ifndef SYNC_SETTINGS_NO_ROM_MINIZ
+// 128 probes is miniz level 6; the ROM has no flag helper, so the value is set by hand.
+static const int DEFLATE_PROBES = 128;
+
+// Compresses into a buffer smaller than the input, so a payload that does not
+// shrink fails here rather than being measured afterwards.
+static uint8_t* deflateOnce(const uint8_t* in, uint16_t in_len, uint16_t& out_len) {
+  if (in == nullptr || in_len == 0) return nullptr;
+  tdefl_compressor* encoder = (tdefl_compressor*)heap_caps_malloc(
+      sizeof(tdefl_compressor), MALLOC_CAP_SPIRAM);
+  if (encoder == nullptr) return nullptr;
+  uint8_t* packed = (uint8_t*)malloc(in_len);
+  if (packed == nullptr) {
+    heap_caps_free(encoder);
+    return nullptr;
+  }
+  tdefl_init(encoder, nullptr, nullptr, DEFLATE_PROBES);
+  size_t consumed = in_len;
+  size_t produced = in_len;
+  tdefl_status status = tdefl_compress(encoder, in, &consumed, packed, &produced,
+                                       TDEFL_FINISH);
+  heap_caps_free(encoder);
+  if (status != TDEFL_STATUS_DONE || consumed != in_len || produced == 0 ||
+      produced >= in_len) {
+    free(packed);
+    return nullptr;
+  }
+  // Nothing is published that this node cannot itself decode back to the original.
+  uint8_t* check = (uint8_t*)malloc(in_len);
+  if (check == nullptr) {
+    free(packed);
+    return nullptr;
+  }
+  size_t back = 0;
+  bool same = inflatePayload(packed, produced, check, in_len, back, nullptr) &&
+              back == in_len && memcmp(check, in, in_len) == 0;
+  free(check);
+  if (!same) {
+    free(packed);
+    return nullptr;
+  }
+  out_len = (uint16_t)produced;
+  return packed;
+}
+
+// The ROM coder needs more stack than the CLI runs on, so it gets its own task.
+struct DeflateJob {
+  const uint8_t* in;
+  uint16_t in_len;
+  uint16_t out_len;
+  uint8_t* out;
+  SemaphoreHandle_t done;
+};
+
+// Measured worst case is 7,008 bytes with a full REGION_DATA_MAX payload.
+static const uint32_t DEFLATE_STACK = 12288;
+
+static void deflateTask(void* argument) {
+  DeflateJob* job = static_cast<DeflateJob*>(argument);
+  job->out = deflateOnce(job->in, job->in_len, job->out_len);
+  xSemaphoreGive(job->done);
+  vTaskDelete(nullptr);
+}
+
+static uint8_t* deflatePayload(const uint8_t* in, uint16_t in_len, uint16_t& out_len) {
+  DeflateJob job = {in, in_len, 0, nullptr, xSemaphoreCreateBinary()};
+  if (job.done == nullptr) return nullptr;
+  if (xTaskCreate(deflateTask, "syncdeflate", DEFLATE_STACK, &job, 1, nullptr) != pdPASS) {
+    vSemaphoreDelete(job.done);
+    return nullptr;
+  }
+  xSemaphoreTake(job.done, portMAX_DELAY);
+  vSemaphoreDelete(job.done);
+  out_len = job.out_len;
+  return job.out;
+}
+#endif
+
 static ReceiveOps receive_ops = {
   acceptsCampaign, verifyFrame, hash, allocateFrame, releaseFrame,
   persistReplay, validateDataset, applyCampaign,
@@ -1145,7 +1223,7 @@ static bool nextGeneration(const DatasetState& current, const uint8_t publisher[
 }
 
 static bool publish(uint8_t dataset, const char* route, const char* channel,
-                    bool reset, bool empty, char* reply) {
+                    bool reset, bool empty, bool raw, char* reply) {
   DatasetState& current = stateFor(dataset);
   bool state_ready = dataset == REGION ? region_state_ready
                                        : policy_state_ready
@@ -1258,18 +1336,41 @@ static bool publish(uint8_t dataset, const char* route, const char* channel,
     return true;
   }
 
+  uint8_t* wire = data;
+  uint16_t wire_len = data_len;
+  uint8_t format = FORMAT_RAW;
+#ifndef SYNC_SETTINGS_NO_ROM_MINIZ
+  // Compression only pays when it removes a whole frame from every round.
+  if (!raw && chunkCount(data_len) > 1) {
+    uint16_t packed_len = 0;
+    uint8_t* packed = deflatePayload(data, data_len, packed_len);
+    if (packed != nullptr) {
+      if (chunkCount(packed_len) < chunkCount(data_len)) {
+        wire = packed;
+        wire_len = packed_len;
+        format = FORMAT_DEFLATE;
+      } else {
+        free(packed);
+      }
+    }
+  }
+#else
+  (void)raw;
+#endif
+
   Manifest manifest = {};
   manifest.dataset = dataset;
-  manifest.format = 1;
+  manifest.format = format;
   manifest.reset = reset;
   manifest.days = current.duration_days;
   manifest.generation = generation;
   memcpy(manifest.channel, channel, channel_len + 1);
-  manifest.data_len = data_len;
-  manifest.chunks = chunkCount(data_len);
+  manifest.data_len = wire_len;
+  manifest.chunks = chunkCount(wire_len);
   uint8_t fingerprint[DIGEST_LEN];
   hash(publisher, sizeof(publisher), fingerprint, nullptr);
   memcpy(manifest.publisher, fingerprint, sizeof(manifest.publisher));
+  // The digest always describes the plaintext, never what the chunks carry.
   hash(data, data_len, manifest.digest, nullptr);
   TxStart start = {};
   start.dataset = dataset;
@@ -1283,17 +1384,21 @@ static bool publish(uint8_t dataset, const char* route, const char* channel,
   if (signed_len != MANIFEST_SIGNED_LEN ||
       !modSignDetached(start.manifest, signed_len,
                        start.manifest + signed_len)) {
+    if (wire != data) free(wire);
     free(data);
     strcpy(reply, "Err - signing");
     return true;
   }
-  start.data = data;
-  start.data_len = data_len;
+  start.data = wire;
+  start.data_len = wire_len;
   if (!transmitter().begin(start, millis())) {
+    if (wire != data) free(wire);
     free(data);
     strcpy(reply, "Err - busy");
     return true;
   }
+  // The transmitter owns the wire buffer now; the plaintext copy is ours to drop.
+  if (wire != data) free(data);
 
   DatasetState next = current;
   next.local_generation = generation;
@@ -1313,7 +1418,10 @@ static bool publish(uint8_t dataset, const char* route, const char* channel,
     return true;
   }
   current = next;
-  strcpy(reply, reset ? "OK - older signed generations may be accepted" : "OK");
+  snprintf(reply, 160, "OK - %s %u B, %u frames per round%s",
+           format == FORMAT_DEFLATE ? "deflated" : "raw",
+           (unsigned)wire_len, (unsigned)manifest.chunks + 1,
+           reset ? "; older signed generations may be accepted" : "");
   return true;
 }
 
@@ -2044,20 +2152,26 @@ static bool publishCommand(char* command, char* reply) {
   for (const Prefix& entry : prefix) {
     size_t len = strlen(entry.text);
     if (strncmp(command, entry.text, len) != 0 || command[len] != ' ') continue;
-    char* part[3];
-    int count = words(command + len + 1, part, 3);
-    bool empty = count == 3 && strcmp(part[2], "-empty") == 0;
-    bool valid = entry.dataset == REGION ? (count == 2 || empty) : count == 2;
-    if (!valid) {
-      snprintf(reply, 160, "Err - syntax: %s <region|*> <channel>%s",
+    char* part[4];
+    int count = words(command + len + 1, part, 4);
+    bool empty = false;
+    bool raw = false;
+    bool flags_ok = true;
+    for (int i = 2; i < count; ++i) {
+      if (strcmp(part[i], "-empty") == 0 && entry.dataset == REGION) empty = true;
+      else if (strcmp(part[i], "-raw") == 0) raw = true;
+      else flags_ok = false;
+    }
+    if (count < 2 || !flags_ok) {
+      snprintf(reply, 160, "Err - syntax: %s <region|*> <channel>%s [-raw]",
                entry.text, entry.dataset == REGION ? " [-empty]" : "");
       return true;
     }
-    return publish(entry.dataset, part[0], part[1], entry.reset, empty, reply);
+    return publish(entry.dataset, part[0], part[1], entry.reset, empty, raw, reply);
   }
   for (const Prefix& entry : prefix) {
     if (strcmp(command, entry.text) != 0) continue;
-    snprintf(reply, 160, "Err - syntax: %s <region|*> <channel>%s",
+    snprintf(reply, 160, "Err - syntax: %s <region|*> <channel>%s [-raw]",
              entry.text, entry.dataset == REGION ? " [-empty]" : "");
     return true;
   }
