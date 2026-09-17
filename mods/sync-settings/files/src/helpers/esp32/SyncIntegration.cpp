@@ -7,6 +7,13 @@
 #include <helpers/sync_settings/SyncStore.h>
 
 #include <Arduino.h>
+#if CONFIG_IDF_TARGET_ESP32C3
+#include "esp32c3/rom/miniz.h"
+#elif CONFIG_IDF_TARGET_ESP32S3
+#include "esp32s3/rom/miniz.h"
+#else
+#define SYNC_SETTINGS_NO_ROM_MINIZ 1
+#endif
 #include <Identity.h>
 #include <Packet.h>
 #include <SHA256.h>
@@ -788,9 +795,35 @@ static bool applyCampaign(uint8_t dataset, const Campaign& campaign,
 #endif
 }
 
+#ifndef SYNC_SETTINGS_NO_ROM_MINIZ
+// Raw deflate through the mask-ROM tinfl; the decompressor state is heap, not static.
+static bool inflatePayload(const uint8_t* in, size_t in_len, uint8_t* out,
+                           size_t out_cap, size_t& out_len, void*) {
+  if (in == nullptr || out == nullptr || in_len == 0 || out_cap == 0) return false;
+  tinfl_decompressor* decoder =
+      (tinfl_decompressor*)malloc(sizeof(tinfl_decompressor));
+  if (decoder == nullptr) return false;
+  tinfl_init(decoder);
+  size_t consumed = in_len;
+  size_t produced = out_cap;
+  tinfl_status status = tinfl_decompress(decoder, in, &consumed, out, out, &produced,
+                                         TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
+  free(decoder);
+  if (status != TINFL_STATUS_DONE || produced == 0 || produced > out_cap) return false;
+  out_len = produced;
+  return true;
+}
+#endif
+
 static ReceiveOps receive_ops = {
   acceptsCampaign, verifyFrame, hash, allocateFrame, releaseFrame,
-  persistReplay, validateDataset, applyCampaign, nullptr, nullptr,
+  persistReplay, validateDataset, applyCampaign,
+#ifdef SYNC_SETTINGS_NO_ROM_MINIZ
+  nullptr,
+#else
+  inflatePayload,
+#endif
+  nullptr,
 };
 static Receiver receiver(
     publishers,
