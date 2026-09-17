@@ -64,6 +64,9 @@ typedef bool (*ValidateFn)(uint8_t dataset, const uint8_t* data,
 struct Campaign;
 typedef bool (*ApplyFn)(uint8_t dataset, const Campaign& campaign,
                         DatasetState& next, void* context);
+// Raw deflate decompressor; null means this build rejects compressed payloads.
+typedef bool (*InflateFn)(const uint8_t* in, size_t in_len, uint8_t* out,
+                          size_t out_cap, size_t& out_len, void* context);
 
 struct ReceiveOps {
   AcceptFn accepts;
@@ -74,6 +77,7 @@ struct ReceiveOps {
   PersistFn persist;
   ValidateFn validate;
   ApplyFn apply;
+  InflateFn inflate;
   void* context;
 };
 

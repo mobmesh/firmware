@@ -790,7 +790,7 @@ static bool applyCampaign(uint8_t dataset, const Campaign& campaign,
 
 static ReceiveOps receive_ops = {
   acceptsCampaign, verifyFrame, hash, allocateFrame, releaseFrame,
-  persistReplay, validateDataset, applyCampaign, nullptr,
+  persistReplay, validateDataset, applyCampaign, nullptr, nullptr,
 };
 static Receiver receiver(
     publishers,
