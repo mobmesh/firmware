@@ -125,6 +125,8 @@ class Receiver {
                          uint32_t now_ms, uint32_t epoch, bool scoped,
                          const uint8_t* route_key);
   ReceiveResult chunk(const uint8_t* frame, size_t len);
+  ReceiveResult expand(const Campaign& active, uint8_t*& plain, uint16_t& plain_len);
+  bool canDecode() const;
   ReceiveResult abort(const uint8_t* frame, size_t len);
   void clear(Campaign& campaign);
 };

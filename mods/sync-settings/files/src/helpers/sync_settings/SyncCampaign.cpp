@@ -139,7 +139,7 @@ ReceiveResult Receiver::manifest(const uint8_t* frame, size_t len,
       !ops_.accepts(value.dataset, value.channel, ops_.context)) return RECEIVE_DISABLED;
 
   // A compressed payload is unusable without a decompressor, so refuse it before locking.
-  if (value.format == FORMAT_DEFLATE && ops_.inflate == nullptr) return RECEIVE_DECODE;
+  if (value.format == FORMAT_DEFLATE && !canDecode()) return RECEIVE_DECODE;
 
   uint8_t manifest_hash[DIGEST_LEN];
   if (ops_.hash == nullptr) return RECEIVE_STORAGE;
@@ -204,6 +204,29 @@ ReceiveResult Receiver::manifest(const uint8_t* frame, size_t len,
   return RECEIVE_OK;
 }
 
+// The one place that decides whether this build can read a compressed payload.
+bool Receiver::canDecode() const { return ops_.inflate != nullptr; }
+
+// Decompresses a complete payload into a fresh buffer without disturbing the
+// campaign, so a later failure can still fall back to the retry path.
+ReceiveResult Receiver::expand(const Campaign& active, uint8_t*& plain,
+                               uint16_t& plain_len) {
+  if (!canDecode() || ops_.alloc == nullptr ||
+      ops_.release == nullptr) return RECEIVE_DECODE;
+  uint8_t* buffer = ops_.alloc(REGION_DATA_MAX, ops_.context);
+  if (buffer == nullptr) return RECEIVE_MEMORY;
+  size_t written = 0;
+  bool ok = ops_.inflate(active.data, active.data_len, buffer, REGION_DATA_MAX,
+                         written, ops_.context);
+  if (!ok || written == 0 || written > REGION_DATA_MAX) {
+    ops_.release(buffer, ops_.context);
+    return RECEIVE_DECODE;
+  }
+  plain = buffer;
+  plain_len = (uint16_t)written;
+  return RECEIVE_OK;
+}
+
 ReceiveResult Receiver::chunk(const uint8_t* frame, size_t len) {
   ChunkView value;
   if (readChunk(frame, len, value) != WIRE_OK) return RECEIVE_MALFORMED;
@@ -234,17 +257,38 @@ ReceiveResult Receiver::chunk(const uint8_t* frame, size_t len) {
 
   uint16_t complete = (uint16_t)(((uint16_t)1u << active.chunks) - 1u);
   if (active.received != complete) return RECEIVE_OK;
-  uint8_t digest[DIGEST_LEN];
   if (ops_.hash == nullptr) return RECEIVE_STORAGE;
-  ops_.hash(active.data, active.data_len, digest, ops_.context);
+
+  uint8_t* plain = nullptr;
+  uint16_t plain_len = 0;
+  if (active.format == FORMAT_DEFLATE) {
+    ReceiveResult expanded = expand(active, plain, plain_len);
+    if (expanded == RECEIVE_MEMORY) return RECEIVE_MEMORY;
+    if (expanded != RECEIVE_OK) {
+      clear(active);
+      return RECEIVE_DECODE;
+    }
+  }
+  const uint8_t* payload = plain != nullptr ? plain : active.data;
+  uint16_t payload_len = plain != nullptr ? plain_len : active.data_len;
+
+  uint8_t digest[DIGEST_LEN];
+  ops_.hash(payload, payload_len, digest, ops_.context);
   if (!same(digest, active.digest, DIGEST_LEN)) {
+    if (plain != nullptr) ops_.release(plain, ops_.context);
     active.received = 0;
     return RECEIVE_MALFORMED;
   }
   if (ops_.validate == nullptr ||
-      !ops_.validate(value.dataset, active.data, active.data_len, ops_.context)) {
+      !ops_.validate(value.dataset, payload, payload_len, ops_.context)) {
+    if (plain != nullptr) ops_.release(plain, ops_.context);
     clear(active);
     return RECEIVE_MALFORMED;
+  }
+  if (plain != nullptr) {
+    ops_.release(active.data, ops_.context);
+    active.data = plain;
+    active.data_len = plain_len;
   }
   active.state = RECEIVE_STAGED;
   return RECEIVE_OK;
