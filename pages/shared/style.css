@@ -957,29 +957,11 @@ input.field:focus {
   margin-bottom: 0.55rem;
 }
 
-.gcm-mark-badge {
-  display: grid;
-  place-items: center;
+.gcm-mark-logo {
+  display: block;
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 55%, var(--accent-warm) 100%);
-  color: var(--bg-0);
-  box-shadow: 0 0 1.4rem rgba(45, 209, 189, 0.28);
-}
-
-.gcm-mark-badge svg {
-  width: 1.25rem;
-  height: 1.25rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.gcm-mark-badge svg circle {
-  fill: currentColor;
+  flex-shrink: 0;
 }
 
 .gcm-mark-name {
