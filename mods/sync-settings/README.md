@@ -160,8 +160,8 @@ Available through serial and authenticated remote admin CLI.
 <tr><td><code>sync.policy on</code></td><td>Accept policy updates. Requires a channel.</td></tr>
 <tr><td><code>sync.policy off</code></td><td>Stop accepting updates; keep already-applied settings.</td></tr>
 <tr><th colspan="2" align="left">📤 Publishing and monitoring</th></tr>
-<tr><td><code>sync.&lt;dataset&gt; publish &lt;region|*&gt; &lt;channel&gt;</code></td><td>Capture and broadcast repeated updates.</td></tr>
-<tr><td><code>sync.&lt;dataset&gt; publish.reset &lt;region|*&gt; &lt;channel&gt;</code></td><td>Recovery publication for an incorrectly far-ahead generation history; eligibility checks still apply.</td></tr>
+<tr><td><code>sync.&lt;dataset&gt; publish &lt;region|*&gt; &lt;channel&gt; [-raw]</code></td><td>Capture and broadcast repeated updates. The reply names the payload format, its size and the frames per round.</td></tr>
+<tr><td><code>sync.&lt;dataset&gt; publish.reset &lt;region|*&gt; &lt;channel&gt; [-raw]</code></td><td>Recovery publication for an incorrectly far-ahead generation history; eligibility checks still apply.</td></tr>
 <tr><td><code>sync.&lt;dataset&gt; publish.abort</code></td><td>Abort outbound work/guard; otherwise cancel inbound reception. No rollback or history erasure.</td></tr>
 <tr><td><code>sync.&lt;dataset&gt; publish.status</code></td><td>Show activity, channel, progress, and relevant warnings/storage state.</td></tr>
 <tr><td><code>sync.&lt;dataset&gt; publish.report &lt;page&gt;</code></td><td>Read outcomes/warnings; pages start at 1.</td></tr>
@@ -227,12 +227,44 @@ sync.region publish * release -empty
 This clears subscribed consumers' overlays—not native lists.
 `-empty` also works with region `publish.reset`; policy does not use it.
 
+**Compressed region tables:**
+
+A region table is usually repetitive—shared prefixes, similar names—so the publisher
+compresses it opportunistically to save on air-time. A full 32-entry table goes
+out in 5 frames per round instead of 13. Compression is decided per campaign and the reply
+says which was used:
+
+```text
+sync.region publish * release
+  -> OK - deflated 280 B, 5 frames per round
+```
+
+- Compression is only chosen when it saves a **chunk**, not merely bytes. A table that
+  already fits one chunk, or one that does not shrink enough to drop a chunk, is sent as-is.
+- A publisher needs PSRAM to hold the compressor. Boards without it publish uncompressed,
+  automatically, with no configuration. The Heltec v4 for example can support compression.
+- Consumers need no setting. A node that cannot decompress refuses a compressed campaign
+  outright rather than half-applying it, and says so in `publish.report`. Note: most ESP32
+  based boards support decompression, this includes all currently supported boards.
+
+**Send uncompressed:**
+
+```text
+sync.region publish * release -raw
+```
+
+`-raw` forces the uncompressed format for that campaign. It works on every publisher, on
+every board, with no rebuild—so a compressed campaign can always be retried as a plain one
+in the field. It also applies to `publish.reset`.
+
+
 ## Hardening and security
 
 - **Authorized updates:** full public-key trust; Ed25519 signs announcements, every chunk, and abort notices.
 - **Replay protection:** saved history per publisher and dataset rejects old updates.
 - **Integrity:** SHA-256 checks complete updates and paired, versioned storage records.
 - **Bounded processing:** queued reception, fixed limits, validation before region replacement, and interrupted-policy recovery.
+- **Compressed payloads are checked, not trusted:** decompression happens only after every chunk's signature passes, is bounded on input and output, and the SHA-256 integrity check covers the decompressed table, never the bytes on air.
 - **Private keys:** remain behind the signing interface; not handed to the mod.
 - **Limits:** public traffic is not confidential; signatures cannot prevent radio flooding or interference.
 
