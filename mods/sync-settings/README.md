@@ -243,9 +243,8 @@ sync.region publish * release
   already fits one chunk, or one that does not shrink enough to drop a chunk, is sent as-is.
 - A publisher needs PSRAM to hold the compressor. Boards without it publish uncompressed,
   automatically, with no configuration. The Heltec v4 for example can support compression.
-- Consumers need no setting. A node that cannot decompress refuses a compressed campaign
-  outright rather than half-applying it, and says so in `publish.report`. Note: most ESP32
-  based boards support decompression, this includes all currently supported boards.
+- Consumers need no setting. All sync-setting clients support decompression. If a board fails
+  decompression for some reason it will say so in its `publish.report`. 
 
 **Send uncompressed:**
 
@@ -253,9 +252,8 @@ sync.region publish * release
 sync.region publish * release -raw
 ```
 
-`-raw` forces the uncompressed format for that campaign. It works on every publisher, on
-every board, with no rebuild—so a compressed campaign can always be retried as a plain one
-in the field. It also applies to `publish.reset`.
+`-raw` forces the uncompressed format for that campaign. Note: A compressed campaign can always be 
+retried as a plain one in the field.
 
 
 ## Hardening and security
