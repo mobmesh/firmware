@@ -211,8 +211,7 @@ bool Receiver::canDecode() const { return ops_.inflate != nullptr; }
 // campaign, so a later failure can still fall back to the retry path.
 ReceiveResult Receiver::expand(const Campaign& active, uint8_t*& plain,
                                uint16_t& plain_len) {
-  if (!canDecode() || ops_.alloc == nullptr ||
-      ops_.release == nullptr) return RECEIVE_DECODE;
+  if (!canDecode()) return RECEIVE_DECODE;
   uint8_t* buffer = ops_.alloc(REGION_DATA_MAX, ops_.context);
   if (buffer == nullptr) return RECEIVE_MEMORY;
   size_t written = 0;
@@ -286,6 +285,7 @@ ReceiveResult Receiver::chunk(const uint8_t* frame, size_t len) {
     return RECEIVE_MALFORMED;
   }
   if (plain != nullptr) {
+    // After this swap data_len is the plaintext length while chunks stays the wire count.
     ops_.release(active.data, ops_.context);
     active.data = plain;
     active.data_len = plain_len;

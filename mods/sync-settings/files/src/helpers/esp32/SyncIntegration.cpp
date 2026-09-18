@@ -816,7 +816,7 @@ static bool inflatePayload(const uint8_t* in, size_t in_len, uint8_t* out,
 #endif
 
 #ifndef SYNC_SETTINGS_NO_ROM_MINIZ
-// 128 probes is miniz level 6; the ROM has no flag helper, so the value is set by hand.
+// 128 probes is miniz level 6, chosen for output size; compression time is irrelevant here.
 static const int DEFLATE_PROBES = 128;
 
 // Compresses into a buffer smaller than the input, so a payload that does not
@@ -886,7 +886,8 @@ static uint8_t* deflatePayload(const uint8_t* in, uint16_t in_len, uint16_t& out
     vSemaphoreDelete(job.done);
     return nullptr;
   }
-  xSemaphoreTake(job.done, portMAX_DELAY);
+  // The job lives on this stack, so wait it out rather than return while the task runs.
+  while (xSemaphoreTake(job.done, portMAX_DELAY) != pdTRUE) {}
   vSemaphoreDelete(job.done);
   out_len = job.out_len;
   return job.out;
