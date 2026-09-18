@@ -1398,7 +1398,7 @@ static bool publish(uint8_t dataset, const char* route, const char* channel,
     strcpy(reply, "Err - busy");
     return true;
   }
-  // The transmitter owns the wire buffer now; the plaintext copy is ours to drop.
+  // The transmitter owns the wire buffer now; the plaintext copy is free to drop.
   if (wire != data) free(data);
 
   DatasetState next = current;
