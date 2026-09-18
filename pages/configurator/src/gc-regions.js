@@ -57,7 +57,7 @@
     (global.location ? global.location.href : "");
 
   function dataUrl(filename) {
-    return new URL("data/" + filename, moduleUrl).href;
+    return new URL("../data/" + filename, moduleUrl).href;
   }
 
   function stateCentroid(code) {

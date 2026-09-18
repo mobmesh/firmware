@@ -47,13 +47,17 @@
 }
 
 .wrap {
-  width: clamp(320px, 90%, var(--cell-w));
+  width: clamp(320px, 94%, 960px);
+  padding-top: 2.75rem;
 }
 
 /* .card supplies the surface; this sets the floor. The panel grows with its content. */
 .cell {
   min-height: var(--cell-min-h);
   padding: 3rem;
+  width: 100%;
+  max-width: var(--cell-w);
+  margin-inline: auto;
 }
 
 .step {

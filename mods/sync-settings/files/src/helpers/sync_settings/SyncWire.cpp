@@ -7,7 +7,6 @@ namespace mobmesh {
 namespace sync {
 
 static const uint8_t MAGIC[] = {0x53, 0x59};
-static const uint8_t FORMAT_VERSION = 0x01;
 static const uint8_t RESET_BIT = 0x01;
 static const uint8_t DAYS_MASK = 0x06;
 static const uint8_t RESERVED_MASK = 0xF8;
@@ -35,6 +34,11 @@ static void write32(uint8_t* p, uint32_t value) {
 
 static bool knownDataset(uint8_t dataset) {
   return dataset == REGION || dataset == POLICY;
+}
+
+// Payload formats the wire layer will parse; the receiver decides what it can decode.
+static bool knownFormat(uint8_t format) {
+  return format == FORMAT_RAW || format == FORMAT_DEFLATE;
 }
 
 static bool channelChar(char c) {
@@ -171,7 +175,7 @@ WireResult readManifest(const uint8_t* frame, size_t len, Manifest& out) {
   if (type != MANIFEST) return WIRE_TYPE_UNSUPPORTED;
   if (len != MANIFEST_LEN) return WIRE_MALFORMED;
   if (!knownDataset(frame[4])) return WIRE_DATASET_UNSUPPORTED;
-  if (frame[5] != FORMAT_VERSION) return WIRE_FORMAT_UNSUPPORTED;
+  if (!knownFormat(frame[5])) return WIRE_FORMAT_UNSUPPORTED;
   if ((frame[6] & RESERVED_MASK) != 0) return WIRE_MALFORMED;
 
   uint32_t generation = read32(frame + 7);
@@ -264,7 +268,7 @@ size_t writeManifestPrefix(const Manifest& manifest, uint8_t* out, size_t capaci
   uint8_t channel_len = channelLength(manifest.channel);
   uint16_t limit = dataLimit(manifest.dataset);
   if (out == nullptr || capacity < MANIFEST_LEN || !knownDataset(manifest.dataset) ||
-      manifest.format != FORMAT_VERSION || manifest.days < 1 || manifest.days > 4 ||
+      !knownFormat(manifest.format) || manifest.days < 1 || manifest.days > 4 ||
       manifest.generation == 0 || channel_len == 0 || manifest.data_len == 0 ||
       manifest.data_len > limit ||
       (manifest.dataset == POLICY && manifest.data_len != POLICY_DATA_LEN) ||

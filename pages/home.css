@@ -1,5 +1,6 @@
 .home-wrap {
-  width: clamp(320px, 92%, 720px);
+  width: clamp(320px, 94%, 960px);
+  padding-top: 2.75rem;
 }
 
 .home-wrap .page-title {
@@ -37,6 +38,11 @@
   background: linear-gradient(180deg, var(--accent), var(--accent-strong));
 }
 
+.home-section-advanced,
+.home-section-spaced {
+  margin-top: 4.5rem;
+}
+
 .home-step + h2::before {
   display: none;
 }
@@ -70,11 +76,23 @@
 }
 
 .home-feature {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.7rem;
+  align-items: start;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--line);
   border-left: 2px solid var(--accent);
   border-radius: var(--radius-sm);
   padding: 0.9rem 1.1rem;
+}
+
+.home-feature-icon {
+  grid-row: span 2;
+  width: 22px;
+  height: 22px;
+  margin-top: 0.1rem;
+  stroke: var(--accent);
 }
 
 .home-feature strong {
@@ -148,6 +166,39 @@
 .home-panel:hover .home-panel-arrow {
   stroke: var(--accent);
   transform: translateX(3px);
+}
+
+.home-panel-disabled {
+  cursor: default;
+  background: rgba(255, 255, 255, 0.015);
+}
+.home-panel.home-panel-disabled:hover {
+  border-color: var(--line);
+  transform: none;
+  box-shadow: none;
+}
+.home-panel-disabled strong {
+  color: var(--fg-muted);
+}
+.home-panel-disabled small {
+  opacity: 0.75;
+}
+
+.home-panel-soon {
+  margin-left: auto;
+  flex-shrink: 0;
+  align-self: center;
+  padding: 0.24rem 0.62rem;
+  border-radius: var(--radius-full);
+  background: var(--accent-warm-soft);
+  border: 1px solid rgba(249, 162, 40, 0.3);
+  color: var(--accent-warm);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .home-panel-advanced {
@@ -226,16 +277,4 @@
 .home-compare tbody tr:last-child th,
 .home-compare tbody tr:last-child td {
   border-bottom: none;
-}
-
-.home-disclaimer {
-  border-top: 1px solid var(--line);
-  padding-top: 1.4rem;
-  color: var(--fg-muted);
-  font-size: 0.85rem;
-  line-height: 1.6;
-}
-
-.home-disclaimer a {
-  color: var(--accent);
 }

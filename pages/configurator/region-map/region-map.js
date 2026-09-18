@@ -11,7 +11,7 @@
   const STATE_NAMES = REGIONS.STATE_NAMES || {};
   const WIDER_SCOPES = REGIONS.WIDER_SCOPES || [];
 
-  const CITIES_URL = (REGIONS.dataUrl || function (f) { return "../shared/data/" + f; })(
+  const CITIES_URL = (REGIONS.dataUrl || function (f) { return "../data/" + f; })(
     "gc-locations.json",
   );
   const STATES_URL = "data/gc-states.geojson";

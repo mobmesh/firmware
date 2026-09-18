@@ -674,6 +674,114 @@ input.field:focus {
   transform: translateY(-1px);
 }
 
+.site-header {
+  position: relative;
+  z-index: 20;
+}
+
+.site-header-inner {
+  width: clamp(320px, 94%, 960px);
+  margin: 0 auto;
+  padding: 1.15rem 1.25rem 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+}
+
+.brand-badge {
+  display: block;
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
+.brand-name {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg);
+  transition: color 0.15s ease;
+}
+
+.brand:hover .brand-name {
+  color: var(--accent);
+}
+
+.site-nav {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  font-size: 0.82rem;
+}
+
+.site-nav a {
+  color: var(--fg-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+.site-nav a:hover {
+  color: var(--accent);
+}
+
+.site-nav a[aria-current="page"] {
+  color: var(--accent);
+  text-shadow: 0 0 0.85rem rgba(45, 209, 189, 0.55);
+}
+
+.site-nav [aria-disabled="true"] {
+  color: var(--fg-muted);
+  opacity: 0.45;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.site-header .github-link {
+  position: static;
+  justify-self: end;
+  padding: 0;
+  background: none;
+  border: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: var(--fg-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.site-header .github-link:hover {
+  color: var(--accent);
+  box-shadow: none;
+  transform: none;
+}
+
+/* Brand and GitHub hold the top row; the nav drops beneath and centres itself. */
+@media (max-width: 760px) {
+  .site-header-inner {
+    grid-template-columns: 1fr auto;
+    row-gap: 0.85rem;
+  }
+  .site-nav {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    font-size: 0.78rem;
+  }
+}
+
 .github-link {
   position: fixed;
   top: 1.25rem;
@@ -816,5 +924,122 @@ input.field:focus {
   }
   .flashing-icon {
     animation: none !important;
+  }
+}
+
+.site-footer {
+  color: var(--fg-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin-top: 7rem;
+  padding-top: 1.4rem;
+  position: relative;
+}
+
+.site-footer::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(45, 209, 189, 0.6), transparent);
+}
+
+.site-footer a {
+  color: var(--accent);
+}
+
+.gcm-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  margin-bottom: 0.55rem;
+}
+
+.gcm-mark-logo {
+  display: block;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+}
+
+.gcm-mark-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+
+.gcm-mark:hover .gcm-mark-name {
+  color: var(--accent);
+}
+
+.footer-prose {
+  max-width: 34ch;
+  margin: 0.55rem 0 0.75rem;
+}
+
+.footer-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin-bottom: 1.35rem;
+}
+
+.footer-heading {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  margin: 0 0 0.5rem;
+}
+
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.32rem;
+}
+
+.footer-links a {
+  color: var(--fg);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.footer-links a:hover {
+  color: var(--accent);
+}
+
+.footer-links .ext::after {
+  content: " \2197";
+  color: var(--fg-muted);
+  font-size: 0.85em;
+}
+
+.hairline {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, var(--line), transparent);
+}
+
+.footer-bottom {
+  margin-top: 0.9rem;
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+@media (min-width: 700px) {
+  .footer-grid {
+    grid-template-columns: 1.3fr 1fr 1fr;
+    gap: 1.5rem 3rem;
+  }
+  .footer-col-end {
+    text-align: right;
+  }
+  .footer-col-end .footer-links {
+    align-items: flex-end;
   }
 }

@@ -45,6 +45,7 @@ enum ReceiveResult : uint8_t {
   RECEIVE_STORAGE,
   RECEIVE_MALFORMED,
   RECEIVE_INCOMPLETE,
+  RECEIVE_DECODE,
 };
 
 enum ReceiveState : uint8_t {
@@ -64,6 +65,9 @@ typedef bool (*ValidateFn)(uint8_t dataset, const uint8_t* data,
 struct Campaign;
 typedef bool (*ApplyFn)(uint8_t dataset, const Campaign& campaign,
                         DatasetState& next, void* context);
+// Raw deflate decompressor; null means this build rejects compressed payloads.
+typedef bool (*InflateFn)(const uint8_t* in, size_t in_len, uint8_t* out,
+                          size_t out_cap, size_t& out_len, void* context);
 
 struct ReceiveOps {
   AcceptFn accepts;
@@ -74,11 +78,13 @@ struct ReceiveOps {
   PersistFn persist;
   ValidateFn validate;
   ApplyFn apply;
+  InflateFn inflate;
   void* context;
 };
 
 struct Campaign {
   uint8_t state;
+  uint8_t format;
   uint8_t publisher_key[32];
   uint16_t publisher_id;
   uint32_t generation;
@@ -119,6 +125,8 @@ class Receiver {
                          uint32_t now_ms, uint32_t epoch, bool scoped,
                          const uint8_t* route_key);
   ReceiveResult chunk(const uint8_t* frame, size_t len);
+  ReceiveResult expand(const Campaign& active, uint8_t*& plain, uint16_t& plain_len);
+  bool canDecode() const;
   ReceiveResult abort(const uint8_t* frame, size_t len);
   void clear(Campaign& campaign);
 };

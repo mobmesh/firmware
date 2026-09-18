@@ -7,6 +7,13 @@
 #include <helpers/sync_settings/SyncStore.h>
 
 #include <Arduino.h>
+#if CONFIG_IDF_TARGET_ESP32C3
+#include "esp32c3/rom/miniz.h"
+#elif CONFIG_IDF_TARGET_ESP32S3
+#include "esp32s3/rom/miniz.h"
+#else
+#define SYNC_SETTINGS_NO_ROM_MINIZ 1
+#endif
 #include <Identity.h>
 #include <Packet.h>
 #include <SHA256.h>
@@ -68,7 +75,7 @@ static Config config;
 static Publishers publishers;
 enum ReportReason : uint8_t {
   REPORT_NONE, REPORT_SIGN, REPORT_APPLY, REPORT_RESTORED,
-  REPORT_SETTLEMENT, REPORT_APPLIED,
+  REPORT_SETTLEMENT, REPORT_APPLIED, REPORT_DECODE,
 };
 struct RuntimeReport {
   uint32_t generation;
@@ -788,9 +795,114 @@ static bool applyCampaign(uint8_t dataset, const Campaign& campaign,
 #endif
 }
 
+#ifndef SYNC_SETTINGS_NO_ROM_MINIZ
+// Raw deflate through the mask-ROM tinfl; the decompressor state is heap, not static.
+static bool inflatePayload(const uint8_t* in, size_t in_len, uint8_t* out,
+                           size_t out_cap, size_t& out_len, void*) {
+  if (in == nullptr || out == nullptr || in_len == 0 || out_cap == 0) return false;
+  tinfl_decompressor* decoder =
+      (tinfl_decompressor*)malloc(sizeof(tinfl_decompressor));
+  if (decoder == nullptr) return false;
+  tinfl_init(decoder);
+  size_t consumed = in_len;
+  size_t produced = out_cap;
+  tinfl_status status = tinfl_decompress(decoder, in, &consumed, out, out, &produced,
+                                         TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
+  free(decoder);
+  if (status != TINFL_STATUS_DONE || produced == 0 || produced > out_cap) return false;
+  out_len = produced;
+  return true;
+}
+#endif
+
+#ifndef SYNC_SETTINGS_NO_ROM_MINIZ
+// 128 probes is miniz level 6, chosen for output size; compression time is irrelevant here.
+static const int DEFLATE_PROBES = 128;
+
+// Compresses into a buffer smaller than the input, so a payload that does not
+// shrink fails here rather than being measured afterwards.
+static uint8_t* deflateOnce(const uint8_t* in, uint16_t in_len, uint16_t& out_len) {
+  if (in == nullptr || in_len == 0) return nullptr;
+  tdefl_compressor* encoder = (tdefl_compressor*)heap_caps_malloc(
+      sizeof(tdefl_compressor), MALLOC_CAP_SPIRAM);
+  if (encoder == nullptr) return nullptr;
+  uint8_t* packed = (uint8_t*)malloc(in_len);
+  if (packed == nullptr) {
+    heap_caps_free(encoder);
+    return nullptr;
+  }
+  tdefl_init(encoder, nullptr, nullptr, DEFLATE_PROBES);
+  size_t consumed = in_len;
+  size_t produced = in_len;
+  tdefl_status status = tdefl_compress(encoder, in, &consumed, packed, &produced,
+                                       TDEFL_FINISH);
+  heap_caps_free(encoder);
+  if (status != TDEFL_STATUS_DONE || consumed != in_len || produced == 0 ||
+      produced >= in_len) {
+    free(packed);
+    return nullptr;
+  }
+  // Nothing is published that this node cannot itself decode back to the original.
+  uint8_t* check = (uint8_t*)malloc(in_len);
+  if (check == nullptr) {
+    free(packed);
+    return nullptr;
+  }
+  size_t back = 0;
+  bool same = inflatePayload(packed, produced, check, in_len, back, nullptr) &&
+              back == in_len && memcmp(check, in, in_len) == 0;
+  free(check);
+  if (!same) {
+    free(packed);
+    return nullptr;
+  }
+  out_len = (uint16_t)produced;
+  return packed;
+}
+
+// The ROM coder needs more stack than the CLI runs on, so it gets its own task.
+struct DeflateJob {
+  const uint8_t* in;
+  uint16_t in_len;
+  uint16_t out_len;
+  uint8_t* out;
+  SemaphoreHandle_t done;
+};
+
+// Measured worst case is 7,008 bytes with a full REGION_DATA_MAX payload.
+static const uint32_t DEFLATE_STACK = 12288;
+
+static void deflateTask(void* argument) {
+  DeflateJob* job = static_cast<DeflateJob*>(argument);
+  job->out = deflateOnce(job->in, job->in_len, job->out_len);
+  xSemaphoreGive(job->done);
+  vTaskDelete(nullptr);
+}
+
+static uint8_t* deflatePayload(const uint8_t* in, uint16_t in_len, uint16_t& out_len) {
+  DeflateJob job = {in, in_len, 0, nullptr, xSemaphoreCreateBinary()};
+  if (job.done == nullptr) return nullptr;
+  if (xTaskCreate(deflateTask, "syncdeflate", DEFLATE_STACK, &job, 1, nullptr) != pdPASS) {
+    vSemaphoreDelete(job.done);
+    return nullptr;
+  }
+  // The job lives on this stack, so wait it out rather than return while the task runs.
+  while (xSemaphoreTake(job.done, portMAX_DELAY) != pdTRUE) {}
+  vSemaphoreDelete(job.done);
+  out_len = job.out_len;
+  return job.out;
+}
+#endif
+
 static ReceiveOps receive_ops = {
   acceptsCampaign, verifyFrame, hash, allocateFrame, releaseFrame,
-  persistReplay, validateDataset, applyCampaign, nullptr,
+  persistReplay, validateDataset, applyCampaign,
+#ifdef SYNC_SETTINGS_NO_ROM_MINIZ
+  nullptr,
+#else
+  inflatePayload,
+#endif
+  nullptr,
 };
 static Receiver receiver(
     publishers,
@@ -1112,7 +1224,7 @@ static bool nextGeneration(const DatasetState& current, const uint8_t publisher[
 }
 
 static bool publish(uint8_t dataset, const char* route, const char* channel,
-                    bool reset, bool empty, char* reply) {
+                    bool reset, bool empty, bool raw, char* reply) {
   DatasetState& current = stateFor(dataset);
   bool state_ready = dataset == REGION ? region_state_ready
                                        : policy_state_ready
@@ -1225,18 +1337,41 @@ static bool publish(uint8_t dataset, const char* route, const char* channel,
     return true;
   }
 
+  uint8_t* wire = data;
+  uint16_t wire_len = data_len;
+  uint8_t format = FORMAT_RAW;
+#ifndef SYNC_SETTINGS_NO_ROM_MINIZ
+  // Compression only pays when it removes a whole frame from every round.
+  if (!raw && chunkCount(data_len) > 1) {
+    uint16_t packed_len = 0;
+    uint8_t* packed = deflatePayload(data, data_len, packed_len);
+    if (packed != nullptr) {
+      if (chunkCount(packed_len) < chunkCount(data_len)) {
+        wire = packed;
+        wire_len = packed_len;
+        format = FORMAT_DEFLATE;
+      } else {
+        free(packed);
+      }
+    }
+  }
+#else
+  (void)raw;
+#endif
+
   Manifest manifest = {};
   manifest.dataset = dataset;
-  manifest.format = 1;
+  manifest.format = format;
   manifest.reset = reset;
   manifest.days = current.duration_days;
   manifest.generation = generation;
   memcpy(manifest.channel, channel, channel_len + 1);
-  manifest.data_len = data_len;
-  manifest.chunks = chunkCount(data_len);
+  manifest.data_len = wire_len;
+  manifest.chunks = chunkCount(wire_len);
   uint8_t fingerprint[DIGEST_LEN];
   hash(publisher, sizeof(publisher), fingerprint, nullptr);
   memcpy(manifest.publisher, fingerprint, sizeof(manifest.publisher));
+  // The digest always describes the plaintext, never what the chunks carry.
   hash(data, data_len, manifest.digest, nullptr);
   TxStart start = {};
   start.dataset = dataset;
@@ -1250,17 +1385,21 @@ static bool publish(uint8_t dataset, const char* route, const char* channel,
   if (signed_len != MANIFEST_SIGNED_LEN ||
       !modSignDetached(start.manifest, signed_len,
                        start.manifest + signed_len)) {
+    if (wire != data) free(wire);
     free(data);
     strcpy(reply, "Err - signing");
     return true;
   }
-  start.data = data;
-  start.data_len = data_len;
+  start.data = wire;
+  start.data_len = wire_len;
   if (!transmitter().begin(start, millis())) {
+    if (wire != data) free(wire);
     free(data);
     strcpy(reply, "Err - busy");
     return true;
   }
+  // The transmitter owns the wire buffer now; the plaintext copy is free to drop.
+  if (wire != data) free(data);
 
   DatasetState next = current;
   next.local_generation = generation;
@@ -1280,7 +1419,10 @@ static bool publish(uint8_t dataset, const char* route, const char* channel,
     return true;
   }
   current = next;
-  strcpy(reply, reset ? "OK - older signed generations may be accepted" : "OK");
+  snprintf(reply, 160, "OK - %s %u B, %u frames per round%s",
+           format == FORMAT_DEFLATE ? "deflated" : "raw",
+           (unsigned)wire_len, (unsigned)manifest.chunks + 1,
+           reset ? "; older signed generations may be accepted" : "");
   return true;
 }
 
@@ -1986,6 +2128,7 @@ static bool reportCommand(uint8_t dataset, const char* page_text, char* reply) {
                 notice.reason == REPORT_SIGN ? "publication signing failed" :
                 notice.reason == REPORT_SETTLEMENT ? "applied; replay settlement pending" :
                 notice.reason == REPORT_APPLIED ? "applied; replay settled" :
+                notice.reason == REPORT_DECODE ? "compressed payload could not be decoded" :
                 notice.reason == REPORT_RESTORED ? "application failed; prior policy restored" :
                                                   "application failed; campaign released");
   return true;
@@ -2010,20 +2153,26 @@ static bool publishCommand(char* command, char* reply) {
   for (const Prefix& entry : prefix) {
     size_t len = strlen(entry.text);
     if (strncmp(command, entry.text, len) != 0 || command[len] != ' ') continue;
-    char* part[3];
-    int count = words(command + len + 1, part, 3);
-    bool empty = count == 3 && strcmp(part[2], "-empty") == 0;
-    bool valid = entry.dataset == REGION ? (count == 2 || empty) : count == 2;
-    if (!valid) {
-      snprintf(reply, 160, "Err - syntax: %s <region|*> <channel>%s",
+    char* part[4];
+    int count = words(command + len + 1, part, 4);
+    bool empty = false;
+    bool raw = false;
+    bool flags_ok = true;
+    for (int i = 2; i < count; ++i) {
+      if (strcmp(part[i], "-empty") == 0 && entry.dataset == REGION) empty = true;
+      else if (strcmp(part[i], "-raw") == 0) raw = true;
+      else flags_ok = false;
+    }
+    if (count < 2 || !flags_ok) {
+      snprintf(reply, 160, "Err - syntax: %s <region|*> <channel>%s [-raw]",
                entry.text, entry.dataset == REGION ? " [-empty]" : "");
       return true;
     }
-    return publish(entry.dataset, part[0], part[1], entry.reset, empty, reply);
+    return publish(entry.dataset, part[0], part[1], entry.reset, empty, raw, reply);
   }
   for (const Prefix& entry : prefix) {
     if (strcmp(command, entry.text) != 0) continue;
-    snprintf(reply, 160, "Err - syntax: %s <region|*> <channel>%s",
+    snprintf(reply, 160, "Err - syntax: %s <region|*> <channel>%s [-raw]",
              entry.text, entry.dataset == REGION ? " [-empty]" : "");
     return true;
   }
@@ -2381,10 +2530,19 @@ void syncLoop() {
 #endif
   const mobmesh::sync::InboxFrame* frame = mobmesh::sync::inbox.front();
   if (frame != nullptr) {
-    mobmesh::sync::receiver.take(frame->data, frame->len, millis(), modClockGet(),
-                                 frame->scoped, frame->key);
+    uint32_t taken_generation = 0;
+    if (frame->len > 4) {
+      taken_generation = mobmesh::sync::receiver.campaign(frame->data[4]).generation;
+    }
+    mobmesh::sync::ReceiveResult taken =
+        mobmesh::sync::receiver.take(frame->data, frame->len, millis(), modClockGet(),
+                                     frame->scoped, frame->key);
     if (frame->len > 4) {
       uint8_t dataset = frame->data[4];
+      // A payload that arrived whole and still would not decode is worth reporting.
+      if (taken == mobmesh::sync::RECEIVE_DECODE) {
+        mobmesh::sync::reportFor(dataset) = {taken_generation, mobmesh::sync::REPORT_DECODE};
+      }
       if (mobmesh::sync::receiver.campaign(dataset).state ==
           mobmesh::sync::RECEIVE_STAGED) {
         uint32_t generation = mobmesh::sync::receiver.campaign(dataset).generation;
