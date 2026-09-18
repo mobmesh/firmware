@@ -6,7 +6,7 @@
 
   const App = (global.ConfiguratorApp = global.ConfiguratorApp || {});
 
-  // Shared region model (pages/shared/gc-regions.js). Loaded before this
+  // Shared region model (pages/configurator/src/gc-regions.js). Loaded before this
   // file; the empty-object fallback keeps things defined if it is ever missing.
   const Regions = global.GCRegions || {};
 
