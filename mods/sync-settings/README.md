@@ -164,7 +164,7 @@ Available through serial and authenticated remote admin CLI.
 <tr><td><code>sync.&lt;dataset&gt; publish.reset &lt;region|*&gt; &lt;channel&gt; [-raw]</code></td><td>Recovery publication for an incorrectly far-ahead generation history; eligibility checks still apply.</td></tr>
 <tr><td><code>sync.&lt;dataset&gt; publish.abort</code></td><td>Abort outbound work/guard; otherwise cancel inbound reception. No rollback or history erasure.</td></tr>
 <tr><td><code>sync.&lt;dataset&gt; publish.status</code></td><td>Show activity, channel, progress, and relevant warnings/storage state.</td></tr>
-<tr><td><code>sync.&lt;dataset&gt; publish.report &lt;page&gt;</code></td><td>Read outcomes/warnings; pages start at 1.</td></tr>
+<tr><td><code>sync.&lt;dataset&gt; publish.report [page]</code></td><td>Read outcomes/warnings; pages start at 1, and omitting the page shows the first.</td></tr>
 <tr><td><code>get sync.&lt;dataset&gt;.publish.interval</code></td><td>Show round interval.</td></tr>
 <tr><td><code>set sync.&lt;dataset&gt;.publish.interval &lt;N&gt;h</code></td><td>Save interval: 3–24 hours. Example: <code>12h</code>.</td></tr>
 <tr><td><code>get sync.&lt;dataset&gt;.publish.duration</code></td><td>Show publication window.</td></tr>
@@ -215,7 +215,7 @@ txdelay                agc.reset.interval
 - Initial schedule: `12h` over `3d` = seven rounds, starting immediately.
 - Regions and policy have independent campaigns and schedules.
 - Schedule changes affect the next publication.
-- Invalid timing input returns the required syntax. No reports returns `Err - no reports`.
+- Invalid timing input returns the required syntax. No reports returns `empty`.
 - No user-facing restore or rollback command.
 
 **Publish an empty overlay — explicit confirmation required:**
@@ -254,6 +254,26 @@ sync.region publish * release -raw
 
 `-raw` forces the uncompressed format for that campaign. Note: A compressed campaign can always be 
 retried as a plain one in the field.
+
+## How far the campaign travelled
+
+A receiver records how many hops each frame of a campaign took and tallies them on the
+report once the campaign ends:
+
+```text
+sync.region publish.report 1
+  -> 1/1 gen 42 applied; replay settled hops 0x1,1x3
+```
+
+Each term is `<hops>x<frames>`: here the manifest arrived direct and three chunks came
+through one relay. Hop counts absent from the line had no frames. The token is omitted
+entirely when nothing was received, so `0x5` genuinely means five direct frames.
+
+Two caveats. Duplicate copies of a frame are dropped before the mod sees them, so what is
+recorded is the shortest route that happened to arrive first -- a node in direct range of
+the publisher reads all zeroes no matter how busy the relays around it are. And a campaign
+that never lands leaves no frames to tally, so this diagnoses a working path, not a broken
+one.
 
 
 ## Hardening and security
