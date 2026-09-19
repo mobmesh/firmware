@@ -32,7 +32,8 @@ class CurrentProjectModelTestCase(unittest.TestCase):
         self.assertEqual(rows[("xiao_c3", "repeater")].mods,
                          ("shim", "hotspot-ota", "timing-safety", "try-settings", "sync-settings"))
         for board in ("heltec_v4", "xiao_c3"):
-            self.assertNotIn("sync-settings", rows[(board, "room_server")].mods)
+            self.assertEqual(rows[(board, "room_server")].mods,
+                             ("shim", "hotspot-ota", "timing-safety", "try-settings", "sync-settings"))
 
     def test_build_plan_serialization_is_deterministic(self):
         self.assertEqual(self.model.build_plan.to_json(), ProjectModel.load(REPO_ROOT).build_plan.to_json())

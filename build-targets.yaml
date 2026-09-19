@@ -36,7 +36,7 @@ targets:
     role: room_server
     build_env: heltec_v4_room_server
     vendor_flasher_assets: false
-    mods: []      # extras beyond core_mods
+    mods: [sync-settings]      # extras beyond core_mods
     # qemu_boot_check: false   # opt this role out of the emulator gate
 
   - board: xiao_c3
@@ -49,4 +49,4 @@ targets:
     role: room_server
     build_env: Xiao_C3_room_server
     vendor_flasher_assets: false
-    mods: []      # extras beyond core_mods
+    mods: [sync-settings]      # extras beyond core_mods

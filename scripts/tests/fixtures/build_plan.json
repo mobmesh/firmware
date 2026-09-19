@@ -51,7 +51,8 @@
         "shim",
         "hotspot-ota",
         "timing-safety",
-        "try-settings"
+        "try-settings",
+        "sync-settings"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -106,7 +107,8 @@
         "shim",
         "hotspot-ota",
         "timing-safety",
-        "try-settings"
+        "try-settings",
+        "sync-settings"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
