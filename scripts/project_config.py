@@ -38,6 +38,7 @@ class IntegrationPhase(str, Enum):
     RADIO_INIT_POLICY = "radio_init_policy"
     LOOP = "loop"
     ROUTE = "route"
+    ALLOW_FORWARD = "allow_forward"
     REGION_EXPORT = "region_export"
     RECV = "recv"
     TX = "tx"

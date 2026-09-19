@@ -159,6 +159,8 @@ Available through serial and authenticated remote admin CLI.
 <tr><th colspan="2" align="left">📥 Policy reception</th></tr>
 <tr><td><code>sync.policy on</code></td><td>Accept policy updates. Requires a channel.</td></tr>
 <tr><td><code>sync.policy off</code></td><td>Stop accepting updates; keep already-applied settings.</td></tr>
+<tr><td><code>get repeat.gate</code></td><td>Show whether flood packets with no permitted region are dropped.</td></tr>
+<tr><td><code>set repeat.gate &lt;on|off&gt;</code></td><td>Drop flood packets whose region scope is unknown or flood-denied. Carried by policy campaigns. Only a room server acts on it; a repeater always gates and stores the value so a shared profile applies cleanly on both.</td></tr>
 <tr><th colspan="2" align="left">📤 Publishing and monitoring</th></tr>
 <tr><td><code>sync.&lt;dataset&gt; publish &lt;region|*&gt; &lt;channel&gt; [-raw]</code></td><td>Capture and broadcast repeated updates. The reply names the payload format, its size and the frames per round.</td></tr>
 <tr><td><code>sync.&lt;dataset&gt; publish.reset &lt;region|*&gt; &lt;channel&gt; [-raw]</code></td><td>Recovery publication for an incorrectly far-ahead generation history; eligibility checks still apply.</td></tr>

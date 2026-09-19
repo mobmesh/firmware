@@ -361,7 +361,7 @@ index a714db6..0909307 100644
      board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
  #else
 diff --git a/examples/simple_room_server/MyMesh.cpp b/examples/simple_room_server/MyMesh.cpp
-index 546d094..30a6a06 100644
+index 546d094..48d5e38 100644
 --- a/examples/simple_room_server/MyMesh.cpp
 +++ b/examples/simple_room_server/MyMesh.cpp
 @@ -1,4 +1,185 @@
@@ -570,7 +570,12 @@ index 546d094..30a6a06 100644
    if (_logging) {
      File f = openAppend(PACKET_LOG_FILE);
      if (f) {
-@@ -307,8 +494,16 @@ bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
+@@ -303,12 +490,21 @@ bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
+       && mesh::isFloodHopLimitExceeded(packet, _prefs.flood_max, _prefs.flood_max_unscoped, _prefs.flood_max_advert)) {
+     return false;
+   }
++  if (packet->isRouteFlood() && !modAllowFlood(packet, recv_pkt_region != NULL)) return false;
+   return true;
  }
  
  mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
@@ -588,7 +593,7 @@ index 546d094..30a6a06 100644
    } else if (pkt->getRouteType() == ROUTE_TYPE_FLOOD) {
      if (region_map.getWildcard().flags & REGION_DENY_FLOOD) {
        recv_pkt_region = NULL;
-@@ -318,6 +513,24 @@ mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
+@@ -318,6 +514,24 @@ mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
    } else {
      recv_pkt_region = NULL;
    }
@@ -613,7 +618,7 @@ index 546d094..30a6a06 100644
    return Mesh::onRecvPacket(pkt);
  }
  
-@@ -641,6 +854,14 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
+@@ -641,6 +855,14 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
    _logging = false;
    region_load_active = false;
    set_radio_at = revert_radio_at = 0;
@@ -628,7 +633,7 @@ index 546d094..30a6a06 100644
    recv_pkt_region = NULL;
  
    // defaults
-@@ -754,6 +975,11 @@ void MyMesh::sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, ui
+@@ -754,6 +976,11 @@ void MyMesh::sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, ui
    bool is_wildcard = recv_pkt_region != NULL && recv_pkt_region->isWildcard();
    bool req_scope_known = recv_pkt_region != NULL && !is_wildcard
                        && region_map.getTransportKeysFor(*recv_pkt_region, &req_scope, 1) > 0;
@@ -640,7 +645,7 @@ index 546d094..30a6a06 100644
  
    switch (mesh::chooseReplyScope(req_scope_known, is_wildcard, !default_scope.isNull())) {
      case mesh::REPLY_SCOPE_REQUEST:
-@@ -984,6 +1210,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -984,6 +1211,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
        snprintf(reply, MAX_POST_TEXT_LEN, "OK");
      }
    } else{

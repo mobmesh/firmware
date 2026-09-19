@@ -180,6 +180,48 @@ jobs:
             done
           fi
 
+          # --- 6. do sync-settings' room-server assumptions still hold? ------------
+          # The repeat.gate patch adds one line to the room server's allowPacketForward and
+          # reads state upstream owns. None of the four below conflict when they change.
+          if [ -d probe-src ] && echo " $MODS " | grep -q " sync-settings "; then
+            ROOM=probe-src/examples/simple_room_server/MyMesh.cpp
+            # Upstream fixing the repeater/room-server asymmetry itself makes the repeat.gate patch redundant.
+            if grep -qE 'recv_pkt_region == NULL' "$ROOM" 2>/dev/null; then
+              DRIFT=true
+              echo "- upstream's room-server \`allowPacketForward\` now bails on \`recv_pkt_region == NULL\` itself -- the repeat.gate patch is likely redundant, and \`set repeat.gate off\` may no longer disable gating (see mods/sync-settings/README.md)" >> "$REPORT"
+            else
+              echo "- upstream's room server still forwards regardless of region; the repeat.gate patch is still needed" >> "$REPORT"
+            fi
+            # The gate reads this to decide scope; a rename compiles but measures the wrong thing.
+            if grep -q 'recv_pkt_region' "$ROOM" 2>/dev/null; then
+              echo "- upstream's room server still tracks \`recv_pkt_region\`; repeat.gate depends on it" >> "$REPORT"
+            else
+              DRIFT=true
+              echo "- upstream's room server no longer tracks \`recv_pkt_region\` -- repeat.gate's scope test has lost its input" >> "$REPORT"
+            fi
+            # repeat.gate is subtractive only because disable_fwd is tested first.
+            if grep -A 2 'bool MyMesh::allowPacketForward' "$ROOM" 2>/dev/null | grep -q '_prefs.disable_fwd'; then
+              echo "- upstream's room server still tests \`disable_fwd\` first; repeat.gate stays inert behind \`repeat off\`" >> "$REPORT"
+            else
+              DRIFT=true
+              echo "- upstream's room server no longer tests \`disable_fwd\` first in \`allowPacketForward\` -- repeat.gate may now affect a node with repeating off" >> "$REPORT"
+            fi
+            # sync-settings claims 'set repeat on' to append a notice; a rename drops it silently.
+            if grep -qE 'memcmp\(config, "repeat ", 7\)' probe-src/src/helpers/CommonCLI.cpp 2>/dev/null; then
+              echo "- upstream still parses \`set repeat <on|off>\`; sync-settings' repeat.gate notice relies on it" >> "$REPORT"
+            else
+              DRIFT=true
+              echo "- upstream's \`set repeat\` parser changed shape -- sync-settings' repeat.gate notice will stop appending, silently" >> "$REPORT"
+            fi
+            # ROOM_PASSWORD is how the mod compiles the notice into room servers only.
+            if grep -q 'ROOM_PASSWORD' probe-src/variants/heltec_v4/platformio.ini 2>/dev/null; then
+              echo "- \`ROOM_PASSWORD\` still marks the room-server env; sync-settings uses it to target the repeat.gate notice" >> "$REPORT"
+            else
+              DRIFT=true
+              echo "- \`ROOM_PASSWORD\` no longer marks the heltec_v4 room-server env -- sync-settings' repeat.gate notice will compile out of every build" >> "$REPORT"
+            fi
+          fi
+
           echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"
           # Appended, not merged into $REPORT: the explanations are collapsed detail under
           # the summary lines, and only exist when something failed.

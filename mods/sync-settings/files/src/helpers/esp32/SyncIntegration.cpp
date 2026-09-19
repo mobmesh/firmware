@@ -352,7 +352,7 @@ static bool loadState(PairPaths& paths, uint8_t type, DatasetState& state,
 }
 
 static size_t buildConfigPayload(uint8_t* out, size_t capacity, void* context) {
-  return capacity < 17 ? 0 : writeConfig(*static_cast<Config*>(context), out);
+  return capacity < 18 ? 0 : writeConfig(*static_cast<Config*>(context), out);
 }
 
 static size_t buildPublisherPayload(uint8_t* out, size_t capacity, void* context) {
@@ -626,6 +626,8 @@ static bool validateDataset(uint8_t dataset, const uint8_t* data,
 }
 
 #if SYNC_SETTINGS_WITH_POLICY
+static bool setRepeatGate(bool on, char* reply);
+
 static bool readNativePolicy(uint8_t out[POLICY_DATA_LEN]) {
   ModPolicyValues native;
   if (!modPolicyRead(&native) || native.multi_acks > 1) return false;
@@ -638,6 +640,7 @@ static bool readNativePolicy(uint8_t out[POLICY_DATA_LEN]) {
   profile.path_mode = native.path_hash_mode;
   profile.loop_detect = native.loop_detect;
   profile.multi_acks = native.multi_acks != 0;
+  profile.repeat_gate = config.repeat_gate != 0;
   profile.airtime_factor = native.airtime_factor;
   profile.tx_delay_factor = native.tx_delay_factor;
   profile.agc_ticks = native.agc_reset_interval;
@@ -674,6 +677,8 @@ static bool applyNativePolicy(const uint8_t data[POLICY_DATA_LEN]) {
       !nativeSet("set agc.reset.interval %u", (unsigned)value.agc_ticks * 4u)) {
     return false;
   }
+  char gate_reply[161];
+  if (!setRepeatGate(value.repeat_gate, gate_reply) || gate_reply[0] != 'O') return false;
   uint8_t actual[POLICY_DATA_LEN];
   return readNativePolicy(actual) && memcmp(actual, data, sizeof(actual)) == 0;
 }
@@ -1600,6 +1605,22 @@ static void listRegions(const char* arg, char* reply) {
 }
 #endif
 
+static bool setRepeatGate(bool on, char* reply) {
+  if (!config_ready) {
+    strcpy(reply, "Err - storage");
+    return true;
+  }
+  Config next = config;
+  next.repeat_gate = on ? 1 : 0;
+  Temp scratch(STORE_MAX);
+  if (!saveConfig(next, scratch)) strcpy(reply, "Err - storage");
+  else {
+    config = next;
+    strcpy(reply, on ? "OK - repeat.gate is now ON" : "OK - repeat.gate is now OFF");
+  }
+  return true;
+}
+
 static bool setChannel(const char* value, char* reply) {
   char normalized[CHANNEL_MAX + 1];
   if (!normalizeChannel(value, normalized)) {
@@ -1647,6 +1668,7 @@ static bool setChannel(const char* value, char* reply) {
   Config next = {};
   next.channel_len = (uint8_t)len;
   memcpy(next.channel, value, len);
+  next.repeat_gate = config.repeat_gate;
   Temp scratch(STORE_MAX);
   if (!config_ready || !saveConfig(next, scratch)) strcpy(reply, "Err - storage");
   else {
@@ -2087,11 +2109,11 @@ static void status(uint8_t dataset, char* reply) {
     ModPolicyValues value;
     if (modPolicyRead(&value) &&
         !append(reply, at,
-                " policy flood %u/%u/%u adv %um/%uh path %u loop %u ack %u af %.6g tx %.6g agc %us",
+                " policy flood %u/%u/%u adv %um/%uh path %u loop %u ack %u gate %u af %.6g tx %.6g agc %us",
                 value.flood_max, value.flood_max_unscoped,
                 value.flood_max_advert, (unsigned)value.advert_interval * 2u,
                 value.flood_advert_interval, value.path_hash_mode,
-                value.loop_detect, value.multi_acks,
+                value.loop_detect, value.multi_acks, config.repeat_gate,
                 (double)value.airtime_factor, (double)value.tx_delay_factor,
                 (unsigned)value.agc_reset_interval * 4u)) goto overflow;
 #endif
@@ -2255,6 +2277,28 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   }
   if (strncmp(command, "set sync.channel", 16) == 0) {
     return setChannel(command[16] == ' ' ? command + 17 : nullptr, reply);
+  }
+#ifdef ROOM_PASSWORD
+  // Room server only: the gate is inert behind 'repeat off', so say so when repeating starts.
+  if (strcmp(command, "set repeat on") == 0) {
+    modCliDispatch(0, command, reply);
+    size_t used = strlen(reply);
+    if (config_ready && config.repeat_gate && used + 18 < 160) {
+      snprintf(reply + used, 160 - used, "; repeat.gate on");
+    }
+    return true;
+  }
+#endif
+  if (strcmp(command, "get repeat.gate") == 0) {
+    if (!config_ready) strcpy(reply, "Err - storage");
+    else snprintf(reply, 160, "> %s", config.repeat_gate ? "on" : "off");
+    return true;
+  }
+  if (strcmp(command, "set repeat.gate on") == 0) return setRepeatGate(true, reply);
+  if (strcmp(command, "set repeat.gate off") == 0) return setRepeatGate(false, reply);
+  if (strncmp(command, "set repeat.gate", 15) == 0) {
+    strcpy(reply, "Err - syntax: set repeat.gate <on|off>");
+    return true;
   }
 #if SYNC_SETTINGS_WITH_REGION
   if (strcmp(command, "sync.region on") == 0 ||
@@ -2511,8 +2555,16 @@ static int exportRegions(RegionMap* base, char* out, size_t capacity,
   return writeRegionList(regions, source, out, capacity);
 }
 #endif
+bool allowFlood(bool scope_known) {
+  return !config.repeat_gate || scope_known;
+}
 }  // namespace sync
 }  // namespace mobmesh
+
+bool syncAllowFlood(const mesh::Packet* packet, bool scope_known) {
+  (void)packet;
+  return mobmesh::sync::allowFlood(scope_known);
+}
 
 bool syncRoute(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out) {
 #if SYNC_SETTINGS_WITH_REGION

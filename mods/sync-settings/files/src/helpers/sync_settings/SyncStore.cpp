@@ -188,7 +188,7 @@ PairResult buildPair(const PairIO& io, uint8_t type, PairView& out,
 }
 
 StoreResult readConfig(const uint8_t* data, size_t len, Config& out) {
-  if (data == nullptr || len != 17 || data[0] > CHANNEL_MAX) return STORE_PAYLOAD;
+  if (data == nullptr || len != 18 || data[0] > CHANNEL_MAX || data[17] > 1) return STORE_PAYLOAD;
   uint8_t channel_len = data[0];
   if (channel_len == 0) {
     if (!allZero(data + 1, CHANNEL_MAX)) return STORE_PAYLOAD;
@@ -200,19 +200,21 @@ StoreResult readConfig(const uint8_t* data, size_t len, Config& out) {
   out.channel_len = channel_len;
   memcpy(out.channel, data + 1, channel_len);
   out.channel[channel_len] = '\0';
+  out.repeat_gate = data[17];
   return STORE_OK;
 }
 
-size_t writeConfig(const Config& config, uint8_t out[17]) {
-  if (out == nullptr || config.channel_len > CHANNEL_MAX ||
+size_t writeConfig(const Config& config, uint8_t out[18]) {
+  if (out == nullptr || config.channel_len > CHANNEL_MAX || config.repeat_gate > 1 ||
       (config.channel_len != 0 &&
        !validChannel((const uint8_t*)config.channel, config.channel_len))) {
     return 0;
   }
-  memset(out, 0, 17);
+  memset(out, 0, 18);
   out[0] = config.channel_len;
   memcpy(out + 1, config.channel, config.channel_len);
-  return 17;
+  out[17] = config.repeat_gate;
+  return 18;
 }
 
 void defaultPublishers(Publishers& publishers) {

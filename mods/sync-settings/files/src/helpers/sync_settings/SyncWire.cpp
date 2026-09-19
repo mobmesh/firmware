@@ -79,7 +79,7 @@ bool validPolicyPayload(const uint8_t* data, size_t len) {
       data[0] > 64 || data[1] > 64 || data[2] > 64 ||
       (data[3] != 0 && (data[3] < 30 || data[3] > 120)) ||
       (data[4] != 0 && (data[4] < 3 || data[4] > 168)) ||
-      (data[5] & 0xe0) != 0 || (data[5] & 3) > 2) return false;
+      (data[5] & 0xc0) != 0 || (data[5] & 3) > 2) return false;
   uint32_t duty_bits = read32(data + 6);
   uint32_t delay_bits = read32(data + 10);
   float duty = policyFloat(data + 6);
@@ -99,6 +99,7 @@ bool readPolicyPayload(const uint8_t data[POLICY_DATA_LEN], PolicyProfile& out) 
   value.path_mode = data[5] & 3;
   value.loop_detect = (data[5] >> 2) & 3;
   value.multi_acks = (data[5] & 0x10) != 0;
+  value.repeat_gate = (data[5] & 0x20) != 0;
   value.airtime_factor = policyFloat(data + 6);
   value.tx_delay_factor = policyFloat(data + 10);
   value.agc_ticks = data[14];
@@ -117,7 +118,7 @@ bool writePolicyPayload(const PolicyProfile& profile,
   out[3] = profile.advert_ticks;
   out[4] = profile.flood_advert_hours;
   out[5] = (uint8_t)(profile.path_mode | (profile.loop_detect << 2) |
-                     (profile.multi_acks ? 0x10 : 0));
+                     (profile.multi_acks ? 0x10 : 0) | (profile.repeat_gate ? 0x20 : 0));
   uint32_t bits;
   memcpy(&bits, &profile.airtime_factor, sizeof(bits));
   write32(out + 6, bits);

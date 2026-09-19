@@ -18,6 +18,10 @@ bool modResolveRegion(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out
   return false;
 }
 
+bool modAllowFlood(const mesh::Packet* packet, bool scope_known) {
+  return true;
+}
+
 int modExportRegions(RegionMap* base, char* out, size_t capacity,
                      uint8_t excluded_flags) {
   return -1;

@@ -9,6 +9,7 @@ namespace mesh { class Packet; }
 struct ModCliContext;
 
 bool syncRoute(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out);
+bool syncAllowFlood(const mesh::Packet* packet, bool scope_known);
 int syncExportRegions(RegionMap* base, char* out, size_t capacity,
                       uint8_t excluded_flags);
 void syncRecv(const mesh::Packet* packet, bool accepted,

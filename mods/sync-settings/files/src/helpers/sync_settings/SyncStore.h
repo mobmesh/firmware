@@ -76,6 +76,7 @@ struct PairView {
 struct Config {
   uint8_t channel_len;
   char channel[CHANNEL_MAX + 1];
+  uint8_t repeat_gate;
 };
 
 enum PublisherStatus : uint8_t {
@@ -185,7 +186,7 @@ PairResult buildPair(const PairIO& io, uint8_t type, PairView& out,
                      PayloadFn validate, PayloadBuildFn build, void* context);
 
 StoreResult readConfig(const uint8_t* data, size_t len, Config& out);
-size_t writeConfig(const Config& config, uint8_t out[17]);
+size_t writeConfig(const Config& config, uint8_t out[18]);
 void defaultPublishers(Publishers& publishers);
 StoreResult readPublishers(const uint8_t* data, size_t len, Publishers& out);
 size_t writePublishers(const Publishers& publishers, uint8_t* out, size_t capacity);
