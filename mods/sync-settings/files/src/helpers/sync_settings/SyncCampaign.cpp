@@ -8,13 +8,14 @@ namespace sync {
 Inbox::Inbox() { clear(); }
 
 bool Inbox::push(const uint8_t* data, size_t len, bool scoped,
-                 const uint8_t* key) {
+                 const uint8_t* key, uint8_t hops) {
   if (data == nullptr || len == 0 || len > FRAME_MAX || count_ == INBOX_CAPACITY) {
     return false;
   }
   uint8_t tail = (uint8_t)((head_ + count_) % INBOX_CAPACITY);
   frame_[tail].len = (uint8_t)len;
   frame_[tail].scoped = scoped;
+  frame_[tail].hops = hops;
   memset(frame_[tail].key, 0, sizeof(frame_[tail].key));
   if (scoped && key != nullptr) memcpy(frame_[tail].key, key, sizeof(frame_[tail].key));
   memcpy(frame_[tail].data, data, len);
@@ -37,7 +38,7 @@ void Inbox::clear() {
   count_ = 0;
 }
 
-static_assert(sizeof(InboxFrame) <= FRAME_MAX + 18, "inbox frame changed");
+static_assert(sizeof(InboxFrame) <= FRAME_MAX + 19, "inbox frame changed");
 
 static const uint32_t DAY_MS = 86400000UL;
 static const uint32_t CLOCK_FLOOR = 1715770351UL;
@@ -118,18 +119,18 @@ const Campaign& Receiver::campaign(uint8_t dataset) const {
 
 ReceiveResult Receiver::take(const uint8_t* frame, size_t len,
                              uint32_t now_ms, uint32_t epoch, bool scoped,
-                             const uint8_t* route_key) {
+                             const uint8_t* route_key, uint8_t hops) {
   uint8_t type = 0;
   WireResult wire = classify(frame, len, type);
   if (wire != WIRE_OK) return wire == WIRE_FOREIGN ? RECEIVE_FOREIGN : RECEIVE_MALFORMED;
-  if (type == MANIFEST) return manifest(frame, len, now_ms, epoch, scoped, route_key);
-  if (type == CHUNK) return chunk(frame, len);
+  if (type == MANIFEST) return manifest(frame, len, now_ms, epoch, scoped, route_key, hops);
+  if (type == CHUNK) return chunk(frame, len, hops);
   return abort(frame, len);
 }
 
 ReceiveResult Receiver::manifest(const uint8_t* frame, size_t len,
                                  uint32_t now_ms, uint32_t epoch, bool scoped,
-                                 const uint8_t* route_key) {
+                                 const uint8_t* route_key, uint8_t hops) {
   if (len < 5 || ops_.accepts == nullptr ||
       !ops_.accepts(frame[4], nullptr, ops_.context)) return RECEIVE_DISABLED;
   Manifest value;
@@ -185,6 +186,8 @@ ReceiveResult Receiver::manifest(const uint8_t* frame, size_t len,
 
   active.state = RECEIVE_ACTIVE;
   active.format = value.format;
+  memset(active.frame_hops, 0, sizeof(active.frame_hops));
+  active.frame_hops[0] = (uint8_t)(hops + 1);
   memcpy(active.publisher_key, publisher->key, sizeof(active.publisher_key));
   active.publisher_id = publisher->id;
   active.generation = value.generation;
@@ -226,7 +229,7 @@ ReceiveResult Receiver::expand(const Campaign& active, uint8_t*& plain,
   return RECEIVE_OK;
 }
 
-ReceiveResult Receiver::chunk(const uint8_t* frame, size_t len) {
+ReceiveResult Receiver::chunk(const uint8_t* frame, size_t len, uint8_t hops) {
   ChunkView value;
   if (readChunk(frame, len, value) != WIRE_OK) return RECEIVE_MALFORMED;
   uint8_t slot = slotOf(value.dataset);
@@ -253,6 +256,8 @@ ReceiveResult Receiver::chunk(const uint8_t* frame, size_t len) {
                    value.signature, ops_.context)) return RECEIVE_SIGNATURE;
   memcpy(active.data + offset, value.data, value.data_len);
   active.received |= bit;
+  // match() already bounds the index; this guards the array write if that ever changes.
+  if (value.index < CHUNK_MAX) active.frame_hops[value.index + 1] = (uint8_t)(hops + 1);
 
   uint16_t complete = (uint16_t)(((uint16_t)1u << active.chunks) - 1u);
   if (active.received != complete) return RECEIVE_OK;

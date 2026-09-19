@@ -80,6 +80,8 @@ enum ReportReason : uint8_t {
 struct RuntimeReport {
   uint32_t generation;
   ReportReason reason;
+  // Hops per accepted frame of that campaign, biased by one; zero means never received.
+  uint8_t hops[CHUNK_MAX + 1];
 };
 static RuntimeReport runtime_report[SYNC_SETTINGS_DATASET_COUNT];
 static uint32_t housekeeping_at[SYNC_SETTINGS_DATASET_COUNT];
@@ -211,7 +213,7 @@ static void receive(const mesh::Packet* packet, bool accepted,
   if (readCarrier(packet->payload, packet->payload_len, frame, sizeof(frame),
                   len, decrypt, nullptr) == CARRIER_OK) {
     bool scoped = packet->getRouteType() == ROUTE_TYPE_TRANSPORT_FLOOD;
-    inbox.push(frame, len, scoped, scope_key);
+    inbox.push(frame, len, scoped, scope_key, packet->getPathHashCount());
   }
 }
 
@@ -751,6 +753,8 @@ static bool applyCampaign(uint8_t dataset, const Campaign& campaign,
     if (!readNativePolicy(actual) ||
         memcmp(actual, campaign.data, sizeof(actual)) != 0) {
       reportFor(dataset) = {campaign.generation, REPORT_RESTORED};
+    } else {
+      reportFor(dataset) = {campaign.generation, REPORT_APPLIED};
     }
     next = policy_state;
     return true;
@@ -786,6 +790,7 @@ static bool applyCampaign(uint8_t dataset, const Campaign& campaign,
     return true;
   }
   region_receive_ready = true;
+  reportFor(dataset) = {campaign.generation, REPORT_APPLIED};
   return true;
 #else
   (void)dataset;
@@ -2097,6 +2102,31 @@ overflow:
   strcpy(reply, "Err - status too long");
 }
 
+// Tallies the recorded hop counts onto the report line as "hops <hops>x<frames>,...".
+static void appendHops(const RuntimeReport& notice, char* reply, size_t cap) {
+  uint8_t tally[64];
+  memset(tally, 0, sizeof(tally));
+  bool any = false;
+  for (uint8_t i = 0; i < CHUNK_MAX + 1; ++i) {
+    if (notice.hops[i] == 0) continue;
+    ++tally[(uint8_t)(notice.hops[i] - 1) & 63];
+    any = true;
+  }
+  if (!any) return;
+  size_t at = strlen(reply);
+  const char* lead = " hops ";
+  for (uint8_t h = 0; h < 64; ++h) {
+    if (tally[h] == 0) continue;
+    char term[16];
+    int n = snprintf(term, sizeof(term), "%s%ux%u", lead, (unsigned)h, (unsigned)tally[h]);
+    if (n <= 0 || at + (size_t)n + 1 > cap) return;
+    memcpy(reply + at, term, (size_t)n);
+    at += (size_t)n;
+    reply[at] = 0;
+    lead = ",";
+  }
+}
+
 static bool reportCommand(uint8_t dataset, const char* page_text, char* reply) {
   uint8_t page;
   if (!parseOffset(page_text, page) || page == 0) {
@@ -2123,14 +2153,17 @@ static bool reportCommand(uint8_t dataset, const char* page_text, char* reply) {
                 (unsigned long)state.warning_generation, state.abort_sent,
                 (unsigned long)state.warning_time,
                 (unsigned long)state.warning_expiry);
-  else snprintf(reply, 160, "%u/%u gen %lu %s", page, count,
-                (unsigned long)notice.generation,
-                notice.reason == REPORT_SIGN ? "publication signing failed" :
-                notice.reason == REPORT_SETTLEMENT ? "applied; replay settlement pending" :
-                notice.reason == REPORT_APPLIED ? "applied; replay settled" :
-                notice.reason == REPORT_DECODE ? "compressed payload could not be decoded" :
-                notice.reason == REPORT_RESTORED ? "application failed; prior policy restored" :
-                                                  "application failed; campaign released");
+  else {
+    snprintf(reply, 160, "%u/%u gen %lu %s", page, count,
+             (unsigned long)notice.generation,
+             notice.reason == REPORT_SIGN ? "publication signing failed" :
+             notice.reason == REPORT_SETTLEMENT ? "applied; replay settlement pending" :
+             notice.reason == REPORT_APPLIED ? "applied; replay settled" :
+             notice.reason == REPORT_DECODE ? "compressed payload could not be decoded" :
+             notice.reason == REPORT_RESTORED ? "application failed; prior policy restored" :
+                                               "application failed; campaign released");
+    appendHops(notice, reply, 160);
+  }
   return true;
 }
 
@@ -2536,7 +2569,7 @@ void syncLoop() {
     }
     mobmesh::sync::ReceiveResult taken =
         mobmesh::sync::receiver.take(frame->data, frame->len, millis(), modClockGet(),
-                                     frame->scoped, frame->key);
+                                     frame->scoped, frame->key, frame->hops);
     if (frame->len > 4) {
       uint8_t dataset = frame->data[4];
       // A payload that arrived whole and still would not decode is worth reporting.
@@ -2546,8 +2579,14 @@ void syncLoop() {
       if (mobmesh::sync::receiver.campaign(dataset).state ==
           mobmesh::sync::RECEIVE_STAGED) {
         uint32_t generation = mobmesh::sync::receiver.campaign(dataset).generation;
+        uint8_t hops[mobmesh::sync::CHUNK_MAX + 1];
+        memcpy(hops, mobmesh::sync::receiver.campaign(dataset).frame_hops, sizeof(hops));
         if (mobmesh::sync::receiver.finish(dataset) != mobmesh::sync::RECEIVE_OK) {
           mobmesh::sync::reportFor(dataset) = {generation, mobmesh::sync::REPORT_APPLY};
+        }
+        // Only stamp the tally when the report still names the campaign it came from.
+        if (mobmesh::sync::reportFor(dataset).generation == generation) {
+          memcpy(mobmesh::sync::reportFor(dataset).hops, hops, sizeof(hops));
         }
       }
     }

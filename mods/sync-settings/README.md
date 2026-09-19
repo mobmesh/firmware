@@ -255,6 +255,26 @@ sync.region publish * release -raw
 `-raw` forces the uncompressed format for that campaign. Note: A compressed campaign can always be 
 retried as a plain one in the field.
 
+## How far the campaign travelled
+
+A receiver records how many hops each frame of a campaign took and tallies them on the
+report once the campaign ends:
+
+```text
+sync.region publish.report 1
+  -> 1/1 gen 42 applied; replay settled hops 0x1,1x3
+```
+
+Each term is `<hops>x<frames>`: here the manifest arrived direct and three chunks came
+through one relay. Hop counts absent from the line had no frames. The token is omitted
+entirely when nothing was received, so `0x5` genuinely means five direct frames.
+
+Two caveats. Duplicate copies of a frame are dropped before the mod sees them, so what is
+recorded is the shortest route that happened to arrive first -- a node in direct range of
+the publisher reads all zeroes no matter how busy the relays around it are. And a campaign
+that never lands leaves no frames to tally, so this diagnoses a working path, not a broken
+one.
+
 
 ## Hardening and security
 

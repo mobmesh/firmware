@@ -11,6 +11,7 @@ static const uint8_t INBOX_CAPACITY = 4;
 struct InboxFrame {
   uint8_t len;
   bool scoped;
+  uint8_t hops;
   uint8_t key[16];
   uint8_t data[FRAME_MAX];
 };
@@ -20,7 +21,7 @@ class Inbox {
   Inbox();
 
   bool push(const uint8_t* data, size_t len, bool scoped = false,
-            const uint8_t* key = nullptr);
+            const uint8_t* key = nullptr, uint8_t hops = 0);
   const InboxFrame* front() const;
   void drop();
   void clear();
@@ -97,6 +98,8 @@ struct Campaign {
   uint8_t route_key[16];
   uint8_t digest[DIGEST_LEN];
   uint8_t manifest_hash[DIGEST_LEN];
+  // Hops per accepted frame, biased by one; manifest at 0, chunk i at i+1, zero means none.
+  uint8_t frame_hops[CHUNK_MAX + 1];
   uint8_t* data;
 };
 
@@ -108,7 +111,7 @@ class Receiver {
 
   ReceiveResult take(const uint8_t* frame, size_t len,
                      uint32_t now_ms, uint32_t epoch, bool scoped = false,
-                     const uint8_t* route_key = nullptr);
+                     const uint8_t* route_key = nullptr, uint8_t hops = 0);
   void tick(uint32_t now_ms);
   ReceiveResult cancel(uint8_t dataset);
   void cancelPublisher(const uint8_t key[32]);
@@ -123,8 +126,8 @@ class Receiver {
 
   ReceiveResult manifest(const uint8_t* frame, size_t len,
                          uint32_t now_ms, uint32_t epoch, bool scoped,
-                         const uint8_t* route_key);
-  ReceiveResult chunk(const uint8_t* frame, size_t len);
+                         const uint8_t* route_key, uint8_t hops);
+  ReceiveResult chunk(const uint8_t* frame, size_t len, uint8_t hops);
   ReceiveResult expand(const Campaign& active, uint8_t*& plain, uint16_t& plain_len);
   bool canDecode() const;
   ReceiveResult abort(const uint8_t* frame, size_t len);
