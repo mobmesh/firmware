@@ -23,6 +23,7 @@ static const size_t ABORT_SIGNED_LEN = 37;
 static const size_t REGION_DATA_MAX = 1057;
 static const size_t POLICY_DATA_LEN = 15;
 static const uint8_t CHUNK_MAX = 12;
+// High nibble is the payload schema, low nibble the codec; a new schema bumps it and old nodes reject the manifest.
 static const uint8_t FORMAT_RAW = 0x01;
 static const uint8_t FORMAT_DEFLATE = 0x02;
 static const uint8_t CARRIER_HASH = 0x35;
