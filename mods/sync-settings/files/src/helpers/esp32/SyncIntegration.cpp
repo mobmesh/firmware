@@ -2129,10 +2129,12 @@ static void appendHops(const RuntimeReport& notice, char* reply, size_t cap) {
 
 static bool reportCommand(uint8_t dataset, const char* page_text, char* reply) {
   uint8_t page;
-  if (!parseOffset(page_text, page) || page == 0) {
+  if (!parseOffset(page_text, page)) {
     strcpy(reply, "Err - page");
     return true;
   }
+  // parseOffset yields 0 for a missing argument; pages count from one, so that means the first.
+  if (page == 0) page = 1;
   bool state_ready = dataset == REGION ? region_state_ready
                                        : policy_state_ready
 #if SYNC_SETTINGS_WITH_POLICY
@@ -2146,7 +2148,7 @@ static bool reportCommand(uint8_t dataset, const char* page_text, char* reply) {
   const DatasetState& state = stateFor(dataset);
   const RuntimeReport& notice = reportFor(dataset);
   uint8_t count = (state.warning_reason != 0) + (notice.reason != REPORT_NONE);
-  if (count == 0) strcpy(reply, "Err - no reports");
+  if (count == 0) strcpy(reply, "empty");
   else if (page > count) strcpy(reply, "Err - page range");
   else if (state.warning_reason != 0 && page == 1) snprintf(reply, 160,
                 "1/1 abort gen %lu notices %u reason deadline at %lu until %lu",
@@ -2390,17 +2392,16 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
     return reportCommand(POLICY, command + sizeof(policy_report) - 1, reply);
   }
 #endif
-  if (
 #if SYNC_SETTINGS_WITH_REGION
-      strcmp(command, "sync.region publish.report") == 0 ||
+  if (strcmp(command, "sync.region publish.report") == 0) {
+    return reportCommand(REGION, "", reply);
+  }
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
-      strcmp(command, "sync.policy publish.report") == 0 ||
-#endif
-      false) {
-    strcpy(reply, "Err - page");
-    return true;
+  if (strcmp(command, "sync.policy publish.report") == 0) {
+    return reportCommand(POLICY, "", reply);
   }
+#endif
 #if SYNC_SETTINGS_WITH_REGION
   if (strcmp(command, "sync.region publish.abort") == 0) {
     return abortCommand(REGION, reply);

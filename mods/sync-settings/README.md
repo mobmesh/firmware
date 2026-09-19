@@ -164,7 +164,7 @@ Available through serial and authenticated remote admin CLI.
 <tr><td><code>sync.&lt;dataset&gt; publish.reset &lt;region|*&gt; &lt;channel&gt; [-raw]</code></td><td>Recovery publication for an incorrectly far-ahead generation history; eligibility checks still apply.</td></tr>
 <tr><td><code>sync.&lt;dataset&gt; publish.abort</code></td><td>Abort outbound work/guard; otherwise cancel inbound reception. No rollback or history erasure.</td></tr>
 <tr><td><code>sync.&lt;dataset&gt; publish.status</code></td><td>Show activity, channel, progress, and relevant warnings/storage state.</td></tr>
-<tr><td><code>sync.&lt;dataset&gt; publish.report &lt;page&gt;</code></td><td>Read outcomes/warnings; pages start at 1.</td></tr>
+<tr><td><code>sync.&lt;dataset&gt; publish.report [page]</code></td><td>Read outcomes/warnings; pages start at 1, and omitting the page shows the first.</td></tr>
 <tr><td><code>get sync.&lt;dataset&gt;.publish.interval</code></td><td>Show round interval.</td></tr>
 <tr><td><code>set sync.&lt;dataset&gt;.publish.interval &lt;N&gt;h</code></td><td>Save interval: 3–24 hours. Example: <code>12h</code>.</td></tr>
 <tr><td><code>get sync.&lt;dataset&gt;.publish.duration</code></td><td>Show publication window.</td></tr>
@@ -215,7 +215,7 @@ txdelay                agc.reset.interval
 - Initial schedule: `12h` over `3d` = seven rounds, starting immediately.
 - Regions and policy have independent campaigns and schedules.
 - Schedule changes affect the next publication.
-- Invalid timing input returns the required syntax. No reports returns `Err - no reports`.
+- Invalid timing input returns the required syntax. No reports returns `empty`.
 - No user-facing restore or rollback command.
 
 **Publish an empty overlay — explicit confirmation required:**
