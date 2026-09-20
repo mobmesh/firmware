@@ -282,9 +282,19 @@ static PairResult loadPair(PairPaths& paths, uint8_t type, PairView& pair,
   return result;
 }
 
+static void discardPair(PairPaths& paths) {
+  SPIFFS.remove(paths.path[0]);
+  SPIFFS.remove(paths.path[1]);
+}
+
 static bool loadConfig(uint8_t* scratch) {
   PairView pair;
   PairResult result = loadPair(CONFIG_PATHS, STORE_CONFIG, pair, scratch, configValid);
+  // A record neither slot can read is unrecoverable, so drop it and start from defaults.
+  if (result == PAIR_FAULT) {
+    discardPair(CONFIG_PATHS);
+    result = PAIR_ABSENT;
+  }
   if (result == PAIR_ABSENT) {
     memset(&config, 0, sizeof(config));
     config_degraded = false;

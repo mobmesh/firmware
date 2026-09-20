@@ -188,7 +188,9 @@ PairResult buildPair(const PairIO& io, uint8_t type, PairView& out,
 }
 
 StoreResult readConfig(const uint8_t* data, size_t len, Config& out) {
-  if (data == nullptr || len != 18 || data[0] > CHANNEL_MAX || data[17] > 1) return STORE_PAYLOAD;
+  // A 17-byte record predates repeat.gate; read it and default the flag off.
+  if (data == nullptr || (len != 17 && len != 18) || data[0] > CHANNEL_MAX) return STORE_PAYLOAD;
+  if (len == 18 && data[17] > 1) return STORE_PAYLOAD;
   uint8_t channel_len = data[0];
   if (channel_len == 0) {
     if (!allZero(data + 1, CHANNEL_MAX)) return STORE_PAYLOAD;
@@ -200,7 +202,7 @@ StoreResult readConfig(const uint8_t* data, size_t len, Config& out) {
   out.channel_len = channel_len;
   memcpy(out.channel, data + 1, channel_len);
   out.channel[channel_len] = '\0';
-  out.repeat_gate = data[17];
+  out.repeat_gate = len == 18 ? data[17] : 0;
   return STORE_OK;
 }
 
