@@ -112,8 +112,9 @@ static const char* buildIdentity() {
   char ver[17] = "", sha[13] = "", role[25] = "";
   HotspotOTA::runningMetadata(ver, sha, role);
 
-  const char* mac = WiFi.softAPmacAddress().c_str();
-  const char* tail = strlen(mac) > 8 ? mac + 9 : mac;   // last three octets identify the node
+  String mac = WiFi.softAPmacAddress();
+  const char* mac_text = mac.c_str();
+  const char* tail = strlen(mac_text) > 8 ? mac_text + 9 : mac_text;   // last three octets identify the node
 
   snprintf(ota_identity, sizeof(ota_identity),
            "{\"nm\":\"%s\",\"id\":\"%s\",\"k\":\"%s\",\"hw\":\"%s\",\"cid\":%d,"
