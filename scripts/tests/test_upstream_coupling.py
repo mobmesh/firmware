@@ -171,6 +171,31 @@ class UpstreamCouplingTestCase(unittest.TestCase):
                 f"{target} no longer returns the configured packet's upstream airtime",
             )
 
+    def test_tempradio_snapshot_tracks_cli_and_loop_transitions(self):
+        patch = Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
+        source = added_source(patch)
+        snapshot = re.compile(
+            r"mod_temp_radio\s*=\s*\{\s*pending_freq,\s*pending_bw,\s*"
+            r"pending_sf,\s*pending_cr,\s*set_radio_at\s*==\s*0\s*&&\s*"
+            r"revert_radio_at\s*!=\s*0\s*&&\s*"
+            r"!millisHasNowPassed\(revert_radio_at\)\s*\};",
+            re.DOTALL,
+        )
+        for role in ("simple_repeater", "simple_room_server"):
+            target = f"examples/{role}/MyMesh.cpp"
+            body = source[target]
+            matches = list(snapshot.finditer(body))
+            self.assertEqual(len(matches), 2, f"{target} must refresh after CLI and timers")
+            dispatch = body.index("if (!modHandleCliCommand")
+            self.assertGreater(matches[0].start(), dispatch)
+
+        patch_text = patch.read_text()
+        self.assertEqual(
+            patch_text.count('MESH_DEBUG_PRINTLN("Radio params restored");\n   }\n \n+  mod_temp_radio'),
+            2,
+            "both role loops refresh only after the revert timer is processed",
+        )
+
     def test_drift_canary_builds_sync_settings_for_both_roles(self):
         workflow = Path(REPO_ROOT, ".github/workflows/patch-drift-canary.yml").read_text()
         self.assertIn("CANARY_EXTRA_MODS: sync-settings", workflow)

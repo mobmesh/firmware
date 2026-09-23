@@ -1,5 +1,5 @@
 diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
-index 7d0179f..30650d8 100644
+index 7d0179f..41e33e8 100644
 --- a/examples/simple_repeater/MyMesh.cpp
 +++ b/examples/simple_repeater/MyMesh.cpp
 @@ -1,6 +1,187 @@
@@ -296,21 +296,33 @@ index 7d0179f..30650d8 100644
    _logging = false;
    region_load_active = false;
    recv_pkt_region = NULL;
-@@ -1280,6 +1513,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -1280,7 +1513,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
        strcpy(reply, "OK - Discover sent");
      }
    } else{
-+    // Liveness is decided here, where the timers are in scope: pending_* are untested before
-+    // the 2s apply and stale after the revert, which clears only the timer.
+-    _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
++    // Mods first: this is the only call site both the release tag and dev spell the same way.
++    if (!modHandleCliCommand(sender_timestamp, command, reply,
++                             FIRMWARE_VERSION, FIRMWARE_BUILD_DATE)) {
++      _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
++    }
 +    mod_temp_radio = { pending_freq, pending_bw, pending_sf, pending_cr,
 +                       set_radio_at == 0 && revert_radio_at != 0
 +                         && !millisHasNowPassed(revert_radio_at) };
-+    // Mods first: this is the only call site both the release tag and dev spell the same way.
-+    if (modHandleCliCommand(sender_timestamp, command, reply,
-+                            FIRMWARE_VERSION, FIRMWARE_BUILD_DATE)) return;
-     _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
    }
  }
+ 
+@@ -1317,6 +1557,10 @@ void MyMesh::loop() {
+     MESH_DEBUG_PRINTLN("Radio params restored");
+   }
+ 
++  mod_temp_radio = { pending_freq, pending_bw, pending_sf, pending_cr,
++                     set_radio_at == 0 && revert_radio_at != 0
++                       && !millisHasNowPassed(revert_radio_at) };
++
+   // is pending dirty contacts write needed?
+   if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
+     acl.save(_fs);
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
 index a714db6..0909307 100644
 --- a/examples/simple_repeater/main.cpp
@@ -361,7 +373,7 @@ index a714db6..0909307 100644
      board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
  #else
 diff --git a/examples/simple_room_server/MyMesh.cpp b/examples/simple_room_server/MyMesh.cpp
-index 546d094..48d5e38 100644
+index 546d094..2c987ab 100644
 --- a/examples/simple_room_server/MyMesh.cpp
 +++ b/examples/simple_room_server/MyMesh.cpp
 @@ -1,4 +1,185 @@
@@ -645,21 +657,33 @@ index 546d094..48d5e38 100644
  
    switch (mesh::chooseReplyScope(req_scope_known, is_wildcard, !default_scope.isNull())) {
      case mesh::REPLY_SCOPE_REQUEST:
-@@ -984,6 +1211,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -984,7 +1211,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
        snprintf(reply, MAX_POST_TEXT_LEN, "OK");
      }
    } else{
-+    // Liveness is decided here, where the timers are in scope: pending_* are untested before
-+    // the 2s apply and stale after the revert, which clears only the timer.
+-    _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
++    // Mods first: this is the only call site both the release tag and dev spell the same way.
++    if (!modHandleCliCommand(sender_timestamp, command, reply,
++                             FIRMWARE_VERSION, FIRMWARE_BUILD_DATE)) {
++      _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
++    }
 +    mod_temp_radio = { pending_freq, pending_bw, pending_sf, pending_cr,
 +                       set_radio_at == 0 && revert_radio_at != 0
 +                         && !millisHasNowPassed(revert_radio_at) };
-+    // Mods first: this is the only call site both the release tag and dev spell the same way.
-+    if (modHandleCliCommand(sender_timestamp, command, reply,
-+                            FIRMWARE_VERSION, FIRMWARE_BUILD_DATE)) return;
-     _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
    }
  }
+ 
+@@ -1064,6 +1298,10 @@ void MyMesh::loop() {
+     MESH_DEBUG_PRINTLN("Radio params restored");
+   }
+ 
++  mod_temp_radio = { pending_freq, pending_bw, pending_sf, pending_cr,
++                     set_radio_at == 0 && revert_radio_at != 0
++                       && !millisHasNowPassed(revert_radio_at) };
++
+   // is pending dirty contacts write needed?
+   if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
+     acl.save(_fs, MyMesh::saveFilter);
 diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
 index d833fff..2af9258 100644
 --- a/examples/simple_room_server/main.cpp
