@@ -3,6 +3,7 @@
 #include <helpers/sync_settings/SyncCampaign.h>
 #include <helpers/sync_settings/SyncPublish.h>
 #include <helpers/sync_settings/SyncRegion.h>
+#include <helpers/sync_settings/SyncRadioMigration.h>
 #include <helpers/sync_settings/SyncSelect.h>
 #include <helpers/sync_settings/SyncStore.h>
 
@@ -39,6 +40,7 @@ static bool config_ready;
 static bool enabled;
 static bool overlay_ready;
 static bool policy_recovery_ready;
+static bool radio_ready;
 #if SYNC_SETTINGS_WITH_REGION
 static Regions regions;
 static uint8_t saved_region_digest[DIGEST_LEN];
@@ -52,6 +54,7 @@ static bool overlay_degraded;
 static bool region_state_degraded;
 static bool policy_state_degraded;
 static bool recovery_degraded;
+static bool radio_degraded;
 static bool trust_degraded;
 static bool dirty;
 #if SYNC_SETTINGS_WITH_REGION
@@ -87,13 +90,17 @@ static RuntimeReport runtime_report[SYNC_SETTINGS_DATASET_COUNT];
 static uint32_t housekeeping_at[SYNC_SETTINGS_DATASET_COUNT];
 static uint8_t housekeeping_failures[SYNC_SETTINGS_DATASET_COUNT];
 static RuntimeReport& reportFor(uint8_t dataset) {
-  return runtime_report[dataset == REGION ? 0 : SYNC_SETTINGS_WITH_REGION];
+  return runtime_report[syncDatasetSlot(dataset)];
 }
 #if SYNC_SETTINGS_WITH_REGION
 static DatasetState region_state;
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
 static DatasetState policy_state;
+#endif
+#if SYNC_SETTINGS_WITH_RADIO
+static DatasetState radio_state;
+static RadioRecord radio_record;
 #endif
 #if SYNC_SETTINGS_WITH_REGION
 static RegionRecord region_record;
@@ -155,6 +162,9 @@ static PairPaths REGION_STATE_PATHS = {{"/sync_rs0", "/sync_rs1"}};
 static PairPaths POLICY_STATE_PATHS = {{"/sync_ps0", "/sync_ps1"}};
 #if SYNC_SETTINGS_WITH_POLICY
 static PairPaths POLICY_RECOVERY_PATHS = {{"/sync_pr0", "/sync_pr1"}};
+#endif
+#if SYNC_SETTINGS_WITH_RADIO
+static PairPaths RADIO_PATHS = {{"/sync_rr0", "/sync_rr1"}};
 #endif
 
 static bool fileExists(uint8_t slot, void* context) {
@@ -243,6 +253,13 @@ static StoreResult stateValid(const uint8_t* data, size_t len, void*) {
 static StoreResult recoveryValid(const uint8_t* data, size_t len, void*) {
   PolicyRecovery value;
   return readPolicyRecovery(data, len, value, hash, nullptr);
+}
+#endif
+
+#if SYNC_SETTINGS_WITH_RADIO
+static StoreResult radioValid(const uint8_t* data, size_t len, void*) {
+  RadioRecord value;
+  return readRadioRecord(data, len, value);
 }
 #endif
 
@@ -361,6 +378,35 @@ static bool loadState(PairPaths& paths, uint8_t type, DatasetState& state,
          readState(pair.record.payload, pair.record.payload_len, state) == STORE_OK;
 }
 
+#if SYNC_SETTINGS_WITH_RADIO
+static void projectRadioState() {
+  defaultState(radio_state);
+  radio_state.enabled = radio_record.enabled;
+  radio_state.local_generation = radio_record.local_generation;
+  memcpy(radio_state.local_key, radio_record.local_key,
+         sizeof(radio_state.local_key));
+  radio_state.replay_count = radio_record.replay_count;
+  memcpy(radio_state.replay, radio_record.replay, sizeof(radio_state.replay));
+}
+
+static bool loadRadio(uint8_t* scratch) {
+  PairView pair;
+  PairResult result = loadPair(RADIO_PATHS, STORE_RADIO, pair, scratch, radioValid);
+  if (result == PAIR_ABSENT) {
+    defaultRadioRecord(radio_record);
+    radio_degraded = false;
+    projectRadioState();
+    return true;
+  }
+  if (result != PAIR_OK ||
+      readRadioRecord(pair.record.payload, pair.record.payload_len,
+                      radio_record) != STORE_OK) return false;
+  radio_degraded = pair.degraded;
+  projectRadioState();
+  return true;
+}
+#endif
+
 static size_t buildConfigPayload(uint8_t* out, size_t capacity, void* context) {
   return capacity < 18 ? 0 : writeConfig(*static_cast<Config*>(context), out);
 }
@@ -372,6 +418,12 @@ static size_t buildPublisherPayload(uint8_t* out, size_t capacity, void* context
 static size_t buildStatePayload(uint8_t* out, size_t capacity, void* context) {
   return writeState(*static_cast<DatasetState*>(context), out, capacity);
 }
+
+#if SYNC_SETTINGS_WITH_RADIO
+static size_t buildRadioPayload(uint8_t* out, size_t capacity, void* context) {
+  return writeRadioRecord(*static_cast<RadioRecord*>(context), out, capacity);
+}
+#endif
 
 #if SYNC_SETTINGS_WITH_REGION
 static size_t buildRegionPayload(uint8_t* out, size_t capacity, void*) {
@@ -424,6 +476,78 @@ static bool saveState(PairPaths& paths, uint8_t type, const DatasetState& value,
   }
   return ok;
 }
+
+#if SYNC_SETTINGS_WITH_RADIO
+static bool saveRadio(const RadioRecord& value, uint8_t* scratch) {
+  PairView pair;
+  bool ok = buildPair(pairIO(RADIO_PATHS), STORE_RADIO, pair, scratch, STORE_MAX,
+                      hash, radioValid, buildRadioPayload,
+                      const_cast<RadioRecord*>(&value)) == PAIR_OK;
+  if (ok) radio_degraded = false;
+  return ok;
+}
+
+static bool radioPersist(const RadioRecord& value, void*) {
+  Temp scratch(STORE_MAX);
+  return radio_ready && saveRadio(value, scratch);
+}
+
+static bool radioCommand(const char* name, const RadioValues& value,
+                         uint16_t minutes) {
+  float freq;
+  float bw;
+  if (!radioToFloats(value, freq, bw)) return false;
+  char command[80];
+  int length = minutes == 0
+      ? snprintf(command, sizeof(command), "%s %.9g,%.9g,%u,%u", name,
+                 (double)freq, (double)bw, value.sf, value.cr)
+      : snprintf(command, sizeof(command), "%s %.9g,%.9g,%u,%u,%u", name,
+                 (double)freq, (double)bw, value.sf, value.cr, minutes);
+  if (length < 0 || (size_t)length >= sizeof(command)) return false;
+  char reply[160];
+  modCliDispatch(0, command, reply);
+  return reply[0] == 'O' && reply[1] == 'K';
+}
+
+static bool radioTemporary(const RadioValues& value, uint16_t minutes, void*) {
+  return minutes != 0 && radioCommand("tempradio", value, minutes);
+}
+
+static bool radioCommit(const RadioValues& value, void*) {
+  return radioCommand("set radio", value, 0);
+}
+
+static bool persistentRadioValues(RadioValues& value) {
+  ModRadioValues native;
+  return modRadioPrefsGet(&native) &&
+         radioFromFloats(native.freq, native.bw, native.sf, native.cr, false,
+                         value);
+}
+
+static bool radioRead(RadioValues& value, void*) {
+  return persistentRadioValues(value);
+}
+
+static void radioReboot(void*) { modBoardReboot(); }
+
+static RadioMigration& radioMigration() {
+  static const RadioMigrationOps ops = {
+      radioPersist, radioTemporary, radioCommit, radioRead, radioReboot, nullptr};
+  static RadioMigration value(radio_record, ops);
+  return value;
+}
+
+static bool radioValues(RadioValues& live, bool& temporary) {
+  if (!persistentRadioValues(live)) return false;
+  float freq;
+  float bw;
+  uint8_t sf;
+  uint8_t cr;
+  temporary = modTempRadioGet(&freq, &bw, &sf, &cr);
+  return !temporary || radioFromFloats(freq, bw, sf, cr, false, live);
+}
+
+#endif
 
 #if SYNC_SETTINGS_WITH_REGION
 static bool saveRegions(uint8_t* scratch) {
@@ -576,6 +700,9 @@ static bool readNativePolicy(uint8_t out[POLICY_DATA_LEN]);
 static bool acceptsCampaign(uint8_t dataset, const char* channel, void*) {
   if (!config_ready || !trust_ready || config.channel_len == 0) return false;
   if (channel != nullptr && strcmp(channel, config.channel) != 0) return false;
+#if SYNC_SETTINGS_WITH_RADIO
+  if (dataset != RADIO && radioMigration().active()) return false;
+#endif
   if (transmitter().active(dataset) || transmitter().aborting(dataset)) return false;
 #if SYNC_SETTINGS_WITH_REGION
   if (dataset == REGION) return overlay_ready && region_state_ready &&
@@ -583,12 +710,24 @@ static bool acceptsCampaign(uint8_t dataset, const char* channel, void*) {
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
   uint8_t current[POLICY_DATA_LEN];
-  return dataset == POLICY && policy_state_ready && policy_recovery_ready &&
-         policy_recovery.phase == RECOVERY_IDLE && policy_state.enabled &&
-         readNativePolicy(current);
-#else
-  return false;
+  if (dataset == POLICY) {
+    return policy_state_ready && policy_recovery_ready &&
+           policy_recovery.phase == RECOVERY_IDLE && policy_state.enabled &&
+           readNativePolicy(current);
+  }
 #endif
+#if SYNC_SETTINGS_WITH_RADIO
+  if (dataset == RADIO) {
+    bool temporary = false;
+    RadioValues live;
+    return radio_ready && radio_record.enabled &&
+           radio_record.phase == RADIO_GUARD_IDLE &&
+           (!radioMigration().active() ||
+            radioMigration().state() == RADIO_MIG_ARMED_R1) &&
+           radioValues(live, temporary) && !temporary;
+  }
+#endif
+  return false;
 }
 
 static bool verifyFrame(const uint8_t key[32], const uint8_t* data, size_t len,
@@ -597,6 +736,54 @@ static bool verifyFrame(const uint8_t key[32], const uint8_t* data, size_t len,
   mesh::Identity identity(key);
   return identity.verify(signature, data, (int)len);
 }
+
+#if SYNC_SETTINGS_WITH_RADIO
+static const Publisher* radioPublisher(const uint8_t fingerprint[FINGERPRINT_LEN]) {
+  const Publisher* found = nullptr;
+  for (uint8_t i = 0; i < publishers.count; ++i) {
+    const Publisher& candidate = publishers.record[i];
+    if (candidate.status != PUBLISHER_ACTIVE) continue;
+    uint8_t digest[DIGEST_LEN];
+    hash(candidate.key, sizeof(candidate.key), digest, nullptr);
+    if (memcmp(digest, fingerprint, FINGERPRINT_LEN) != 0) continue;
+    if (found != nullptr) return nullptr;
+    found = &candidate;
+  }
+  return found;
+}
+
+static bool radioScopeMatches(const InboxFrame& frame) {
+  const RadioStage& staged = radioMigration().staged();
+  return staged.scoped == frame.scoped &&
+         (!frame.scoped || memcmp(staged.route_key, frame.key, 16) == 0);
+}
+
+static bool handleRadioControl(const InboxFrame& frame) {
+  uint8_t type = 0;
+  if (classify(frame.data, frame.len, type) != WIRE_OK ||
+      (type != RADIO_CONFIRM && type != RADIO_ABORT)) return false;
+  if (!radioMigration().active() || !radioScopeMatches(frame)) return true;
+
+  const Publisher* publisher = radioPublisher(frame.data + 5);
+  if (publisher == nullptr ||
+      publisher->id != radioMigration().staged().publisher_id) return true;
+
+  if (type == RADIO_CONFIRM) {
+    RadioConfirmView value;
+    if (readRadioConfirm(frame.data, frame.len, value) != WIRE_OK ||
+        !verifyFrame(publisher->key, frame.data, RADIO_CONFIRM_SIGNED_LEN,
+                     value.signature, nullptr)) return true;
+    radioMigration().confirm(value.migration_id, value.target_digest, value.cutover);
+  } else {
+    RadioAbortView value;
+    if (readRadioAbort(frame.data, frame.len, value) != WIRE_OK ||
+        !verifyFrame(publisher->key, frame.data, RADIO_ABORT_SIGNED_LEN,
+                     value.signature, nullptr)) return true;
+    radioMigration().abort(value.migration_id);
+  }
+  return true;
+}
+#endif
 
 static uint8_t* allocateFrame(size_t len, void*) {
   return static_cast<uint8_t*>(malloc(len));
@@ -613,11 +800,25 @@ static bool persistReplay(uint8_t dataset, const DatasetState& state, void*) {
   }
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
-  return dataset == POLICY && policy_state_ready &&
-         saveState(POLICY_STATE_PATHS, STORE_POLICY_STATE, state, scratch);
-#else
-  return false;
+  if (dataset == POLICY) {
+    return policy_state_ready &&
+           saveState(POLICY_STATE_PATHS, STORE_POLICY_STATE, state, scratch);
+  }
 #endif
+#if SYNC_SETTINGS_WITH_RADIO
+  if (dataset == RADIO && radio_ready) {
+    RadioRecord next = radio_record;
+    next.local_generation = state.local_generation;
+    memcpy(next.local_key, state.local_key, sizeof(next.local_key));
+    next.replay_count = state.replay_count;
+    memcpy(next.replay, state.replay, sizeof(next.replay));
+    if (!saveRadio(next, scratch)) return false;
+    radio_record = next;
+    radio_state = state;
+    return true;
+  }
+#endif
+  return false;
 }
 
 static bool validateDataset(uint8_t dataset, const uint8_t* data,
@@ -629,10 +830,15 @@ static bool validateDataset(uint8_t dataset, const uint8_t* data,
   }
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
-  return dataset == POLICY && validPolicyPayload(data, len);
-#else
-  return false;
+  if (dataset == POLICY) return validPolicyPayload(data, len);
 #endif
+#if SYNC_SETTINGS_WITH_RADIO
+  if (dataset == RADIO) {
+    RadioPayload value;
+    return readRadioPayload(data, len, MOBMESH_BUILD_EPOCH, value) == WIRE_OK;
+  }
+#endif
+  return false;
 }
 
 #if SYNC_SETTINGS_WITH_POLICY
@@ -745,6 +951,43 @@ static bool recoverPolicy(uint8_t* scratch) {
 
 static bool applyCampaign(uint8_t dataset, const Campaign& campaign,
                           DatasetState& next, void*) {
+#if SYNC_SETTINGS_WITH_RADIO
+  if (dataset == RADIO) {
+    RadioPayload payload;
+    RadioValues current;
+    bool temporary = false;
+    if (!radio_ready ||
+        readRadioPayload(campaign.data, campaign.data_len,
+                         MOBMESH_BUILD_EPOCH, payload) != WIRE_OK ||
+        !radioValues(current, temporary) || temporary) return false;
+    RadioStage staged = {};
+    staged.payload = payload;
+    staged.publisher_id = campaign.publisher_id;
+    staged.generation = campaign.generation;
+    hash(campaign.data + 10, 10, staged.target_digest, nullptr);
+    staged.channel_len = campaign.channel_len;
+    memcpy(staged.channel, campaign.channel, campaign.channel_len + 1);
+    staged.scoped = campaign.scoped;
+    if (campaign.scoped) {
+      memcpy(staged.route_key, campaign.route_key, sizeof(staged.route_key));
+    }
+    RadioMigrationResult result = radioMigration().stage(staged, current, millis());
+    if (result != RADIO_MIG_OK) return false;
+
+    RadioRecord stored = radio_record;
+    stored.local_generation = next.local_generation;
+    memcpy(stored.local_key, next.local_key, sizeof(stored.local_key));
+    stored.replay_count = next.replay_count;
+    memcpy(stored.replay, next.replay, sizeof(stored.replay));
+    Temp scratch(STORE_MAX);
+    if (!saveRadio(stored, scratch)) {
+      radioMigration().abort(payload.migration_id);
+      return false;
+    }
+    radio_record = stored;
+    return true;
+  }
+#endif
 #if SYNC_SETTINGS_WITH_POLICY
   if (dataset == POLICY) {
     Temp scratch(STORE_MAX);
@@ -936,6 +1179,11 @@ static Receiver receiver(
 #else
     nullptr,
 #endif
+#if SYNC_SETTINGS_WITH_RADIO
+    &radio_state,
+#else
+    nullptr,
+#endif
     receive_ops);
 
 static bool eraseStoredReplay(PairPaths& paths, uint8_t type, uint16_t id,
@@ -1062,6 +1310,10 @@ static void boot() {
 #if SYNC_SETTINGS_WITH_POLICY
   policy_state_ready =
       loadState(POLICY_STATE_PATHS, STORE_POLICY_STATE, policy_state, scratch);
+#endif
+#if SYNC_SETTINGS_WITH_RADIO
+  radio_ready = loadRadio(scratch);
+  if (radio_ready) radio_ready = radioMigration().recover() == RADIO_MIG_OK;
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
   policy_recovery_ready = loadRecovery(scratch);
@@ -2607,6 +2859,15 @@ void syncRecv(const mesh::Packet* packet, bool accepted,
 
 void syncLoop() {
   if (!mobmesh::sync::booted) mobmesh::sync::boot();
+#if SYNC_SETTINGS_WITH_RADIO
+  if (mobmesh::sync::radio_ready) {
+    mobmesh::sync::RadioValues live;
+    bool temporary = false;
+    if (mobmesh::sync::radioValues(live, temporary)) {
+      mobmesh::sync::radioMigration().tick(millis(), live, temporary);
+    }
+  }
+#endif
 #if SYNC_SETTINGS_WITH_REGION
   if (mobmesh::sync::disable_pending) {
     mobmesh::sync::enabled = false;
@@ -2625,6 +2886,14 @@ void syncLoop() {
   }
 #endif
   const mobmesh::sync::InboxFrame* frame = mobmesh::sync::inbox.front();
+  if (frame != nullptr) {
+#if SYNC_SETTINGS_WITH_RADIO
+    if (mobmesh::sync::handleRadioControl(*frame)) {
+      mobmesh::sync::inbox.drop();
+      frame = nullptr;
+    }
+#endif
+  }
   if (frame != nullptr) {
     uint32_t taken_generation = 0;
     if (frame->len > 4) {

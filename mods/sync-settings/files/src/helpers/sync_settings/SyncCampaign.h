@@ -90,6 +90,8 @@ struct Campaign {
   uint16_t publisher_id;
   uint32_t generation;
   bool reset;
+  uint8_t channel_len;
+  char channel[CHANNEL_MAX + 1];
   uint8_t chunks;
   uint16_t data_len;
   uint16_t received;

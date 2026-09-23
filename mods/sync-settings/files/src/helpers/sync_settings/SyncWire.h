@@ -54,6 +54,19 @@ enum Dataset : uint8_t {
   RADIO = 0x03,
 };
 
+inline uint8_t syncDatasetSlot(uint8_t dataset) {
+#if SYNC_SETTINGS_WITH_REGION
+  if (dataset == REGION) return 0;
+#endif
+#if SYNC_SETTINGS_WITH_POLICY
+  if (dataset == POLICY) return SYNC_SETTINGS_WITH_REGION;
+#endif
+#if SYNC_SETTINGS_WITH_RADIO
+  if (dataset == RADIO) return SYNC_SETTINGS_WITH_REGION + SYNC_SETTINGS_WITH_POLICY;
+#endif
+  return 0xff;
+}
+
 enum WireResult : uint8_t {
   WIRE_OK,
   WIRE_FOREIGN,

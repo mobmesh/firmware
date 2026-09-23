@@ -45,19 +45,6 @@ static const uint32_t CLOCK_FLOOR = 1715770351UL;
 static const uint32_t RESET_AHEAD = 432000UL;
 static const uint32_t CLOCK_SKEW = 86400UL;
 
-static uint8_t slotOf(uint8_t dataset) {
-#if SYNC_SETTINGS_WITH_REGION
-  if (dataset == REGION) return 0;
-#endif
-#if SYNC_SETTINGS_WITH_POLICY
-  if (dataset == POLICY) return SYNC_SETTINGS_WITH_REGION;
-#endif
-#if SYNC_SETTINGS_WITH_RADIO
-  if (dataset == RADIO) return SYNC_SETTINGS_WITH_REGION + SYNC_SETTINGS_WITH_POLICY;
-#endif
-  return 0xff;
-}
-
 static bool same(const uint8_t* a, const uint8_t* b, size_t len) {
   return a != nullptr && b != nullptr && memcmp(a, b, len) == 0;
 }
@@ -96,17 +83,17 @@ Receiver::Receiver(Publishers& publishers, DatasetState* region,
                    const ReceiveOps& ops)
     : publishers_(publishers), ops_(ops) {
 #if SYNC_SETTINGS_WITH_REGION
-  state_[slotOf(REGION)] = region;
+  state_[syncDatasetSlot(REGION)] = region;
 #else
   (void)region;
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
-  state_[slotOf(POLICY)] = policy;
+  state_[syncDatasetSlot(POLICY)] = policy;
 #else
   (void)policy;
 #endif
 #if SYNC_SETTINGS_WITH_RADIO
-  state_[slotOf(RADIO)] = radio;
+  state_[syncDatasetSlot(RADIO)] = radio;
 #else
   (void)radio;
 #endif
@@ -126,7 +113,7 @@ void Receiver::clear(Campaign& campaign) {
 
 const Campaign& Receiver::campaign(uint8_t dataset) const {
   static const Campaign none = {};
-  uint8_t slot = slotOf(dataset);
+  uint8_t slot = syncDatasetSlot(dataset);
   return slot < SYNC_SETTINGS_DATASET_COUNT ? campaign_[slot] : none;
 }
 
@@ -148,7 +135,7 @@ ReceiveResult Receiver::manifest(const uint8_t* frame, size_t len,
       !ops_.accepts(frame[4], nullptr, ops_.context)) return RECEIVE_DISABLED;
   Manifest value;
   if (readManifest(frame, len, value) != WIRE_OK) return RECEIVE_MALFORMED;
-  uint8_t slot = slotOf(value.dataset);
+  uint8_t slot = syncDatasetSlot(value.dataset);
   if (slot >= SYNC_SETTINGS_DATASET_COUNT || state_[slot] == nullptr ||
       !ops_.accepts(value.dataset, value.channel, ops_.context)) return RECEIVE_DISABLED;
 
@@ -206,6 +193,8 @@ ReceiveResult Receiver::manifest(const uint8_t* frame, size_t len,
   active.publisher_id = publisher->id;
   active.generation = value.generation;
   active.reset = value.reset;
+  active.channel_len = (uint8_t)strlen(value.channel);
+  memcpy(active.channel, value.channel, active.channel_len + 1);
   active.chunks = value.chunks;
   active.data_len = value.data_len;
   active.received = 0;
@@ -246,7 +235,7 @@ ReceiveResult Receiver::expand(const Campaign& active, uint8_t*& plain,
 ReceiveResult Receiver::chunk(const uint8_t* frame, size_t len, uint8_t hops) {
   ChunkView value;
   if (readChunk(frame, len, value) != WIRE_OK) return RECEIVE_MALFORMED;
-  uint8_t slot = slotOf(value.dataset);
+  uint8_t slot = syncDatasetSlot(value.dataset);
   if (slot >= SYNC_SETTINGS_DATASET_COUNT || ops_.accepts == nullptr ||
       !ops_.accepts(value.dataset, nullptr, ops_.context)) {
     if (slot < SYNC_SETTINGS_DATASET_COUNT) clear(campaign_[slot]);
@@ -316,7 +305,7 @@ ReceiveResult Receiver::chunk(const uint8_t* frame, size_t len, uint8_t hops) {
 ReceiveResult Receiver::abort(const uint8_t* frame, size_t len) {
   AbortView value;
   if (readAbort(frame, len, value) != WIRE_OK) return RECEIVE_MALFORMED;
-  uint8_t slot = slotOf(value.dataset);
+  uint8_t slot = syncDatasetSlot(value.dataset);
   if (slot >= SYNC_SETTINGS_DATASET_COUNT) return RECEIVE_MALFORMED;
   Campaign& active = campaign_[slot];
   if (active.state == RECEIVE_IDLE) return RECEIVE_INCOMPLETE;
@@ -339,7 +328,7 @@ void Receiver::tick(uint32_t now_ms) {
 }
 
 ReceiveResult Receiver::cancel(uint8_t dataset) {
-  uint8_t slot = slotOf(dataset);
+  uint8_t slot = syncDatasetSlot(dataset);
   if (slot >= SYNC_SETTINGS_DATASET_COUNT) return RECEIVE_MALFORMED;
   if (campaign_[slot].state == RECEIVE_IDLE) return RECEIVE_INCOMPLETE;
   clear(campaign_[slot]);
@@ -355,7 +344,7 @@ void Receiver::cancelPublisher(const uint8_t key[32]) {
 }
 
 ReceiveResult Receiver::finish(uint8_t dataset) {
-  uint8_t slot = slotOf(dataset);
+  uint8_t slot = syncDatasetSlot(dataset);
   if (slot >= SYNC_SETTINGS_DATASET_COUNT || state_[slot] == nullptr) {
     return RECEIVE_MALFORMED;
   }

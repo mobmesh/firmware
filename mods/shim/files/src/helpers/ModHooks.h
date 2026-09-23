@@ -77,6 +77,16 @@ struct ModPolicyValues {
 
 bool modPolicyRead(ModPolicyValues* out);
 
+struct ModRadioValues {
+  float freq;
+  float bw;
+  uint8_t sf;
+  uint8_t cr;
+};
+
+bool modRadioPrefsGet(ModRadioValues* out);
+bool modRandomFill(uint8_t* out, size_t len);
+
 bool modPublisherKey(uint8_t out[32]);
 bool modSignDetached(const uint8_t* data, size_t len, uint8_t signature[64]);
 bool modSendGroup(const uint8_t* secret, uint8_t hash, const uint8_t* data,

@@ -15,6 +15,11 @@ bool radioValuesValid(const RadioValues& value, bool allow_keep_cr) {
          value.sf >= 5 && value.sf <= 12 && crValid(value.cr, allow_keep_cr);
 }
 
+bool radioValuesEqual(const RadioValues& first, const RadioValues& second) {
+  return first.freq_hz == second.freq_hz && first.bw_hz == second.bw_hz &&
+         first.sf == second.sf && first.cr == second.cr;
+}
+
 static bool scaled(float value, double factor, uint32_t& out) {
   if (!isfinite(value) || value < 0) return false;
   double result = floor((double)value * factor + 0.5);
@@ -91,6 +96,39 @@ bool radioLocalDeadline(uint32_t stamp, uint32_t target, uint32_t now_ms,
   uint64_t delta = (uint64_t)(target - stamp) * 1000u;
   if (delta > 0x7fffffffu) return false;
   deadline_ms = now_ms + (uint32_t)delta;
+  return true;
+}
+
+bool radioSamePlan(const RadioPayload& first, const RadioPayload& next) {
+  return first.migration_id == next.migration_id &&
+         first.target.freq_hz == next.target.freq_hz &&
+         first.target.bw_hz == next.target.bw_hz &&
+         first.target.sf == next.target.sf && first.target.cr == next.target.cr &&
+         first.start == next.start && first.cutover == next.cutover &&
+         first.schedule.campaign_interval == next.schedule.campaign_interval &&
+         first.schedule.test_interval == next.schedule.test_interval &&
+         first.schedule.test_window == next.schedule.test_window &&
+         first.schedule.campaign_duration == next.schedule.campaign_duration &&
+         first.schedule.confirm_interval == next.schedule.confirm_interval &&
+         first.schedule.confirm_window == next.schedule.confirm_window;
+}
+
+bool radioNextTestWindow(const RadioPayload& value, uint32_t now_ms,
+                         uint32_t& start_ms, uint32_t& end_ms) {
+  if (!radioPayloadValid(value, 0) || value.schedule.test_interval == 0) return false;
+  uint32_t interval = (uint32_t)value.schedule.test_interval * 60u;
+  uint32_t window = (uint32_t)value.schedule.test_window * 60u;
+  uint32_t first = value.start + interval;
+  uint32_t test = first;
+  if (value.stamp > first) {
+    uint32_t elapsed = value.stamp - value.start;
+    uint32_t count = (elapsed + interval - 1u) / interval;
+    if (count == 0) count = 1;
+    test = value.start + count * interval;
+  }
+  if ((uint64_t)test + window + 60u > value.cutover ||
+      !radioLocalDeadline(value.stamp, test, now_ms, start_ms)) return false;
+  end_ms = start_ms + window * 1000u;
   return true;
 }
 

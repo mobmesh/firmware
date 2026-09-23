@@ -18,18 +18,8 @@ Transmitter::~Transmitter() {
 }
 
 TxState* Transmitter::find(uint8_t dataset) {
-#if SYNC_SETTINGS_WITH_REGION
-  if (dataset == REGION) return &slot_[0];
-#endif
-#if SYNC_SETTINGS_WITH_POLICY
-  if (dataset == POLICY) return &slot_[SYNC_SETTINGS_WITH_REGION];
-#endif
-#if SYNC_SETTINGS_WITH_RADIO
-  if (dataset == RADIO) {
-    return &slot_[SYNC_SETTINGS_WITH_REGION + SYNC_SETTINGS_WITH_POLICY];
-  }
-#endif
-  return nullptr;
+  uint8_t slot = syncDatasetSlot(dataset);
+  return slot < SYNC_SETTINGS_DATASET_COUNT ? &slot_[slot] : nullptr;
 }
 
 const TxState* Transmitter::find(uint8_t dataset) const {

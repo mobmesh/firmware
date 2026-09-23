@@ -196,6 +196,18 @@ class UpstreamCouplingTestCase(unittest.TestCase):
             "both role loops refresh only after the revert timer is processed",
         )
 
+    def test_radio_campaign_adapters_exist_in_both_roles(self):
+        header = Path(REPO_ROOT, "mods/shim/files/src/helpers/ModHooks.h").read_text()
+        self.assertIn("bool modRadioPrefsGet(ModRadioValues* out);", header)
+        self.assertIn("bool modRandomFill(uint8_t* out, size_t len);", header)
+        source = added_source(
+            Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
+        )
+        for role in ("simple_repeater", "simple_room_server"):
+            body = source[f"examples/{role}/MyMesh.cpp"]
+            self.assertIn("bool modRadioPrefsGet(ModRadioValues* out)", body)
+            self.assertIn("esp_fill_random(out, len);", body)
+
     def test_drift_canary_builds_sync_settings_for_both_roles(self):
         workflow = Path(REPO_ROOT, ".github/workflows/patch-drift-canary.yml").read_text()
         self.assertIn("CANARY_EXTRA_MODS: sync-settings", workflow)

@@ -48,6 +48,7 @@ enum RadioClass : uint8_t {
 };
 
 bool radioValuesValid(const RadioValues& value, bool allow_keep_cr);
+bool radioValuesEqual(const RadioValues& first, const RadioValues& second);
 bool radioFromFloats(float freq_mhz, float bw_khz, uint8_t sf, uint8_t cr,
                      bool allow_keep_cr, RadioValues& out);
 bool radioToFloats(const RadioValues& value, float& freq_mhz, float& bw_khz);
@@ -57,6 +58,9 @@ uint8_t radioResolvedCr(const RadioValues& target, const RadioValues& current);
 RadioClass radioClassify(const RadioValues& current, const RadioValues& target);
 bool radioLocalDeadline(uint32_t stamp, uint32_t target, uint32_t now_ms,
                         uint32_t& deadline_ms);
+bool radioSamePlan(const RadioPayload& first, const RadioPayload& next);
+bool radioNextTestWindow(const RadioPayload& value, uint32_t now_ms,
+                         uint32_t& start_ms, uint32_t& end_ms);
 
 }  // namespace sync
 }  // namespace mobmesh
