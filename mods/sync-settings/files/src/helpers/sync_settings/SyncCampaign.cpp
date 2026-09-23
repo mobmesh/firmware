@@ -52,6 +52,9 @@ static uint8_t slotOf(uint8_t dataset) {
 #if SYNC_SETTINGS_WITH_POLICY
   if (dataset == POLICY) return SYNC_SETTINGS_WITH_REGION;
 #endif
+#if SYNC_SETTINGS_WITH_RADIO
+  if (dataset == RADIO) return SYNC_SETTINGS_WITH_REGION + SYNC_SETTINGS_WITH_POLICY;
+#endif
   return 0xff;
 }
 
@@ -86,6 +89,11 @@ static Freshness freshness(const DatasetState& state, uint16_t publisher_id,
 
 Receiver::Receiver(Publishers& publishers, DatasetState* region,
                    DatasetState* policy, const ReceiveOps& ops)
+    : Receiver(publishers, region, policy, nullptr, ops) {}
+
+Receiver::Receiver(Publishers& publishers, DatasetState* region,
+                   DatasetState* policy, DatasetState* radio,
+                   const ReceiveOps& ops)
     : publishers_(publishers), ops_(ops) {
 #if SYNC_SETTINGS_WITH_REGION
   state_[slotOf(REGION)] = region;
@@ -96,6 +104,11 @@ Receiver::Receiver(Publishers& publishers, DatasetState* region,
   state_[slotOf(POLICY)] = policy;
 #else
   (void)policy;
+#endif
+#if SYNC_SETTINGS_WITH_RADIO
+  state_[slotOf(RADIO)] = radio;
+#else
+  (void)radio;
 #endif
   memset(campaign_, 0, sizeof(campaign_));
 }
@@ -166,14 +179,15 @@ ReceiveResult Receiver::manifest(const uint8_t* frame, size_t len,
       !ops_.verify(publisher->key, frame, MANIFEST_SIGNED_LEN,
                    value.signature, ops_.context)) return RECEIVE_SIGNATURE;
 
-  Freshness fresh = freshness(*state_[slot], publisher->id, value, epoch);
+  Freshness fresh = freshness(*state_[slot], publisher->id, value,
+                              value.dataset == RADIO ? 0 : epoch);
   if (fresh == SEEN) return RECEIVE_OK;
   if (fresh == REFUSED) return RECEIVE_REPLAY;
   if (ops_.alloc == nullptr || ops_.release == nullptr) return RECEIVE_MEMORY;
   uint8_t* data = ops_.alloc(value.data_len, ops_.context);
   if (data == nullptr) return RECEIVE_MEMORY;
 
-  if (!value.reset) {
+  if (!value.reset && value.dataset != RADIO) {
     DatasetState next = *state_[slot];
     if (setPublisherReplay(next, publisher->id, value.generation, value.digest) != STORE_OK ||
         ops_.persist == nullptr ||
@@ -348,7 +362,7 @@ ReceiveResult Receiver::finish(uint8_t dataset) {
   Campaign& active = campaign_[slot];
   if (active.state != RECEIVE_STAGED) return RECEIVE_INCOMPLETE;
   DatasetState next = *state_[slot];
-  if (active.reset) {
+  if (active.reset || dataset == RADIO) {
     if (setPublisherReplay(next, active.publisher_id, active.generation,
                            active.digest) != STORE_OK) {
       clear(active);

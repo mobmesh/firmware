@@ -24,6 +24,11 @@ TxState* Transmitter::find(uint8_t dataset) {
 #if SYNC_SETTINGS_WITH_POLICY
   if (dataset == POLICY) return &slot_[SYNC_SETTINGS_WITH_REGION];
 #endif
+#if SYNC_SETTINGS_WITH_RADIO
+  if (dataset == RADIO) {
+    return &slot_[SYNC_SETTINGS_WITH_REGION + SYNC_SETTINGS_WITH_POLICY];
+  }
+#endif
   return nullptr;
 }
 
@@ -43,12 +48,15 @@ bool Transmitter::begin(const TxStart& start, uint32_t now) {
   uint8_t chunks = chunkCount(start.data_len);
   Manifest manifest = {};
   if (state == nullptr || state->active || state->aborting || start.data == nullptr ||
-      chunks == 0 || start.interval_hours < 3 || start.interval_hours > 24 ||
-      start.duration_days < 1 || start.duration_days > 4 ||
+      chunks == 0 ||
+      (!start.one_shot && (start.interval_hours < 3 || start.interval_hours > 24 ||
+                           start.duration_days < 1 || start.duration_days > 4)) ||
+      (start.one_shot && (start.dataset != RADIO || start.interval_hours != 0 ||
+                          start.duration_days != 0)) ||
       readManifest(start.manifest, sizeof(start.manifest), manifest) != WIRE_OK ||
       manifest.dataset != start.dataset || manifest.generation != start.generation ||
       manifest.data_len != start.data_len || manifest.chunks != chunks ||
-      manifest.days != start.duration_days) return false;
+      manifest.days != (start.one_shot ? 1 : start.duration_days)) return false;
   memset(state, 0, sizeof(*state));
   state->active = true;
   state->dataset = start.dataset;
@@ -61,8 +69,10 @@ bool Transmitter::begin(const TxStart& start, uint32_t now) {
   state->data = start.data;
   state->data_len = start.data_len;
   state->chunks = chunks;
-  state->rounds = (uint8_t)(((uint16_t)start.duration_days * 24u) /
-                            start.interval_hours + 1u);
+  state->one_shot = start.one_shot;
+  state->rounds = start.one_shot ? 1 :
+      (uint8_t)(((uint16_t)start.duration_days * 24u) /
+                start.interval_hours + 1u);
   state->started = now;
   state->retry_at = now;
   return true;

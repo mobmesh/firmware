@@ -3,6 +3,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "SyncSelect.h"
+
+#if SYNC_SETTINGS_WITH_RADIO && !defined(MOBMESH_BUILD_EPOCH)
+#error "RADIO requires MOBMESH_BUILD_EPOCH"
+#endif
+
 namespace mobmesh {
 namespace sync {
 

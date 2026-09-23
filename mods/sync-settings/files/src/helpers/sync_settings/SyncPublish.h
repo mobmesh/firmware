@@ -54,6 +54,7 @@ struct TxStart {
   uint8_t manifest[MANIFEST_LEN];
   uint8_t* data;
   uint16_t data_len;
+  bool one_shot;
 };
 
 struct TxState {
@@ -71,6 +72,7 @@ struct TxState {
   uint8_t chunks;
   uint8_t rounds;
   uint8_t rounds_done;
+  bool one_shot;
   bool round_open;
   uint8_t frame;
   uint8_t attempts;

@@ -107,6 +107,8 @@ class Receiver {
  public:
   Receiver(Publishers& publishers, DatasetState* region, DatasetState* policy,
            const ReceiveOps& ops);
+  Receiver(Publishers& publishers, DatasetState* region, DatasetState* policy,
+           DatasetState* radio, const ReceiveOps& ops);
   ~Receiver();
 
   ReceiveResult take(const uint8_t* frame, size_t len,

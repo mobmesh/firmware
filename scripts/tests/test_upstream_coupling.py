@@ -202,6 +202,11 @@ class UpstreamCouplingTestCase(unittest.TestCase):
         self.assertIn("for role in sorted({t['role'] for t in targets})", workflow)
         self.assertIn("t['mods'] + extras", workflow)
 
+    def test_radio_build_epoch_reaches_release_and_canary_builds(self):
+        for name in ("build-release.yml", "patch-drift-canary.yml"):
+            workflow = Path(REPO_ROOT, ".github/workflows", name).read_text()
+            self.assertIn("MOBMESH_BUILD_EPOCH", workflow, name)
+
     def test_drift_canary_probes_the_stats_serial_gate(self):
         """power-guard's remote stats forward breaks silently; only the canary grep sees it."""
         workflow = Path(REPO_ROOT, ".github/workflows/patch-drift-canary.yml").read_text()

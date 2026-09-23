@@ -251,7 +251,8 @@ jobs:
           cd upstream-src
           OTA_MOD_SHA="$(git -C .. rev-parse --short HEAD)"
           OTA_MOD_DATE="$(date -u +"%-d %b %Y") - $OTA_MOD_SHA"
-          PLATFORMIO_BUILD_FLAGS="-D 'OTA_MOD_BUILD_DATE=\"$OTA_MOD_DATE\"' -D 'OTA_MOD_SHORT_SHA=\"$OTA_MOD_SHA\"'" \
+          MOBMESH_BUILD_EPOCH="${SOURCE_DATE_EPOCH:-$(date -u +%s)}"
+          PLATFORMIO_BUILD_FLAGS="-D 'OTA_MOD_BUILD_DATE=\"$OTA_MOD_DATE\"' -D 'OTA_MOD_SHORT_SHA=\"$OTA_MOD_SHA\"' -D MOBMESH_BUILD_EPOCH=$MOBMESH_BUILD_EPOCH" \
             pio run -e ${{ matrix.build_env }}
 
       - id: rollback_check

@@ -240,7 +240,7 @@ jobs:
           pip install --quiet platformio==6.1.19
           # FEM bypass on: it is off in every shipped build, so a default build would
           # preprocess away the code that broke.
-          FLAGS="-D 'OTA_MOD_BUILD_DATE=\"canary\"' -D 'OTA_MOD_SHORT_SHA=\"canary\"' -D POWER_GUARD_AUTO_DROP_FEM_LNA=1"
+          FLAGS="-D 'OTA_MOD_BUILD_DATE=\"canary\"' -D 'OTA_MOD_SHORT_SHA=\"canary\"' -D MOBMESH_BUILD_EPOCH=$(date -u +%s) -D POWER_GUARD_AUTO_DROP_FEM_LNA=1"
           SPECS=$(python3 scripts/generate-board-config.py resolve-targets | python3 -c "
           import json, os, sys
           targets = json.load(sys.stdin)['include']
