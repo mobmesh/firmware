@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "SyncRadio.h"
+
 namespace mobmesh {
 namespace sync {
 
@@ -20,6 +22,10 @@ static const size_t CHUNK_DATA_MAX = 91;
 static const size_t CHUNK_MIN_LEN = 75;
 static const size_t ABORT_LEN = 101;
 static const size_t ABORT_SIGNED_LEN = 37;
+static const size_t RADIO_CONFIRM_SIGNED_LEN = 57;
+static const size_t RADIO_CONFIRM_LEN = 121;
+static const size_t RADIO_ABORT_SIGNED_LEN = 21;
+static const size_t RADIO_ABORT_LEN = 85;
 static const size_t REGION_DATA_MAX = 1057;
 static const size_t POLICY_DATA_LEN = 15;
 static const uint8_t CHUNK_MAX = 12;
@@ -38,11 +44,14 @@ enum FrameType : uint8_t {
   MANIFEST = 0x01,
   CHUNK = 0x02,
   ABORT = 0x03,
+  RADIO_CONFIRM = 0x04,
+  RADIO_ABORT = 0x05,
 };
 
 enum Dataset : uint8_t {
   REGION = 0x01,
   POLICY = 0x02,
+  RADIO = 0x03,
 };
 
 enum WireResult : uint8_t {
@@ -96,6 +105,20 @@ struct AbortView {
   const uint8_t* signature;
 };
 
+struct RadioConfirmView {
+  const uint8_t* publisher;
+  uint64_t migration_id;
+  const uint8_t* target_digest;
+  uint32_t cutover;
+  const uint8_t* signature;
+};
+
+struct RadioAbortView {
+  const uint8_t* publisher;
+  uint64_t migration_id;
+  const uint8_t* signature;
+};
+
 struct PolicyProfile {
   uint8_t flood_max;
   uint8_t flood_unscoped;
@@ -115,6 +138,10 @@ WireResult classify(const uint8_t* frame, size_t len, uint8_t& type);
 WireResult readManifest(const uint8_t* frame, size_t len, Manifest& out);
 WireResult readChunk(const uint8_t* frame, size_t len, ChunkView& out);
 WireResult readAbort(const uint8_t* frame, size_t len, AbortView& out);
+WireResult readRadioConfirm(const uint8_t* frame, size_t len,
+                            RadioConfirmView& out);
+WireResult readRadioAbort(const uint8_t* frame, size_t len,
+                          RadioAbortView& out);
 WireResult match(const ChunkView& chunk, const Manifest& manifest, uint16_t& offset);
 
 uint8_t chunkCount(uint16_t data_len);
@@ -125,6 +152,10 @@ bool validPolicyPayload(const uint8_t* data, size_t len);
 bool readPolicyPayload(const uint8_t data[POLICY_DATA_LEN], PolicyProfile& out);
 bool writePolicyPayload(const PolicyProfile& profile,
                         uint8_t out[POLICY_DATA_LEN]);
+WireResult readRadioPayload(const uint8_t* data, size_t len,
+                            uint32_t build_epoch, RadioPayload& out);
+size_t writeRadioPayload(const RadioPayload& value, uint32_t build_epoch,
+                         uint8_t* out, size_t capacity);
 
 size_t writeManifestPrefix(const Manifest& manifest, uint8_t* out, size_t capacity);
 size_t writeChunkPrefix(uint8_t dataset, uint32_t generation, uint8_t index,
@@ -132,6 +163,13 @@ size_t writeChunkPrefix(uint8_t dataset, uint32_t generation, uint8_t index,
                         uint8_t* out, size_t capacity);
 size_t writeAbortPrefix(uint8_t dataset, const uint8_t manifest_hash[DIGEST_LEN],
                         uint8_t* out, size_t capacity);
+size_t writeRadioConfirmPrefix(const uint8_t publisher[FINGERPRINT_LEN],
+                               uint64_t migration_id,
+                               const uint8_t target_digest[DIGEST_LEN],
+                               uint32_t cutover, uint8_t* out, size_t capacity);
+size_t writeRadioAbortPrefix(const uint8_t publisher[FINGERPRINT_LEN],
+                             uint64_t migration_id,
+                             uint8_t* out, size_t capacity);
 CarrierResult readCarrier(const uint8_t* payload, size_t payload_len,
                           uint8_t* frame, size_t capacity, uint8_t& frame_len,
                           DecryptFn decrypt, void* context);

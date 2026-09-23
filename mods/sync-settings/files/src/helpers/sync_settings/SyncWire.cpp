@@ -20,6 +20,10 @@ static uint32_t read32(const uint8_t* p) {
          (uint32_t)p[2] << 8 | p[3];
 }
 
+static uint64_t read64(const uint8_t* p) {
+  return (uint64_t)read32(p) << 32 | read32(p + 4);
+}
+
 static void write16(uint8_t* p, uint16_t value) {
   p[0] = (uint8_t)(value >> 8);
   p[1] = (uint8_t)value;
@@ -32,8 +36,13 @@ static void write32(uint8_t* p, uint32_t value) {
   p[3] = (uint8_t)value;
 }
 
+static void write64(uint8_t* p, uint64_t value) {
+  write32(p, (uint32_t)(value >> 32));
+  write32(p + 4, (uint32_t)value);
+}
+
 static bool knownDataset(uint8_t dataset) {
-  return dataset == REGION || dataset == POLICY;
+  return dataset == REGION || dataset == POLICY || dataset == RADIO;
 }
 
 // Payload formats the wire layer will parse; the receiver decides what it can decode.
@@ -128,6 +137,59 @@ bool writePolicyPayload(const PolicyProfile& profile,
   return validPolicyPayload(out, POLICY_DATA_LEN);
 }
 
+WireResult readRadioPayload(const uint8_t* data, size_t len,
+                            uint32_t build_epoch, RadioPayload& out) {
+  if (data == nullptr || len != RADIO_PAYLOAD_LEN || data[0] != RADIO_SCHEMA ||
+      data[1] != 0) return WIRE_MALFORMED;
+  RadioPayload value = {};
+  value.migration_id = read64(data + 2);
+  value.target.freq_hz = read32(data + 10);
+  value.target.bw_hz = read32(data + 14);
+  value.target.sf = data[18];
+  value.target.cr = data[19];
+  value.start = read32(data + 20);
+  value.cutover = read32(data + 24);
+  value.stamp = read32(data + 28);
+  value.schedule.campaign_interval = read16(data + 32);
+  value.schedule.test_interval = read16(data + 34);
+  value.schedule.test_window = read16(data + 36);
+  value.schedule.campaign_duration = read16(data + 38);
+  value.schedule.confirm_interval = read16(data + 40);
+  value.schedule.confirm_window = read16(data + 42);
+  float freq;
+  float bw;
+  if (!radioPayloadValid(value, build_epoch) ||
+      !radioToFloats(value.target, freq, bw)) return WIRE_MALFORMED;
+  out = value;
+  return WIRE_OK;
+}
+
+size_t writeRadioPayload(const RadioPayload& value, uint32_t build_epoch,
+                         uint8_t* out, size_t capacity) {
+  float freq;
+  float bw;
+  if (out == nullptr || capacity < RADIO_PAYLOAD_LEN ||
+      !radioPayloadValid(value, build_epoch) ||
+      !radioToFloats(value.target, freq, bw)) return 0;
+  out[0] = RADIO_SCHEMA;
+  out[1] = 0;
+  write64(out + 2, value.migration_id);
+  write32(out + 10, value.target.freq_hz);
+  write32(out + 14, value.target.bw_hz);
+  out[18] = value.target.sf;
+  out[19] = value.target.cr;
+  write32(out + 20, value.start);
+  write32(out + 24, value.cutover);
+  write32(out + 28, value.stamp);
+  write16(out + 32, value.schedule.campaign_interval);
+  write16(out + 34, value.schedule.test_interval);
+  write16(out + 36, value.schedule.test_window);
+  write16(out + 38, value.schedule.campaign_duration);
+  write16(out + 40, value.schedule.confirm_interval);
+  write16(out + 42, value.schedule.confirm_window);
+  return RADIO_PAYLOAD_LEN;
+}
+
 static uint8_t channelLength(const char* channel) {
   if (channel == nullptr) return 0;
   size_t len = strnlen(channel, CHANNEL_MAX + 1);
@@ -138,6 +200,7 @@ static uint8_t channelLength(const char* channel) {
 static uint16_t dataLimit(uint8_t dataset) {
   if (dataset == REGION) return REGION_DATA_MAX;
   if (dataset == POLICY) return POLICY_DATA_LEN;
+  if (dataset == RADIO) return RADIO_PAYLOAD_LEN;
   return 0;
 }
 
@@ -154,7 +217,7 @@ WireResult classify(const uint8_t* frame, size_t len, uint8_t& type) {
   }
   if (frame[2] != WIRE_VERSION) return WIRE_VERSION_UNSUPPORTED;
   type = frame[3];
-  if (type < MANIFEST || type > ABORT) return WIRE_TYPE_UNSUPPORTED;
+  if (type < MANIFEST || type > RADIO_ABORT) return WIRE_TYPE_UNSUPPORTED;
   return WIRE_OK;
 }
 
@@ -194,7 +257,9 @@ WireResult readManifest(const uint8_t* frame, size_t len, Manifest& out) {
   uint16_t data_len = read16(frame + 27);
   uint16_t limit = dataLimit(frame[4]);
   if (data_len == 0 || data_len > limit ||
-      (frame[4] == POLICY && data_len != POLICY_DATA_LEN)) {
+      (frame[4] == POLICY && data_len != POLICY_DATA_LEN) ||
+      (frame[4] == RADIO &&
+       (frame[5] != FORMAT_RAW || data_len != RADIO_PAYLOAD_LEN))) {
     return WIRE_MALFORMED;
   }
   uint8_t chunks = frame[29];
@@ -255,6 +320,39 @@ WireResult readAbort(const uint8_t* frame, size_t len, AbortView& out) {
   return WIRE_OK;
 }
 
+WireResult readRadioConfirm(const uint8_t* frame, size_t len,
+                            RadioConfirmView& out) {
+  uint8_t type = 0;
+  WireResult result = classify(frame, len, type);
+  if (result != WIRE_OK) return result;
+  if (type != RADIO_CONFIRM) return WIRE_TYPE_UNSUPPORTED;
+  if (len != RADIO_CONFIRM_LEN || frame[4] != RADIO) return WIRE_MALFORMED;
+  uint64_t migration_id = read64(frame + 13);
+  uint32_t cutover = read32(frame + 53);
+  if (migration_id == 0 || cutover == 0) return WIRE_MALFORMED;
+  out.publisher = frame + 5;
+  out.migration_id = migration_id;
+  out.target_digest = frame + 21;
+  out.cutover = cutover;
+  out.signature = frame + RADIO_CONFIRM_SIGNED_LEN;
+  return WIRE_OK;
+}
+
+WireResult readRadioAbort(const uint8_t* frame, size_t len,
+                          RadioAbortView& out) {
+  uint8_t type = 0;
+  WireResult result = classify(frame, len, type);
+  if (result != WIRE_OK) return result;
+  if (type != RADIO_ABORT) return WIRE_TYPE_UNSUPPORTED;
+  if (len != RADIO_ABORT_LEN || frame[4] != RADIO) return WIRE_MALFORMED;
+  uint64_t migration_id = read64(frame + 13);
+  if (migration_id == 0) return WIRE_MALFORMED;
+  out.publisher = frame + 5;
+  out.migration_id = migration_id;
+  out.signature = frame + RADIO_ABORT_SIGNED_LEN;
+  return WIRE_OK;
+}
+
 WireResult match(const ChunkView& chunk, const Manifest& manifest, uint16_t& offset) {
   if (chunk.dataset != manifest.dataset || chunk.generation != manifest.generation) {
     return WIRE_MISMATCH;
@@ -273,6 +371,8 @@ size_t writeManifestPrefix(const Manifest& manifest, uint8_t* out, size_t capaci
       manifest.generation == 0 || channel_len == 0 || manifest.data_len == 0 ||
       manifest.data_len > limit ||
       (manifest.dataset == POLICY && manifest.data_len != POLICY_DATA_LEN) ||
+      (manifest.dataset == RADIO &&
+       (manifest.format != FORMAT_RAW || manifest.data_len != RADIO_PAYLOAD_LEN)) ||
       manifest.chunks != chunkCount(manifest.data_len)) {
     return 0;
   }
@@ -321,6 +421,33 @@ size_t writeAbortPrefix(uint8_t dataset, const uint8_t manifest_hash[DIGEST_LEN]
   return ABORT_SIGNED_LEN;
 }
 
+size_t writeRadioConfirmPrefix(const uint8_t publisher[FINGERPRINT_LEN],
+                               uint64_t migration_id,
+                               const uint8_t target_digest[DIGEST_LEN],
+                               uint32_t cutover, uint8_t* out, size_t capacity) {
+  if (publisher == nullptr || migration_id == 0 || target_digest == nullptr ||
+      cutover == 0 || out == nullptr || capacity < RADIO_CONFIRM_LEN) return 0;
+  preamble(out, RADIO_CONFIRM);
+  out[4] = RADIO;
+  memcpy(out + 5, publisher, FINGERPRINT_LEN);
+  write64(out + 13, migration_id);
+  memcpy(out + 21, target_digest, DIGEST_LEN);
+  write32(out + 53, cutover);
+  return RADIO_CONFIRM_SIGNED_LEN;
+}
+
+size_t writeRadioAbortPrefix(const uint8_t publisher[FINGERPRINT_LEN],
+                             uint64_t migration_id,
+                             uint8_t* out, size_t capacity) {
+  if (publisher == nullptr || migration_id == 0 || out == nullptr ||
+      capacity < RADIO_ABORT_LEN) return 0;
+  preamble(out, RADIO_ABORT);
+  out[4] = RADIO;
+  memcpy(out + 5, publisher, FINGERPRINT_LEN);
+  write64(out + 13, migration_id);
+  return RADIO_ABORT_SIGNED_LEN;
+}
+
 CarrierResult readCarrier(const uint8_t* payload, size_t payload_len,
                           uint8_t* frame, size_t capacity, uint8_t& frame_len,
                           DecryptFn decrypt, void* context) {
@@ -358,6 +485,10 @@ size_t writeCarrier(const uint8_t* frame, size_t frame_len,
 
 static_assert(MANIFEST_SIGNED_LEN + SIGNATURE_LEN == MANIFEST_LEN,
               "manifest layout changed");
+static_assert(RADIO_CONFIRM_SIGNED_LEN + SIGNATURE_LEN == RADIO_CONFIRM_LEN,
+              "radio confirmation layout changed");
+static_assert(RADIO_ABORT_SIGNED_LEN + SIGNATURE_LEN == RADIO_ABORT_LEN,
+              "radio abort layout changed");
 static_assert(CHUNK_HEADER_LEN + CHUNK_DATA_MAX + SIGNATURE_LEN == FRAME_MAX,
               "chunk layout changed");
 static_assert(ABORT_SIGNED_LEN + SIGNATURE_LEN == ABORT_LEN,

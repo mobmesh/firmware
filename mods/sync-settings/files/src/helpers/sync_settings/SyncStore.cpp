@@ -22,6 +22,10 @@ static uint32_t read32(const uint8_t* p) {
          (uint32_t)p[2] << 8 | p[3];
 }
 
+static uint64_t read64(const uint8_t* p) {
+  return (uint64_t)read32(p) << 32 | read32(p + 4);
+}
+
 static void write16(uint8_t* p, uint16_t value) {
   p[0] = (uint8_t)(value >> 8);
   p[1] = (uint8_t)value;
@@ -32,6 +36,11 @@ static void write32(uint8_t* p, uint32_t value) {
   p[1] = (uint8_t)(value >> 16);
   p[2] = (uint8_t)(value >> 8);
   p[3] = (uint8_t)value;
+}
+
+static void write64(uint8_t* p, uint64_t value) {
+  write32(p, (uint32_t)(value >> 32));
+  write32(p + 4, (uint32_t)value);
 }
 
 static bool allZero(const uint8_t* data, size_t len) {
@@ -91,7 +100,7 @@ size_t writeStore(uint8_t type, uint32_t sequence, const uint8_t* payload,
   size_t len = (size_t)payload_len + STORE_OVERHEAD;
   if (out == nullptr || hash == nullptr || sequence == 0 ||
       (payload_len != 0 && payload == nullptr) || len > capacity || len > STORE_MAX ||
-      type < STORE_CONFIG || type > STORE_POLICY_RECOVERY) {
+      type < STORE_CONFIG || type > STORE_RADIO) {
     return 0;
   }
 
@@ -646,6 +655,210 @@ size_t writePolicyRecovery(const PolicyRecovery& recovery, uint8_t* out,
   return 74;
 }
 
+void defaultRadioRecord(RadioRecord& record) {
+  memset(&record, 0, sizeof(record));
+  record.schedule.campaign_interval = 10;
+  record.schedule.campaign_duration = 360;
+  record.schedule.confirm_interval = 5;
+  record.schedule.confirm_window = 45;
+}
+
+static bool radioReplayValid(const RadioRecord& record) {
+  if (record.replay_count > STATE_REPLAY_MAX) return false;
+  uint16_t prior = 0;
+  for (uint8_t i = 0; i < record.replay_count; ++i) {
+    const ReplayRecord& replay = record.replay[i];
+    if (replay.publisher_id == 0 || replay.publisher_id <= prior ||
+        replay.generation == 0) return false;
+    prior = replay.publisher_id;
+  }
+  return true;
+}
+
+static bool radioGuardZero(const RadioRecord& record) {
+  return record.role == 0 && record.publisher_id == 0 && record.migration_id == 0 &&
+         record.target.freq_hz == 0 && record.target.bw_hz == 0 &&
+         record.target.sf == 0 && record.target.cr == 0 && record.resolved_cr == 0 &&
+         record.prior.freq_hz == 0 && record.prior.bw_hz == 0 &&
+         record.prior.sf == 0 && record.prior.cr == 0 &&
+         !anyNonzero(record.target_digest, sizeof(record.target_digest)) &&
+         record.start == 0 && record.cutover == 0 &&
+         record.captured.campaign_interval == 0 && record.captured.test_interval == 0 &&
+         record.captured.test_window == 0 && record.captured.campaign_duration == 0 &&
+         record.captured.confirm_interval == 0 && record.captured.confirm_window == 0 &&
+         record.channel_len == 0 && !anyNonzero((const uint8_t*)record.channel,
+                                                sizeof(record.channel)) &&
+         record.route_kind == 0 && !anyNonzero(record.route_key, sizeof(record.route_key)) &&
+         record.latest_generation == 0 && record.flags == 0 && record.result == 0;
+}
+
+static StoreResult radioRecordValid(const RadioRecord& record) {
+  if (!radioScheduleValid(record.schedule) || !radioReplayValid(record) ||
+      record.phase > RADIO_GUARD_ABORT_PENDING || record.role > RADIO_ROLE_RECEIVER ||
+      record.route_kind > 1 || (record.flags & 0xfc) != 0 ||
+      record.result > RADIO_RESULT_FAULT || record.channel_len > CHANNEL_MAX) {
+    return STORE_PAYLOAD;
+  }
+  bool has_local_key = anyNonzero(record.local_key, sizeof(record.local_key));
+  if ((record.local_generation == 0) != !has_local_key) return STORE_PAYLOAD;
+
+  bool retained = record.phase != RADIO_GUARD_IDLE ||
+                  record.result != RADIO_RESULT_NONE;
+  if (!retained) {
+    return radioGuardZero(record) ? STORE_OK : STORE_PAYLOAD;
+  }
+
+  float freq;
+  float bw;
+
+  if (record.role == RADIO_ROLE_NONE || record.migration_id == 0 ||
+      !radioValuesValid(record.target, true) ||
+      !radioValuesValid(record.prior, false) ||
+      !radioToFloats(record.target, freq, bw) ||
+      !radioToFloats(record.prior, freq, bw) ||
+      record.resolved_cr < 5 || record.resolved_cr > 8 ||
+      !anyNonzero(record.target_digest, sizeof(record.target_digest)) ||
+      record.start == 0 || record.cutover <= record.start ||
+      !radioScheduleValid(record.captured) || record.channel_len == 0 ||
+      !validChannel((const uint8_t*)record.channel, record.channel_len) ||
+      record.channel[record.channel_len] != 0 || record.latest_generation == 0 ||
+      (record.route_kind == 0 && anyNonzero(record.route_key, sizeof(record.route_key))) ||
+      (record.route_kind == 1 && !anyNonzero(record.route_key, sizeof(record.route_key)))) {
+    return STORE_PAYLOAD;
+  }
+  for (uint8_t i = record.channel_len + 1; i < sizeof(record.channel); ++i) {
+    if (record.channel[i] != 0) return STORE_PAYLOAD;
+  }
+  if ((record.role == RADIO_ROLE_PUBLISHER && record.publisher_id != 0) ||
+      (record.role == RADIO_ROLE_RECEIVER && record.publisher_id == 0)) {
+    return STORE_PAYLOAD;
+  }
+  if (record.phase == RADIO_GUARD_IDLE) {
+    return record.result == RADIO_RESULT_NONE ? STORE_PAYLOAD : STORE_OK;
+  }
+  if (record.result != RADIO_RESULT_NONE) return STORE_PAYLOAD;
+  if ((record.phase == RADIO_GUARD_PUBLISHING ||
+       record.phase == RADIO_GUARD_CONFIRMING ||
+       record.phase == RADIO_GUARD_ABORT_PENDING) &&
+      record.role != RADIO_ROLE_PUBLISHER) return STORE_PAYLOAD;
+  return STORE_OK;
+}
+
+StoreResult readRadioRecord(const uint8_t* data, size_t len, RadioRecord& out) {
+  if (data == nullptr || len != 784 || data[0] != RADIO_SCHEMA || data[1] > 1 ||
+      data[50] > STATE_REPLAY_MAX) return STORE_PAYLOAD;
+  RadioRecord value = {};
+  value.enabled = data[1] != 0;
+  value.schedule.campaign_interval = read16(data + 2);
+  value.schedule.test_interval = read16(data + 4);
+  value.schedule.test_window = read16(data + 6);
+  value.schedule.campaign_duration = read16(data + 8);
+  value.schedule.confirm_interval = read16(data + 10);
+  value.schedule.confirm_window = read16(data + 12);
+  value.local_generation = read32(data + 14);
+  memcpy(value.local_key, data + 18, sizeof(value.local_key));
+  value.replay_count = data[50];
+  size_t cursor = 51;
+  for (uint8_t i = 0; i < STATE_REPLAY_MAX; ++i) {
+    if (i < value.replay_count) {
+      ReplayRecord& replay = value.replay[i];
+      replay.publisher_id = read16(data + cursor);
+      replay.generation = read32(data + cursor + 2);
+      memcpy(replay.digest, data + cursor + 6, sizeof(replay.digest));
+    } else if (!allZero(data + cursor, STATE_REPLAY_LEN)) {
+      return STORE_PAYLOAD;
+    }
+    cursor += STATE_REPLAY_LEN;
+  }
+  value.phase = data[659];
+  value.role = data[660];
+  value.publisher_id = read16(data + 661);
+  value.migration_id = read64(data + 663);
+  value.target.freq_hz = read32(data + 671);
+  value.target.bw_hz = read32(data + 675);
+  value.target.sf = data[679];
+  value.target.cr = data[680];
+  value.resolved_cr = data[681];
+  value.prior.freq_hz = read32(data + 682);
+  value.prior.bw_hz = read32(data + 686);
+  value.prior.sf = data[690];
+  value.prior.cr = data[691];
+  memcpy(value.target_digest, data + 692, sizeof(value.target_digest));
+  value.start = read32(data + 724);
+  value.cutover = read32(data + 728);
+  value.captured.campaign_interval = read16(data + 732);
+  value.captured.test_interval = read16(data + 734);
+  value.captured.test_window = read16(data + 736);
+  value.captured.campaign_duration = read16(data + 738);
+  value.captured.confirm_interval = read16(data + 740);
+  value.captured.confirm_window = read16(data + 742);
+  value.channel_len = data[744];
+  memcpy(value.channel, data + 745, CHANNEL_MAX);
+  value.channel[CHANNEL_MAX] = 0;
+  value.route_kind = data[761];
+  memcpy(value.route_key, data + 762, sizeof(value.route_key));
+  value.latest_generation = read32(data + 778);
+  value.flags = data[782];
+  value.result = data[783];
+  StoreResult result = radioRecordValid(value);
+  if (result == STORE_OK) out = value;
+  return result;
+}
+
+size_t writeRadioRecord(const RadioRecord& record, uint8_t* out, size_t capacity) {
+  if (out == nullptr || capacity < 784 || radioRecordValid(record) != STORE_OK) return 0;
+  memset(out, 0, 784);
+  out[0] = RADIO_SCHEMA;
+  out[1] = record.enabled ? 1 : 0;
+  write16(out + 2, record.schedule.campaign_interval);
+  write16(out + 4, record.schedule.test_interval);
+  write16(out + 6, record.schedule.test_window);
+  write16(out + 8, record.schedule.campaign_duration);
+  write16(out + 10, record.schedule.confirm_interval);
+  write16(out + 12, record.schedule.confirm_window);
+  write32(out + 14, record.local_generation);
+  memcpy(out + 18, record.local_key, sizeof(record.local_key));
+  out[50] = record.replay_count;
+  size_t cursor = 51;
+  for (uint8_t i = 0; i < record.replay_count; ++i) {
+    const ReplayRecord& replay = record.replay[i];
+    write16(out + cursor, replay.publisher_id);
+    write32(out + cursor + 2, replay.generation);
+    memcpy(out + cursor + 6, replay.digest, sizeof(replay.digest));
+    cursor += STATE_REPLAY_LEN;
+  }
+  out[659] = record.phase;
+  out[660] = record.role;
+  write16(out + 661, record.publisher_id);
+  write64(out + 663, record.migration_id);
+  write32(out + 671, record.target.freq_hz);
+  write32(out + 675, record.target.bw_hz);
+  out[679] = record.target.sf;
+  out[680] = record.target.cr;
+  out[681] = record.resolved_cr;
+  write32(out + 682, record.prior.freq_hz);
+  write32(out + 686, record.prior.bw_hz);
+  out[690] = record.prior.sf;
+  out[691] = record.prior.cr;
+  memcpy(out + 692, record.target_digest, sizeof(record.target_digest));
+  write32(out + 724, record.start);
+  write32(out + 728, record.cutover);
+  write16(out + 732, record.captured.campaign_interval);
+  write16(out + 734, record.captured.test_interval);
+  write16(out + 736, record.captured.test_window);
+  write16(out + 738, record.captured.campaign_duration);
+  write16(out + 740, record.captured.confirm_interval);
+  write16(out + 742, record.captured.confirm_window);
+  out[744] = record.channel_len;
+  memcpy(out + 745, record.channel, record.channel_len);
+  out[761] = record.route_kind;
+  memcpy(out + 762, record.route_key, sizeof(record.route_key));
+  write32(out + 778, record.latest_generation);
+  out[782] = record.flags;
+  out[783] = record.result;
+  return 784;
+}
+
 static_assert(REGION_META_LEN + REGION_DATA_MAX == 1102,
               "region record bound changed");
 static_assert(STORE_OVERHEAD + 1102 == STORE_MAX, "store bound changed");
@@ -654,6 +867,7 @@ static_assert(STATE_FIXED_LEN + STATE_REPLAY_MAX * STATE_REPLAY_LEN == 725,
 static_assert(PUBLISHER_FIXED_LEN + PUBLISHER_MAX * PUBLISHER_RECORD_LEN == 565,
               "publisher record bound changed");
 static_assert(STORE_OVERHEAD + 74 == 118, "policy recovery bound changed");
+static_assert(STORE_OVERHEAD + 784 == 828, "radio record bound changed");
 
 }  // namespace sync
 }  // namespace mobmesh

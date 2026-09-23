@@ -19,6 +19,7 @@ enum StoreType : uint8_t {
   STORE_REGIONS = 0x04,
   STORE_POLICY_STATE = 0x05,
   STORE_POLICY_RECOVERY = 0x06,
+  STORE_RADIO = 0x07,
 };
 
 enum StoreResult : uint8_t {
@@ -171,6 +172,62 @@ struct PolicyRecovery {
   uint8_t target[POLICY_DATA_LEN];
 };
 
+enum RadioGuardPhase : uint8_t {
+  RADIO_GUARD_IDLE,
+  RADIO_GUARD_PUBLISHING,
+  RADIO_GUARD_CONFIRMING,
+  RADIO_GUARD_COMMIT_PENDING,
+  RADIO_GUARD_ABORT_PENDING,
+};
+
+enum RadioGuardRole : uint8_t {
+  RADIO_ROLE_NONE,
+  RADIO_ROLE_PUBLISHER,
+  RADIO_ROLE_RECEIVER,
+};
+
+enum RadioResult : uint8_t {
+  RADIO_RESULT_NONE,
+  RADIO_RESULT_COMMITTED,
+  RADIO_RESULT_IDENTICAL,
+  RADIO_RESULT_CR_ONLY,
+  RADIO_RESULT_FALLBACK,
+  RADIO_RESULT_ABORTED,
+  RADIO_RESULT_FAULT,
+};
+
+enum RadioFlags : uint8_t {
+  RADIO_FLAG_CONFIRM_RX = 0x01,
+  RADIO_FLAG_CONFIRM_TX = 0x02,
+};
+
+struct RadioRecord {
+  bool enabled;
+  RadioSchedule schedule;
+  uint32_t local_generation;
+  uint8_t local_key[32];
+  uint8_t replay_count;
+  ReplayRecord replay[16];
+  uint8_t phase;
+  uint8_t role;
+  uint16_t publisher_id;
+  uint64_t migration_id;
+  RadioValues target;
+  uint8_t resolved_cr;
+  RadioValues prior;
+  uint8_t target_digest[DIGEST_LEN];
+  uint32_t start;
+  uint32_t cutover;
+  RadioSchedule captured;
+  uint8_t channel_len;
+  char channel[CHANNEL_MAX + 1];
+  uint8_t route_kind;
+  uint8_t route_key[16];
+  uint32_t latest_generation;
+  uint8_t flags;
+  uint8_t result;
+};
+
 SerialOrder serialOrder(uint32_t first, uint32_t second);
 uint32_t nextSequence(uint32_t current);
 StoreResult readStore(const uint8_t* data, size_t len, uint8_t expected_type,
@@ -210,6 +267,9 @@ StoreResult readPolicyRecovery(const uint8_t* data, size_t len,
                                PolicyRecovery& out, HashFn hash, void* context);
 size_t writePolicyRecovery(const PolicyRecovery& recovery, uint8_t* out,
                            size_t capacity, HashFn hash, void* context);
+void defaultRadioRecord(RadioRecord& record);
+StoreResult readRadioRecord(const uint8_t* data, size_t len, RadioRecord& out);
+size_t writeRadioRecord(const RadioRecord& record, uint8_t* out, size_t capacity);
 
 }  // namespace sync
 }  // namespace mobmesh
