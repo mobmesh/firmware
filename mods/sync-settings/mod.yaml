@@ -13,6 +13,7 @@ integration:
     route: syncRoute
     allow_forward: syncAllowFlood
     region_export: syncExportRegions
+    owner_info: syncOwnerInfo
     recv: syncRecv
     tx: syncTx
     cli:

@@ -38,6 +38,7 @@ bool modResolveRegionName(const char* name, ModRegionMatch* out);
 bool modRegionNameForKey(const uint8_t key[16], char* out, size_t capacity);
 int modExportRegions(RegionMap* base, char* out, size_t capacity,
                      uint8_t excluded_flags);
+void modAppendOwnerInfo(char* out, size_t capacity);
 void modObserveRecv(const mesh::Packet* packet, bool accepted,
                     const uint8_t scope_key[16]);
 void modObserveTx(uint32_t packet_id, bool succeeded);

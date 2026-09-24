@@ -101,6 +101,20 @@ static DatasetState policy_state;
 #if SYNC_SETTINGS_WITH_RADIO
 static DatasetState radio_state;
 static RadioRecord radio_record;
+struct RadioArm {
+  bool active;
+  RadioValues target;
+  RadioSchedule schedule;
+  bool scoped;
+  uint8_t route_key[16];
+  char route[REGION_NAME_MAX + 1];
+  uint8_t channel_len;
+  char channel[CHANNEL_MAX + 1];
+  bool timed;
+  uint32_t cutover;
+  uint32_t armed_ms;
+};
+static RadioArm radio_arm;
 #endif
 #if SYNC_SETTINGS_WITH_REGION
 static RegionRecord region_record;
@@ -142,6 +156,9 @@ static bool txSend(const uint8_t* frame, size_t len, bool scoped,
 
 static void txFree(uint8_t* data, void*) { free(data); }
 static bool txFinish(uint8_t dataset, TxEnd ending, uint8_t notices, void*);
+#if SYNC_SETTINGS_WITH_RADIO
+static RadioPublisher& radioPublisherMachine();
+#endif
 
 static Transmitter& transmitter() {
   static const TxOps ops = {txSign, txSend, txFree, txFinish, nullptr};
@@ -489,7 +506,10 @@ static bool saveRadio(const RadioRecord& value, uint8_t* scratch) {
 
 static bool radioPersist(const RadioRecord& value, void*) {
   Temp scratch(STORE_MAX);
-  return radio_ready && saveRadio(value, scratch);
+  if (!radio_ready || !saveRadio(value, scratch)) return false;
+  radio_record = value;
+  projectRadioState();
+  return true;
 }
 
 static bool radioCommand(const char* name, const RadioValues& value,
@@ -534,6 +554,78 @@ static RadioMigration& radioMigration() {
   static const RadioMigrationOps ops = {
       radioPersist, radioTemporary, radioCommit, radioRead, radioReboot, nullptr};
   static RadioMigration value(radio_record, ops);
+  return value;
+}
+
+static bool radioPrepare(const RadioRecord& record, const RadioPayload& payload,
+                         uint32_t generation, void*) {
+  uint8_t* data = static_cast<uint8_t*>(malloc(RADIO_PAYLOAD_LEN));
+  if (data == nullptr ||
+      writeRadioPayload(payload, MOBMESH_BUILD_EPOCH, data, RADIO_PAYLOAD_LEN) !=
+          RADIO_PAYLOAD_LEN) {
+    free(data);
+    return false;
+  }
+  Manifest manifest = {};
+  manifest.dataset = RADIO;
+  manifest.format = FORMAT_RAW;
+  manifest.days = 1;
+  manifest.generation = generation;
+  memcpy(manifest.channel, record.channel, record.channel_len + 1);
+  manifest.data_len = RADIO_PAYLOAD_LEN;
+  manifest.chunks = 1;
+  uint8_t fingerprint[DIGEST_LEN];
+  hash(record.local_key, sizeof(record.local_key), fingerprint, nullptr);
+  memcpy(manifest.publisher, fingerprint, FINGERPRINT_LEN);
+  hash(data, RADIO_PAYLOAD_LEN, manifest.digest, nullptr);
+
+  TxStart start = {};
+  start.dataset = RADIO;
+  start.generation = generation;
+  start.scoped = record.route_kind != 0;
+  if (start.scoped) memcpy(start.key, record.route_key, sizeof(start.key));
+  size_t signed_len = writeManifestPrefix(manifest, start.manifest,
+                                          sizeof(start.manifest));
+  if (signed_len != MANIFEST_SIGNED_LEN ||
+      !modSignDetached(start.manifest, signed_len,
+                       start.manifest + signed_len)) {
+    free(data);
+    return false;
+  }
+  start.data = data;
+  start.data_len = RADIO_PAYLOAD_LEN;
+  start.one_shot = true;
+  if (!transmitter().begin(start, millis())) {
+    free(data);
+    return false;
+  }
+  return true;
+}
+
+static bool radioControl(const RadioRecord& record, bool aborting,
+                         uint32_t& packet_id, void*) {
+  uint8_t frame[RADIO_CONFIRM_LEN];
+  uint8_t fingerprint[DIGEST_LEN];
+  hash(record.local_key, sizeof(record.local_key), fingerprint, nullptr);
+  size_t signed_len = aborting
+      ? writeRadioAbortPrefix(fingerprint, record.migration_id, frame,
+                              sizeof(frame))
+      : writeRadioConfirmPrefix(fingerprint, record.migration_id,
+                                record.target_digest, record.cutover, frame,
+                                sizeof(frame));
+  size_t frame_len = aborting ? RADIO_ABORT_LEN : RADIO_CONFIRM_LEN;
+  uint32_t airtime = 0;
+  return signed_len + SIGNATURE_LEN == frame_len &&
+         modSignDetached(frame, signed_len, frame + signed_len) &&
+         txSend(frame, frame_len, record.route_kind != 0, record.route_key,
+                packet_id, airtime, nullptr);
+}
+
+static RadioPublisher& radioPublisherMachine() {
+  static const RadioPublisherOps ops = {
+      radioPersist, radioTemporary, radioCommit, radioRead, radioPrepare,
+      radioControl, radioReboot, nullptr};
+  static RadioPublisher value(radio_record, ops);
   return value;
 }
 
@@ -642,6 +734,12 @@ static bool guardExpired(const DatasetState& state, uint32_t now) {
 }
 
 static bool txFinish(uint8_t dataset, TxEnd ending, uint8_t notices, void*) {
+#if SYNC_SETTINGS_WITH_RADIO
+  if (dataset == RADIO) {
+    radioPublisherMachine().roundFinished(ending == TX_QUIET, millis());
+    return true;
+  }
+#endif
   DatasetState next = stateFor(dataset);
   if (ending == TX_QUIET || ending == TX_SIGN_FAILED) {
     if (next.guard == GUARD_IDLE) return true;
@@ -701,7 +799,8 @@ static bool acceptsCampaign(uint8_t dataset, const char* channel, void*) {
   if (!config_ready || !trust_ready || config.channel_len == 0) return false;
   if (channel != nullptr && strcmp(channel, config.channel) != 0) return false;
 #if SYNC_SETTINGS_WITH_RADIO
-  if (dataset != RADIO && radioMigration().active()) return false;
+  if (dataset != RADIO &&
+      (radioMigration().active() || radioPublisherMachine().active())) return false;
 #endif
   if (transmitter().active(dataset) || transmitter().aborting(dataset)) return false;
 #if SYNC_SETTINGS_WITH_REGION
@@ -1226,6 +1325,17 @@ static bool finishForget(uint8_t* scratch) {
                          nullptr, false,
 #endif
                          scratch)) return false;
+#if SYNC_SETTINGS_WITH_RADIO
+  if (!radio_ready) return false;
+  DatasetState radio_next = radio_state;
+  erasePublisherReplay(radio_next, id);
+  RadioRecord radio_stored = radio_record;
+  radio_stored.replay_count = radio_next.replay_count;
+  memcpy(radio_stored.replay, radio_next.replay, sizeof(radio_stored.replay));
+  if (!saveRadio(radio_stored, scratch)) return false;
+  radio_record = radio_stored;
+  radio_state = radio_next;
+#endif
 
   Publishers next = publishers;
   if (completePublisherForget(next) != TRUST_OK) return false;
@@ -1314,6 +1424,9 @@ static void boot() {
 #if SYNC_SETTINGS_WITH_RADIO
   radio_ready = loadRadio(scratch);
   if (radio_ready) radio_ready = radioMigration().recover() == RADIO_MIG_OK;
+  if (radio_ready) {
+    radio_ready = radioPublisherMachine().recover(millis()) == RADIO_PUB_OK;
+  }
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
   policy_recovery_ready = loadRecovery(scratch);
@@ -1517,6 +1630,12 @@ static bool publish(uint8_t dataset, const char* route, const char* channel,
     strcpy(reply, "Err - busy");
     return true;
   }
+#if SYNC_SETTINGS_WITH_RADIO
+  if (radioMigration().active() || radioPublisherMachine().active()) {
+    strcpy(reply, "Err - locked");
+    return true;
+  }
+#endif
   char normalized[CHANNEL_MAX + 1];
   if (!normalizeChannel(channel, normalized)) {
     strcpy(reply, "Err - channel: 1-16 letters, digits, - or _");
@@ -1788,7 +1907,12 @@ static bool publisherCommand(char* command, char* reply) {
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
       (action == PUBLISHER_FORGET &&
-       policy_recovery.phase != RECOVERY_IDLE)
+       policy_recovery.phase != RECOVERY_IDLE) ||
+#endif
+#if SYNC_SETTINGS_WITH_RADIO
+      (action == PUBLISHER_FORGET &&
+       (radio_record.phase != RADIO_GUARD_IDLE ||
+        receiver.campaign(RADIO).state != RECEIVE_IDLE))
 #else
       false
 #endif
@@ -1898,6 +2022,9 @@ static bool setChannel(const char* value, char* reply) {
 #if SYNC_SETTINGS_WITH_POLICY
       !policy_state_ready || !policy_recovery_ready ||
 #endif
+#if SYNC_SETTINGS_WITH_RADIO
+      !radio_ready ||
+#endif
       false) {
     strcpy(reply, "Err - storage");
     return true;
@@ -1909,21 +2036,26 @@ static bool setChannel(const char* value, char* reply) {
 #if SYNC_SETTINGS_WITH_POLICY
       policy_state.enabled ||
 #endif
+#if SYNC_SETTINGS_WITH_RADIO
+      radio_record.enabled ||
+#endif
       false) {
     snprintf(reply, 160, "Err - sync must be off; channel %s",
              config.channel_len ? config.channel : "unset");
     return true;
   }
-  if (
+  bool busy = false;
 #if SYNC_SETTINGS_WITH_REGION
-      receiver.campaign(REGION).state != RECEIVE_IDLE ||
+  busy = busy || receiver.campaign(REGION).state != RECEIVE_IDLE;
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
-      receiver.campaign(POLICY).state != RECEIVE_IDLE ||
-      policy_recovery.phase != RECOVERY_IDLE) {
-#else
-      false) {
+  busy = busy || receiver.campaign(POLICY).state != RECEIVE_IDLE ||
+         policy_recovery.phase != RECOVERY_IDLE;
 #endif
+  #if SYNC_SETTINGS_WITH_RADIO
+  busy = busy || radioMigration().active() || radioPublisherMachine().active();
+  #endif
+  if (busy) {
     strcpy(reply, "Err - busy");
     return true;
   }
@@ -1993,6 +2125,225 @@ static int words(char* text, char* out[], int capacity) {
   }
   return count;
 }
+
+#if SYNC_SETTINGS_WITH_RADIO
+static const char RADIO_SCHEDULE_SYNTAX[] =
+    "set sync.radio.schedule <campaign_interval>,<test_interval>,<test_window>,"
+    "<campaign_duration>,<confirm_interval>,<confirm_window>";
+
+static void radioPlanSyntax(bool arm, char* reply) {
+  snprintf(reply, 160,
+           "Err - syntax: sync.radio publish.%s <region|*> <channel> "
+           "<freq>,<bw>,<sf>,<cr> [@YYYY-MM-DDTHH:MMZ]",
+           arm ? "arm" : "go");
+}
+
+static bool parseRadioValues(const char* text, RadioValues& out) {
+  if (text == nullptr) return false;
+  char* end;
+  float freq = strtof(text, &end);
+  if (end == text || *end++ != ',') return false;
+  char* next;
+  float bw = strtof(end, &next);
+  if (next == end || *next++ != ',') return false;
+  unsigned long sf = strtoul(next, &end, 10);
+  if (end == next || *end++ != ',') return false;
+  unsigned long cr = strtoul(end, &next, 10);
+  return *next == 0 && sf <= 255 && cr <= 255 &&
+         radioFromFloats(freq, bw, (uint8_t)sf, (uint8_t)cr, true, out);
+}
+
+static int64_t civilDays(int year, unsigned month, unsigned day) {
+  year -= month <= 2;
+  int era = (year >= 0 ? year : year - 399) / 400;
+  unsigned yoe = (unsigned)(year - era * 400);
+  unsigned adjusted_month = month > 2 ? month - 3 : month + 9;
+  unsigned doy = (153u * adjusted_month + 2u) / 5u + day - 1u;
+  unsigned doe = yoe * 365u + yoe / 4u - yoe / 100u + doy;
+  return (int64_t)era * 146097 + doe - 719468;
+}
+
+static bool parseUtc(const char* text, uint32_t& epoch) {
+  if (text == nullptr || strlen(text) != 18 || text[0] != '@' ||
+      text[5] != '-' || text[8] != '-' || text[11] != 'T' ||
+      text[14] != ':' || text[17] != 'Z') return false;
+  static const uint8_t digit[] = {1, 2, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16};
+  for (uint8_t n = 0; n < sizeof(digit); ++n) {
+    uint8_t i = digit[n];
+    if (text[i] < '0' || text[i] > '9') return false;
+  }
+  int year = (text[1] - '0') * 1000 + (text[2] - '0') * 100 +
+             (text[3] - '0') * 10 + text[4] - '0';
+  unsigned month = (text[6] - '0') * 10 + text[7] - '0';
+  unsigned day = (text[9] - '0') * 10 + text[10] - '0';
+  unsigned hour = (text[12] - '0') * 10 + text[13] - '0';
+  unsigned minute = (text[15] - '0') * 10 + text[16] - '0';
+  static const uint8_t days[] = {31, 28, 31, 30, 31, 30,
+                                 31, 31, 30, 31, 30, 31};
+  bool leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+  if (year < 1970 || month < 1 || month > 12 || day < 1 ||
+      day > days[month - 1] + (month == 2 && leap) || hour > 23 || minute > 59) {
+    return false;
+  }
+  int64_t value = civilDays(year, month, day) * 86400 +
+                  (int64_t)hour * 3600 + minute * 60;
+  if (value <= 0 || value > 0xffffffffLL) return false;
+  epoch = (uint32_t)value;
+  return true;
+}
+
+static bool parseMinute(const char*& text, uint16_t& value, bool last) {
+  if (text == nullptr || *text < '0' || *text > '9') return false;
+  char* end;
+  unsigned long parsed = strtoul(text, &end, 10);
+  if (end == text || parsed > 65535 || *end++ != 'm' ||
+      (last ? *end != 0 : *end != ',')) return false;
+  value = (uint16_t)parsed;
+  text = last ? end : end + 1;
+  return true;
+}
+
+static bool parseRadioSchedule(const char* text, RadioSchedule& schedule) {
+  RadioSchedule value = {};
+  if (!parseMinute(text, value.campaign_interval, false) ||
+      !parseMinute(text, value.test_interval, false) ||
+      !parseMinute(text, value.test_window, false) ||
+      !parseMinute(text, value.campaign_duration, false) ||
+      !parseMinute(text, value.confirm_interval, false) ||
+      !parseMinute(text, value.confirm_window, true) ||
+      !radioScheduleValid(value)) return false;
+  schedule = value;
+  return true;
+}
+
+static bool radioPlan(char* text, RadioArm& out) {
+  char* part[4];
+  int count = words(text, part, 4);
+  if (count != 3 && count != 4) return false;
+  RadioArm value = {};
+  if (!routeName(part[0], value.route) ||
+      !normalizeChannel(part[1], value.channel) ||
+      !parseRadioValues(part[2], value.target) ||
+      !publishRoute(value.route, value.scoped, value.route_key)) return false;
+  value.channel_len = (uint8_t)strlen(value.channel);
+  value.schedule = radio_record.schedule;
+  value.timed = count == 4;
+  if (value.timed && !parseUtc(part[3], value.cutover)) return false;
+  out = value;
+  return true;
+}
+
+static bool sameArm(const RadioArm& first, const RadioArm& second) {
+  return radioValuesEqual(first.target, second.target) &&
+         first.schedule.campaign_interval == second.schedule.campaign_interval &&
+         first.schedule.test_interval == second.schedule.test_interval &&
+         first.schedule.test_window == second.schedule.test_window &&
+         first.schedule.campaign_duration == second.schedule.campaign_duration &&
+         first.schedule.confirm_interval == second.schedule.confirm_interval &&
+         first.schedule.confirm_window == second.schedule.confirm_window &&
+         first.scoped == second.scoped &&
+         memcmp(first.route_key, second.route_key, sizeof(first.route_key)) == 0 &&
+         strcmp(first.route, second.route) == 0 &&
+         strcmp(first.channel, second.channel) == 0 &&
+         first.timed == second.timed &&
+         (!first.timed || first.cutover == second.cutover);
+}
+
+static bool radioLocked() {
+  if (radioMigration().active() || radioPublisherMachine().active()) return true;
+#if SYNC_SETTINGS_WITH_REGION
+  if (transmitter().active(REGION) || transmitter().aborting(REGION) ||
+      receiver.campaign(REGION).state != RECEIVE_IDLE) return true;
+#endif
+#if SYNC_SETTINGS_WITH_POLICY
+  if (transmitter().active(POLICY) || transmitter().aborting(POLICY) ||
+      receiver.campaign(POLICY).state != RECEIVE_IDLE ||
+      policy_recovery.phase != RECOVERY_IDLE) return true;
+#endif
+  return false;
+}
+
+static bool hasTrustedPublisher() {
+  for (uint8_t i = 0; i < publishers.count; ++i) {
+    if (publishers.record[i].status == PUBLISHER_ACTIVE) return true;
+  }
+  return false;
+}
+
+static bool radioEnable(bool enabled_value, char* reply) {
+  if (!radio_ready || !config_ready || !trust_ready) {
+    strcpy(reply, "Err - storage");
+    return true;
+  }
+  if (enabled_value && config.channel_len == 0) {
+    strcpy(reply, "Err - channel not set");
+    return true;
+  }
+  if (enabled_value && !hasTrustedPublisher()) {
+    strcpy(reply, "Err - no publishers");
+    return true;
+  }
+  if (!enabled_value && radioPublisherMachine().active()) {
+    strcpy(reply, "Err - locked; use sync.radio publish.abort");
+    return true;
+  }
+  if (!enabled_value && radioMigration().active()) {
+    RadioMigrationResult result = radioMigration().abort(
+        radioMigration().staged().payload.migration_id);
+    if (result != RADIO_MIG_OK) {
+      strcpy(reply, "Err - native");
+      return true;
+    }
+  }
+  RadioRecord next = radio_record;
+  next.enabled = enabled_value;
+  Temp scratch(STORE_MAX);
+  if (!saveRadio(next, scratch)) strcpy(reply, "Err - storage");
+  else {
+    radio_record = next;
+    projectRadioState();
+    if (!enabled_value) memset(&radio_arm, 0, sizeof(radio_arm));
+    strcpy(reply, "OK");
+  }
+  return true;
+}
+
+static bool radioScheduleCommand(char* command, char* reply) {
+  if (strcmp(command, "get sync.radio.schedule") == 0) {
+    if (!radio_ready) strcpy(reply, "Err - storage");
+    else snprintf(reply, 160, "> %um,%um,%um,%um,%um,%um",
+                  radio_record.schedule.campaign_interval,
+                  radio_record.schedule.test_interval,
+                  radio_record.schedule.test_window,
+                  radio_record.schedule.campaign_duration,
+                  radio_record.schedule.confirm_interval,
+                  radio_record.schedule.confirm_window);
+    return true;
+  }
+  static const char prefix[] = "set sync.radio.schedule";
+  if (strncmp(command, prefix, sizeof(prefix) - 1) != 0) return false;
+  RadioSchedule value;
+  if (command[sizeof(prefix) - 1] != ' ' ||
+      !parseRadioSchedule(command + sizeof(prefix), value)) {
+    snprintf(reply, 160, "Err - syntax: %s", RADIO_SCHEDULE_SYNTAX);
+    return true;
+  }
+  if (!radio_ready || radioLocked()) {
+    strcpy(reply, !radio_ready ? "Err - storage" : "Err - locked");
+    return true;
+  }
+  RadioRecord next = radio_record;
+  next.schedule = value;
+  Temp scratch(STORE_MAX);
+  if (!saveRadio(next, scratch)) strcpy(reply, "Err - storage");
+  else {
+    radio_record = next;
+    memset(&radio_arm, 0, sizeof(radio_arm));
+    strcpy(reply, "OK");
+  }
+  return true;
+}
+#endif
 
 #if SYNC_SETTINGS_WITH_REGION
 static RegionResult buildEdit(EditKind kind, const char* name,
@@ -2524,6 +2875,234 @@ static bool abortCommand(uint8_t dataset, char* reply) {
   return true;
 }
 
+#if SYNC_SETTINGS_WITH_RADIO
+static const char* radioStateName() {
+  if (radioPublisherMachine().active()) {
+    switch (radioPublisherMachine().state()) {
+      case RADIO_PUB_R1: return "publisher R1";
+      case RADIO_PUB_TEST_PENDING: return "publisher test pending";
+      case RADIO_PUB_TEST_R2: return "publisher testing R2";
+      case RADIO_PUB_TEST_FALLBACK: return "publisher returning R1";
+      case RADIO_PUB_CUTOVER_PENDING: return "publisher cutover pending";
+      case RADIO_PUB_CONFIRM_R2: return "publisher confirming R2";
+      case RADIO_PUB_COMMITTING: return "publisher committing";
+      case RADIO_PUB_FALLBACK: return "publisher fallback";
+      case RADIO_PUB_ABORTING: return "publisher aborting";
+      case RADIO_PUB_FAULT: return "publisher fault";
+      default: return "publisher busy";
+    }
+  }
+  if (radioMigration().active()) {
+    switch (radioMigration().state()) {
+      case RADIO_MIG_ARMED_R1: return "receiver armed R1";
+      case RADIO_MIG_TEST_PENDING: return "receiver test pending";
+      case RADIO_MIG_TEST_R2: return "receiver testing R2";
+      case RADIO_MIG_CUTOVER_PENDING: return "receiver cutover pending";
+      case RADIO_MIG_CONFIRM_R2: return "receiver confirming R2";
+      case RADIO_MIG_COMMITTING: return "receiver committing";
+      case RADIO_MIG_FALLBACK: return "receiver fallback";
+      case RADIO_MIG_FAULT: return "receiver fault";
+      default: return "receiver busy";
+    }
+  }
+  return radio_arm.active ? "publisher armed" : "idle R1";
+}
+
+static bool radioStatusCommand(char* reply) {
+  if (!radio_ready) {
+    strcpy(reply, "fault storage");
+    return true;
+  }
+  const char* state = radioStateName();
+  const char* channel = config_ready && config.channel_len ? config.channel : "unset";
+#ifdef SYNC_SETTINGS_RADIO_BENCH_TIMING
+  static const char build_kind[] = " test-timing";
+#else
+  static const char build_kind[] = "";
+#endif
+  if (radio_record.phase != RADIO_GUARD_IDLE) {
+    snprintf(reply, 160, "%s %s T %lu channel %s%s",
+             radio_record.enabled ? "on" : "off", state,
+             (unsigned long)radio_record.cutover, channel, build_kind);
+  } else {
+    snprintf(reply, 160, "%s %s channel %s%s",
+             radio_record.enabled ? "on" : "off", state, channel, build_kind);
+  }
+  return true;
+}
+
+static bool radioReportCommand(const char* page, char* reply) {
+  uint8_t parsed;
+  if (!parseOffset(page, parsed) || parsed > 1) {
+    strcpy(reply, "Err - page");
+    return true;
+  }
+  if (!radio_ready) strcpy(reply, "Err - storage");
+  else if (radio_record.result == RADIO_RESULT_NONE) strcpy(reply, "empty");
+  else {
+    static const char* result[] = {"none", "committed", "identical", "cr-only",
+                                   "fallback", "aborted", "fault"};
+    snprintf(reply, 160, "1/1 migration %llx %s",
+             (unsigned long long)radio_record.migration_id,
+             result[radio_record.result]);
+  }
+  return true;
+}
+
+static bool radioPublishPlanCommand(char* command, bool arm, char* reply) {
+  const char* verb = arm ? "sync.radio publish.arm" : "sync.radio publish.go";
+  size_t prefix = strlen(verb);
+  RadioArm parsed;
+  if (command[prefix] != ' ' || !radioPlan(command + prefix + 1, parsed)) {
+    radioPlanSyntax(arm, reply);
+    return true;
+  }
+  if (!radio_ready) {
+    strcpy(reply, "Err - storage");
+    return true;
+  }
+  uint32_t now = modClockGet();
+  if (now < MOBMESH_BUILD_EPOCH) {
+    strcpy(reply, "Err - clock");
+    return true;
+  }
+  uint32_t cutover = parsed.timed
+      ? parsed.cutover
+      : now + (uint32_t)parsed.schedule.campaign_duration * 60u;
+  uint32_t duration = cutover - now;
+  if (cutover <= now || duration == 0 || duration >= 1441u * 60u) {
+    radioPlanSyntax(arm, reply);
+    return true;
+  }
+  if (arm) {
+    parsed.active = true;
+    parsed.armed_ms = millis();
+    radio_arm = parsed;
+    if (parsed.timed) {
+      snprintf(reply, 160, "OK - armed %s %s T %lu", parsed.route,
+               parsed.target.cr == 0 ? "cr keep" : "radio",
+               (unsigned long)cutover);
+    } else {
+      snprintf(reply, 160, "OK - armed %s %s in %um", parsed.route,
+               parsed.target.cr == 0 ? "cr keep" : "radio",
+               parsed.schedule.campaign_duration);
+    }
+    return true;
+  }
+  if (!radio_arm.active) {
+    strcpy(reply, "Err - no publish arm");
+    return true;
+  }
+  if ((uint32_t)(millis() - radio_arm.armed_ms) >= 360u * 60000u) {
+    memset(&radio_arm, 0, sizeof(radio_arm));
+    strcpy(reply, "Err - publish arm expired");
+    return true;
+  }
+  if (!sameArm(radio_arm, parsed)) {
+    strcpy(reply, "Err - publish arm mismatch");
+    return true;
+  }
+  if (radioLocked()) {
+    strcpy(reply, "Err - locked");
+    return true;
+  }
+  RadioValues prior;
+  bool temporary = false;
+  if (!radioValues(prior, temporary) || temporary) {
+    strcpy(reply, "Err - native");
+    return true;
+  }
+  RadioPublishPlan plan = {};
+  plan.payload.target = parsed.target;
+  plan.payload.start = now;
+  plan.payload.cutover = cutover;
+  plan.payload.stamp = now;
+  plan.payload.schedule = parsed.schedule;
+  plan.prior = prior;
+  do {
+    if (!modRandomFill((uint8_t*)&plan.migration_id,
+                       sizeof(plan.migration_id))) {
+      strcpy(reply, "Err - random");
+      return true;
+    }
+  } while (plan.migration_id == 0);
+  plan.payload.migration_id = plan.migration_id;
+  uint8_t encoded[RADIO_PAYLOAD_LEN];
+  if (writeRadioPayload(plan.payload, MOBMESH_BUILD_EPOCH, encoded,
+                        sizeof(encoded)) != sizeof(encoded)) {
+    radioPlanSyntax(false, reply);
+    return true;
+  }
+  hash(encoded + 10, 10, plan.target_digest, nullptr);
+  if (!modPublisherKey(plan.publisher_key)) {
+    strcpy(reply, "Err - identity");
+    return true;
+  }
+  plan.channel_len = parsed.channel_len;
+  memcpy(plan.channel, parsed.channel, parsed.channel_len + 1);
+  plan.scoped = parsed.scoped;
+  if (parsed.scoped) memcpy(plan.route_key, parsed.route_key, sizeof(plan.route_key));
+  RadioPublisherResult result = radioPublisherMachine().begin(plan, now, millis());
+  if (result != RADIO_PUB_OK) {
+    strcpy(reply, result == RADIO_PUB_STORAGE ? "Err - storage" :
+                  result == RADIO_PUB_BUSY ? "Err - locked" : "Err - native");
+    return true;
+  }
+  memset(&radio_arm, 0, sizeof(radio_arm));
+  snprintf(reply, 160, "OK - migration %llx T %lu",
+           (unsigned long long)plan.migration_id,
+           (unsigned long)cutover);
+  return true;
+}
+
+static bool radioAbortCommand(char* reply) {
+  memset(&radio_arm, 0, sizeof(radio_arm));
+  if (radioPublisherMachine().active()) {
+    RadioPublisherResult result = radioPublisherMachine().abort(millis());
+    strcpy(reply, result == RADIO_PUB_OK ? "OK" :
+                  result == RADIO_PUB_TOO_LATE ? "Err - too late" :
+                  result == RADIO_PUB_STORAGE ? "Err - storage" : "Err - send");
+    return true;
+  }
+  if (radioMigration().active()) {
+    RadioMigrationResult result = radioMigration().abort(
+        radioMigration().staged().payload.migration_id);
+    strcpy(reply, result == RADIO_MIG_OK ? "OK" :
+                  result == RADIO_MIG_TOO_LATE ? "Err - too late" : "Err - native");
+    return true;
+  }
+  strcpy(reply, "Err - no campaign");
+  return true;
+}
+
+static bool radioCli(char* command, char* reply) {
+  if (strcmp(command, "sync.radio on") == 0) return radioEnable(true, reply);
+  if (strcmp(command, "sync.radio off") == 0) return radioEnable(false, reply);
+  static const char arm[] = "sync.radio publish.arm";
+  static const char go[] = "sync.radio publish.go";
+  if (strncmp(command, arm, sizeof(arm) - 1) == 0) {
+    return radioPublishPlanCommand(command, true, reply);
+  }
+  if (strncmp(command, go, sizeof(go) - 1) == 0) {
+    return radioPublishPlanCommand(command, false, reply);
+  }
+  if (strcmp(command, "sync.radio publish.abort") == 0) {
+    return radioAbortCommand(reply);
+  }
+  if (strcmp(command, "sync.radio publish.status") == 0) {
+    return radioStatusCommand(reply);
+  }
+  static const char report[] = "sync.radio publish.report";
+  if (strcmp(command, report) == 0 ||
+      strncmp(command, "sync.radio publish.report ", sizeof(report)) == 0) {
+    const char* page = command[sizeof(report) - 1] == ' '
+        ? command + sizeof(report) : nullptr;
+    return radioReportCommand(page, reply);
+  }
+  return radioScheduleCommand(command, reply);
+}
+#endif
+
 
 static bool handleCli(const ModCliContext& context, char* command, char* reply) {
 #if !SYNC_SETTINGS_WITH_REGION
@@ -2531,6 +3110,9 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
 #endif
   if (!booted) boot();
   if (publisherCommand(command, reply)) return true;
+#if SYNC_SETTINGS_WITH_RADIO
+  if (radioCli(command, reply)) return true;
+#endif
   if (publishCommand(command, reply)) return true;
   if (strcmp(command, "get sync.channel") == 0) {
     if (!config_ready) strcpy(reply, "Err - storage");
@@ -2852,6 +3434,27 @@ int syncExportRegions(RegionMap* base, char* out, size_t capacity,
 #endif
 }
 
+void syncOwnerInfo(char* out, size_t capacity) {
+#if SYNC_SETTINGS_WITH_RADIO
+  static_assert(8 + 31 + 1 + 119 + 4 + 2 + 15 <= MAX_PACKET_PAYLOAD,
+                "owner marker must fit the anonymous reply");
+  static const uint8_t ready[] = {0xf0, 0x9f, 0x93, 0xa1};
+  static const uint8_t armed[] = {0xf0, 0x9f, 0x93, 0xbb};
+  if (out == nullptr || capacity == 0) return;
+  size_t length = strnlen(out, capacity);
+  if (length == capacity || length + sizeof(ready) >= capacity) return;
+  const uint8_t* marker = mobmesh::sync::radio_ready &&
+                                  mobmesh::sync::radioMigration().awaitingCutover()
+                              ? armed
+                              : ready;
+  memcpy(out + length, marker, sizeof(ready));
+  out[length + sizeof(ready)] = 0;
+#else
+  (void)out;
+  (void)capacity;
+#endif
+}
+
 void syncRecv(const mesh::Packet* packet, bool accepted,
               const uint8_t scope_key[16]) {
   mobmesh::sync::receive(packet, accepted, scope_key);
@@ -2865,6 +3468,7 @@ void syncLoop() {
     bool temporary = false;
     if (mobmesh::sync::radioValues(live, temporary)) {
       mobmesh::sync::radioMigration().tick(millis(), live, temporary);
+      mobmesh::sync::radioPublisherMachine().tick(millis(), live, temporary);
     }
   }
 #endif
@@ -2936,6 +3540,9 @@ void syncLoop() {
 
 void syncTx(uint32_t packet_id, bool succeeded) {
   mobmesh::sync::transmitter().complete(packet_id, succeeded, millis());
+#if SYNC_SETTINGS_WITH_RADIO
+  mobmesh::sync::radioPublisherMachine().complete(packet_id, succeeded, millis());
+#endif
 }
 
 bool syncCli(const ModCliContext& context, char* command, char* reply) {

@@ -166,6 +166,7 @@ def load_integrations(mods: list) -> list:
     route_owner = None
     allow_forward_owner = None
     region_export_owner = None
+    owner_info_owner = None
     for order, mod_name in enumerate(mods):
         definition = load_mod_definition(mod_name)
         integration = definition.integration
@@ -230,6 +231,12 @@ def load_integrations(mods: list) -> list:
                         f"region_export is exclusive but claimed by '{region_export_owner}' and '{mod_name}'"
                     )
                 region_export_owner = mod_name
+            if phase is IntegrationPhase.OWNER_INFO:
+                if owner_info_owner is not None:
+                    raise ValueError(
+                        f"owner_info is exclusive but claimed by '{owner_info_owner}' and '{mod_name}'"
+                    )
+                owner_info_owner = mod_name
         integrations.append(parsed)
     return integrations
 
@@ -248,6 +255,8 @@ def render_mod_hooks(integrations: list) -> str:
                       for item in integrations if "allow_forward" in item["hooks"]]
     region_exports = [item["hooks"]["region_export"]["symbol"]
                       for item in integrations if "region_export" in item["hooks"]]
+    owner_infos = [item["hooks"]["owner_info"]["symbol"]
+                   for item in integrations if "owner_info" in item["hooks"]]
     recvs = [item["hooks"]["recv"]["symbol"]
              for item in integrations if "recv" in item["hooks"]]
     txs = [item["hooks"]["tx"]["symbol"]
@@ -268,6 +277,7 @@ def render_mod_hooks(integrations: list) -> str:
         f"{region_exports[0]}(base, out, capacity, excluded_flags)"
         if region_exports else "-1"
     )
+    owner_info_call = f"  {owner_infos[0]}(out, capacity);" if owner_infos else ""
     recv_block = (
         "void modObserveRecv(const mesh::Packet* packet, bool accepted,\n"
         "                    const uint8_t scope_key[16]) {\n"
@@ -307,6 +317,10 @@ bool modAllowFlood(const mesh::Packet* packet, bool scope_known) {{
 int modExportRegions(RegionMap* base, char* out, size_t capacity,
                      uint8_t excluded_flags) {{
   return {region_export_call};
+}}
+
+void modAppendOwnerInfo(char* out, size_t capacity) {{
+{owner_info_call}
 }}
 
 {recv_block}
@@ -650,6 +664,11 @@ def cmd_inject_env(args):
         IntegrationPhase.TX in definition.integration.hooks
         for definition in (load_mod_definition(name) for name in mods)
     )
+    has_owner_info_hook = any(
+        definition.integration is not None and
+        IntegrationPhase.OWNER_INFO in definition.integration.hooks
+        for definition in (load_mod_definition(name) for name in mods)
+    )
 
     env_flag_owner = {}
     env_flag_lines = []
@@ -712,6 +731,8 @@ def cmd_inject_env(args):
     all_build_flags_lines = env_flag_lines + override_flag_lines
     if has_tx_hooks:
         all_build_flags_lines.append("-D MOD_WITH_TX_HOOKS=1")
+    if has_owner_info_hook:
+        all_build_flags_lines.append("-D MOD_WITH_OWNER_INFO_HOOK=1")
     if ota_page_mod:
         # Upstream's own startOTAUpdate() is unreachable once the mod consumes `start ota`, but it
         # still compiles and still pulls in the library dropped below.

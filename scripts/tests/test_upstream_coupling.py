@@ -208,6 +208,30 @@ class UpstreamCouplingTestCase(unittest.TestCase):
             self.assertIn("bool modRadioPrefsGet(ModRadioValues* out)", body)
             self.assertIn("esp_fill_random(out, len);", body)
 
+    def test_owner_marker_is_a_bounded_repeater_reply_hook(self):
+        header = Path(REPO_ROOT, "mods/shim/files/src/helpers/ModHooks.h").read_text()
+        self.assertIn("void modAppendOwnerInfo(char* out, size_t capacity);", header)
+        source = added_source(
+            Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
+        )
+        repeater = source["examples/simple_repeater/MyMesh.cpp"]
+        room = source["examples/simple_room_server/MyMesh.cpp"]
+        self.assertEqual(repeater.count("modAppendOwnerInfo("), 1)
+        self.assertIn("#ifdef MOD_WITH_OWNER_INFO_HOOK", repeater)
+        self.assertNotIn("modAppendOwnerInfo(", room)
+
+        generator = Path(REPO_ROOT, "scripts/generate-board-config.py").read_text()
+        self.assertIn("has_owner_info_hook = any(", generator)
+        self.assertIn('all_build_flags_lines.append("-D MOD_WITH_OWNER_INFO_HOOK=1")', generator)
+
+        integration = Path(
+            REPO_ROOT,
+            "mods/sync-settings/files/src/helpers/esp32/SyncIntegration.cpp",
+        ).read_text()
+        self.assertIn("8 + 31 + 1 + 119 + 4 + 2 + 15 <= MAX_PACKET_PAYLOAD", integration)
+        self.assertIn("{0xf0, 0x9f, 0x93, 0xa1}", integration)
+        self.assertIn("{0xf0, 0x9f, 0x93, 0xbb}", integration)
+
     def test_drift_canary_builds_sync_settings_for_both_roles(self):
         workflow = Path(REPO_ROOT, ".github/workflows/patch-drift-canary.yml").read_text()
         self.assertIn("CANARY_EXTRA_MODS: sync-settings", workflow)

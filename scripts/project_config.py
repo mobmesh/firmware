@@ -40,6 +40,7 @@ class IntegrationPhase(str, Enum):
     ROUTE = "route"
     ALLOW_FORWARD = "allow_forward"
     REGION_EXPORT = "region_export"
+    OWNER_INFO = "owner_info"
     RECV = "recv"
     TX = "tx"
     WANTS_POWER_SAVING = "wants_power_saving"

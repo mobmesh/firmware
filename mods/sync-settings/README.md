@@ -40,6 +40,7 @@ connected with fellow participants.
 
 - **Regions:** updates replace the sync overlay, never the native list.
 - **Policy:** updates selected native operating settings—not radio settings or credentials.
+- **Radio:** coordinates an optional, timed move to new LoRa settings with automatic fallback.
 - **Receiving:** requires sync on, a matching channel, and an authorized publisher.
 - **Publishing:** works with receiving off; the command specifies its channel.
 - **Routing:** overlay matches take priority; a matching deny in either list wins.
@@ -55,9 +56,20 @@ sync.publisher add <full-public-key>
 set sync.channel release
 sync.region on
 sync.policy on
+sync.radio on
 ```
 
 Enable regions, policy, or both, depending on the installed build.
+
+**Publisher — schedule a radio change:**
+
+```text
+set sync.radio.schedule 10m,0m,0m,360m,5m,45m
+sync.radio publish.arm * release 915,125,8,0
+sync.radio publish.go  * release 915,125,8,0
+```
+
+The two publish commands must match. CR `0` keeps each repeater's current coding rate.
 
 **Publisher — prepare and send regions:**
 
@@ -127,6 +139,21 @@ Consumer already applied -> keep applied update; no rollback
 
 Abort notices can be lost. Unconfirmed transmission completion leaves a warning.
 
+### Radio migration
+
+```text
+R1: Publisher -- repeated signed plans --> Subscribers
+                         optional tests: R1 -> R2 -> R1
+At T:                   Publisher + Subscribers -> temporary R2
+R2: Publisher -- signed confirmations --> Subscribers
+                         confirmed nodes save R2; others return to R1
+```
+
+- Publisher time coordinates the change; consumer clocks do not need to agree.
+- Test windows are optional and never save R2.
+- No confirmation means automatic return to the prior radio settings.
+- A later reverse campaign can move the mesh back.
+
 ## CLI Commands
 
 Available through serial and authenticated remote admin CLI.
@@ -161,6 +188,16 @@ Available through serial and authenticated remote admin CLI.
 <tr><td><code>sync.policy off</code></td><td>Stop accepting updates; keep already-applied settings.</td></tr>
 <tr><td><code>get repeat.gate</code></td><td>Show whether flood packets with no permitted region are dropped.</td></tr>
 <tr><td><code>set repeat.gate &lt;on|off&gt;</code></td><td>Drop flood packets whose region scope is unknown or flood-denied. Carried by policy campaigns. Only a room server acts on it; a repeater always gates and stores the value so a shared profile applies cleanly on both.</td></tr>
+<tr><th colspan="2" align="left">📻 Radio migration</th></tr>
+<tr><td><code>sync.radio on</code></td><td>Accept radio migration plans. Requires a channel and trusted publisher.</td></tr>
+<tr><td><code>sync.radio off</code></td><td>Stop accepting plans; cancel a receiver migration before commit.</td></tr>
+<tr><td><code>get sync.radio.schedule</code></td><td>Show the six timing values, all in minutes.</td></tr>
+<tr><td><code>set sync.radio.schedule &lt;campaign&gt;,&lt;test-interval&gt;,&lt;test-window&gt;,&lt;duration&gt;,&lt;confirm-interval&gt;,&lt;confirm-window&gt;</code></td><td>Save radio campaign timing. Use <code>0m,0m</code> to disable tests.</td></tr>
+<tr><td><code>sync.radio publish.arm &lt;region|*&gt; &lt;channel&gt; &lt;freq&gt;,&lt;bw&gt;,&lt;sf&gt;,&lt;cr&gt; [@UTC]</code></td><td>Validate and preview a plan. Writes and transmits nothing.</td></tr>
+<tr><td><code>sync.radio publish.go &lt;region|*&gt; &lt;channel&gt; &lt;freq&gt;,&lt;bw&gt;,&lt;sf&gt;,&lt;cr&gt; [@UTC]</code></td><td>Start the exact armed plan. Optional UTC format: <code>@YYYY-MM-DDTHH:MMZ</code>.</td></tr>
+<tr><td><code>sync.radio publish.abort</code></td><td>Cancel an active publisher or receiver migration before durable commit.</td></tr>
+<tr><td><code>sync.radio publish.status</code></td><td>Show the current migration phase, channel, and cutover time.</td></tr>
+<tr><td><code>sync.radio publish.report [page]</code></td><td>Show the most recent terminal migration result.</td></tr>
 <tr><th colspan="2" align="left">📤 Publishing and monitoring</th></tr>
 <tr><td><code>sync.&lt;dataset&gt; publish &lt;region|*&gt; &lt;channel&gt; [-raw]</code></td><td>Capture and broadcast repeated updates. The reply names the payload format, its size and the frames per round.</td></tr>
 <tr><td><code>sync.&lt;dataset&gt; publish.reset &lt;region|*&gt; &lt;channel&gt; [-raw]</code></td><td>Recovery publication for an incorrectly far-ahead generation history; eligibility checks still apply.</td></tr>

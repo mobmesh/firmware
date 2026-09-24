@@ -699,11 +699,15 @@ static StoreResult radioRecordValid(const RadioRecord& record) {
       record.result > RADIO_RESULT_FAULT || record.channel_len > CHANNEL_MAX) {
     return STORE_PAYLOAD;
   }
-  bool has_local_key = anyNonzero(record.local_key, sizeof(record.local_key));
-  if ((record.local_generation == 0) != !has_local_key) return STORE_PAYLOAD;
-
   bool retained = record.phase != RADIO_GUARD_IDLE ||
                   record.result != RADIO_RESULT_NONE;
+  bool publisher_before_first = record.role == RADIO_ROLE_PUBLISHER &&
+                                record.latest_generation == 0;
+  bool has_local_key = anyNonzero(record.local_key, sizeof(record.local_key));
+  if ((record.local_generation == 0) != !has_local_key &&
+      !(publisher_before_first && record.local_generation == 0 && has_local_key)) {
+    return STORE_PAYLOAD;
+  }
   if (!retained) {
     return radioGuardZero(record) ? STORE_OK : STORE_PAYLOAD;
   }
@@ -721,7 +725,8 @@ static StoreResult radioRecordValid(const RadioRecord& record) {
       record.start == 0 || record.cutover <= record.start ||
       !radioScheduleValid(record.captured) || record.channel_len == 0 ||
       !validChannel((const uint8_t*)record.channel, record.channel_len) ||
-      record.channel[record.channel_len] != 0 || record.latest_generation == 0 ||
+      record.channel[record.channel_len] != 0 ||
+      (record.latest_generation == 0 && !publisher_before_first) ||
       (record.route_kind == 0 && anyNonzero(record.route_key, sizeof(record.route_key))) ||
       (record.route_kind == 1 && !anyNonzero(record.route_key, sizeof(record.route_key)))) {
     return STORE_PAYLOAD;
