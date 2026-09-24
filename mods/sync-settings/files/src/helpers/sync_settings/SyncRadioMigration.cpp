@@ -60,11 +60,19 @@ RadioMigrationResult RadioMigration::stage(const RadioStage& next,
     if (next.generation <= stage_.generation) return RADIO_MIG_REPLAY;
     if (sameStage(next)) {
       stage_.generation = next.generation;
-      stage_.payload.stamp = next.payload.stamp;
-      sync_ms_ = now_ms;
-      sync_epoch_ = next.payload.stamp;
-      cutover_ms_ = cutover;
-      if (state_ == RADIO_MIG_ARMED_R1) nextTest(now_ms);
+      const uint32_t publisher_now = sync_epoch_ +
+          (uint32_t)(now_ms - sync_ms_) / 1000u;
+      if (next.payload.stamp > publisher_now) {
+        stage_.payload.stamp = next.payload.stamp;
+        sync_ms_ = now_ms;
+        sync_epoch_ = next.payload.stamp;
+        cutover_ms_ = cutover;
+        confirm_end_ms_ = cutover +
+            (uint32_t)next.payload.schedule.confirm_window * 60000u;
+        test_start_ms_ = 0;
+        test_end_ms_ = 0;
+        if (state_ == RADIO_MIG_ARMED_R1) nextTest(now_ms);
+      }
       return RADIO_MIG_OK;
     }
     if (state_ != RADIO_MIG_ARMED_R1 ||
