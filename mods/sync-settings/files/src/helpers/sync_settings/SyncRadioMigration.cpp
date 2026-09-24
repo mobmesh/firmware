@@ -72,7 +72,9 @@ RadioMigrationResult RadioMigration::stage(const RadioStage& next,
             (uint32_t)next.payload.schedule.confirm_window * 60000u;
         test_start_ms_ = 0;
         test_end_ms_ = 0;
-        if (state_ == RADIO_MIG_ARMED_R1) nextTest(now_ms);
+        if (radioClassify(prior_, stage_.payload.target) == RADIO_RETUNE) {
+          nextTest(now_ms);
+        }
       }
       return RADIO_MIG_OK;
     }
