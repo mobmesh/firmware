@@ -62,7 +62,8 @@ RadioMigrationResult RadioMigration::stage(const RadioStage& next,
       stage_.generation = next.generation;
       const uint32_t publisher_now = sync_epoch_ +
           (uint32_t)(now_ms - sync_ms_) / 1000u;
-      if (next.payload.stamp > publisher_now) {
+      if (state_ == RADIO_MIG_ARMED_R1 &&
+          next.payload.stamp > publisher_now) {
         stage_.payload.stamp = next.payload.stamp;
         sync_ms_ = now_ms;
         sync_epoch_ = next.payload.stamp;
@@ -283,7 +284,9 @@ void RadioMigration::tick(uint32_t now_ms, const RadioValues& live,
 
 static const uint32_t RADIO_TX_TIMEOUT_MS = 60000;
 static const uint32_t RADIO_RETRY_MS = 2000;
+static const uint32_t RADIO_ABORT_INTERVAL_MS = 30000;
 static const uint32_t RADIO_ABORT_DEADLINE_MS = 300000;
+static const uint8_t RADIO_ABORT_NOTICES = 2;
 
 RadioPublisher::RadioPublisher(RadioRecord& record,
                                const RadioPublisherOps& ops)
@@ -291,7 +294,8 @@ RadioPublisher::RadioPublisher(RadioRecord& record,
       sync_epoch_(0), cutover_ms_(0), test_start_ms_(0), test_end_ms_(0),
       confirm_end_ms_(0), prepare_due_ms_(0), control_due_ms_(0),
       control_sent_ms_(0), control_id_(0), prepare_in_flight_(false),
-      control_in_flight_(false), fallback_result_(RADIO_RESULT_FALLBACK) {
+      control_in_flight_(false), abort_sent_(0),
+      fallback_result_(RADIO_RESULT_FALLBACK) {
   memset(&payload_, 0, sizeof(payload_));
   memset(&target_, 0, sizeof(target_));
 }
@@ -342,6 +346,7 @@ RadioPublisherResult RadioPublisher::begin(const RadioPublishPlan& plan,
   control_id_ = 0;
   prepare_in_flight_ = false;
   control_in_flight_ = false;
+  abort_sent_ = 0;
   fallback_result_ = RADIO_RESULT_FALLBACK;
   test_start_ms_ = 0;
   test_end_ms_ = 0;
@@ -387,6 +392,7 @@ RadioPublisherResult RadioPublisher::recover(uint32_t now_ms) {
   state_ = RADIO_PUB_ABORTING;
   confirm_end_ms_ = now_ms + RADIO_ABORT_DEADLINE_MS;
   control_due_ms_ = now_ms;
+  abort_sent_ = 0;
   return RADIO_PUB_OK;
 }
 
@@ -479,6 +485,7 @@ RadioPublisherResult RadioPublisher::abort(uint32_t now_ms) {
   state_ = RADIO_PUB_ABORTING;
   control_due_ms_ = now_ms;
   confirm_end_ms_ = now_ms + RADIO_ABORT_DEADLINE_MS;
+  abort_sent_ = 0;
   return RADIO_PUB_OK;
 }
 
@@ -504,9 +511,14 @@ void RadioPublisher::complete(uint32_t packet_id, bool success,
     }
   } else if (state_ == RADIO_PUB_ABORTING) {
     if (success) {
-      fallback_result_ = RADIO_RESULT_ABORTED;
-      control_due_ms_ = 0;
-      state_ = RADIO_PUB_FALLBACK;
+      ++abort_sent_;
+      if (abort_sent_ >= RADIO_ABORT_NOTICES) {
+        fallback_result_ = RADIO_RESULT_ABORTED;
+        control_due_ms_ = 0;
+        state_ = RADIO_PUB_FALLBACK;
+      } else {
+        control_due_ms_ = now_ms + RADIO_ABORT_INTERVAL_MS;
+      }
     }
     else control_due_ms_ = now_ms;
   }

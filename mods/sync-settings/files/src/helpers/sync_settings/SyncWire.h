@@ -24,8 +24,8 @@ static const size_t ABORT_LEN = 101;
 static const size_t ABORT_SIGNED_LEN = 37;
 static const size_t RADIO_CONFIRM_SIGNED_LEN = 57;
 static const size_t RADIO_CONFIRM_LEN = 121;
-static const size_t RADIO_ABORT_SIGNED_LEN = 21;
-static const size_t RADIO_ABORT_LEN = 85;
+static const size_t RADIO_ABORT_SIGNED_LEN = 25;
+static const size_t RADIO_ABORT_LEN = 89;
 static const size_t REGION_DATA_MAX = 1057;
 static const size_t POLICY_DATA_LEN = 15;
 static const uint8_t CHUNK_MAX = 12;
@@ -129,6 +129,7 @@ struct RadioConfirmView {
 struct RadioAbortView {
   const uint8_t* publisher;
   uint64_t migration_id;
+  uint32_t generation;
   const uint8_t* signature;
 };
 
@@ -181,7 +182,7 @@ size_t writeRadioConfirmPrefix(const uint8_t publisher[FINGERPRINT_LEN],
                                const uint8_t target_digest[DIGEST_LEN],
                                uint32_t cutover, uint8_t* out, size_t capacity);
 size_t writeRadioAbortPrefix(const uint8_t publisher[FINGERPRINT_LEN],
-                             uint64_t migration_id,
+                             uint64_t migration_id, uint32_t generation,
                              uint8_t* out, size_t capacity);
 CarrierResult readCarrier(const uint8_t* payload, size_t payload_len,
                           uint8_t* frame, size_t capacity, uint8_t& frame_len,

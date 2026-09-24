@@ -335,6 +335,34 @@ ReceiveResult Receiver::cancel(uint8_t dataset) {
   return RECEIVE_OK;
 }
 
+ReceiveResult Receiver::cancelThrough(uint8_t dataset, uint16_t publisher_id,
+                                      uint32_t generation) {
+  uint8_t slot = syncDatasetSlot(dataset);
+  if (slot >= SYNC_SETTINGS_DATASET_COUNT || state_[slot] == nullptr ||
+      publisher_id == 0 || generation == 0) return RECEIVE_MALFORMED;
+  for (uint8_t i = 0; i < state_[slot]->replay_count; ++i) {
+    const ReplayRecord& prior = state_[slot]->replay[i];
+    if (prior.publisher_id != publisher_id) continue;
+    if (prior.generation >= generation) {
+      Campaign& active = campaign_[slot];
+      if (active.state != RECEIVE_IDLE && active.publisher_id == publisher_id &&
+          active.generation <= generation) clear(active);
+      return RECEIVE_OK;
+    }
+    break;
+  }
+  DatasetState next = *state_[slot];
+  uint8_t digest[DIGEST_LEN] = {};
+  if (setPublisherReplay(next, publisher_id, generation, digest) != STORE_OK ||
+      ops_.persist == nullptr ||
+      !ops_.persist(dataset, next, ops_.context)) return RECEIVE_STORAGE;
+  *state_[slot] = next;
+  Campaign& active = campaign_[slot];
+  if (active.state != RECEIVE_IDLE && active.publisher_id == publisher_id &&
+      active.generation <= generation) clear(active);
+  return RECEIVE_OK;
+}
+
 void Receiver::cancelPublisher(const uint8_t key[32]) {
   if (key == nullptr) return;
   for (uint8_t i = 0; i < SYNC_SETTINGS_DATASET_COUNT; ++i) {

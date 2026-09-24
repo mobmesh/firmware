@@ -189,6 +189,7 @@ class RadioPublisher {
   uint32_t control_id_;
   bool prepare_in_flight_;
   bool control_in_flight_;
+  uint8_t abort_sent_;
   uint8_t fallback_result_;
 
   bool save(const RadioRecord& next);

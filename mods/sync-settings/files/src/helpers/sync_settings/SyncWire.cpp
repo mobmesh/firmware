@@ -346,9 +346,11 @@ WireResult readRadioAbort(const uint8_t* frame, size_t len,
   if (type != RADIO_ABORT) return WIRE_TYPE_UNSUPPORTED;
   if (len != RADIO_ABORT_LEN || frame[4] != RADIO) return WIRE_MALFORMED;
   uint64_t migration_id = read64(frame + 13);
-  if (migration_id == 0) return WIRE_MALFORMED;
+  uint32_t generation = read32(frame + 21);
+  if (migration_id == 0 || generation == 0) return WIRE_MALFORMED;
   out.publisher = frame + 5;
   out.migration_id = migration_id;
+  out.generation = generation;
   out.signature = frame + RADIO_ABORT_SIGNED_LEN;
   return WIRE_OK;
 }
@@ -437,14 +439,15 @@ size_t writeRadioConfirmPrefix(const uint8_t publisher[FINGERPRINT_LEN],
 }
 
 size_t writeRadioAbortPrefix(const uint8_t publisher[FINGERPRINT_LEN],
-                             uint64_t migration_id,
+                             uint64_t migration_id, uint32_t generation,
                              uint8_t* out, size_t capacity) {
-  if (publisher == nullptr || migration_id == 0 || out == nullptr ||
-      capacity < RADIO_ABORT_LEN) return 0;
+  if (publisher == nullptr || migration_id == 0 || generation == 0 ||
+      out == nullptr || capacity < RADIO_ABORT_LEN) return 0;
   preamble(out, RADIO_ABORT);
   out[4] = RADIO;
   memcpy(out + 5, publisher, FINGERPRINT_LEN);
   write64(out + 13, migration_id);
+  write32(out + 21, generation);
   return RADIO_ABORT_SIGNED_LEN;
 }
 

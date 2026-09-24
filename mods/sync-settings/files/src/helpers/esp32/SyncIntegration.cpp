@@ -609,8 +609,8 @@ static bool radioControl(const RadioRecord& record, bool aborting,
   uint8_t fingerprint[DIGEST_LEN];
   hash(record.local_key, sizeof(record.local_key), fingerprint, nullptr);
   size_t signed_len = aborting
-      ? writeRadioAbortPrefix(fingerprint, record.migration_id, frame,
-                              sizeof(frame))
+      ? writeRadioAbortPrefix(fingerprint, record.migration_id,
+                              record.latest_generation, frame, sizeof(frame))
       : writeRadioConfirmPrefix(fingerprint, record.migration_id,
                                 record.target_digest, record.cutover, frame,
                                 sizeof(frame));
@@ -852,15 +852,18 @@ static const Publisher* radioPublisher(const uint8_t fingerprint[FINGERPRINT_LEN
   return found;
 }
 
+static ReceiveResult cancelRadioThrough(uint16_t publisher_id,
+                                        uint32_t generation);
+
 static bool handleRadioControl(const InboxFrame& frame) {
   uint8_t type = 0;
   if (classify(frame.data, frame.len, type) != WIRE_OK ||
       (type != RADIO_CONFIRM && type != RADIO_ABORT)) return false;
-  const RadioStage& staged = radioMigration().staged();
-  if (!radioMigration().active() || staged.scoped != frame.scoped ||
-      (frame.scoped && memcmp(staged.route_key, frame.key, 16) != 0)) return true;
-
   if (type == RADIO_CONFIRM) {
+    if (!radioMigration().active()) return true;
+    const RadioStage& staged = radioMigration().staged();
+    if (staged.scoped != frame.scoped ||
+        (frame.scoped && memcmp(staged.route_key, frame.key, 16) != 0)) return true;
     RadioConfirmView value;
     if (readRadioConfirm(frame.data, frame.len, value) != WIRE_OK) return true;
     const Publisher* publisher = radioPublisher(value.publisher);
@@ -872,10 +875,24 @@ static bool handleRadioControl(const InboxFrame& frame) {
     RadioAbortView value;
     if (readRadioAbort(frame.data, frame.len, value) != WIRE_OK) return true;
     const Publisher* publisher = radioPublisher(value.publisher);
-    if (publisher == nullptr || publisher->id != staged.publisher_id ||
+    if (publisher == nullptr ||
         !verifyFrame(publisher->key, frame.data, RADIO_ABORT_SIGNED_LEN,
                      value.signature, nullptr)) return true;
-    radioMigration().abort(value.migration_id);
+    bool active = radioMigration().active();
+    if (active) {
+      const RadioStage& staged = radioMigration().staged();
+      if (publisher->id != staged.publisher_id ||
+          staged.payload.migration_id != value.migration_id ||
+          value.generation < staged.generation ||
+          staged.scoped != frame.scoped ||
+          (frame.scoped && memcmp(staged.route_key, frame.key, 16) != 0)) {
+        return true;
+      }
+    }
+    if (cancelRadioThrough(publisher->id, value.generation) != RECEIVE_OK) {
+      return true;
+    }
+    if (active) radioMigration().abort(value.migration_id);
   }
   return true;
 }
@@ -1281,6 +1298,11 @@ static Receiver receiver(
     nullptr,
 #endif
     receive_ops);
+
+static ReceiveResult cancelRadioThrough(uint16_t publisher_id,
+                                        uint32_t generation) {
+  return receiver.cancelThrough(RADIO, publisher_id, generation);
+}
 
 static bool eraseStoredReplay(PairPaths& paths, uint8_t type, uint16_t id,
                               DatasetState* resident, bool resident_ready,
@@ -2297,6 +2319,7 @@ static bool radioEnable(bool enabled_value, char* reply) {
     radio_record = next;
     projectRadioState();
     if (!enabled_value) memset(&radio_arm, 0, sizeof(radio_arm));
+    if (!enabled_value) receiver.cancel(RADIO);
     if (stop_receiver) {
       RadioMigrationResult result = radioMigration().abort(
           radioMigration().staged().payload.migration_id);
@@ -3053,6 +3076,7 @@ static bool radioPublishPlanCommand(char* command, bool arm, char* reply) {
 
 static bool radioAbortCommand(char* reply) {
   memset(&radio_arm, 0, sizeof(radio_arm));
+  bool cancelled_receive = receiver.cancel(RADIO) == RECEIVE_OK;
   if (radioPublisherMachine().active()) {
     RadioPublisherResult result = radioPublisherMachine().abort(millis());
     strcpy(reply, result == RADIO_PUB_OK ? "OK" :
@@ -3068,7 +3092,7 @@ static bool radioAbortCommand(char* reply) {
                   result == RADIO_MIG_STORAGE ? "Err - storage" : "Err - native");
     return true;
   }
-  strcpy(reply, "Err - no campaign");
+  strcpy(reply, cancelled_receive ? "OK" : "Err - no campaign");
   return true;
 }
 

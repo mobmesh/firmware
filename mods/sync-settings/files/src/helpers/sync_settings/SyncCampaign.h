@@ -118,6 +118,8 @@ class Receiver {
                      const uint8_t* route_key = nullptr, uint8_t hops = 0);
   void tick(uint32_t now_ms);
   ReceiveResult cancel(uint8_t dataset);
+  ReceiveResult cancelThrough(uint8_t dataset, uint16_t publisher_id,
+                              uint32_t generation);
   void cancelPublisher(const uint8_t key[32]);
   ReceiveResult finish(uint8_t dataset);
   const Campaign& campaign(uint8_t dataset) const;
