@@ -72,7 +72,6 @@ struct TxState {
   uint8_t chunks;
   uint8_t rounds;
   uint8_t rounds_done;
-  bool one_shot;
   bool round_open;
   uint8_t frame;
   uint8_t attempts;

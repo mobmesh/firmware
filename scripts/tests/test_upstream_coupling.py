@@ -199,26 +199,35 @@ class UpstreamCouplingTestCase(unittest.TestCase):
     def test_radio_campaign_adapters_exist_in_both_roles(self):
         header = Path(REPO_ROOT, "mods/shim/files/src/helpers/ModHooks.h").read_text()
         self.assertIn("bool modRadioPrefsGet(ModRadioValues* out);", header)
-        self.assertIn("bool modRandomFill(uint8_t* out, size_t len);", header)
+        self.assertNotIn("modRandomFill", header)
         source = added_source(
             Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
         )
         for role in ("simple_repeater", "simple_room_server"):
             body = source[f"examples/{role}/MyMesh.cpp"]
             self.assertIn("bool modRadioPrefsGet(ModRadioValues* out)", body)
-            self.assertIn("esp_fill_random(out, len);", body)
+            self.assertNotIn("modRandomFill", body)
+
+        integration = Path(
+            REPO_ROOT,
+            "mods/sync-settings/files/src/helpers/esp32/SyncIntegration.cpp",
+        ).read_text()
+        self.assertIn("esp_fill_random(&plan.payload.migration_id", integration)
 
     def test_owner_marker_is_a_bounded_repeater_reply_hook(self):
         header = Path(REPO_ROOT, "mods/shim/files/src/helpers/ModHooks.h").read_text()
-        self.assertIn("void modAppendOwnerInfo(char* out, size_t capacity);", header)
+        self.assertIn("size_t modOwnerInfoMarker(uint8_t out[4]);", header)
+        self.assertNotIn("modAppendOwnerInfo", header)
         source = added_source(
             Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
         )
         repeater = source["examples/simple_repeater/MyMesh.cpp"]
         room = source["examples/simple_room_server/MyMesh.cpp"]
-        self.assertEqual(repeater.count("modAppendOwnerInfo("), 1)
+        self.assertEqual(repeater.count("modOwnerInfoMarker("), 1)
+        self.assertIn("uint8_t marker[4]", repeater)
+        self.assertIn("marker_len == sizeof(marker)", repeater)
         self.assertIn("#ifdef MOD_WITH_OWNER_INFO_HOOK", repeater)
-        self.assertNotIn("modAppendOwnerInfo(", room)
+        self.assertNotIn("modOwnerInfoMarker(", room)
 
         generator = Path(REPO_ROOT, "scripts/generate-board-config.py").read_text()
         self.assertIn("has_owner_info_hook = any(", generator)
@@ -228,6 +237,8 @@ class UpstreamCouplingTestCase(unittest.TestCase):
             REPO_ROOT,
             "mods/sync-settings/files/src/helpers/esp32/SyncIntegration.cpp",
         ).read_text()
+        self.assertIn("size_t syncOwnerInfoMarker(uint8_t out[4])", integration)
+        self.assertNotIn("syncOwnerInfo(char*", integration)
         self.assertIn("8 + 31 + 1 + 119 + 4 + 2 + 15 <= MAX_PACKET_PAYLOAD", integration)
         self.assertIn("{0xf0, 0x9f, 0x93, 0xa1}", integration)
         self.assertIn("{0xf0, 0x9f, 0x93, 0xbb}", integration)

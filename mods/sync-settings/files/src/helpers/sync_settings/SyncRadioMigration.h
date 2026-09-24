@@ -95,6 +95,7 @@ class RadioMigration {
   uint32_t confirm_end_ms_;
   bool confirmed_;
   bool trial_fallback_;
+  uint8_t fallback_result_;
 
   bool save(const RadioRecord& next);
   bool sameStage(const RadioStage& next) const;
@@ -123,8 +124,6 @@ enum RadioPublisherResult : uint8_t {
   RADIO_PUB_OK,
   RADIO_PUB_BUSY,
   RADIO_PUB_STORAGE,
-  RADIO_PUB_NATIVE,
-  RADIO_PUB_SEND,
   RADIO_PUB_TOO_LATE,
   RADIO_PUB_MALFORMED,
 };
@@ -132,7 +131,6 @@ enum RadioPublisherResult : uint8_t {
 struct RadioPublishPlan {
   RadioPayload payload;
   RadioValues prior;
-  uint64_t migration_id;
   uint8_t target_digest[DIGEST_LEN];
   uint8_t publisher_key[32];
   uint8_t channel_len;
@@ -151,7 +149,6 @@ struct RadioPublisherOps {
   RadioPersistFn persist;
   RadioTempFn temporary;
   RadioCommitFn commit;
-  RadioReadFn read;
   RadioPrepareFn prepare;
   RadioControlFn control;
   RadioRebootFn reboot;
@@ -192,7 +189,6 @@ class RadioPublisher {
   uint32_t control_id_;
   bool prepare_in_flight_;
   bool control_in_flight_;
-  bool confirmation_sent_;
   uint8_t fallback_result_;
 
   bool save(const RadioRecord& next);

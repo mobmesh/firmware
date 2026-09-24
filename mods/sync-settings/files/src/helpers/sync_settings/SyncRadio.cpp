@@ -5,14 +5,11 @@
 namespace mobmesh {
 namespace sync {
 
-static bool crValid(uint8_t cr, bool allow_keep) {
-  return (allow_keep && cr == 0) || (cr >= 5 && cr <= 8);
-}
-
 bool radioValuesValid(const RadioValues& value, bool allow_keep_cr) {
   return value.freq_hz >= 150000000u && value.freq_hz <= 2500000000u &&
          value.bw_hz >= 7000u && value.bw_hz <= 500000u &&
-         value.sf >= 5 && value.sf <= 12 && crValid(value.cr, allow_keep_cr);
+         value.sf >= 5 && value.sf <= 12 &&
+         ((allow_keep_cr && value.cr == 0) || (value.cr >= 5 && value.cr <= 8));
 }
 
 bool radioValuesEqual(const RadioValues& first, const RadioValues& second) {
@@ -85,12 +82,24 @@ bool radioScheduleValid(const RadioSchedule& value) {
          value.campaign_duration;
 }
 
+bool radioTimelineValid(const RadioSchedule& schedule, uint32_t start,
+                        uint32_t cutover) {
+  if (!radioScheduleValid(schedule) || start == 0 || cutover <= start) return false;
+  uint64_t duration = (uint64_t)cutover - start;
+  if (duration >= 1441u * 60u ||
+      duration <= (uint32_t)schedule.campaign_interval * 60u) return false;
+  if (schedule.test_interval == 0) return true;
+  uint32_t first_test = (uint32_t)schedule.test_interval +
+                        schedule.test_window + 1u;
+  return duration >= (uint64_t)first_test * 60u;
+}
+
 bool radioPayloadValid(const RadioPayload& value, uint32_t build_epoch) {
   if (value.migration_id == 0 || !radioValuesValid(value.target, true) ||
-      !radioScheduleValid(value.schedule) || value.start == 0 ||
-      value.cutover <= value.start || value.stamp < value.start ||
+      !radioTimelineValid(value.schedule, value.start, value.cutover) ||
+      value.stamp < value.start ||
       value.stamp >= value.cutover || value.stamp < build_epoch) return false;
-  return (uint64_t)value.cutover - value.start < 1441u * 60u;
+  return true;
 }
 
 uint8_t radioResolvedCr(const RadioValues& target, const RadioValues& current) {
@@ -138,7 +147,6 @@ bool radioNextTestWindow(const RadioPayload& value, uint32_t now_ms,
   if (value.stamp > first) {
     uint32_t elapsed = value.stamp - value.start;
     uint32_t count = (elapsed + interval - 1u) / interval;
-    if (count == 0) count = 1;
     test = value.start + count * interval;
   }
   if ((uint64_t)test + window + 60u > value.cutover ||

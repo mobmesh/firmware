@@ -27,8 +27,8 @@ int modExportRegions(RegionMap* base, char* out, size_t capacity,
   return -1;
 }
 
-void modAppendOwnerInfo(char* out, size_t capacity) {
-
+size_t modOwnerInfoMarker(uint8_t out[4]) {
+  return 0;
 }
 
 void modObserveRecv(const mesh::Packet*, bool, const uint8_t*) {}

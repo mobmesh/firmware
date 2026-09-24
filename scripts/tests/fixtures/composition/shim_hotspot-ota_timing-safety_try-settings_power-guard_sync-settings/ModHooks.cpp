@@ -31,8 +31,8 @@ int modExportRegions(RegionMap* base, char* out, size_t capacity,
   return syncExportRegions(base, out, capacity, excluded_flags);
 }
 
-void modAppendOwnerInfo(char* out, size_t capacity) {
-  syncOwnerInfo(out, capacity);
+size_t modOwnerInfoMarker(uint8_t out[4]) {
+  return syncOwnerInfoMarker(out);
 }
 
 void modObserveRecv(const mesh::Packet* packet, bool accepted,

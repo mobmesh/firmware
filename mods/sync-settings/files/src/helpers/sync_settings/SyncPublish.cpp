@@ -59,7 +59,6 @@ bool Transmitter::begin(const TxStart& start, uint32_t now) {
   state->data = start.data;
   state->data_len = start.data_len;
   state->chunks = chunks;
-  state->one_shot = start.one_shot;
   state->rounds = start.one_shot ? 1 :
       (uint8_t)(((uint16_t)start.duration_days * 24u) /
                 start.interval_hours + 1u);

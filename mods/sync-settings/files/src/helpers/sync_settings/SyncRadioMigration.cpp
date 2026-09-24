@@ -12,7 +12,8 @@ static bool reached(uint32_t now, uint32_t target) {
 RadioMigration::RadioMigration(RadioRecord& record, const RadioMigrationOps& ops)
     : record_(record), ops_(ops), state_(RADIO_MIG_IDLE), sync_ms_(0),
       sync_epoch_(0), cutover_ms_(0), test_start_ms_(0), test_end_ms_(0),
-      confirm_end_ms_(0), confirmed_(false), trial_fallback_(false) {
+      confirm_end_ms_(0), confirmed_(false), trial_fallback_(false),
+      fallback_result_(RADIO_RESULT_FALLBACK) {
   memset(&stage_, 0, sizeof(stage_));
   memset(&prior_, 0, sizeof(prior_));
   memset(&target_, 0, sizeof(target_));
@@ -85,6 +86,7 @@ RadioMigrationResult RadioMigration::stage(const RadioStage& next,
       (uint32_t)next.payload.schedule.confirm_window * 60000u;
   confirmed_ = false;
   trial_fallback_ = false;
+  fallback_result_ = RADIO_RESULT_FALLBACK;
   state_ = RADIO_MIG_ARMED_R1;
   if (radioClassify(current, next.payload.target) == RADIO_RETUNE) nextTest(now_ms);
   return RADIO_MIG_OK;
@@ -106,7 +108,7 @@ RadioMigrationResult RadioMigration::confirm(
 RadioMigrationResult RadioMigration::abort(uint64_t migration_id) {
   if (!active()) return RADIO_MIG_TOO_LATE;
   if (migration_id != stage_.payload.migration_id) return RADIO_MIG_LOCKED;
-  if (state_ == RADIO_MIG_COMMITTING) return RADIO_MIG_TOO_LATE;
+  if (record_.phase == RADIO_GUARD_COMMIT_PENDING) return RADIO_MIG_TOO_LATE;
   if (state_ == RADIO_MIG_TEST_R2 || state_ == RADIO_MIG_TEST_PENDING ||
       state_ == RADIO_MIG_CONFIRM_R2 || state_ == RADIO_MIG_CUTOVER_PENDING) {
     if (ops_.temporary == nullptr ||
@@ -115,10 +117,22 @@ RadioMigrationResult RadioMigration::abort(uint64_t migration_id) {
       return RADIO_MIG_NATIVE;
     }
     trial_fallback_ = false;
+    fallback_result_ = RADIO_RESULT_ABORTED;
     state_ = RADIO_MIG_FALLBACK;
     return RADIO_MIG_OK;
   }
-  state_ = RADIO_MIG_IDLE;
+  if (state_ == RADIO_MIG_FALLBACK) {
+    trial_fallback_ = false;
+    fallback_result_ = RADIO_RESULT_ABORTED;
+    return RADIO_MIG_OK;
+  }
+  if (state_ != RADIO_MIG_ARMED_R1) return RADIO_MIG_NATIVE;
+  RadioRecord next = retained(RADIO_GUARD_IDLE, RADIO_RESULT_ABORTED);
+  if (!save(next)) {
+    state_ = RADIO_MIG_FAULT;
+    return RADIO_MIG_STORAGE;
+  }
+  state_ = RADIO_MIG_COMMITTED;
   return RADIO_MIG_OK;
 }
 
@@ -240,6 +254,7 @@ void RadioMigration::tick(uint32_t now_ms, const RadioValues& live,
         beginCommit(RADIO_RESULT_COMMITTED);
       } else {
         trial_fallback_ = false;
+        fallback_result_ = RADIO_RESULT_FALLBACK;
         state_ = RADIO_MIG_FALLBACK;
       }
     }
@@ -253,7 +268,7 @@ void RadioMigration::tick(uint32_t now_ms, const RadioValues& live,
       test_end_ms_ = 0;
       nextTest(now_ms);
     } else {
-      state_ = RADIO_MIG_IDLE;
+      finish(fallback_result_, false);
     }
   }
 }
@@ -268,8 +283,7 @@ RadioPublisher::RadioPublisher(RadioRecord& record,
       sync_epoch_(0), cutover_ms_(0), test_start_ms_(0), test_end_ms_(0),
       confirm_end_ms_(0), prepare_due_ms_(0), control_due_ms_(0),
       control_sent_ms_(0), control_id_(0), prepare_in_flight_(false),
-      control_in_flight_(false), confirmation_sent_(false),
-      fallback_result_(RADIO_RESULT_FALLBACK) {
+      control_in_flight_(false), fallback_result_(RADIO_RESULT_FALLBACK) {
   memset(&payload_, 0, sizeof(payload_));
   memset(&target_, 0, sizeof(target_));
 }
@@ -295,7 +309,6 @@ RadioPublisherResult RadioPublisher::begin(const RadioPublishPlan& plan,
                                            uint32_t now_ms) {
   if (active() || record_.phase != RADIO_GUARD_IDLE) return RADIO_PUB_BUSY;
   if (plan.payload.migration_id == 0 ||
-      plan.payload.migration_id != plan.migration_id ||
       plan.payload.stamp != now_epoch || plan.channel_len == 0 ||
       plan.channel_len > CHANNEL_MAX || plan.channel[plan.channel_len] != 0 ||
       !radioValuesValid(plan.prior, false) ||
@@ -321,7 +334,6 @@ RadioPublisherResult RadioPublisher::begin(const RadioPublishPlan& plan,
   control_id_ = 0;
   prepare_in_flight_ = false;
   control_in_flight_ = false;
-  confirmation_sent_ = false;
   fallback_result_ = RADIO_RESULT_FALLBACK;
   test_start_ms_ = 0;
   test_end_ms_ = 0;
@@ -331,7 +343,7 @@ RadioPublisherResult RadioPublisher::begin(const RadioPublishPlan& plan,
   next.phase = RADIO_GUARD_PUBLISHING;
   next.role = RADIO_ROLE_PUBLISHER;
   next.publisher_id = 0;
-  next.migration_id = plan.migration_id;
+  next.migration_id = plan.payload.migration_id;
   next.target = plan.payload.target;
   next.resolved_cr = target_.cr;
   next.prior = plan.prior;
@@ -450,7 +462,7 @@ void RadioPublisher::beginFallback(uint8_t result) {
 
 RadioPublisherResult RadioPublisher::abort(uint32_t now_ms) {
   if (!active()) return RADIO_PUB_BUSY;
-  if (state_ == RADIO_PUB_COMMITTING) return RADIO_PUB_TOO_LATE;
+  if (record_.phase == RADIO_GUARD_COMMIT_PENDING) return RADIO_PUB_TOO_LATE;
   RadioRecord next = record_;
   next.phase = RADIO_GUARD_ABORT_PENDING;
   if (!save(next)) return RADIO_PUB_STORAGE;
@@ -470,11 +482,10 @@ void RadioPublisher::roundFinished(bool success, uint32_t now_ms) {
 
 void RadioPublisher::complete(uint32_t packet_id, bool success,
                               uint32_t now_ms) {
-  if (!control_in_flight_ || packet_id == 0 || packet_id != control_id_) return;
+  if (!control_in_flight_ || packet_id != control_id_) return;
   control_in_flight_ = false;
   if (state_ == RADIO_PUB_CONFIRM_R2) {
     if (success) {
-      confirmation_sent_ = true;
       if ((record_.flags & RADIO_FLAG_CONFIRM_TX) == 0) {
         RadioRecord next = record_;
         next.flags |= RADIO_FLAG_CONFIRM_TX;
@@ -565,7 +576,8 @@ void RadioPublisher::tick(uint32_t now_ms, const RadioValues& live,
     }
     if (reached(now_ms, confirm_end_ms_)) {
       control_in_flight_ = false;
-      if (state_ == RADIO_PUB_CONFIRM_R2 && confirmation_sent_ &&
+      if (state_ == RADIO_PUB_CONFIRM_R2 &&
+          (record_.flags & RADIO_FLAG_CONFIRM_TX) != 0 &&
           radioValuesEqual(live, target_) && temporary) beginCommit();
       else beginFallback(RADIO_RESULT_FALLBACK);
       return;

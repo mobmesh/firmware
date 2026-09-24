@@ -277,7 +277,7 @@ def render_mod_hooks(integrations: list) -> str:
         f"{region_exports[0]}(base, out, capacity, excluded_flags)"
         if region_exports else "-1"
     )
-    owner_info_call = f"  {owner_infos[0]}(out, capacity);" if owner_infos else ""
+    owner_info_call = f"return {owner_infos[0]}(out);" if owner_infos else "return 0;"
     recv_block = (
         "void modObserveRecv(const mesh::Packet* packet, bool accepted,\n"
         "                    const uint8_t scope_key[16]) {\n"
@@ -319,8 +319,8 @@ int modExportRegions(RegionMap* base, char* out, size_t capacity,
   return {region_export_call};
 }}
 
-void modAppendOwnerInfo(char* out, size_t capacity) {{
-{owner_info_call}
+size_t modOwnerInfoMarker(uint8_t out[4]) {{
+  {owner_info_call}
 }}
 
 {recv_block}

@@ -8,6 +8,7 @@
 #include <helpers/sync_settings/SyncStore.h>
 
 #include <Arduino.h>
+#include <esp_system.h>
 #if CONFIG_IDF_TARGET_ESP32C3
 #include "esp32c3/rom/miniz.h"
 #elif CONFIG_IDF_TARGET_ESP32S3
@@ -623,8 +624,8 @@ static bool radioControl(const RadioRecord& record, bool aborting,
 
 static RadioPublisher& radioPublisherMachine() {
   static const RadioPublisherOps ops = {
-      radioPersist, radioTemporary, radioCommit, radioRead, radioPrepare,
-      radioControl, radioReboot, nullptr};
+      radioPersist, radioTemporary, radioCommit, radioPrepare, radioControl,
+      radioReboot, nullptr};
   static RadioPublisher value(radio_record, ops);
   return value;
 }
@@ -851,31 +852,27 @@ static const Publisher* radioPublisher(const uint8_t fingerprint[FINGERPRINT_LEN
   return found;
 }
 
-static bool radioScopeMatches(const InboxFrame& frame) {
-  const RadioStage& staged = radioMigration().staged();
-  return staged.scoped == frame.scoped &&
-         (!frame.scoped || memcmp(staged.route_key, frame.key, 16) == 0);
-}
-
 static bool handleRadioControl(const InboxFrame& frame) {
   uint8_t type = 0;
   if (classify(frame.data, frame.len, type) != WIRE_OK ||
       (type != RADIO_CONFIRM && type != RADIO_ABORT)) return false;
-  if (!radioMigration().active() || !radioScopeMatches(frame)) return true;
-
-  const Publisher* publisher = radioPublisher(frame.data + 5);
-  if (publisher == nullptr ||
-      publisher->id != radioMigration().staged().publisher_id) return true;
+  const RadioStage& staged = radioMigration().staged();
+  if (!radioMigration().active() || staged.scoped != frame.scoped ||
+      (frame.scoped && memcmp(staged.route_key, frame.key, 16) != 0)) return true;
 
   if (type == RADIO_CONFIRM) {
     RadioConfirmView value;
-    if (readRadioConfirm(frame.data, frame.len, value) != WIRE_OK ||
+    if (readRadioConfirm(frame.data, frame.len, value) != WIRE_OK) return true;
+    const Publisher* publisher = radioPublisher(value.publisher);
+    if (publisher == nullptr || publisher->id != staged.publisher_id ||
         !verifyFrame(publisher->key, frame.data, RADIO_CONFIRM_SIGNED_LEN,
                      value.signature, nullptr)) return true;
     radioMigration().confirm(value.migration_id, value.target_digest, value.cutover);
   } else {
     RadioAbortView value;
-    if (readRadioAbort(frame.data, frame.len, value) != WIRE_OK ||
+    if (readRadioAbort(frame.data, frame.len, value) != WIRE_OK) return true;
+    const Publisher* publisher = radioPublisher(value.publisher);
+    if (publisher == nullptr || publisher->id != staged.publisher_id ||
         !verifyFrame(publisher->key, frame.data, RADIO_ABORT_SIGNED_LEN,
                      value.signature, nullptr)) return true;
     radioMigration().abort(value.migration_id);
@@ -2287,13 +2284,10 @@ static bool radioEnable(bool enabled_value, char* reply) {
     strcpy(reply, "Err - locked; use sync.radio publish.abort");
     return true;
   }
-  if (!enabled_value && radioMigration().active()) {
-    RadioMigrationResult result = radioMigration().abort(
-        radioMigration().staged().payload.migration_id);
-    if (result != RADIO_MIG_OK) {
-      strcpy(reply, "Err - native");
-      return true;
-    }
+  bool stop_receiver = !enabled_value && radioMigration().active();
+  if (stop_receiver && radio_record.phase == RADIO_GUARD_COMMIT_PENDING) {
+    strcpy(reply, "Err - too late");
+    return true;
   }
   RadioRecord next = radio_record;
   next.enabled = enabled_value;
@@ -2303,7 +2297,15 @@ static bool radioEnable(bool enabled_value, char* reply) {
     radio_record = next;
     projectRadioState();
     if (!enabled_value) memset(&radio_arm, 0, sizeof(radio_arm));
-    strcpy(reply, "OK");
+    if (stop_receiver) {
+      RadioMigrationResult result = radioMigration().abort(
+          radioMigration().staged().payload.migration_id);
+      strcpy(reply, result == RADIO_MIG_OK ? "OK" :
+                    result == RADIO_MIG_STORAGE ? "Err - storage" :
+                    "Err - native");
+    } else {
+      strcpy(reply, "OK");
+    }
   }
   return true;
 }
@@ -2969,8 +2971,7 @@ static bool radioPublishPlanCommand(char* command, bool arm, char* reply) {
   uint32_t cutover = parsed.timed
       ? parsed.cutover
       : now + (uint32_t)parsed.schedule.campaign_duration * 60u;
-  uint32_t duration = cutover - now;
-  if (cutover <= now || duration == 0 || duration >= 1441u * 60u) {
+  if (!radioTimelineValid(parsed.schedule, now, cutover)) {
     radioPlanSyntax(arm, reply);
     return true;
   }
@@ -3020,13 +3021,8 @@ static bool radioPublishPlanCommand(char* command, bool arm, char* reply) {
   plan.payload.schedule = parsed.schedule;
   plan.prior = prior;
   do {
-    if (!modRandomFill((uint8_t*)&plan.migration_id,
-                       sizeof(plan.migration_id))) {
-      strcpy(reply, "Err - random");
-      return true;
-    }
-  } while (plan.migration_id == 0);
-  plan.payload.migration_id = plan.migration_id;
+    esp_fill_random(&plan.payload.migration_id, sizeof(plan.payload.migration_id));
+  } while (plan.payload.migration_id == 0);
   uint8_t encoded[RADIO_PAYLOAD_LEN];
   if (writeRadioPayload(plan.payload, MOBMESH_BUILD_EPOCH, encoded,
                         sizeof(encoded)) != sizeof(encoded)) {
@@ -3050,7 +3046,7 @@ static bool radioPublishPlanCommand(char* command, bool arm, char* reply) {
   }
   memset(&radio_arm, 0, sizeof(radio_arm));
   snprintf(reply, 160, "OK - migration %llx T %lu",
-           (unsigned long long)plan.migration_id,
+           (unsigned long long)plan.payload.migration_id,
            (unsigned long)cutover);
   return true;
 }
@@ -3068,7 +3064,8 @@ static bool radioAbortCommand(char* reply) {
     RadioMigrationResult result = radioMigration().abort(
         radioMigration().staged().payload.migration_id);
     strcpy(reply, result == RADIO_MIG_OK ? "OK" :
-                  result == RADIO_MIG_TOO_LATE ? "Err - too late" : "Err - native");
+                  result == RADIO_MIG_TOO_LATE ? "Err - too late" :
+                  result == RADIO_MIG_STORAGE ? "Err - storage" : "Err - native");
     return true;
   }
   strcpy(reply, "Err - no campaign");
@@ -3434,24 +3431,22 @@ int syncExportRegions(RegionMap* base, char* out, size_t capacity,
 #endif
 }
 
-void syncOwnerInfo(char* out, size_t capacity) {
+size_t syncOwnerInfoMarker(uint8_t out[4]) {
 #if SYNC_SETTINGS_WITH_RADIO
   static_assert(8 + 31 + 1 + 119 + 4 + 2 + 15 <= MAX_PACKET_PAYLOAD,
                 "owner marker must fit the anonymous reply");
   static const uint8_t ready[] = {0xf0, 0x9f, 0x93, 0xa1};
   static const uint8_t armed[] = {0xf0, 0x9f, 0x93, 0xbb};
-  if (out == nullptr || capacity == 0) return;
-  size_t length = strnlen(out, capacity);
-  if (length == capacity || length + sizeof(ready) >= capacity) return;
+  if (out == nullptr) return 0;
   const uint8_t* marker = mobmesh::sync::radio_ready &&
                                   mobmesh::sync::radioMigration().awaitingCutover()
                               ? armed
                               : ready;
-  memcpy(out + length, marker, sizeof(ready));
-  out[length + sizeof(ready)] = 0;
+  memcpy(out, marker, sizeof(ready));
+  return sizeof(ready);
 #else
   (void)out;
-  (void)capacity;
+  return 0;
 #endif
 }
 
