@@ -509,7 +509,7 @@ void RadioPublisher::complete(uint32_t packet_id, bool success,
         if (!save(next)) state_ = RADIO_PUB_FAULT;
       }
     } else {
-      control_due_ms_ = now_ms;
+      control_due_ms_ = now_ms + RADIO_RETRY_MS;
     }
   } else if (state_ == RADIO_PUB_ABORTING) {
     if (success) {
@@ -522,7 +522,7 @@ void RadioPublisher::complete(uint32_t packet_id, bool success,
         control_due_ms_ = now_ms + RADIO_ABORT_INTERVAL_MS;
       }
     }
-    else control_due_ms_ = now_ms;
+    else control_due_ms_ = now_ms + RADIO_RETRY_MS;
   }
 }
 
