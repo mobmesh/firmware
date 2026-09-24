@@ -2128,56 +2128,7 @@
 						}
 					}
 				},
-				{
-					"title": "[R8] Companion radio",
-					"class": "community",
-					"role": "companionBle",
-					"github": {
-						"type": "companion",
-						"files": {
-							"flash-wipe": "heltec_v4_r8_companion_radio_ble.*?-merged\\.bin",
-							"flash-update": "heltec_v4_r8_companion_radio_ble.*?-[a-f0-9]{7}\\.bin"
-						}
-					}
-				},
-				{
-					"title": "[R8] Companion radio",
-					"class": "community",
-					"role": "companionUsb",
-					"github": {
-						"type": "companion",
-						"files": {
-							"flash-wipe": "heltec_v4_r8_companion_radio_usb.*?-merged\\.bin",
-							"flash-update": "heltec_v4_r8_companion_radio_usb.*?-[a-f0-9]{7}\\.bin"
-						}
-					}
-				},
-				{
-					"title": "[R8] Repeater",
-					"class": "community",
-					"role": "repeater",
-					"notice": "otafixRecommended",
-					"github": {
-						"type": "repeater",
-						"files": {
-							"flash-wipe": "heltec_v4_r8_[rR]epeater.*?-merged\\.bin",
-							"flash-update": "heltec_v4_r8_[rR]epeater.*?-[a-f0-9]{7}\\.bin"
-						}
-					}
-				},
-				{
-					"title": "[R8] Room Server",
-					"class": "community",
-					"role": "roomServer",
-					"notice": "otafixRecommended",
-					"github": {
-						"type": "room-server",
-						"files": {
-							"flash-wipe": "heltec_v4_r8_room_server.*?-merged\\.bin",
-							"flash-update": "heltec_v4_r8_room_server.*?-[a-f0-9]{7}\\.bin"
-						}
-					}
-				},
+
 				{
 					"class": "community",
 					"role": "kissRadio",
@@ -2196,6 +2147,65 @@
 									"title": "App firmware bin"
 								}
 							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"maker": "heltec",
+			"name": "Heltec v4 R8",
+			"icon": "/img/lora.svg",
+			"type": "esp32",
+			"tooltip": "<img class='device' src='/img/heltec_v4.svg'>",
+			"firmware": [
+				{
+					"title": "Companion radio",
+					"class": "community",
+					"role": "companionBle",
+					"github": {
+						"type": "companion",
+						"files": {
+							"flash-wipe": "heltec_v4_r8_companion_radio_ble.*?-merged\\.bin",
+							"flash-update": "heltec_v4_r8_companion_radio_ble.*?-[a-f0-9]{7}\\.bin"
+						}
+					}
+				},
+				{
+					"title": "Companion radio",
+					"class": "community",
+					"role": "companionUsb",
+					"github": {
+						"type": "companion",
+						"files": {
+							"flash-wipe": "heltec_v4_r8_companion_radio_usb.*?-merged\\.bin",
+							"flash-update": "heltec_v4_r8_companion_radio_usb.*?-[a-f0-9]{7}\\.bin"
+						}
+					}
+				},
+				{
+					"title": "Repeater",
+					"class": "community",
+					"role": "repeater",
+					"notice": "otafixRecommended",
+					"github": {
+						"type": "repeater",
+						"files": {
+							"flash-wipe": "heltec_v4_r8_[rR]epeater.*?-merged\\.bin",
+							"flash-update": "heltec_v4_r8_[rR]epeater.*?-[a-f0-9]{7}\\.bin"
+						}
+					}
+				},
+				{
+					"title": "Room Server",
+					"class": "community",
+					"role": "roomServer",
+					"notice": "otafixRecommended",
+					"github": {
+						"type": "room-server",
+						"files": {
+							"flash-wipe": "heltec_v4_r8_room_server.*?-merged\\.bin",
+							"flash-update": "heltec_v4_r8_room_server.*?-[a-f0-9]{7}\\.bin"
 						}
 					}
 				}
