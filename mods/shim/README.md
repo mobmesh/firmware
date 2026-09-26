@@ -5,8 +5,9 @@ on every pass of the main loop, when a CLI command comes in, and so on. Rather t
 have every mod patch upstream on its own, `shim` adds those call points once and
 every other mod plugs into them.
 
-On its own, shim does nothing. Build it with no other mods and you get firmware that
-behaves just like upstream.
+On its own, shim changes one thing. Build it with no other mods and you get firmware that
+behaves like upstream, except that `poweroff` and `shutdown`, which never wake, are refused
+unless a mod such as power-guard provides a version that does.
 
 ## What it touches
 

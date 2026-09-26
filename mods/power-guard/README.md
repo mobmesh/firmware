@@ -72,9 +72,9 @@ board that states nothing gets a mod that does nothing. Power saving additionall
 `POWER_GUARD_AUTO_DEFAULT` or `powersaving auto on`.
 
 Optionally bypasses the FEM LNA while power saving
-(`POWER_GUARD_AUTO_DROP_FEM_LNA: 1`, off by default): ~0.3 mA saved for ~10 dB of RX
-sensitivity, which usually is not worth it -- a repeater that hears less than it
-advertises is a routing hazard.
+(`POWER_GUARD_AUTO_DROP_FEM_LNA: 1`, off by default): about 9 mA saved at idle on a Heltec V4
+(bench, 2026-09-16) for ~10 dB of RX sensitivity. Off by default because a repeater that
+hears less than it advertises is a routing hazard.
 
 Requires the `battery_measurement` capability; `fem_lna_control` and
 `deep_sleep_rail_shutdown` are optional.
