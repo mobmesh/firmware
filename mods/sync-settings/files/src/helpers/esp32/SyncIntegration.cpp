@@ -1020,6 +1020,9 @@ static bool timeSend(uint32_t now) {
   TimeRecord reserved = time_record;
   reserved.local_generation = generation;
   memcpy(reserved.local_key, key, sizeof(key));
+  // The first sample fixes the schedule to the clock it is actually sampled from.
+  if (timeScheduleUnsent(reserved) &&
+      !timeScheduleShift(reserved, (int64_t)now - (int64_t)reserved.started)) return false;
   if (!saveTime(reserved)) return false;
   uint8_t frame[TIME_SAMPLE_LEN];
   uint8_t fingerprint[DIGEST_LEN];
@@ -1051,7 +1054,29 @@ static bool timePreflightEligible() {
 }
 #endif
 
+static uint32_t time_anchor_rtc;
+static uint32_t time_anchor_ms;
+static bool time_anchor_valid;
+
+static void timeWatchClock() {
+  uint32_t rtc = modClockGet();
+  uint32_t ms = millis();
+  if (time_ready && time_anchor_valid && time_record.active &&
+      !timeScheduleUnsent(time_record)) {
+    int64_t expected = (int64_t)time_anchor_rtc + (uint32_t)(ms - time_anchor_ms) / 1000u;
+    int64_t jump = (int64_t)rtc - expected;
+    if (jump > 60 || jump < -60) {
+      TimeRecord next = time_record;
+      if (timeScheduleShift(next, jump)) saveTime(next);
+    }
+  }
+  time_anchor_rtc = rtc;
+  time_anchor_ms = ms;
+  time_anchor_valid = true;
+}
+
 static void timeTick() {
+  timeWatchClock();
   if (!time_ready || !time_record.active) return;
   if (time_tx_pending) {
     if ((uint32_t)(millis() - time_tx_ms) < TIME_TX_TIMEOUT_MS) return;
@@ -1074,7 +1099,8 @@ static void timeTick() {
 #endif
   uint32_t now = modClockGet();
   if (!clockSane(now)) return;
-  TimeStep step = timeScheduleStep(time_record, now);
+  TimeStep step = timeScheduleUnsent(time_record) ? TIME_STEP_DUE
+                                                  : timeScheduleStep(time_record, now);
   if (step == TIME_STEP_CLOSE) {
     TimeRecord next = time_record;
     timeScheduleClear(next);

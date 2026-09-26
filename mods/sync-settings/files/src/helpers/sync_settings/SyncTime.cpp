@@ -234,6 +234,22 @@ void timeScheduleAdvance(TimeRecord& record, uint32_t now) {
   record.next_sample = next > 0xffffffffull ? 0xffffffffu : (uint32_t)next;
 }
 
+bool timeScheduleUnsent(const TimeRecord& record) {
+  return record.active && record.next_sample == record.started;
+}
+
+bool timeScheduleShift(TimeRecord& record, int64_t delta) {
+  if (!record.active) return false;
+  int64_t started = (int64_t)record.started + delta;
+  int64_t next = (int64_t)record.next_sample + delta;
+  int64_t ends = (int64_t)record.ends + delta;
+  if (started <= 0 || ends >= 0xffffffffLL || next > 0xffffffffLL) return false;
+  record.started = (uint32_t)started;
+  record.next_sample = (uint32_t)next;
+  record.ends = (uint32_t)ends;
+  return true;
+}
+
 void timeScheduleClear(TimeRecord& record) {
   record.active = false;
   record.route_kind = 0;

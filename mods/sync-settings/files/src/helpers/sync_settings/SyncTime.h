@@ -82,6 +82,8 @@ bool timeScheduleStart(TimeRecord& record, uint32_t now, bool scoped,
                        const uint8_t route_key[16], const char* channel);
 TimeStep timeScheduleStep(const TimeRecord& record, uint32_t now);
 void timeScheduleAdvance(TimeRecord& record, uint32_t now);
+bool timeScheduleUnsent(const TimeRecord& record);
+bool timeScheduleShift(TimeRecord& record, int64_t delta);
 void timeScheduleClear(TimeRecord& record);
 
 }  // namespace sync
