@@ -44,6 +44,16 @@ jobs:
             "$(python3 scripts/generate-board-config.py project-info --field ordered-mods)" \
             "$CANARY_EXTRA_MODS" | tr ' ' '\n' | awk 'NF && !seen[$0]++' | xargs)
           echo "mods: $MODS"
+          # The release build-release builds from; the command contracts are taken from it.
+          BASE=$(gh api "repos/${UPSTREAM_REPO}/releases" \
+            --jq '[.[] | select(.tag_name | startswith("repeater-v"))][0].tag_name' 2>/dev/null || true)
+          [ -n "$BASE" ] || BASE=$(git ls-remote --tags --refs "https://github.com/${UPSTREAM_REPO}.git" 'repeater-v*' \
+            | sed 's|.*refs/tags/||' | sort -V | tail -1)
+          echo "base: $BASE"
+          BOARDS=$(python3 scripts/generate-board-config.py resolve-targets \
+            | python3 -c "import json,sys; print(','.join(sorted({t['board_id'] for t in json.load(sys.stdin)['include']})))")
+          CONTRACTS=contracts.md
+          : > "$CONTRACTS"
 
           # Conflicts resolve to upstream's side, or the patch drags the old base back in.
           # Never --depth 1: three-way silently degrades without the preimage blobs.
@@ -55,6 +65,26 @@ jobs:
                 continue
               }
             sha=$(git -C probe-src rev-parse --short HEAD)
+            # Replaying the series on the release writes each patch's preimage blobs, which three-way needs.
+            rm -rf seed-src
+            git -C probe-src worktree add --quiet --detach ../seed-src "$BASE"
+            python3 scripts/generate-board-config.py copy-src \
+              --upstream seed-src --mods "$(echo $MODS | tr ' ' ',')" >/dev/null
+            python3 scripts/generate-board-config.py compose-mods \
+              --upstream seed-src --mods "$(echo $MODS | tr ' ' ',')" >/dev/null
+            git -C seed-src add -A
+            for mod in $MODS; do
+              for patch in "mods/$mod/patches"/*.patch; do
+                [ -e "$patch" ] || continue
+                if git -C seed-src apply "../$patch"; then
+                  git -C seed-src add -A
+                else
+                  echo "- \`$mod/$(basename "$patch")\` does not apply to \`$BASE\` itself -- its three-way results below are unreliable" >> "$REPORT"
+                  DRIFT=true
+                fi
+              done
+            done
+            git -C probe-src worktree remove --force ../seed-src
             python3 scripts/generate-board-config.py copy-src \
               --upstream probe-src --mods "$(echo $MODS | tr ' ' ',')" >/dev/null
             python3 scripts/generate-board-config.py compose-mods \
@@ -82,9 +112,11 @@ jobs:
                 } >> "$EXPLAIN"
 
                 err=$(git -C probe-src apply -3 "../$patch" 2>&1) || true
+                # Still missing after seeding means the patch was cut against a tree nobody can rebuild.
                 if echo "$err" | grep -q "lacks the necessary blob"; then
-                  echo "::error::probe-src lacks preimage blobs -- three-way degraded to plain apply silently; the clone must not be shallow" >&2
-                  exit 1
+                  echo "::warning::$name: preimage blob missing -- regenerate the patch against $BASE" >&2
+                  conflicted="$conflicted $name(no-preimage)"
+                  continue
                 fi
                 unmerged=$(git -C probe-src diff --name-only --diff-filter=U)
                 if [ -n "$unmerged" ]; then
@@ -104,6 +136,12 @@ jobs:
                                    || echo "dev_buildable=false" >> "$GITHUB_OUTPUT"
               rm -rf dev-src && cp -a probe-src dev-src
             fi
+            # Commands move without conflicting, so a rename or a move to another board is only visible here.
+            rc=0
+            python3 scripts/check_command_contracts.py --tree probe-src --base "$BASE" \
+              --head HEAD --ref "$ref" --boards "$BOARDS" >> "$CONTRACTS" || rc=$?
+            [ "$rc" = 2 ] && DRIFT=true
+            [ "$rc" != 0 ] && [ "$rc" != 2 ] && echo "- \`$ref\`: command contract check **crashed** (exit $rc) -- see the run log" >> "$CONTRACTS"
             if [ -z "$placed$conflicted" ]; then
               echo "- \`$ref\` (\`$sha\`): all patches apply" >> "$REPORT"
             else
@@ -222,6 +260,9 @@ jobs:
             fi
           fi
 
+          # --- 7. do the upstream commands our mods send or intercept still exist? --
+          cat "$CONTRACTS" >> "$REPORT"
+
           echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"
           # Appended, not merged into $REPORT: the explanations are collapsed detail under
           # the summary lines, and only exist when something failed.
@@ -232,6 +273,7 @@ jobs:
       # Applying and compiling are different questions: a patch can apply against a tree
       # that has deleted the virtual it calls. The widest composition per upstream role,
       # since shim bridges are implemented separately in both. Drift only if vanilla builds.
+      # One build per chip family too: toolchains break separately, boards of one family rarely do.
       - id: buildcheck
         name: Build the patched tree against dev
         if: steps.probe.outputs.dev_buildable == 'true'
@@ -242,17 +284,26 @@ jobs:
           # preprocess away the code that broke.
           FLAGS="-D 'OTA_MOD_BUILD_DATE=\"canary\"' -D 'OTA_MOD_SHORT_SHA=\"canary\"' -D MOBMESH_BUILD_EPOCH=$(date -u +%s) -D POWER_GUARD_AUTO_DROP_FEM_LNA=1"
           SPECS=$(python3 scripts/generate-board-config.py resolve-targets | python3 -c "
-          import json, os, sys
+          import json, os, sys, yaml
           targets = json.load(sys.stdin)['include']
           extras = os.environ.get('CANARY_EXTRA_MODS', '').split()
-          for role in sorted({t['role'] for t in targets}):
-              t = max((x for x in targets if x['role'] == role), key=lambda x: len(x['mods']))
+          def family(board):
+              with open(f'variants/{board}/overrides.yaml') as f:
+                  return ((yaml.safe_load(f) or {}).get('qemu') or {}).get('mcu') or board
+          groups = {}
+          for t in targets:
+              groups.setdefault((t['role'], family(t['board_id'])), []).append(t)
+          for key in sorted(groups):
+              t = max(groups[key], key=lambda x: len(x['mods']))
               mods = list(dict.fromkeys(t['mods'] + extras))
               print('|'.join([','.join(mods), t['board_id'], t['build_env']]))
           ")
           FAILED=""
           for SPEC in $SPECS; do
             mods=${SPEC%%|*}; rest=${SPEC#*|}; board=${rest%%|*}; env=${rest##*|}
+            # The probe composed hooks for the union of mods; a target without one of them cannot link that.
+            rm -f dev-src/src/helpers/ModHooks.cpp dev-src/src/helpers/esp32/CommonCliMods.cpp
+            python3 scripts/generate-board-config.py compose-mods --upstream dev-src --mods "$mods" >/dev/null
             python3 scripts/generate-board-config.py inject-env \
               --board "$board" --env "$env" \
               --platformio-ini "dev-src/variants/$board/platformio.ini" --mods "$mods"
