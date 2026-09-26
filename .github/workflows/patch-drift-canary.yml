@@ -1,4 +1,4 @@
-# Early warning for patch drift. Never builds, never publishes.
+# Early warning for patch and integration drift. Never publishes.
 #
 # build-release only notices drift when upstream tags a release, so this probes the moving
 # branches daily. It also flags patches duplicating a merged fix, which still apply cleanly.

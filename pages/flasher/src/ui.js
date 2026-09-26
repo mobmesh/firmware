@@ -639,9 +639,8 @@ function renderLocation(step) {
     field.addEventListener('input', () => { draft[key] = field.value; refreshContinue(); });
   }
 
-  // There is no `get` for the admin password, so an Upgrade cannot show the real one and
-  // cannot tell whether it changed. A placeholder says one is set; touching the field
-  // clears it, and leaving it alone sends no `password` command at all.
+  // There is no `get` for the admin password. A placeholder means one is set; leaving it
+  // untouched sends no `password` command.
   const passwordField = form.querySelector('#admin-password');
   const passwordNote = form.querySelector('#password-note');
   // The map is not a form field, so its expand control is what a validation message

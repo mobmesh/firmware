@@ -32,8 +32,7 @@ static uint32_t boot_time_ms = 0;
 static bool confirmed_or_not_applicable = false;
 static uint32_t last_confirm_attempt_ms = 0;
 
-// begin() runs deep in MeshCore's init chain, where a SPIFFS write added enough stack depth to
-// reproduce the handleGetCmd() boot instability (987639c). Deferred to poll(), called shallower.
+// Defer the SPIFFS write to poll() to avoid adding stack depth inside MeshCore's init chain.
 static char pending_version[24] = {0};
 static bool version_write_pending = false;
 

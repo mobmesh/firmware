@@ -28,12 +28,10 @@
 #define OTA_NTP_VERIFY_ATTEMPTS   2
 #define OTA_WAN_RESTORE_ATTEMPTS  2
 
-// CI scans the built image for this, so the mod's bit is evidence it compiled in rather than a
-// claim from build config. Keep it referenced: --gc-sections drops an unreferenced string.
+// Keep referenced: --gc-sections drops an unreferenced build marker.
 static const char OTA_MOD_MARKER[] = "H0TSP0T";   // must never change
 
-// 80 bytes CI writes into esp_app_desc_t's reserved tail -- patch_ota_metadata.py. Fixed
-// offset, so no scan window and no sidecar carrying where the marker happened to land.
+// Metadata occupies 80 bytes at a fixed offset in esp_app_desc_t's reserved tail.
 #define OTA_META_OFFSET        208
 #define OTA_META_LEN           80
 #define OTA_META_MIN_BYTES     (OTA_META_OFFSET + OTA_META_LEN)   // decided in the first packet

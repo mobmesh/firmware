@@ -87,10 +87,8 @@ export function detectFileSystemAccessSupport() {
   return typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function';
 }
 
-// Brave is the one Chromium browser that ships this disabled by default — a privacy
-// decision on their end, not a bug — and its UA string doesn't self-identify (see
-// `detectBrowserKind`, which folds it into 'chromium'), so the copy names both causes
-// rather than guessing which one applies.
+// Brave disables this API by default and does not identify itself in the UA, so the copy
+// explains both the missing API and Brave's setting.
 const FILE_SYSTEM_ACCESS_COPY = {
   title: 'This browser can’t save the bootloader file directly',
   body:
