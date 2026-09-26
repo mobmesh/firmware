@@ -18,6 +18,7 @@ struct ModCliContext {
 bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
 void modLoop();                            // called first in loop()
 bool modWantsPowerSaving();                // OR'd with the operator's powersaving_enabled
+bool modLoadAllowed();                     // AND of mods that veto a heavy load; true when none
 void modBeforeDeepSleep();                 // before a mod's own sleep while the radio is not running
 
 struct ModRegionMatch {

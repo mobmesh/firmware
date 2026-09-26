@@ -190,7 +190,8 @@ it restores WiFi first and hotspot power second, then verifies both match their 
 The command queues the work and returns immediately. When it finishes, `get ota.status` shows
 `wan-complete` whether verification passed or failed; `get ota.wan.health` holds the result.
 A reboot cancels the check; it does not automatically power hardware or rejoin WiFi during
-startup.
+startup. Where power-guard is installed, `ota wan join`, `ota wan verify` and OTA updates refuse
+with `ERR: battery low; hotspot not powered` while the battery is below its resume level.
 
 `get ota.wan.health` reports `WAN_0|NTP_0`, `WAN_1|NTP_0`, `WAN_1|NTP_1`, or
 `RESTORE_FAULT`, plus `proven=yes|no`. A successful result stays proven across later transient

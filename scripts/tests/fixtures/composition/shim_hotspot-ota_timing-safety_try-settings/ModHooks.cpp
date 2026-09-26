@@ -39,6 +39,10 @@ bool modWantsPowerSaving() {
   return false;
 }
 
+bool modLoadAllowed() {
+  return true;
+}
+
 void modBeforeDeepSleep() {
 }
 

@@ -99,6 +99,16 @@ bool powerGuardWantsPowerSaving() {
   return power_guard.isActive();
 }
 
+// No reading means no battery to protect, as in the policy loop.
+bool powerGuardLoadAllowed() {
+#if POWER_GUARD_RESUME_MV > 0
+  uint16_t mv = modBoardBattMilliVolts();
+  return mv == 0 || mv >= POWER_GUARD_RESUME_MV;
+#else
+  return true;
+#endif
+}
+
 void powerGuardBeforeDeepSleep() {
 #ifdef POWER_GUARD_HAS_POWERDOWN
   powerGuardDownPreRadio();   // self-contained SPI, so it works whether or not radio_init() began the bus

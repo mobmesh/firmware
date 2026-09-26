@@ -42,6 +42,10 @@ bool modWantsPowerSaving() {
   return powerGuardWantsPowerSaving();
 }
 
+bool modLoadAllowed() {
+  return powerGuardLoadAllowed();
+}
+
 void modBeforeDeepSleep() {
   powerGuardBeforeDeepSleep();
 }

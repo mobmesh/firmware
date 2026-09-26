@@ -794,6 +794,10 @@ bool HotspotOTA::start(const HotspotOtaConfig& cfg, char reply[]) {
     strcpy(reply, "ERR: ota.wan.wifi not configured");
     return false;
   }
+  if (!modLoadAllowed()) {
+    strcpy(reply, "ERR: battery low; hotspot not powered");
+    return false;
+  }
   // On probation the other slot holds the only known-good firmware; overwriting it trades a
   // recoverable bad update for a brick. The reply names the retry time, so it reads as a wait.
   RollbackGuard::ProbationState probation = RollbackGuard::probation();
@@ -994,6 +998,10 @@ bool HotspotOTA::wifiConnect(char reply[]) {
     strcpy(reply, "ERR: ota.wan.wifi not configured");
     return false;
   }
+  if (!modLoadAllowed()) {
+    strcpy(reply, "ERR: battery low; hotspot not powered");
+    return false;
+  }
 
   pinMode(PIN_HOTSPOT_PWR, OUTPUT);
   digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // hotspot needs power before its AP exists to join
@@ -1034,6 +1042,10 @@ bool HotspotOTA::verifyWan(char reply[]) {
   HotspotOTA::loadConfig(cfg);
   if (cfg.ssid[0] == 0) {
     strcpy(reply, "ERR: ota.wan.wifi not configured");
+    return false;
+  }
+  if (!modLoadAllowed()) {
+    strcpy(reply, "ERR: battery low; hotspot not powered");
     return false;
   }
 
