@@ -1,0 +1,59 @@
+#pragma once
+
+#include "SyncStore.h"
+
+namespace mobmesh {
+namespace sync {
+
+static const size_t TIME_RECORD_LEN = 97;
+static const uint16_t TIME_TOLERANCE_DEFAULT = 20;
+static const uint16_t TIME_INTERVAL_HOURS_DEFAULT = 168;
+static const uint16_t TIME_DURATION_DAYS_DEFAULT = 180;
+static const uint16_t TIME_INTERVAL_HOURS_MAX = 720;
+static const uint16_t TIME_DURATION_DAYS_MAX = 365;
+
+struct TimeRecord {
+  bool enabled;
+  uint16_t tolerance;
+  uint16_t interval_hours;
+  uint16_t duration_days;
+  uint32_t local_generation;
+  uint8_t local_key[32];
+  bool active;
+  uint8_t route_kind;
+  uint8_t route_key[16];
+  uint8_t channel_len;
+  char channel[CHANNEL_MAX + 1];
+  uint32_t started;
+  uint32_t next_sample;
+  uint32_t ends;
+  uint32_t interval_seconds;
+  uint16_t captured_tolerance;
+};
+
+enum TimeStep : uint8_t {
+  TIME_STEP_IDLE,
+  TIME_STEP_WAIT,
+  TIME_STEP_DUE,
+  TIME_STEP_CLOSE,
+};
+
+int64_t timeDelta(uint32_t receiver_now, uint32_t publisher_epoch);
+bool timeNeedsCorrection(uint32_t receiver_now, uint32_t publisher_epoch,
+                         uint16_t tolerance_minutes);
+
+void defaultTimeRecord(TimeRecord& record);
+StoreResult readTimeRecord(const uint8_t* data, size_t len, TimeRecord& out);
+size_t writeTimeRecord(const TimeRecord& record, uint8_t* out, size_t capacity);
+
+bool timeSettingsValid(uint16_t interval_hours, uint16_t duration_days);
+bool timeGeneration(const TimeRecord& record, const uint8_t key[32], uint32_t now,
+                    uint32_t& generation);
+bool timeScheduleStart(TimeRecord& record, uint32_t now, bool scoped,
+                       const uint8_t route_key[16], const char* channel);
+TimeStep timeScheduleStep(const TimeRecord& record, uint32_t now);
+void timeScheduleAdvance(TimeRecord& record, uint32_t now);
+void timeScheduleClear(TimeRecord& record);
+
+}  // namespace sync
+}  // namespace mobmesh

@@ -7,7 +7,8 @@ namespace sync {
 
 static const uint8_t STORE_MAGIC[] = {'S', 'Y', 'F', 'S'};
 static const uint16_t PUBLISHER_FIXED_LEN = 5;
-static const uint8_t PUBLISHER_RECORD_LEN = 35;
+static const uint8_t PUBLISHER_LEGACY_LEN = 35;
+static const uint8_t PUBLISHER_RECORD_LEN = 39;
 static const uint16_t REGION_META_LEN = 45;
 static const uint16_t STATE_FIXED_LEN = 117;
 static const uint8_t STATE_REPLAY_MAX = 16;
@@ -261,10 +262,13 @@ static StoreResult publishersValid(const Publishers& publishers) {
 }
 
 StoreResult readPublishers(const uint8_t* data, size_t len, Publishers& out) {
-  if (data == nullptr || len < PUBLISHER_FIXED_LEN || data[0] > PUBLISHER_MAX ||
-      len != PUBLISHER_FIXED_LEN + (size_t)data[0] * PUBLISHER_RECORD_LEN) {
+  if (data == nullptr || len < PUBLISHER_FIXED_LEN || data[0] > PUBLISHER_MAX) {
     return STORE_PAYLOAD;
   }
+  // A 35-byte entry predates the TIME replay high-water, which then reads as zero.
+  size_t record_len = len == PUBLISHER_FIXED_LEN + (size_t)data[0] * PUBLISHER_LEGACY_LEN
+                          ? PUBLISHER_LEGACY_LEN : PUBLISHER_RECORD_LEN;
+  if (len != PUBLISHER_FIXED_LEN + (size_t)data[0] * record_len) return STORE_PAYLOAD;
   Publishers publishers;
   memset(&publishers, 0, sizeof(publishers));
   publishers.count = data[0];
@@ -276,7 +280,8 @@ StoreResult readPublishers(const uint8_t* data, size_t len, Publishers& out) {
     record.id = read16(data + cursor);
     record.status = data[cursor + 2];
     memcpy(record.key, data + cursor + 3, sizeof(record.key));
-    cursor += PUBLISHER_RECORD_LEN;
+    if (record_len == PUBLISHER_RECORD_LEN) record.time_generation = read32(data + cursor + 35);
+    cursor += record_len;
   }
   StoreResult result = publishersValid(publishers);
   if (result == STORE_OK) out = publishers;
@@ -298,6 +303,7 @@ size_t writePublishers(const Publishers& publishers, uint8_t* out, size_t capaci
     write16(out + cursor, record.id);
     out[cursor + 2] = record.status;
     memcpy(out + cursor + 3, record.key, sizeof(record.key));
+    write32(out + cursor + 35, record.time_generation);
     cursor += PUBLISHER_RECORD_LEN;
   }
   return len;
@@ -869,7 +875,7 @@ static_assert(REGION_META_LEN + REGION_DATA_MAX == 1102,
 static_assert(STORE_OVERHEAD + 1102 == STORE_MAX, "store bound changed");
 static_assert(STATE_FIXED_LEN + STATE_REPLAY_MAX * STATE_REPLAY_LEN == 725,
               "state record bound changed");
-static_assert(PUBLISHER_FIXED_LEN + PUBLISHER_MAX * PUBLISHER_RECORD_LEN == 565,
+static_assert(PUBLISHER_FIXED_LEN + PUBLISHER_MAX * PUBLISHER_RECORD_LEN == 629,
               "publisher record bound changed");
 static_assert(STORE_OVERHEAD + 74 == 118, "policy recovery bound changed");
 static_assert(STORE_OVERHEAD + 784 == 828, "radio record bound changed");

@@ -26,6 +26,9 @@ static const size_t RADIO_CONFIRM_SIGNED_LEN = 57;
 static const size_t RADIO_CONFIRM_LEN = 121;
 static const size_t RADIO_ABORT_SIGNED_LEN = 25;
 static const size_t RADIO_ABORT_LEN = 89;
+static const size_t TIME_SAMPLE_SIGNED_LEN = 40;
+static const size_t TIME_SAMPLE_LEN = 104;
+static const uint16_t TIME_TOLERANCE_MAX = 1440;
 static const size_t REGION_DATA_MAX = 1057;
 static const size_t POLICY_DATA_LEN = 15;
 static const uint8_t CHUNK_MAX = 12;
@@ -46,12 +49,14 @@ enum FrameType : uint8_t {
   ABORT = 0x03,
   RADIO_CONFIRM = 0x04,
   RADIO_ABORT = 0x05,
+  TIME_SAMPLE = 0x06,
 };
 
 enum Dataset : uint8_t {
   REGION = 0x01,
   POLICY = 0x02,
   RADIO = 0x03,
+  TIME = 0x04,
 };
 
 inline uint8_t syncDatasetSlot(uint8_t dataset) {
@@ -133,6 +138,15 @@ struct RadioAbortView {
   const uint8_t* signature;
 };
 
+struct TimeSampleView {
+  char channel[CHANNEL_MAX + 1];
+  const uint8_t* publisher;
+  uint32_t generation;
+  uint32_t epoch;
+  uint16_t tolerance;
+  const uint8_t* signature;
+};
+
 struct PolicyProfile {
   uint8_t flood_max;
   uint8_t flood_unscoped;
@@ -156,6 +170,8 @@ WireResult readRadioConfirm(const uint8_t* frame, size_t len,
                             RadioConfirmView& out);
 WireResult readRadioAbort(const uint8_t* frame, size_t len,
                           RadioAbortView& out);
+WireResult readTimeSample(const uint8_t* frame, size_t len, uint32_t build_epoch,
+                          TimeSampleView& out);
 WireResult match(const ChunkView& chunk, const Manifest& manifest, uint16_t& offset);
 
 uint8_t chunkCount(uint16_t data_len);
@@ -183,6 +199,11 @@ size_t writeRadioConfirmPrefix(const uint8_t publisher[FINGERPRINT_LEN],
                                uint32_t cutover, uint8_t* out, size_t capacity);
 size_t writeRadioAbortPrefix(const uint8_t publisher[FINGERPRINT_LEN],
                              uint64_t migration_id, uint32_t generation,
+                             uint8_t* out, size_t capacity);
+size_t writeTimeSamplePrefix(const char* channel,
+                             const uint8_t publisher[FINGERPRINT_LEN],
+                             uint32_t generation, uint32_t epoch,
+                             uint16_t tolerance, uint32_t build_epoch,
                              uint8_t* out, size_t capacity);
 CarrierResult readCarrier(const uint8_t* payload, size_t payload_len,
                           uint8_t* frame, size_t capacity, uint8_t& frame_len,

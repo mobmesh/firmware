@@ -20,6 +20,7 @@ enum StoreType : uint8_t {
   STORE_POLICY_STATE = 0x05,
   STORE_POLICY_RECOVERY = 0x06,
   STORE_RADIO = 0x07,
+  STORE_TIME = 0x08,
 };
 
 enum StoreResult : uint8_t {
@@ -89,6 +90,7 @@ struct Publisher {
   uint16_t id;
   uint8_t status;
   uint8_t key[32];
+  uint32_t time_generation;
 };
 
 struct Publishers {

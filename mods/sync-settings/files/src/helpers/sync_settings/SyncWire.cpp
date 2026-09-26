@@ -217,7 +217,9 @@ WireResult classify(const uint8_t* frame, size_t len, uint8_t& type) {
   }
   if (frame[2] != WIRE_VERSION) return WIRE_VERSION_UNSUPPORTED;
   type = frame[3];
-  if (type < MANIFEST || type > RADIO_ABORT) return WIRE_TYPE_UNSUPPORTED;
+  if (type < MANIFEST || type > (SYNC_SETTINGS_WITH_TIME ? TIME_SAMPLE : RADIO_ABORT)) {
+    return WIRE_TYPE_UNSUPPORTED;
+  }
   return WIRE_OK;
 }
 
@@ -355,6 +357,34 @@ WireResult readRadioAbort(const uint8_t* frame, size_t len,
   return WIRE_OK;
 }
 
+WireResult readTimeSample(const uint8_t* frame, size_t len, uint32_t build_epoch,
+                          TimeSampleView& out) {
+  uint8_t type = 0;
+  WireResult result = classify(frame, len, type);
+  if (result != WIRE_OK) return result;
+  if (type != TIME_SAMPLE) return WIRE_TYPE_UNSUPPORTED;
+  if (len != TIME_SAMPLE_LEN || frame[4] != TIME) return WIRE_MALFORMED;
+  uint8_t channel_len = frame[5];
+  if (channel_len == 0 || channel_len > CHANNEL_MAX ||
+      !validChannel(frame + 6, channel_len)) return WIRE_MALFORMED;
+  for (size_t i = channel_len; i < CHANNEL_MAX; ++i) {
+    if (frame[6 + i] != 0) return WIRE_MALFORMED;
+  }
+  uint32_t generation = read32(frame + 30);
+  uint32_t epoch = read32(frame + 34);
+  uint16_t tolerance = read16(frame + 38);
+  if (generation == 0 || epoch < build_epoch || tolerance == 0 ||
+      tolerance > TIME_TOLERANCE_MAX) return WIRE_MALFORMED;
+  memcpy(out.channel, frame + 6, channel_len);
+  out.channel[channel_len] = 0;
+  out.publisher = frame + 22;
+  out.generation = generation;
+  out.epoch = epoch;
+  out.tolerance = tolerance;
+  out.signature = frame + TIME_SAMPLE_SIGNED_LEN;
+  return WIRE_OK;
+}
+
 WireResult match(const ChunkView& chunk, const Manifest& manifest, uint16_t& offset) {
   if (chunk.dataset != manifest.dataset || chunk.generation != manifest.generation) {
     return WIRE_MISMATCH;
@@ -449,6 +479,27 @@ size_t writeRadioAbortPrefix(const uint8_t publisher[FINGERPRINT_LEN],
   write64(out + 13, migration_id);
   write32(out + 21, generation);
   return RADIO_ABORT_SIGNED_LEN;
+}
+
+size_t writeTimeSamplePrefix(const char* channel,
+                             const uint8_t publisher[FINGERPRINT_LEN],
+                             uint32_t generation, uint32_t epoch,
+                             uint16_t tolerance, uint32_t build_epoch,
+                             uint8_t* out, size_t capacity) {
+  uint8_t channel_len = channelLength(channel);
+  if (channel_len == 0 || publisher == nullptr || generation == 0 ||
+      epoch < build_epoch || tolerance == 0 || tolerance > TIME_TOLERANCE_MAX ||
+      out == nullptr || capacity < TIME_SAMPLE_LEN) return 0;
+  memset(out, 0, TIME_SAMPLE_LEN);
+  preamble(out, TIME_SAMPLE);
+  out[4] = TIME;
+  out[5] = channel_len;
+  memcpy(out + 6, channel, channel_len);
+  memcpy(out + 22, publisher, FINGERPRINT_LEN);
+  write32(out + 30, generation);
+  write32(out + 34, epoch);
+  write16(out + 38, tolerance);
+  return TIME_SAMPLE_SIGNED_LEN;
 }
 
 CarrierResult readCarrier(const uint8_t* payload, size_t payload_len,
