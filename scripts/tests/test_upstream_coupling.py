@@ -243,11 +243,12 @@ class UpstreamCouplingTestCase(unittest.TestCase):
         self.assertIn("{0xf0, 0x9f, 0x93, 0xa1}", integration)
         self.assertIn("{0xf0, 0x9f, 0x93, 0xbb}", integration)
 
-    def test_drift_canary_builds_sync_settings_for_both_roles(self):
+    def test_drift_canary_builds_sync_settings_per_role_and_chip_family(self):
         workflow = Path(REPO_ROOT, ".github/workflows/patch-drift-canary.yml").read_text()
         self.assertIn("CANARY_EXTRA_MODS: sync-settings", workflow)
-        self.assertIn("for role in sorted({t['role'] for t in targets})", workflow)
+        self.assertIn("groups.setdefault((t['role'], family(t['board_id'])), [])", workflow)
         self.assertIn("t['mods'] + extras", workflow)
+        self.assertIn('compose-mods --upstream dev-src --mods "$mods"', workflow)
 
     def test_radio_build_epoch_reaches_release_and_canary_builds(self):
         for name in ("build-release.yml", "patch-drift-canary.yml"):

@@ -260,7 +260,7 @@ jobs:
             fi
           fi
 
-          # --- 7. do the upstream commands our mods send or intercept still exist? --
+          # --- 7. do the upstream commands the mods send or intercept still exist? --
           cat "$CONTRACTS" >> "$REPORT"
 
           echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"

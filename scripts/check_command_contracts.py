@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that the upstream CLI commands our mods send or intercept still exist on a ref."""
+"""Check that the upstream CLI commands the mods send or intercept still exist on a ref."""
 
 import argparse
 import re
@@ -18,7 +18,7 @@ TOKEN_RE = re.compile(r"\"(?:[^\"\\\n]|\\.)*\"|'(?:[^'\\\n]|\\.)*'|//[^\n]*|/\*.
 COMMAND_RE = re.compile(r"^[a-z][a-z0-9.\-]*(?: [a-z][a-z0-9.\-]*){0,2}$")
 MAX_HINTS = 5
 
-# Reply shapes and constants our mods parse or mirror: (label, fixed text, mods relying on it).
+# Reply shapes and constants the mods parse or mirror: (label, fixed text, mods relying on it).
 REPLY_CONTRACTS = [
     ("`get` replies start with `> `", '"> ', "try-settings"),
     ("`tempradio` acknowledges with `OK - temp params`", '"OK - temp params', "try-settings, sync-settings"),
@@ -113,7 +113,7 @@ def check(tree, base, head, boards, mods_dir):
 def report(ref, problems, moved, ok, reply_problems):
     lines = []
     if not problems and not reply_problems:
-        lines.append(f"- `{ref}`: all {ok} upstream commands our mods rely on are still handled")
+        lines.append(f"- `{ref}`: all {ok} upstream commands the mods rely on are still handled")
     for key, users, why, where in problems:
         lines.append(f"- `{ref}`: command `{key}` ({users}) **{why}**")
         if where:
