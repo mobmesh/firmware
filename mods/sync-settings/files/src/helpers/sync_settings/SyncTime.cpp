@@ -278,9 +278,9 @@ uint32_t timeNtpMark(const TimeRecord& record, uint32_t at) {
   return (at - record.started) / ((uint32_t)record.ntp_interval_hours * HOUR);
 }
 
-bool timeNtpDue(const TimeRecord& record, bool refreshed, uint32_t refreshed_mark) {
+bool timeNtpDue(const TimeRecord& record, bool refreshed, uint32_t refreshed_mark, uint32_t at) {
   return record.ntp_interval_hours == 0 || !refreshed ||
-         timeNtpMark(record, record.next_sample) > refreshed_mark;
+         timeNtpMark(record, at) > refreshed_mark;
 }
 
 uint32_t timeEstablishRetryMs(uint8_t failures, uint16_t ntp_interval_hours) {

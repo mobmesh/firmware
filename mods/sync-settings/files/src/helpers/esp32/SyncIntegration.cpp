@@ -1110,7 +1110,7 @@ static void timeTick() {
     }
     if (result == HotspotOTA::WanRun::Verified) {
       time_ntp_refreshed = true;
-      time_ntp_mark = timeNtpMark(time_record, time_record.next_sample);
+      time_ntp_mark = timeNtpMark(time_record, modClockGet());
     }
   }
 #endif
@@ -1144,7 +1144,8 @@ static void timeTick() {
   if (step != TIME_STEP_DUE) return;
 #if SYNC_TIME_PREFLIGHT
   if (!time_preflight_done || time_preflight_for != time_record.next_sample) {
-    if (timeNtpDue(time_record, time_ntp_refreshed, time_ntp_mark) && timeStartPreflight()) {
+    if (timeNtpDue(time_record, time_ntp_refreshed, time_ntp_mark, now) &&
+        timeStartPreflight()) {
       return;
     }
     time_preflight_done = true;
@@ -3467,7 +3468,13 @@ static bool timeSet(const char* setting, const char* value, char* reply) {
     strcpy(reply, "Err - interval exceeds duration");
     return true;
   }
-  strcpy(reply, saveTime(next) ? "OK" : "Err - storage");
+  if (!saveTime(next)) {
+    strcpy(reply, "Err - storage");
+    return true;
+  }
+  // A changed NTP interval starts a fresh calendar at the next sample.
+  if (strcmp(setting, "ntp.interval") == 0) time_ntp_refreshed = false;
+  strcpy(reply, "OK");
   return true;
 }
 
