@@ -58,8 +58,15 @@ sync.time publish * release
 be right.
 
 - A Heltec V4 publisher with a hotspot configured (see hotspot-ota's `ota wan verify`) checks
-  its internet path and refreshes its clock by NTP before each sample. This happens only
-  after `ota wan verify` has succeeded once with the saved WiFi settings.
+  its internet path and refreshes its clock by NTP before a sample. This happens only after
+  `ota wan verify` has succeeded once with the saved WiFi settings.
+- To save battery the refresh follows its own calendar, counted from the start of the
+  schedule: `set sync.time.ntp.interval 7d` (the default) refreshes on the first sample, then
+  on the first sample at or after each further 7 days. With a 2-day sample interval that is
+  days 1, 9, 15, …; choose a multiple of the sample interval (6d) to land exactly on day 7.
+  `0` refreshes before every sample. A failed refresh is tried again on the next sample, and
+  a restart always refreshes on the first sample. The ESP32 clock drifts only seconds a day,
+  far inside the tolerance.
 - Without that, the publisher uses its clock as it stands. Set it first, for example with
   `time` or `ota wan verify`.
 - If the publisher's clock is corrected while a schedule runs, the schedule moves with it.
@@ -77,6 +84,8 @@ be right.
 | `set sync.time.publish.interval <N>h\|<N>d` | Save interval: 1 hour to 30 days, never longer than the duration. |
 | `get sync.time.publish.duration` | Show how long a schedule runs. |
 | `set sync.time.publish.duration <N>d` | Save duration: 1–365 days. |
+| `get sync.time.ntp.interval` | Show how often the hotspot clock refresh runs. |
+| `set sync.time.ntp.interval <N>h\|<N>d\|0` | Save it: 1 hour to 365 days, or 0 for every sample. Takes effect on the next sample. |
 | `sync.time publish <region\|*> <channel>` | Start a schedule. |
 | `sync.time publish.abort` | Stop this repeater's schedule. |
 

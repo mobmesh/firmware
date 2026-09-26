@@ -5,12 +5,15 @@
 namespace mobmesh {
 namespace sync {
 
-static const size_t TIME_RECORD_LEN = 97;
+static const size_t TIME_RECORD_LEGACY_LEN = 97;
+static const size_t TIME_RECORD_LEN = 99;
 static const uint16_t TIME_TOLERANCE_DEFAULT = 20;
 static const uint16_t TIME_INTERVAL_HOURS_DEFAULT = 168;
 static const uint16_t TIME_DURATION_DAYS_DEFAULT = 180;
 static const uint16_t TIME_INTERVAL_HOURS_MAX = 720;
 static const uint16_t TIME_DURATION_DAYS_MAX = 365;
+static const uint16_t TIME_NTP_HOURS_DEFAULT = 168;
+static const uint16_t TIME_NTP_HOURS_MAX = 8760;
 
 struct TimeRecord {
   bool enabled;
@@ -29,6 +32,7 @@ struct TimeRecord {
   uint32_t ends;
   uint32_t interval_seconds;
   uint16_t captured_tolerance;
+  uint16_t ntp_interval_hours;
 };
 
 enum TimeReceiveResult : uint8_t {
@@ -95,6 +99,8 @@ bool timeScheduleUnsent(const TimeRecord& record);
 bool timeScheduleShift(TimeRecord& record, int64_t delta);
 int64_t timeClockJump(TimeClockWatch& watch, uint32_t rtc, uint32_t ms);
 bool timeClockCredible(const TimeRecord& record, uint32_t now, uint32_t build_epoch);
+uint32_t timeNtpMark(const TimeRecord& record, uint32_t at);
+bool timeNtpDue(const TimeRecord& record, bool refreshed, uint32_t refreshed_mark);
 void timeScheduleClear(TimeRecord& record);
 
 }  // namespace sync

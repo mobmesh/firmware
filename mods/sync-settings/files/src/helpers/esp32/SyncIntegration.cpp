@@ -144,6 +144,8 @@ static uint32_t time_preflight_for;
 static bool time_preflight_done;
 static TimeClockWatch time_watch;
 static bool time_establish_tried;
+static bool time_ntp_refreshed;
+static uint32_t time_ntp_mark;
 static uint32_t time_establish_ms;
 static bool time_shift_unsaved;
 static uint32_t time_shift_retry_ms;
@@ -1050,6 +1052,7 @@ static bool timeSend(uint32_t now) {
 static void timePreflightReset() {
   time_preflight_run = 0;
   time_preflight_done = false;
+  time_ntp_refreshed = false;
 }
 
 #if SYNC_TIME_PREFLIGHT
@@ -1105,6 +1108,10 @@ static void timeTick() {
       time_preflight_done = true;
       time_preflight_for = time_record.next_sample;
     }
+    if (result == HotspotOTA::WanRun::Verified) {
+      time_ntp_refreshed = true;
+      time_ntp_mark = timeNtpMark(time_record, time_record.next_sample);
+    }
   }
 #endif
   // Stored deadlines are trusted only once this boot has a credible clock.
@@ -1135,7 +1142,9 @@ static void timeTick() {
   if (step != TIME_STEP_DUE) return;
 #if SYNC_TIME_PREFLIGHT
   if (!time_preflight_done || time_preflight_for != time_record.next_sample) {
-    if (timeStartPreflight()) return;
+    if (timeNtpDue(time_record, time_ntp_refreshed, time_ntp_mark) && timeStartPreflight()) {
+      return;
+    }
     time_preflight_done = true;
     time_preflight_for = time_record.next_sample;
   }
@@ -3413,6 +3422,19 @@ static bool parseTimeInterval(const char* text, uint16_t& hours) {
   return parseTimeNumber(text, 'h', 1, TIME_INTERVAL_HOURS_MAX, hours);
 }
 
+static bool parseTimeNtp(const char* text, uint16_t& hours) {
+  if (text != nullptr && strcmp(text, "0") == 0) {
+    hours = 0;
+    return true;
+  }
+  uint16_t days;
+  if (parseTimeNumber(text, 'd', 1, TIME_DURATION_DAYS_MAX, days)) {
+    hours = (uint16_t)(days * 24u);
+    return true;
+  }
+  return parseTimeNumber(text, 'h', 1, TIME_NTP_HOURS_MAX, hours);
+}
+
 static void timeIntervalText(uint16_t hours, char out[8]) {
   if (hours % 24 == 0) snprintf(out, 8, "%ud", (unsigned)(hours / 24));
   else snprintf(out, 8, "%uh", (unsigned)hours);
@@ -3428,6 +3450,11 @@ static bool timeSet(const char* setting, const char* value, char* reply) {
   } else if (strcmp(setting, "publish.interval") == 0) {
     if (!parseTimeInterval(value, next.interval_hours)) {
       strcpy(reply, "Err - syntax: set sync.time.publish.interval <N>h|<N>d; 1h..30d");
+      return true;
+    }
+  } else if (strcmp(setting, "ntp.interval") == 0) {
+    if (!parseTimeNtp(value, next.ntp_interval_hours)) {
+      strcpy(reply, "Err - syntax: set sync.time.ntp.interval <N>h|<N>d|0; 1h..365d, 0 every sample");
       return true;
     }
   } else if (!parseTimeNumber(value, 'd', 1, TIME_DURATION_DAYS_MAX, next.duration_days)) {
@@ -3563,7 +3590,7 @@ static bool timeCli(char* command, char* reply) {
   char* value = strchr(setting, ' ');
   if (value != nullptr) *value++ = 0;
   if (strcmp(setting, "tolerance") != 0 && strcmp(setting, "publish.interval") != 0 &&
-      strcmp(setting, "publish.duration") != 0) {
+      strcmp(setting, "publish.duration") != 0 && strcmp(setting, "ntp.interval") != 0) {
     if (value != nullptr) value[-1] = ' ';
     return false;
   }
@@ -3574,6 +3601,11 @@ static bool timeCli(char* command, char* reply) {
   if (!getting) return timeSet(setting, value, reply);
   if (value != nullptr) {
     snprintf(reply, 160, "Err - syntax: get sync.time.%s", setting);
+  } else if (setting[0] == 'n') {
+    char interval[8];
+    timeIntervalText(time_record.ntp_interval_hours, interval);
+    if (time_record.ntp_interval_hours == 0) strcpy(reply, "> 0");
+    else snprintf(reply, 160, "> %s", interval);
   } else if (setting[0] == 't') {
     if (time_record.tolerance == 0) strcpy(reply, "> unset");
     else snprintf(reply, 160, "> %um", (unsigned)time_record.tolerance);

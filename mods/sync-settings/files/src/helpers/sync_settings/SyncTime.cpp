@@ -101,10 +101,11 @@ void defaultTimeRecord(TimeRecord& record) {
   record.tolerance = TIME_TOLERANCE_DEFAULT;
   record.interval_hours = TIME_INTERVAL_HOURS_DEFAULT;
   record.duration_days = TIME_DURATION_DAYS_DEFAULT;
+  record.ntp_interval_hours = TIME_NTP_HOURS_DEFAULT;
 }
 
 static StoreResult timeRecordValid(const TimeRecord& value) {
-  if (value.tolerance > TIME_TOLERANCE_MAX ||
+  if (value.tolerance > TIME_TOLERANCE_MAX || value.ntp_interval_hours > TIME_NTP_HOURS_MAX ||
       !timeSettingsValid(value.interval_hours, value.duration_days) ||
       (value.local_generation == 0 && !allZero(value.local_key, sizeof(value.local_key)))) {
     return STORE_PAYLOAD;
@@ -132,7 +133,9 @@ static StoreResult timeRecordValid(const TimeRecord& value) {
 }
 
 StoreResult readTimeRecord(const uint8_t* data, size_t len, TimeRecord& out) {
-  if (data == nullptr || len != TIME_RECORD_LEN || data[0] != TIME_SCHEMA ||
+  // A 97-byte record predates the NTP interval and takes its default.
+  if (data == nullptr || (len != TIME_RECORD_LEN && len != TIME_RECORD_LEGACY_LEN) ||
+      data[0] != TIME_SCHEMA ||
       data[1] > 1 || data[44] > 1 || data[62] > CHANNEL_MAX ||
       !allZero(data + 63 + data[62], CHANNEL_MAX - data[62])) return STORE_PAYLOAD;
   TimeRecord value;
@@ -153,6 +156,7 @@ StoreResult readTimeRecord(const uint8_t* data, size_t len, TimeRecord& out) {
   value.ends = read32(data + 87);
   value.interval_seconds = read32(data + 91);
   value.captured_tolerance = read16(data + 95);
+  value.ntp_interval_hours = len == TIME_RECORD_LEN ? read16(data + 97) : TIME_NTP_HOURS_DEFAULT;
   StoreResult result = timeRecordValid(value);
   if (result == STORE_OK) out = value;
   return result;
@@ -179,6 +183,7 @@ size_t writeTimeRecord(const TimeRecord& record, uint8_t* out, size_t capacity) 
   write32(out + 87, record.ends);
   write32(out + 91, record.interval_seconds);
   write16(out + 95, record.captured_tolerance);
+  write16(out + 97, record.ntp_interval_hours);
   return TIME_RECORD_LEN;
 }
 
@@ -268,6 +273,16 @@ bool timeClockCredible(const TimeRecord& record, uint32_t now, uint32_t build_ep
   return !record.active || timeScheduleUnsent(record) || now >= record.started;
 }
 
+uint32_t timeNtpMark(const TimeRecord& record, uint32_t at) {
+  if (!record.active || record.ntp_interval_hours == 0 || at <= record.started) return 0;
+  return (at - record.started) / ((uint32_t)record.ntp_interval_hours * HOUR);
+}
+
+bool timeNtpDue(const TimeRecord& record, bool refreshed, uint32_t refreshed_mark) {
+  return record.ntp_interval_hours == 0 || !refreshed ||
+         timeNtpMark(record, record.next_sample) > refreshed_mark;
+}
+
 void timeScheduleClear(TimeRecord& record) {
   record.active = false;
   record.route_kind = 0;
@@ -281,7 +296,7 @@ void timeScheduleClear(TimeRecord& record) {
   record.captured_tolerance = 0;
 }
 
-static_assert(STORE_OVERHEAD + TIME_RECORD_LEN == 141, "time record bound changed");
+static_assert(STORE_OVERHEAD + TIME_RECORD_LEN == 143, "time record bound changed");
 
 }  // namespace sync
 }  // namespace mobmesh
