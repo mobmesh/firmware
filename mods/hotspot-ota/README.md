@@ -57,6 +57,12 @@ The pin is held high for the whole update, not pulsed, so a load-switch enable l
 stay asserted and should have a pulldown. See `variants/<board>/README.md` for each board's
 pin. Rollback protection and clock sync need no extra hardware.
 
+The node switches the hotspot off at every startup, before the radio starts, and before any
+reboot it triggers itself, so a reset or crash never leaves a modem drawing current. Where
+[`power-guard`](../power-guard) is also installed, the hotspot is not powered while the
+battery is below its resume mark: `ota wan join`, `ota wan verify` and updates reply
+`ERR: battery low; hotspot not powered`. `set ota.wan.pwr on` is not held back.
+
 ---
 
 ## 2. CLI Commands
@@ -181,7 +187,9 @@ flowchart TD
 
 ## 6. Automatic Clock Sync
 
-Whenever the node joins WiFi for OTA, it also sets its clock from `us.pool.ntp.org` (falling
-back to `pool.ntp.org`). These boards lose the time on every reboot, and the
+Whenever the node joins WiFi for OTA, `ota wan join` or `ota wan verify`, it also sets its
+clock from `us.pool.ntp.org` (falling back to `pool.ntp.org`). A
+[`sync-settings`](../sync-settings/docs/time.md) time publisher uses `ota wan verify` to
+refresh its own clock before it broadcasts. These boards lose the time on every reboot, and the
 [`timing-safety`](../timing-safety) mod explains why that matters. If the time server doesn't
 answer, the update carries on.

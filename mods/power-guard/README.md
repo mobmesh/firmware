@@ -58,6 +58,11 @@ a site visit. The remote CLI path is already authenticated and the replies only 
 It also rebases the clock after a brownout, which upstream leaves scrambled until NTP
 or a battery pull corrects it.
 
+Where [`hotspot-ota`](../hotspot-ota) is also installed, the hotspot modem is not powered
+while the battery is below the resume mark, so an update, WAN check or clock refresh cannot
+add the load that browns the node out. power-guard answers through a shim hook; neither mod
+depends on the other, and without power-guard the hotspot is never held back.
+
 ## Enabling
 
 Add `power-guard` to a target's `mods:` in `build-targets.yaml`, then set the board's

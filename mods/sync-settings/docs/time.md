@@ -57,22 +57,41 @@ sync.time publish * release
 **The publisher's own clock.** Every sample carries the publisher's clock, so that clock must
 be right.
 
-- A Heltec V4 publisher with a hotspot configured (see hotspot-ota's `ota wan verify`) checks
-  its internet path and refreshes its clock by NTP before a sample. This happens only after
-  `ota wan verify` has succeeded once with the saved WiFi settings.
-- To save battery the refresh follows its own calendar, counted from the start of the
-  schedule: `set sync.time.ntp.interval 7d` (the default) refreshes on the first sample, then
-  on the first sample at or after each further 7 days. With a 2-day sample interval that is
-  days 1, 9, 15, …; choose a multiple of the sample interval (6d) to land exactly on day 7.
-  `0` refreshes before every sample. A failed refresh is tried again on the next sample, and
-  a restart always refreshes on the first sample. The ESP32 clock drifts only seconds a day,
-  far inside the tolerance.
-- Without that, the publisher uses its clock as it stands. Set it first, for example with
-  `time` or `ota wan verify`.
-- If the publisher's clock is corrected while a schedule runs, the schedule moves with it.
-- These boards have no battery-backed clock. After a power loss a publisher with the hotspot
-  check refreshes its clock before resuming the schedule; one without it waits until its clock
-  is set, for example with `time`.
+- **With a proven hotspot** (Heltec V4, after one successful `ota wan verify`), the
+  publisher refreshes its clock by NTP before sampling.
+- **Refresh schedule:** `set sync.time.ntp.interval 7d` (default) refreshes on the first
+  sample, then on the first sample at or after every 7 days. `0` refreshes every sample.
+  Failed refreshes retry on the next sample. See the table below for examples.
+- **Without a proven hotspot**, samples use the clock as it stands. Set it first with `time`
+  or `ota wan verify`.
+- **Clock changes** during a schedule move the schedule with them.
+- **After a power loss** the clock resets. With the hotspot the publisher refreshes it before
+  resuming; without it the schedule waits until the clock is set.
+
+NTP refresh days over 30 days, with the schedule starting on day 1:
+
+| Sample interval | NTP interval | Refreshes | Days |
+|---|---|---:|---|
+| 1d | 7d | 5 | 1, 8, 15, 22, 29 |
+| 2d | 6d | 6 | 1, 7, 13, 19, 25, 31 |
+| 2d | 7d | 5 | 1, 9, 15, 23, 29 |
+| 3d | 7d | 5 | 1, 10, 16, 22, 31 |
+| 7d | 14d | 3 | 1, 15, 29 |
+
+An NTP interval that is a multiple of the sample interval gives evenly spaced refreshes.
+
+**After a restart.** A running schedule survives a restart; what happens next depends on
+whether the clock survived too. A software restart usually keeps it; a power loss or brownout
+resets it to May 2024.
+
+| Restart | With the hotspot check | Without it |
+|---|---|---|
+| Clock kept | Resumes at once. The next due sample refreshes the clock first, then the NTP calendar continues. | Resumes at once from the local clock. |
+| Clock reset | Shows `waiting-clock`, refreshes the clock straight away, then resumes. A failed refresh is retried after 10 minutes, doubling each time up to the NTP interval. | Shows `waiting-clock` and sends nothing until the clock is set. |
+
+- Deadlines never move because of the restart, and missed samples collapse into one.
+- A schedule whose end passed during the outage closes without sending.
+- A clock that comes back wrong in the forward direction cannot be detected.
 
 ### Commands
 

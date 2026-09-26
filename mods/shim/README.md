@@ -49,3 +49,6 @@ A few ground rules:
   not the node.
 - **Keys stay put:** mods can ask the firmware to sign things, but they never see its
   private key.
+- **Vetoes combine:** where several mods may refuse something, such as powering a heavy
+  load, every one must agree. With no such mod installed it is allowed, so no mod depends
+  on another.
