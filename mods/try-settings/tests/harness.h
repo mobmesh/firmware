@@ -10,6 +10,7 @@ struct Fake {
   std::map<std::string, std::string> prefs;
   std::vector<std::string> dispatched;
   uint32_t clock = 1000000;
+  uint32_t ms = 5000;
 
   bool save_ok = true;          // false makes trySetSave refuse, as a full filesystem would
   bool saved = false;           // whether a record is on the fake flash

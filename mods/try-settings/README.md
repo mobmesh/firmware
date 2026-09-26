@@ -43,8 +43,9 @@ reached, or by being site-dependent enough that it has to be judged where the no
 ## Two things worth knowing
 
 **A reboot ends a trial, it never resumes one.** An unscheduled restart is most likely a
-brownout, and a brownout leaves the RTC deadline the trial was counting against unverifiable.
-A slot found at boot is reverted, not resumed.
+brownout, and the trial's countdown does not survive a restart. A slot found at boot is
+reverted, not resumed. The countdown runs on the node's uptime, not its clock, so setting or
+correcting the clock during a trial neither shortens nor extends it.
 
 **`tryset keep` only commits radio settings while the trial is still running.** Once the
 trial has lapsed, keep is refused and you have to start another one. That refusal is the

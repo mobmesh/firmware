@@ -36,9 +36,11 @@ static const char* const TRY_SET_KEYS[] = {
 static TrySetSlot slot;
 static bool booted = false;
 
-// One restore attempt per RTC second, so a persistently failing one cannot hammer flash.
-// Compared by equality, not ordering, so a brownout clock jump costs one attempt at most.
-static uint32_t last_restore_try = 0;
+// Expiry runs on millis() so an RTC correction can neither postpone nor shorten a trial.
+static uint32_t trial_started_ms = 0;
+static uint32_t trial_ms = 0;
+static uint32_t last_restore_ms = 0;
+static bool restore_tried = false;
 
 static bool keyAllowed(const char* key) {
   for (int i = 0; TRY_SET_KEYS[i]; i++) {
@@ -156,6 +158,9 @@ static void startKey(uint32_t secs, const char* key, const char* value, char* re
   }
 
   slot = prepared;
+  trial_started_ms = millis();
+  trial_ms = secs * 1000UL;
+  restore_tried = false;
 
   sprintf(reply, "OK - tryset %us (reverts unless kept)", (unsigned)secs);
 }
@@ -264,8 +269,8 @@ static void handleGet(char* reply) {
     return;
   }
   if (slot.active()) {
-    uint32_t now = modClockGet();
-    uint32_t left = slot.expires_at > now ? slot.expires_at - now : 0;
+    uint32_t elapsed = millis() - trial_started_ms;
+    uint32_t left = elapsed < trial_ms ? (trial_ms - elapsed + 999) / 1000 : 0;
     sprintf(reply, "%s %s %us", slot.key, slot.trial, (unsigned)left);
     return;
   }
@@ -278,18 +283,21 @@ void trySetLoop() {
     // A slot that survived a reboot is not resumed: an unscheduled restart is most likely a
     // brownout, and a brownout leaves the RTC deadline it was counting against unverifiable.
     if (trySetLoad(slot)) {
-      // Zeroing the deadline hands the retry to the expiry path: after a brownout that
-      // deadline is the untrustworthy part.
-      last_restore_try = modClockGet();
-      if (restore(slot)) clearSlot(); else slot.expires_at = 0;
+      // A zero trial length hands any retry to the expiry path.
+      restore_tried = true;
+      last_restore_ms = millis();
+      trial_ms = 0;
+      if (restore(slot)) clearSlot();
     }
     return;
   }
   if (!slot.active()) return;
-  uint32_t now = modClockGet();
-  if (now < slot.expires_at) return;
-  if (now == last_restore_try) return;
-  last_restore_try = now;
+  uint32_t now = millis();
+  if (now - trial_started_ms < trial_ms) return;
+  // One restore attempt per second, so a persistently failing one cannot hammer flash.
+  if (restore_tried && now - last_restore_ms < 1000) return;
+  restore_tried = true;
+  last_restore_ms = now;
   if (restore(slot)) clearSlot();
 }
 
