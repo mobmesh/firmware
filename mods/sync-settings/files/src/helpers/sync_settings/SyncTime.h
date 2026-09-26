@@ -53,6 +53,15 @@ struct TimeReceiveOps {
   void* context;
 };
 
+struct TimeClockWatch {
+  bool valid;
+  bool established;
+  uint32_t rtc;
+  uint32_t ms;
+};
+
+static const int64_t TIME_JUMP_SECONDS = 60;
+
 enum TimeStep : uint8_t {
   TIME_STEP_IDLE,
   TIME_STEP_WAIT,
@@ -84,6 +93,7 @@ TimeStep timeScheduleStep(const TimeRecord& record, uint32_t now);
 void timeScheduleAdvance(TimeRecord& record, uint32_t now);
 bool timeScheduleUnsent(const TimeRecord& record);
 bool timeScheduleShift(TimeRecord& record, int64_t delta);
+int64_t timeClockJump(TimeClockWatch& watch, uint32_t rtc, uint32_t ms);
 void timeScheduleClear(TimeRecord& record);
 
 }  // namespace sync

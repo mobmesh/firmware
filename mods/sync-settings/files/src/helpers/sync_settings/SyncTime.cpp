@@ -250,6 +250,19 @@ bool timeScheduleShift(TimeRecord& record, int64_t delta) {
   return true;
 }
 
+int64_t timeClockJump(TimeClockWatch& watch, uint32_t rtc, uint32_t ms) {
+  int64_t jump = 0;
+  if (watch.valid && watch.established) {
+    int64_t expected = (int64_t)watch.rtc + (uint32_t)(ms - watch.ms) / 1000u;
+    jump = (int64_t)rtc - expected;
+    if (jump <= TIME_JUMP_SECONDS && jump >= -TIME_JUMP_SECONDS) jump = 0;
+  }
+  watch.valid = true;
+  watch.rtc = rtc;
+  watch.ms = ms;
+  return jump;
+}
+
 void timeScheduleClear(TimeRecord& record) {
   record.active = false;
   record.route_kind = 0;

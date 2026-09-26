@@ -142,6 +142,9 @@ static int64_t time_rx_delta;
 static uint32_t time_preflight_run;
 static uint32_t time_preflight_for;
 static bool time_preflight_done;
+static TimeClockWatch time_watch;
+static bool time_shift_unsaved;
+static uint32_t time_shift_retry_ms;
 #endif
 #if SYNC_SETTINGS_WITH_REGION
 static RegionRecord region_record;
@@ -490,6 +493,7 @@ static bool saveTime(const TimeRecord& value) {
                 buildTimePayload, const_cast<TimeRecord*>(&value)) != PAIR_OK) return false;
   time_record = value;
   time_degraded = false;
+  time_shift_unsaved = false;
   return true;
 }
 #endif
@@ -1054,26 +1058,29 @@ static bool timePreflightEligible() {
 }
 #endif
 
-static uint32_t time_anchor_rtc;
-static uint32_t time_anchor_ms;
-static bool time_anchor_valid;
-
 static void timeWatchClock() {
-  uint32_t rtc = modClockGet();
   uint32_t ms = millis();
-  if (time_ready && time_anchor_valid && time_record.active &&
-      !timeScheduleUnsent(time_record)) {
-    int64_t expected = (int64_t)time_anchor_rtc + (uint32_t)(ms - time_anchor_ms) / 1000u;
-    int64_t jump = (int64_t)rtc - expected;
-    if (jump > 60 || jump < -60) {
-      TimeRecord next = time_record;
-      if (timeScheduleShift(next, jump)) saveTime(next);
-    }
+  bool watching = time_ready && time_record.active && !timeScheduleUnsent(time_record);
+  int64_t jump = timeClockJump(time_watch, modClockGet(), ms);
+  if (watching && jump != 0 && timeScheduleShift(time_record, jump)) {
+    time_shift_unsaved = true;
+    time_shift_retry_ms = ms - TIME_RETRY_MS;
   }
-  time_anchor_rtc = rtc;
-  time_anchor_ms = ms;
-  time_anchor_valid = true;
+  if (time_shift_unsaved && (uint32_t)(ms - time_shift_retry_ms) >= TIME_RETRY_MS) {
+    time_shift_retry_ms = ms;
+    saveTime(time_record);
+  }
 }
+
+#if SYNC_TIME_PREFLIGHT
+static bool timeStartPreflight() {
+  if (!timePreflightEligible()) return false;
+  uint32_t run = 0;
+  if (HotspotOTA::startWanVerify(run)) time_preflight_run = run;
+  else timeRetryLater();
+  return true;
+}
+#endif
 
 static void timeTick() {
   timeWatchClock();
@@ -1094,9 +1101,13 @@ static void timeTick() {
     if (result != HotspotOTA::WanRun::Unknown) {
       time_preflight_done = true;
       time_preflight_for = time_record.next_sample;
+      time_watch.established = true;
     }
   }
+  // After a reboot the clock is re-established before stored deadlines are trusted.
+  if (!time_watch.established && timeStartPreflight()) return;
 #endif
+  time_watch.established = true;
   uint32_t now = modClockGet();
   if (!clockSane(now)) return;
   TimeStep step = timeScheduleUnsent(time_record) ? TIME_STEP_DUE
@@ -1110,11 +1121,7 @@ static void timeTick() {
   if (step != TIME_STEP_DUE) return;
 #if SYNC_TIME_PREFLIGHT
   if (!time_preflight_done || time_preflight_for != time_record.next_sample) {
-    uint32_t run = 0;
-    if (timePreflightEligible() && HotspotOTA::startWanVerify(run)) {
-      time_preflight_run = run;
-      return;
-    }
+    if (timeStartPreflight()) return;
     time_preflight_done = true;
     time_preflight_for = time_record.next_sample;
   }
@@ -3481,7 +3488,8 @@ static bool timeStatus(char* reply) {
     strcpy(reply, "fault storage");
     return true;
   }
-  const char* channel = config_ready && config.channel_len ? config.channel : "unset";
+  const char* channel = time_record.active ? time_record.channel
+                        : config_ready && config.channel_len ? config.channel : "unset";
   size_t used = time_record.active
       ? (size_t)snprintf(reply, 160, "%s active%s next %lu ends %lu channel %s",
                          time_record.enabled ? "on" : "off",

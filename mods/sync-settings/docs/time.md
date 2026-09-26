@@ -63,6 +63,9 @@ be right.
 - Without that, the publisher uses its clock as it stands. Set it first, for example with
   `time` or `ota wan verify`.
 - If the publisher's clock is corrected while a schedule runs, the schedule moves with it.
+- These boards have no battery-backed clock. After a power loss a publisher with the hotspot
+  check refreshes its clock before resuming the schedule; one without it waits until its clock
+  is set, for example with `time`.
 
 ### Commands
 
