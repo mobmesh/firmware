@@ -6,6 +6,7 @@
 #include <helpers/sync_settings/SyncRadioMigration.h>
 #include <helpers/sync_settings/SyncSelect.h>
 #include <helpers/sync_settings/SyncStore.h>
+#include <helpers/sync_settings/SyncTime.h>
 
 #include <Arduino.h>
 #include <esp_system.h>
@@ -117,6 +118,21 @@ struct RadioArm {
 };
 static RadioArm radio_arm;
 #endif
+#if SYNC_SETTINGS_WITH_TIME
+enum TimeOutcome : uint8_t {
+  TIME_RX_NONE, TIME_RX_CORRECTED, TIME_RX_WITHIN, TIME_RX_REPLAY, TIME_RX_STORAGE,
+};
+static TimeRecord time_record;
+static bool time_ready;
+static bool time_degraded;
+static bool time_tx_pending;
+static uint32_t time_tx_id;
+static uint32_t time_tx_ms;
+static uint32_t time_retry_ms;
+static bool time_retry_wait;
+static TimeOutcome time_rx_outcome;
+static int64_t time_rx_delta;
+#endif
 #if SYNC_SETTINGS_WITH_REGION
 static RegionRecord region_record;
 static bool regionSettlementPending() {
@@ -183,6 +199,9 @@ static PairPaths POLICY_RECOVERY_PATHS = {{"/sync_pr0", "/sync_pr1"}};
 #endif
 #if SYNC_SETTINGS_WITH_RADIO
 static PairPaths RADIO_PATHS = {{"/sync_rr0", "/sync_rr1"}};
+#endif
+#if SYNC_SETTINGS_WITH_TIME
+static PairPaths TIME_PATHS = {{"/sync_ts0", "/sync_ts1"}};
 #endif
 
 static bool fileExists(uint8_t slot, void* context) {
@@ -278,6 +297,13 @@ static StoreResult recoveryValid(const uint8_t* data, size_t len, void*) {
 static StoreResult radioValid(const uint8_t* data, size_t len, void*) {
   RadioRecord value;
   return readRadioRecord(data, len, value);
+}
+#endif
+
+#if SYNC_SETTINGS_WITH_TIME
+static StoreResult timeValid(const uint8_t* data, size_t len, void*) {
+  TimeRecord value;
+  return readTimeRecord(data, len, value);
 }
 #endif
 
@@ -421,6 +447,39 @@ static bool loadRadio(uint8_t* scratch) {
                       radio_record) != STORE_OK) return false;
   radio_degraded = pair.degraded;
   projectRadioState();
+  return true;
+}
+#endif
+
+#if SYNC_SETTINGS_WITH_TIME
+static bool loadTime(uint8_t* scratch) {
+  PairView pair;
+  PairResult result = loadPair(TIME_PATHS, STORE_TIME, pair, scratch, timeValid);
+  if (result == PAIR_ABSENT) {
+    defaultTimeRecord(time_record);
+    time_degraded = false;
+    return true;
+  }
+  if (result != PAIR_OK ||
+      readTimeRecord(pair.record.payload, pair.record.payload_len, time_record) != STORE_OK) {
+    return false;
+  }
+  time_degraded = pair.degraded;
+  return true;
+}
+
+static size_t buildTimePayload(uint8_t* out, size_t capacity, void* context) {
+  return writeTimeRecord(*static_cast<TimeRecord*>(context), out, capacity);
+}
+
+static bool saveTime(const TimeRecord& value) {
+  Temp scratch(STORE_MAX);
+  PairView pair;
+  if (!time_ready || !scratch ||
+      buildPair(pairIO(TIME_PATHS), STORE_TIME, pair, scratch, STORE_MAX, hash, timeValid,
+                buildTimePayload, const_cast<TimeRecord*>(&value)) != PAIR_OK) return false;
+  time_record = value;
+  time_degraded = false;
   return true;
 }
 #endif
@@ -837,8 +896,7 @@ static bool verifyFrame(const uint8_t key[32], const uint8_t* data, size_t len,
   return identity.verify(signature, data, (int)len);
 }
 
-#if SYNC_SETTINGS_WITH_RADIO
-static const Publisher* radioPublisher(const uint8_t fingerprint[FINGERPRINT_LEN]) {
+static const Publisher* trustedPublisher(const uint8_t fingerprint[FINGERPRINT_LEN]) {
   const Publisher* found = nullptr;
   for (uint8_t i = 0; i < publishers.count; ++i) {
     const Publisher& candidate = publishers.record[i];
@@ -852,6 +910,7 @@ static const Publisher* radioPublisher(const uint8_t fingerprint[FINGERPRINT_LEN
   return found;
 }
 
+#if SYNC_SETTINGS_WITH_RADIO
 static ReceiveResult cancelRadioThrough(uint16_t publisher_id,
                                         uint32_t generation);
 
@@ -866,7 +925,7 @@ static bool handleRadioControl(const InboxFrame& frame) {
         (frame.scoped && memcmp(staged.route_key, frame.key, 16) != 0)) return true;
     RadioConfirmView value;
     if (readRadioConfirm(frame.data, frame.len, value) != WIRE_OK) return true;
-    const Publisher* publisher = radioPublisher(value.publisher);
+    const Publisher* publisher = trustedPublisher(value.publisher);
     if (publisher == nullptr || publisher->id != staged.publisher_id ||
         !verifyFrame(publisher->key, frame.data, RADIO_CONFIRM_SIGNED_LEN,
                      value.signature, nullptr)) return true;
@@ -874,7 +933,7 @@ static bool handleRadioControl(const InboxFrame& frame) {
   } else {
     RadioAbortView value;
     if (readRadioAbort(frame.data, frame.len, value) != WIRE_OK) return true;
-    const Publisher* publisher = radioPublisher(value.publisher);
+    const Publisher* publisher = trustedPublisher(value.publisher);
     if (publisher == nullptr ||
         !verifyFrame(publisher->key, frame.data, RADIO_ABORT_SIGNED_LEN,
                      value.signature, nullptr)) return true;
@@ -895,6 +954,119 @@ static bool handleRadioControl(const InboxFrame& frame) {
     if (active) radioMigration().abort(value.migration_id);
   }
   return true;
+}
+#endif
+
+#if SYNC_SETTINGS_WITH_TIME
+static const uint32_t TIME_TX_TIMEOUT_MS = 60000;
+static const uint32_t TIME_RETRY_MS = 60000;
+
+static bool timeRadioLocked() {
+#if SYNC_SETTINGS_WITH_RADIO
+  return radioMigration().active() || radioPublisherMachine().active();
+#else
+  return false;
+#endif
+}
+
+static bool handleTimeSample(const InboxFrame& frame) {
+  uint8_t type = 0;
+  if (classify(frame.data, frame.len, type) != WIRE_OK || type != TIME_SAMPLE) return false;
+  if (!time_ready || !time_record.enabled || !config_ready || !trust_ready ||
+      config.channel_len == 0) return true;
+  TimeSampleView value;
+  if (readTimeSample(frame.data, frame.len, MOBMESH_BUILD_EPOCH, value) != WIRE_OK ||
+      strcmp(value.channel, config.channel) != 0) return true;
+  const Publisher* publisher = trustedPublisher(value.publisher);
+  if (publisher == nullptr ||
+      !verifyFrame(publisher->key, frame.data, TIME_SAMPLE_SIGNED_LEN, value.signature,
+                   nullptr) ||
+      timeRadioLocked()) return true;
+  if (value.generation <= publisher->time_generation) {
+    time_rx_outcome = TIME_RX_REPLAY;
+    return true;
+  }
+  Publishers next = publishers;
+  next.record[publisher - publishers.record].time_generation = value.generation;
+  Temp scratch(STORE_MAX);
+  if (!scratch || !savePublishers(next, scratch)) {
+    time_rx_outcome = TIME_RX_STORAGE;
+    return true;
+  }
+  publishers = next;
+  uint32_t now = modClockGet();
+  time_rx_delta = timeDelta(now, value.epoch);
+  if (timeNeedsCorrection(now, value.epoch, value.tolerance)) {
+    modClockSet(value.epoch);
+    time_rx_outcome = TIME_RX_CORRECTED;
+  } else {
+    time_rx_outcome = TIME_RX_WITHIN;
+  }
+  return true;
+}
+
+static void timeRetryLater() {
+  time_retry_wait = true;
+  time_retry_ms = millis();
+}
+
+static bool timeSend(uint32_t now) {
+  uint8_t key[32];
+  uint32_t generation;
+  if (!modPublisherKey(key) || !timeGeneration(time_record, key, now, generation)) return false;
+  TimeRecord reserved = time_record;
+  reserved.local_generation = generation;
+  memcpy(reserved.local_key, key, sizeof(key));
+  if (!saveTime(reserved)) return false;
+  uint8_t frame[TIME_SAMPLE_LEN];
+  uint8_t fingerprint[DIGEST_LEN];
+  hash(key, sizeof(key), fingerprint, nullptr);
+  size_t signed_len = writeTimeSamplePrefix(time_record.channel, fingerprint, generation, now,
+                                            time_record.captured_tolerance,
+                                            MOBMESH_BUILD_EPOCH, frame, sizeof(frame));
+  uint32_t airtime = 0;
+  if (signed_len != TIME_SAMPLE_SIGNED_LEN ||
+      !modSignDetached(frame, signed_len, frame + signed_len) ||
+      !txSend(frame, sizeof(frame), time_record.route_kind != 0, time_record.route_key,
+              time_tx_id, airtime, nullptr)) return false;
+  time_tx_pending = true;
+  time_tx_ms = millis();
+  return true;
+}
+
+static void timeTick() {
+  if (!time_ready || !time_record.active) return;
+  if (time_tx_pending) {
+    if ((uint32_t)(millis() - time_tx_ms) < TIME_TX_TIMEOUT_MS) return;
+    time_tx_pending = false;
+    timeRetryLater();
+  }
+  if (time_retry_wait && (uint32_t)(millis() - time_retry_ms) < TIME_RETRY_MS) return;
+  time_retry_wait = false;
+  if (timeRadioLocked()) return;
+  uint32_t now = modClockGet();
+  if (!clockSane(now)) return;
+  TimeStep step = timeScheduleStep(time_record, now);
+  if (step == TIME_STEP_CLOSE) {
+    TimeRecord next = time_record;
+    timeScheduleClear(next);
+    if (!saveTime(next)) timeRetryLater();
+    return;
+  }
+  if (step == TIME_STEP_DUE && !timeSend(now)) timeRetryLater();
+}
+
+static void timeComplete(uint32_t packet_id, bool succeeded) {
+  if (!time_tx_pending || packet_id != time_tx_id) return;
+  time_tx_pending = false;
+  if (!succeeded) {
+    timeRetryLater();
+    return;
+  }
+  if (!time_record.active) return;
+  TimeRecord next = time_record;
+  timeScheduleAdvance(next, modClockGet());
+  if (!saveTime(next)) timeRetryLater();
 }
 #endif
 
@@ -1451,6 +1623,9 @@ static void boot() {
   policy_recovery_ready = loadRecovery(scratch);
 #endif
   trust_ready = loadPublishers(scratch);
+#if SYNC_SETTINGS_WITH_TIME
+  time_ready = loadTime(scratch);
+#endif
 #if SYNC_SETTINGS_WITH_REGION
   region_receive_ready = region_state_ready &&
                          (!trust_ready || replayKnown(region_state));
@@ -2044,6 +2219,9 @@ static bool setChannel(const char* value, char* reply) {
 #if SYNC_SETTINGS_WITH_RADIO
       !radio_ready ||
 #endif
+#if SYNC_SETTINGS_WITH_TIME
+      !time_ready ||
+#endif
       false) {
     strcpy(reply, "Err - storage");
     return true;
@@ -2057,6 +2235,9 @@ static bool setChannel(const char* value, char* reply) {
 #endif
 #if SYNC_SETTINGS_WITH_RADIO
       radio_record.enabled ||
+#endif
+#if SYNC_SETTINGS_WITH_TIME
+      time_record.enabled ||
 #endif
       false) {
     snprintf(reply, 160, "Err - sync must be off; channel %s",
@@ -3125,6 +3306,196 @@ static bool radioCli(char* command, char* reply) {
 #endif
 
 
+#if SYNC_SETTINGS_WITH_TIME
+static bool parseTimeNumber(const char* text, char suffix, unsigned long low,
+                            unsigned long high, uint16_t& out) {
+  if (text == nullptr || *text < '0' || *text > '9') return false;
+  char* end;
+  unsigned long value = strtoul(text, &end, 10);
+  if (*end != suffix || end[1] != 0 || value < low || value > high) return false;
+  out = (uint16_t)value;
+  return true;
+}
+
+static bool parseTimeInterval(const char* text, uint16_t& hours) {
+  uint16_t days;
+  if (parseTimeNumber(text, 'd', 1, 30, days)) {
+    hours = (uint16_t)(days * 24u);
+    return true;
+  }
+  return parseTimeNumber(text, 'h', 1, TIME_INTERVAL_HOURS_MAX, hours);
+}
+
+static void timeIntervalText(uint16_t hours, char out[8]) {
+  if (hours % 24 == 0) snprintf(out, 8, "%ud", (unsigned)(hours / 24));
+  else snprintf(out, 8, "%uh", (unsigned)hours);
+}
+
+static bool timeSet(const char* setting, const char* value, char* reply) {
+  TimeRecord next = time_record;
+  if (strcmp(setting, "tolerance") == 0) {
+    if (!parseTimeNumber(value, 'm', 1, TIME_TOLERANCE_MAX, next.tolerance)) {
+      strcpy(reply, "Err - syntax: set sync.time.tolerance <N>m; N=1..1440");
+      return true;
+    }
+  } else if (strcmp(setting, "publish.interval") == 0) {
+    if (!parseTimeInterval(value, next.interval_hours)) {
+      strcpy(reply, "Err - syntax: set sync.time.publish.interval <N>h|<N>d; 1h..30d");
+      return true;
+    }
+  } else if (!parseTimeNumber(value, 'd', 1, TIME_DURATION_DAYS_MAX, next.duration_days)) {
+    strcpy(reply, "Err - syntax: set sync.time.publish.duration <N>d; N=1..365");
+    return true;
+  }
+  if (!timeSettingsValid(next.interval_hours, next.duration_days)) {
+    strcpy(reply, "Err - interval exceeds duration");
+    return true;
+  }
+  strcpy(reply, saveTime(next) ? "OK" : "Err - storage");
+  return true;
+}
+
+static bool timePublish(char* args, char* reply) {
+  char* part[3];
+  if (words(args, part, 2) != 2) {
+    strcpy(reply, "Err - syntax: sync.time publish <region|*> <channel>");
+    return true;
+  }
+  if (!time_ready) {
+    strcpy(reply, "Err - storage");
+    return true;
+  }
+  if (time_record.active) {
+    strcpy(reply, "Err - busy; sync.time publish.abort first");
+    return true;
+  }
+  if (time_record.tolerance == 0 || time_record.tolerance > TIME_TOLERANCE_MAX) {
+    strcpy(reply, "Err - tolerance unset; set sync.time.tolerance <N>m");
+    return true;
+  }
+  if (timeRadioLocked()) {
+    strcpy(reply, "Err - locked");
+    return true;
+  }
+  char channel[CHANNEL_MAX + 1];
+  if (!normalizeChannel(part[1], channel)) {
+    strcpy(reply, "Err - channel: 1-16 letters, digits, - or _");
+    return true;
+  }
+  bool scoped;
+  uint8_t route_key[16];
+  if (!publishRoute(part[0], scoped, route_key)) {
+    strcpy(reply, "Err - invalid route");
+    return true;
+  }
+  uint32_t now = modClockGet();
+  if (!clockSane(now)) {
+    strcpy(reply, "Err - clock");
+    return true;
+  }
+  TimeRecord next = time_record;
+  if (!timeScheduleStart(next, now, scoped, route_key, channel)) {
+    strcpy(reply, "Err - invalid schedule");
+    return true;
+  }
+  if (!saveTime(next)) {
+    strcpy(reply, "Err - storage");
+    return true;
+  }
+  time_retry_wait = false;
+  char interval[8];
+  timeIntervalText(next.interval_hours, interval);
+  snprintf(reply, 160, "OK - every %s until %lu", interval, (unsigned long)next.ends);
+  return true;
+}
+
+static bool timeStatus(char* reply) {
+  if (!time_ready) {
+    strcpy(reply, "fault storage");
+    return true;
+  }
+  const char* channel = config_ready && config.channel_len ? config.channel : "unset";
+  size_t used = time_record.active
+      ? (size_t)snprintf(reply, 160, "%s active%s next %lu ends %lu channel %s",
+                         time_record.enabled ? "on" : "off",
+                         time_tx_pending ? " sending" : time_retry_wait ? " retry" : "",
+                         (unsigned long)time_record.next_sample,
+                         (unsigned long)time_record.ends, channel)
+      : (size_t)snprintf(reply, 160, "%s idle channel %s",
+                         time_record.enabled ? "on" : "off", channel);
+  static const char* outcome[] = {"", "corrected", "within", "replay", "storage"};
+  if (time_rx_outcome != TIME_RX_NONE && used < 160) {
+    if (time_rx_outcome == TIME_RX_CORRECTED || time_rx_outcome == TIME_RX_WITHIN) {
+      snprintf(reply + used, 160 - used, "; last %s %llds", outcome[time_rx_outcome],
+               (long long)time_rx_delta);
+    } else {
+      snprintf(reply + used, 160 - used, "; last %s", outcome[time_rx_outcome]);
+    }
+  }
+  return true;
+}
+
+static bool timeCli(char* command, char* reply) {
+  if (strcmp(command, "sync.time on") == 0 || strcmp(command, "sync.time off") == 0) {
+    bool on = command[11] == 'n';
+    if (!time_ready || !config_ready) strcpy(reply, "Err - storage");
+    else if (on && config.channel_len == 0) strcpy(reply, "Err - channel not set");
+    else {
+      TimeRecord next = time_record;
+      next.enabled = on;
+      strcpy(reply, saveTime(next) ? "OK" : "Err - storage");
+    }
+    return true;
+  }
+  static const char publish[] = "sync.time publish";
+  if (strncmp(command, publish, sizeof(publish) - 1) == 0 &&
+      (command[sizeof(publish) - 1] == ' ' || command[sizeof(publish) - 1] == 0)) {
+    return timePublish(command + sizeof(publish) - 1, reply);
+  }
+  if (strcmp(command, "sync.time publish.status") == 0) return timeStatus(reply);
+  if (strcmp(command, "sync.time publish.abort") == 0) {
+    if (!time_ready) strcpy(reply, "Err - storage");
+    else if (!time_record.active) strcpy(reply, "Err - no schedule");
+    else {
+      TimeRecord next = time_record;
+      timeScheduleClear(next);
+      strcpy(reply, saveTime(next) ? "OK" : "Err - storage");
+    }
+    return true;
+  }
+  static const char get[] = "get sync.time.";
+  static const char set[] = "set sync.time.";
+  bool getting = strncmp(command, get, sizeof(get) - 1) == 0;
+  if (!getting && strncmp(command, set, sizeof(set) - 1) != 0) return false;
+  char* setting = command + sizeof(get) - 1;
+  char* value = strchr(setting, ' ');
+  if (value != nullptr) *value++ = 0;
+  if (strcmp(setting, "tolerance") != 0 && strcmp(setting, "publish.interval") != 0 &&
+      strcmp(setting, "publish.duration") != 0) {
+    if (value != nullptr) value[-1] = ' ';
+    return false;
+  }
+  if (!time_ready) {
+    strcpy(reply, "Err - storage");
+    return true;
+  }
+  if (!getting) return timeSet(setting, value, reply);
+  if (value != nullptr) {
+    snprintf(reply, 160, "Err - syntax: get sync.time.%s", setting);
+  } else if (setting[0] == 't') {
+    if (time_record.tolerance == 0) strcpy(reply, "> unset");
+    else snprintf(reply, 160, "> %um", (unsigned)time_record.tolerance);
+  } else if (setting[8] == 'i') {
+    char interval[8];
+    timeIntervalText(time_record.interval_hours, interval);
+    snprintf(reply, 160, "> %s", interval);
+  } else {
+    snprintf(reply, 160, "> %ud", (unsigned)time_record.duration_days);
+  }
+  return true;
+}
+#endif
+
 static bool handleCli(const ModCliContext& context, char* command, char* reply) {
 #if !SYNC_SETTINGS_WITH_REGION
   (void)context;
@@ -3133,6 +3504,9 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   if (publisherCommand(command, reply)) return true;
 #if SYNC_SETTINGS_WITH_RADIO
   if (radioCli(command, reply)) return true;
+#endif
+#if SYNC_SETTINGS_WITH_TIME
+  if (timeCli(command, reply)) return true;
 #endif
   if (publishCommand(command, reply)) return true;
   if (strcmp(command, "get sync.channel") == 0) {
@@ -3509,6 +3883,12 @@ void syncLoop() {
   }
 #endif
   const mobmesh::sync::InboxFrame* frame = mobmesh::sync::inbox.front();
+#if SYNC_SETTINGS_WITH_TIME
+  if (frame != nullptr && mobmesh::sync::handleTimeSample(*frame)) {
+    mobmesh::sync::inbox.drop();
+    frame = nullptr;
+  }
+#endif
   if (frame != nullptr) {
 #if SYNC_SETTINGS_WITH_RADIO
     if (mobmesh::sync::handleRadioControl(*frame)) {
@@ -3549,6 +3929,9 @@ void syncLoop() {
   }
   mobmesh::sync::receiver.tick(millis());
   mobmesh::sync::transmitter().tick(millis());
+#if SYNC_SETTINGS_WITH_TIME
+  mobmesh::sync::timeTick();
+#endif
 #if SYNC_SETTINGS_WITH_REGION
   mobmesh::sync::maintainState(mobmesh::sync::REGION, millis());
 #endif
@@ -3561,6 +3944,9 @@ void syncTx(uint32_t packet_id, bool succeeded) {
   mobmesh::sync::transmitter().complete(packet_id, succeeded, millis());
 #if SYNC_SETTINGS_WITH_RADIO
   mobmesh::sync::radioPublisherMachine().complete(packet_id, succeeded, millis());
+#endif
+#if SYNC_SETTINGS_WITH_TIME
+  mobmesh::sync::timeComplete(packet_id, succeeded);
 #endif
 }
 

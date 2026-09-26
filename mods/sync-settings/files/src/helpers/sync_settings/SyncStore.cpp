@@ -101,7 +101,7 @@ size_t writeStore(uint8_t type, uint32_t sequence, const uint8_t* payload,
   size_t len = (size_t)payload_len + STORE_OVERHEAD;
   if (out == nullptr || hash == nullptr || sequence == 0 ||
       (payload_len != 0 && payload == nullptr) || len > capacity || len > STORE_MAX ||
-      type < STORE_CONFIG || type > STORE_RADIO) {
+      type < STORE_CONFIG || type > STORE_TIME) {
     return 0;
   }
 
