@@ -1,4 +1,5 @@
 #include "RollbackGuard.h"
+#include "RadioFailPolicy.h"
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
 #include <esp_system.h>   // esp_restart()
@@ -110,11 +111,13 @@ static uint8_t readFailCount() {
   return count;
 }
 
-static void writeFailCount(uint8_t count) {
+// Read back, because an unmounted or full volume can accept the open and still lose the byte.
+static bool writeFailCount(uint8_t count) {
   File f = SPIFFS.open(RADIO_FAIL_COUNT_PATH, "w");
-  if (!f) return;
-  f.write(&count, 1);
+  if (!f) return false;
+  size_t written = f.write(&count, 1);
   f.close();
+  return written == 1 && readFailCount() == count;
 }
 
 // The app image header carries the prebuilt Arduino core's build info, not FIRMWARE_VERSION, so
@@ -176,20 +179,25 @@ void RollbackGuard::onRadioInitFailure() {
   // Not on probation -- transient or genuine radio failure unrelated to any update. Retry with cap
   // instead of hanging forever on the first attempt.
   uint8_t count = readFailCount();
-  if (count < 255) writeFailCount(count + 1);
-  if (count < RADIO_INIT_RESET_CAP) {
+  bool durable = writeFailCount(count < 255 ? count + 1 : count);
+  RadioFailAction action = radioFailAction(count, durable, RADIO_INIT_RESET_CAP,
+                                           OTA_RADIO_FAIL_SLEEP_START_SECS,
+                                           OTA_RADIO_FAIL_SLEEP_MAX_SECS);
+  if (action.restart) {
     esp_restart();   // does not return
   }
 
-  // Cap exhausted -- one retry per wake, backing off, until begin() clears the count.
-  uint32_t shift = count - RADIO_INIT_RESET_CAP;
-  uint32_t secs = OTA_RADIO_FAIL_SLEEP_MAX_SECS;
-  if (shift < 16) secs = OTA_RADIO_FAIL_SLEEP_START_SECS << shift;
-  if (secs > OTA_RADIO_FAIL_SLEEP_MAX_SECS) secs = OTA_RADIO_FAIL_SLEEP_MAX_SECS;
-  Serial.printf("radio init failed %u times -- deep sleep %us\n", (unsigned)count + 1, (unsigned)secs);
+  // Cap exhausted, or the count could not be kept -- one retry per wake, until begin() clears it.
+  if (durable) {
+    Serial.printf("radio init failed %u times -- deep sleep %us\n", (unsigned)count + 1,
+                  (unsigned)action.sleep_secs);
+  } else {
+    Serial.printf("radio init failed; fail count not saved -- deep sleep %us\n",
+                  (unsigned)action.sleep_secs);
+  }
   Serial.flush();
   modBeforeDeepSleep();
-  modBoardDeepSleep(secs);   // does not return
+  modBoardDeepSleep(action.sleep_secs);   // does not return
 }
 
 RollbackGuard::Slots RollbackGuard::slots() {
