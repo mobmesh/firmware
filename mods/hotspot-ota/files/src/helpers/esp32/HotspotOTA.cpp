@@ -242,7 +242,7 @@ static const char* serviceStateName(OtaServiceState state) {
     case OtaServiceState::Succeeded: return "succeeded";
     case OtaServiceState::Failed: return "failed";
     case OtaServiceState::Canceled: return "canceled";
-    case OtaServiceState::WanComplete: return "wan-verified";
+    case OtaServiceState::WanComplete: return "wan-complete";
   }
   return "unknown";
 }

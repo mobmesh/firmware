@@ -187,8 +187,10 @@ active OTA service.
 `ota wan verify` is the unattended health check. It powers and joins the configured hotspot when
 needed, checks WAN access twice, and then attempts a fresh NTP synchronization twice. On completion
 it restores WiFi first and hotspot power second, then verifies both match their starting state.
-The command queues the work and returns immediately. A reboot cancels the check; it does not
-automatically power hardware or rejoin WiFi during startup.
+The command queues the work and returns immediately. When it finishes, `get ota.status` shows
+`wan-complete` whether verification passed or failed; `get ota.wan.health` holds the result.
+A reboot cancels the check; it does not automatically power hardware or rejoin WiFi during
+startup.
 
 `get ota.wan.health` reports `WAN_0|NTP_0`, `WAN_1|NTP_0`, `WAN_1|NTP_1`, or
 `RESTORE_FAULT`, plus `proven=yes|no`. A successful result stays proven across later transient
