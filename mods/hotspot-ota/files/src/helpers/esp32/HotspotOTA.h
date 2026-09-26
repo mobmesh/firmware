@@ -50,4 +50,8 @@ namespace HotspotOTA {
   bool wifiConnect(char reply[]);
   void wifiDisconnect();
   bool checkWan(char reply[]);
+  bool verifyWan(char reply[]);
+  void wanHealth(char reply[]);
+  bool wanProven();
+  bool resetWanHealth();
 }

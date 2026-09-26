@@ -6,6 +6,7 @@
 #include <helpers/esp32/PowerGuardIntegration.h>
 
 bool modRadioInit(const char* build_id) {
+  hotspotOtaBeforeRadioInit();
   powerGuardBeforeRadioInit();
   return hotspotOtaRadioInit(build_id);
 }

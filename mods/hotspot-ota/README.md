@@ -76,6 +76,8 @@ All of these work over serial or remotely over the mesh. Full details are in
 <tr><td><code>set ota.fw.marker &lt;on|off&gt;</code></td><td>Turn the build-stamp check off for the next update only. See below.</td></tr>
 <tr><td><code>ota wan join</code> / <code>ota wan leave</code></td><td>Join WiFi without downloading, or disconnect and cut hotspot power.</td></tr>
 <tr><td><code>ota wan check</code></td><td>Check the node can reach the internet.</td></tr>
+<tr><td><code>ota wan verify</code></td><td>Test WAN and NTP, then restore the current WiFi and hotspot-power state.</td></tr>
+<tr><td><code>get ota.wan.health</code></td><td>Show the latest verification and whether this WiFi setup has succeeded before.</td></tr>
 <tr><td><code>get|set ota.wan.pwr</code></td><td>Read or switch the hotspot power directly.</td></tr>
 <tr><td><code>get ota.slot</code></td><td>Version and state of both slots.</td></tr>
 <tr><td><code>ota slot boot &lt;A|B&gt;</code></td><td>Boot the other slot, if it holds a valid image.</td></tr>
@@ -92,6 +94,8 @@ command:
 
 ```text
 set ota.wan.wifi MyHotspot,hunter2
+ota wan verify
+get ota.wan.health
 set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin
 start ota wan update
 ```

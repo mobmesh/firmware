@@ -20,6 +20,7 @@ requirements:
 integration:
   header: helpers/esp32/HotspotOtaIntegration.h
   hooks:
+    before_radio_init: hotspotOtaBeforeRadioInit
     radio_init_policy: hotspotOtaRadioInit
     loop: hotspotOtaLoop
     cli:

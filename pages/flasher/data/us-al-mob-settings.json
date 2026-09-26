@@ -5,7 +5,7 @@
   "name_prefix": "al-",
 
   "commands": [
-    "set radio 910.525,62.5,7,6",
+    "set radio 910.525,62.5,7,8",
     "set advert.interval 240",
     "set flood.advert.interval 23",
     "set path.hash.mode 1",

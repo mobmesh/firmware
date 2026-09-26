@@ -7,6 +7,7 @@
 #include <helpers/sync_settings/SyncIntegration.h>
 
 bool modRadioInit(const char* build_id) {
+  hotspotOtaBeforeRadioInit();
   powerGuardBeforeRadioInit();
   return hotspotOtaRadioInit(build_id);
 }

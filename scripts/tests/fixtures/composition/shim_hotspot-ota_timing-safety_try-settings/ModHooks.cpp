@@ -5,7 +5,7 @@
 #include <helpers/esp32/TrySetIntegration.h>
 
 bool modRadioInit(const char* build_id) {
-
+  hotspotOtaBeforeRadioInit();
   return hotspotOtaRadioInit(build_id);
 }
 

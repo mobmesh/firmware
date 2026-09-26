@@ -20,6 +20,10 @@
 #define OTA_MOD_BUILD_DATE "unknown"
 #endif
 
+void hotspotOtaBeforeRadioInit() {
+  HotspotOTA::setPower(false);
+}
+
 bool hotspotOtaRadioInit(const char* build_id) {
   SPIFFS.begin(true);
   for (int attempt = 0; attempt < 3; attempt++) {
@@ -292,7 +296,10 @@ static bool refuseWhileApWriting(char* reply) {
 }
 
 static void apPoll() {
-  if (ap_reboot_pending && millis() - ap_reboot_ms >= OTA_REBOOT_GRACE_MS) modBoardReboot();
+  if (ap_reboot_pending && millis() - ap_reboot_ms >= OTA_REBOOT_GRACE_MS) {
+    HotspotOTA::setPower(false);
+    modBoardReboot();
+  }
   if (!ap_up) return;
   if (Update.isRunning()) {
     size_t written = Update.progress();
@@ -424,6 +431,9 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
       HotspotOTA::wifiDisconnect();
       strcpy(reply, "OK - disconnected");
     }
+  } else if (strcmp(command, "ota wan verify") == 0) {
+    if (refuseWhileApUp(reply)) return true;
+    HotspotOTA::verifyWan(reply);
   } else if (memcmp(command, "ota wan check", 13) == 0) {
     HotspotOTA::checkWan(reply);
   } else if (memcmp(command, "ota slot boot ", 14) == 0) {
@@ -433,6 +443,7 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
     } else if (refuseWhileApWriting(reply)) {
       return true;
     } else if (RollbackGuard::setActivePartition(command[14], reply)) {
+      HotspotOTA::setPower(false);
       modBoardReboot();
     }
   } else {
@@ -444,6 +455,10 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
 static bool handleSet(char* command, char* reply) {
   char* config = &command[4];
   if (memcmp(config, "ota.wan.wifi ", 13) == 0) {
+    if (HotspotOTA::isActive()) {
+      strcpy(reply, "ERR: OTA/WAN operation active");
+      return true;
+    }
     HotspotOtaConfig cfg;
     HotspotOTA::loadConfig(cfg);
     char* comma = strchr(&config[13], ',');
@@ -451,8 +466,13 @@ static bool handleSet(char* command, char* reply) {
       *comma = 0;
       StrHelper::strncpy(cfg.ssid, &config[13], sizeof(cfg.ssid));
       StrHelper::strncpy(cfg.password, comma + 1, sizeof(cfg.password));
-      HotspotOTA::saveConfig(cfg);
-      strcpy(reply, "OK");
+      if (!HotspotOTA::saveConfig(cfg)) {
+        strcpy(reply, "ERR: could not save WiFi settings");
+      } else if (!HotspotOTA::resetWanHealth()) {
+        strcpy(reply, "ERR: WiFi saved; WAN health reset failed");
+      } else {
+        strcpy(reply, "OK");
+      }
     } else {
       strcpy(reply, "ERR: expected <ssid>,<password>");
     }
@@ -502,6 +522,8 @@ static bool handleGet(char* command, char* reply) {
     sprintf(reply, "> %s", cfg.url[0] ? cfg.url : "(not set)");
   } else if (memcmp(config, "ota.wan.pwr", 11) == 0) {
     sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
+  } else if (memcmp(config, "ota.wan.health", 14) == 0) {
+    HotspotOTA::wanHealth(reply);
   } else if (memcmp(config, "ota.status", 10) == 0) {
     HotspotOTA::status(reply);
   } else if (memcmp(config, "ota.ap", 6) == 0) {

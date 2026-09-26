@@ -1366,7 +1366,9 @@ confirm or force the rail off if state is ever in doubt (e.g. after a crash or w
 **Usage:**
 - `ota wan join`
 - `ota wan check`
+- `ota wan verify`
 - `ota wan leave`
+- `get ota.wan.health`
 
 **Note:** `ota wan join` joins the configured WiFi network only (no WAN check, no download),
 returning in one quick attempt (~15s worst case) instead of `start ota wan`'s full patient join
@@ -1374,6 +1376,17 @@ budget (~115s). `ota wan check` checks WAN reachability on demand, repeatable wi
 `ota wan leave` disconnects and drops WAN power for a clean retry. A successful `ota wan join` lets
 `start ota wan` skip its own join step right after. These commands refuse to interfere with an
 active OTA service.
+
+`ota wan verify` is the unattended health check. It powers and joins the configured hotspot when
+needed, checks WAN access twice, and then attempts a fresh NTP synchronization twice. On completion
+it restores WiFi first and hotspot power second, then verifies both match their starting state.
+The command queues the work and returns immediately. A reboot cancels the check; it does not
+automatically power hardware or rejoin WiFi during startup.
+
+`get ota.wan.health` reports `WAN_0|NTP_0`, `WAN_1|NTP_0`, `WAN_1|NTP_1`, or
+`RESTORE_FAULT`, plus `proven=yes|no`. A successful result stays proven across later transient
+failures. Changing `ota.wan.wifi` clears it. A restore fault records a failed runtime cleanup but
+does not create a persistent lock.
 
 **Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
 
