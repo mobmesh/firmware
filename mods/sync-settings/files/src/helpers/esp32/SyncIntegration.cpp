@@ -144,6 +144,7 @@ static uint32_t time_preflight_for;
 static bool time_preflight_done;
 static TimeClockWatch time_watch;
 static bool time_establish_tried;
+static uint8_t time_establish_failures;
 static bool time_ntp_refreshed;
 static uint32_t time_ntp_mark;
 static uint32_t time_establish_ms;
@@ -978,7 +979,6 @@ static bool handleRadioControl(const InboxFrame& frame) {
 #if SYNC_SETTINGS_WITH_TIME
 static const uint32_t TIME_TX_TIMEOUT_MS = 60000;
 static const uint32_t TIME_RETRY_MS = 60000;
-static const uint32_t TIME_ESTABLISH_RETRY_MS = 600000;
 
 static bool timeRadioLocked() {
 #if SYNC_SETTINGS_WITH_RADIO
@@ -1119,7 +1119,9 @@ static void timeTick() {
     if (!timeClockCredible(time_record, modClockGet(), MOBMESH_BUILD_EPOCH)) {
 #if SYNC_TIME_PREFLIGHT
       if (!time_establish_tried ||
-          (uint32_t)(millis() - time_establish_ms) >= TIME_ESTABLISH_RETRY_MS) {
+          (uint32_t)(millis() - time_establish_ms) >=
+              timeEstablishRetryMs(time_establish_failures, time_record.ntp_interval_hours)) {
+        if (time_establish_tried && time_establish_failures < 255) ++time_establish_failures;
         time_establish_tried = true;
         time_establish_ms = millis();
         timeStartPreflight();

@@ -101,6 +101,7 @@ int64_t timeClockJump(TimeClockWatch& watch, uint32_t rtc, uint32_t ms);
 bool timeClockCredible(const TimeRecord& record, uint32_t now, uint32_t build_epoch);
 uint32_t timeNtpMark(const TimeRecord& record, uint32_t at);
 bool timeNtpDue(const TimeRecord& record, bool refreshed, uint32_t refreshed_mark);
+uint32_t timeEstablishRetryMs(uint8_t failures, uint16_t ntp_interval_hours);
 void timeScheduleClear(TimeRecord& record);
 
 }  // namespace sync

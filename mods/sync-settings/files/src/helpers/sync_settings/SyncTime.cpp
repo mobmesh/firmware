@@ -283,6 +283,15 @@ bool timeNtpDue(const TimeRecord& record, bool refreshed, uint32_t refreshed_mar
          timeNtpMark(record, record.next_sample) > refreshed_mark;
 }
 
+uint32_t timeEstablishRetryMs(uint8_t failures, uint16_t ntp_interval_hours) {
+  const uint64_t first = 600000ull;
+  uint64_t cap = (uint64_t)ntp_interval_hours * HOUR * 1000ull;
+  if (cap < first) cap = first;
+  if (cap > 0x7fffffffull) cap = 0x7fffffffull;
+  uint64_t delay = failures >= 32 ? cap : first << failures;
+  return (uint32_t)(delay < cap ? delay : cap);
+}
+
 void timeScheduleClear(TimeRecord& record) {
   record.active = false;
   record.route_kind = 0;
