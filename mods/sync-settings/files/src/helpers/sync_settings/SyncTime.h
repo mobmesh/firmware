@@ -31,6 +31,28 @@ struct TimeRecord {
   uint16_t captured_tolerance;
 };
 
+enum TimeReceiveResult : uint8_t {
+  TIME_RECEIVE_IGNORED,
+  TIME_RECEIVE_UNTRUSTED,
+  TIME_RECEIVE_SIGNATURE,
+  TIME_RECEIVE_LOCKED,
+  TIME_RECEIVE_REPLAY,
+  TIME_RECEIVE_STORAGE,
+  TIME_RECEIVE_WITHIN,
+  TIME_RECEIVE_CORRECTED,
+};
+
+struct TimeReceiveOps {
+  bool (*verify)(const uint8_t key[32], const uint8_t* data, size_t len,
+                 const uint8_t signature[64], void* context);
+  bool (*persist)(const Publishers& next, void* context);
+  bool (*locked)(void* context);
+  uint32_t (*clock_get)(void* context);
+  void (*clock_set)(uint32_t epoch, void* context);
+  HashFn hash;
+  void* context;
+};
+
 enum TimeStep : uint8_t {
   TIME_STEP_IDLE,
   TIME_STEP_WAIT,
@@ -41,6 +63,13 @@ enum TimeStep : uint8_t {
 int64_t timeDelta(uint32_t receiver_now, uint32_t publisher_epoch);
 bool timeNeedsCorrection(uint32_t receiver_now, uint32_t publisher_epoch,
                          uint16_t tolerance_minutes);
+
+int8_t timeTrustedPublisher(const Publishers& publishers,
+                            const uint8_t fingerprint[FINGERPRINT_LEN], HashFn hash,
+                            void* context);
+TimeReceiveResult timeReceive(const uint8_t* frame, size_t len, const char* channel,
+                              Publishers& publishers, uint32_t build_epoch,
+                              const TimeReceiveOps& ops, int64_t& delta);
 
 void defaultTimeRecord(TimeRecord& record);
 StoreResult readTimeRecord(const uint8_t* data, size_t len, TimeRecord& out);

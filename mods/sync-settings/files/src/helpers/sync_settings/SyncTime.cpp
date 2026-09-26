@@ -48,6 +48,48 @@ bool timeNeedsCorrection(uint32_t receiver_now, uint32_t publisher_epoch,
   return delta > (int64_t)tolerance_minutes * 60;
 }
 
+int8_t timeTrustedPublisher(const Publishers& publishers,
+                            const uint8_t fingerprint[FINGERPRINT_LEN], HashFn hash,
+                            void* context) {
+  int8_t found = -1;
+  for (uint8_t i = 0; i < publishers.count && i < PUBLISHER_MAX; ++i) {
+    const Publisher& candidate = publishers.record[i];
+    if (candidate.status != PUBLISHER_ACTIVE) continue;
+    uint8_t digest[STORE_DIGEST_LEN];
+    hash(candidate.key, sizeof(candidate.key), digest, context);
+    if (memcmp(digest, fingerprint, FINGERPRINT_LEN) != 0) continue;
+    if (found >= 0) return -1;
+    found = (int8_t)i;
+  }
+  return found;
+}
+
+TimeReceiveResult timeReceive(const uint8_t* frame, size_t len, const char* channel,
+                              Publishers& publishers, uint32_t build_epoch,
+                              const TimeReceiveOps& ops, int64_t& delta) {
+  TimeSampleView value;
+  if (channel == nullptr || channel[0] == 0 ||
+      readTimeSample(frame, len, build_epoch, value) != WIRE_OK ||
+      strcmp(value.channel, channel) != 0) return TIME_RECEIVE_IGNORED;
+  int8_t index = timeTrustedPublisher(publishers, value.publisher, ops.hash, ops.context);
+  if (index < 0) return TIME_RECEIVE_UNTRUSTED;
+  Publisher& publisher = publishers.record[index];
+  if (!ops.verify(publisher.key, frame, TIME_SAMPLE_SIGNED_LEN, value.signature, ops.context)) {
+    return TIME_RECEIVE_SIGNATURE;
+  }
+  if (ops.locked(ops.context)) return TIME_RECEIVE_LOCKED;
+  if (value.generation <= publisher.time_generation) return TIME_RECEIVE_REPLAY;
+  Publishers next = publishers;
+  next.record[index].time_generation = value.generation;
+  if (!ops.persist(next, ops.context)) return TIME_RECEIVE_STORAGE;
+  publishers = next;
+  uint32_t now = ops.clock_get(ops.context);
+  delta = timeDelta(now, value.epoch);
+  if (!timeNeedsCorrection(now, value.epoch, value.tolerance)) return TIME_RECEIVE_WITHIN;
+  ops.clock_set(value.epoch, ops.context);
+  return TIME_RECEIVE_CORRECTED;
+}
+
 bool timeSettingsValid(uint16_t interval_hours, uint16_t duration_days) {
   return interval_hours >= 1 && interval_hours <= TIME_INTERVAL_HOURS_MAX &&
          duration_days >= 1 && duration_days <= TIME_DURATION_DAYS_MAX &&

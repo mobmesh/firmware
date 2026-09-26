@@ -979,38 +979,31 @@ static bool timeRadioLocked() {
 #endif
 }
 
+static bool timeTrustPersist(const Publishers& next, void*) {
+  Temp scratch(STORE_MAX);
+  return scratch && savePublishers(next, scratch);
+}
+
+static bool timeLocked(void*) { return timeRadioLocked(); }
+static uint32_t timeClockGet(void*) { return modClockGet(); }
+static void timeClockSet(uint32_t epoch, void*) { modClockSet(epoch); }
+
 static bool handleTimeSample(const InboxFrame& frame) {
   uint8_t type = 0;
   if (classify(frame.data, frame.len, type) != WIRE_OK || type != TIME_SAMPLE) return false;
-  if (!time_ready || !time_record.enabled || !config_ready || !trust_ready ||
-      config.channel_len == 0) return true;
-  TimeSampleView value;
-  if (readTimeSample(frame.data, frame.len, MOBMESH_BUILD_EPOCH, value) != WIRE_OK ||
-      strcmp(value.channel, config.channel) != 0) return true;
-  const Publisher* publisher = trustedPublisher(value.publisher);
-  if (publisher == nullptr ||
-      !verifyFrame(publisher->key, frame.data, TIME_SAMPLE_SIGNED_LEN, value.signature,
-                   nullptr) ||
-      timeRadioLocked()) return true;
-  if (value.generation <= publisher->time_generation) {
+  if (!time_ready || !time_record.enabled || !config_ready || !trust_ready) return true;
+  static const TimeReceiveOps ops = {verifyFrame, timeTrustPersist, timeLocked,
+                                     timeClockGet, timeClockSet, hash, nullptr};
+  int64_t delta = 0;
+  TimeReceiveResult result = timeReceive(frame.data, frame.len, config.channel, publishers,
+                                         MOBMESH_BUILD_EPOCH, ops, delta);
+  if (result == TIME_RECEIVE_CORRECTED || result == TIME_RECEIVE_WITHIN) {
+    time_rx_outcome = result == TIME_RECEIVE_CORRECTED ? TIME_RX_CORRECTED : TIME_RX_WITHIN;
+    time_rx_delta = delta;
+  } else if (result == TIME_RECEIVE_REPLAY) {
     time_rx_outcome = TIME_RX_REPLAY;
-    return true;
-  }
-  Publishers next = publishers;
-  next.record[publisher - publishers.record].time_generation = value.generation;
-  Temp scratch(STORE_MAX);
-  if (!scratch || !savePublishers(next, scratch)) {
+  } else if (result == TIME_RECEIVE_STORAGE) {
     time_rx_outcome = TIME_RX_STORAGE;
-    return true;
-  }
-  publishers = next;
-  uint32_t now = modClockGet();
-  time_rx_delta = timeDelta(now, value.epoch);
-  if (timeNeedsCorrection(now, value.epoch, value.tolerance)) {
-    modClockSet(value.epoch);
-    time_rx_outcome = TIME_RX_CORRECTED;
-  } else {
-    time_rx_outcome = TIME_RX_WITHIN;
   }
   return true;
 }
