@@ -263,6 +263,11 @@ int64_t timeClockJump(TimeClockWatch& watch, uint32_t rtc, uint32_t ms) {
   return jump;
 }
 
+bool timeClockCredible(const TimeRecord& record, uint32_t now, uint32_t build_epoch) {
+  if (now < build_epoch) return false;
+  return !record.active || timeScheduleUnsent(record) || now >= record.started;
+}
+
 void timeScheduleClear(TimeRecord& record) {
   record.active = false;
   record.route_kind = 0;

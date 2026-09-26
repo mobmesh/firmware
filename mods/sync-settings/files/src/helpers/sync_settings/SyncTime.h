@@ -94,6 +94,7 @@ void timeScheduleAdvance(TimeRecord& record, uint32_t now);
 bool timeScheduleUnsent(const TimeRecord& record);
 bool timeScheduleShift(TimeRecord& record, int64_t delta);
 int64_t timeClockJump(TimeClockWatch& watch, uint32_t rtc, uint32_t ms);
+bool timeClockCredible(const TimeRecord& record, uint32_t now, uint32_t build_epoch);
 void timeScheduleClear(TimeRecord& record);
 
 }  // namespace sync

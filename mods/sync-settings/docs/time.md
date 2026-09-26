@@ -114,6 +114,7 @@ Status words while a schedule is active:
 
 | Word | Meaning |
 |---|---|
+| `waiting-clock` | After a restart the clock is not yet believable (before this firmware was built, or before the schedule began); nothing is sent until it is set. |
 | `verifying` | The hotspot preflight is refreshing the publisher's clock. |
 | `sending` | A sample has been handed to the radio. |
 | `retry` | The last attempt did not complete; it retries after a minute. |

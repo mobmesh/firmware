@@ -143,6 +143,8 @@ static uint32_t time_preflight_run;
 static uint32_t time_preflight_for;
 static bool time_preflight_done;
 static TimeClockWatch time_watch;
+static bool time_establish_tried;
+static uint32_t time_establish_ms;
 static bool time_shift_unsaved;
 static uint32_t time_shift_retry_ms;
 #endif
@@ -974,6 +976,7 @@ static bool handleRadioControl(const InboxFrame& frame) {
 #if SYNC_SETTINGS_WITH_TIME
 static const uint32_t TIME_TX_TIMEOUT_MS = 60000;
 static const uint32_t TIME_RETRY_MS = 60000;
+static const uint32_t TIME_ESTABLISH_RETRY_MS = 600000;
 
 static bool timeRadioLocked() {
 #if SYNC_SETTINGS_WITH_RADIO
@@ -1101,13 +1104,24 @@ static void timeTick() {
     if (result != HotspotOTA::WanRun::Unknown) {
       time_preflight_done = true;
       time_preflight_for = time_record.next_sample;
-      time_watch.established = true;
     }
   }
-  // After a reboot the clock is re-established before stored deadlines are trusted.
-  if (!time_watch.established && timeStartPreflight()) return;
 #endif
-  time_watch.established = true;
+  // Stored deadlines are trusted only once this boot has a credible clock.
+  if (!time_watch.established) {
+    if (!timeClockCredible(time_record, modClockGet(), MOBMESH_BUILD_EPOCH)) {
+#if SYNC_TIME_PREFLIGHT
+      if (!time_establish_tried ||
+          (uint32_t)(millis() - time_establish_ms) >= TIME_ESTABLISH_RETRY_MS) {
+        time_establish_tried = true;
+        time_establish_ms = millis();
+        timeStartPreflight();
+      }
+#endif
+      return;
+    }
+    time_watch.established = true;
+  }
   uint32_t now = modClockGet();
   if (!clockSane(now)) return;
   TimeStep step = timeScheduleUnsent(time_record) ? TIME_STEP_DUE
@@ -3494,6 +3508,7 @@ static bool timeStatus(char* reply) {
       ? (size_t)snprintf(reply, 160, "%s active%s next %lu ends %lu channel %s",
                          time_record.enabled ? "on" : "off",
                          time_preflight_run != 0 ? " verifying" :
+                         !time_watch.established ? " waiting-clock" :
                          time_tx_pending ? " sending" : time_retry_wait ? " retry" : "",
                          (unsigned long)time_record.next_sample,
                          (unsigned long)time_record.ends, channel)
