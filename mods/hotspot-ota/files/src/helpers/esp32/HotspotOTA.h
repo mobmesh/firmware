@@ -54,4 +54,8 @@ namespace HotspotOTA {
   void wanHealth(char reply[]);
   bool wanProven();
   bool resetWanHealth();
+
+  enum class WanRun : uint8_t { Pending, Unknown, WanFailed, NtpFailed, Verified, RestoreFault };
+  bool startWanVerify(uint32_t& run);
+  WanRun wanVerifyResult(uint32_t run);
 }

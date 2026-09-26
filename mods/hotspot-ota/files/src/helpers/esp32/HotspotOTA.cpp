@@ -136,6 +136,11 @@ static bool service_cancel_requested = false;
 static bool service_sleep_inhibited = false;
 static uint32_t service_clock_epoch = 0;
 static ServiceKind service_kind = ServiceKind::None;
+static uint32_t service_run = 0;
+static uint32_t wan_run_seq = 0;
+static uint32_t wan_done_run = 0;
+static WanResult service_wan_result = WanResult::Unknown;
+static WanResult wan_done_result = WanResult::Unknown;
 static WanRuntimeState service_wan_initial;
 
 static void sha256(const uint8_t* data, size_t len, uint8_t out[32]) {
@@ -719,6 +724,9 @@ static bool runWanVerify(const HotspotOtaConfig& cfg, const WanRuntimeState& ini
   bool restored = restoreWanState(initial, cfg);
   if (!restored) {
     record.result = (uint8_t)WanResult::RestoreFault;
+    portENTER_CRITICAL(&service_mux);
+    service_wan_result = WanResult::RestoreFault;
+    portEXIT_CRITICAL(&service_mux);
     saveWanRecord(record);
     strcpy(reply, "ERR: WAN state restore failed");
     return false;
@@ -727,6 +735,9 @@ static bool runWanVerify(const HotspotOtaConfig& cfg, const WanRuntimeState& ini
   record.result = (uint8_t)(!wan_ok ? WanResult::WanFailed
                                     : (!ntp_ok ? WanResult::NtpFailed : WanResult::Verified));
   if (wan_ok && ntp_ok) record.proven = 1;
+  portENTER_CRITICAL(&service_mux);
+  service_wan_result = (WanResult)record.result;
+  portEXIT_CRITICAL(&service_mux);
   if (!saveWanRecord(record)) {
     strcpy(reply, "ERR: WAN health not saved");
     return false;
@@ -915,9 +926,11 @@ void HotspotOTA::poll() {
   OtaServiceState state;
   bool release_sleep = false;
   uint32_t clock_epoch;
+  ServiceKind kind;
 
   portENTER_CRITICAL(&service_mux);
   state = service_state;
+  kind = service_kind;
   clock_epoch = service_clock_epoch;
   service_clock_epoch = 0;
   if (service_sleep_inhibited
@@ -931,6 +944,12 @@ void HotspotOTA::poll() {
 
   if (clock_epoch != 0) modClockSet(clock_epoch);
   if (release_sleep) modBoardInhibitSleep(false);
+  if (release_sleep && kind == ServiceKind::WanVerify) {
+    portENTER_CRITICAL(&service_mux);
+    wan_done_run = service_run;
+    wan_done_result = service_wan_result;
+    portEXIT_CRITICAL(&service_mux);
+  }
   if (state == OtaServiceState::Succeeded) {
     HotspotOTA::setPower(false);
     modBoardReboot();
@@ -1045,6 +1064,9 @@ bool HotspotOTA::verifyWan(char reply[]) {
   service_config = cfg;
   service_wan_initial = initial;
   service_kind = ServiceKind::WanVerify;
+  service_wan_result = WanResult::Unknown;
+  if (++wan_run_seq == 0) wan_run_seq = 1;
+  service_run = wan_run_seq;
   service_result[0] = 0;
   service_sleep_inhibited = true;
   portEXIT_CRITICAL(&service_mux);
@@ -1112,4 +1134,32 @@ bool HotspotOTA::resetWanHealth() {
   WanRecord record = newWanRecord();
   credentialDigest(cfg, record.credentials);
   return saveWanRecord(record);
+}
+
+bool HotspotOTA::startWanVerify(uint32_t& run) {
+  char reply[MAX_TEXT_LEN];
+  if (!HotspotOTA::verifyWan(reply)) return false;
+  portENTER_CRITICAL(&service_mux);
+  run = service_run;
+  portEXIT_CRITICAL(&service_mux);
+  return true;
+}
+
+HotspotOTA::WanRun HotspotOTA::wanVerifyResult(uint32_t run) {
+  portENTER_CRITICAL(&service_mux);
+  uint32_t current = service_run;
+  uint32_t done = wan_done_run;
+  WanResult result = wan_done_result;
+  portEXIT_CRITICAL(&service_mux);
+  if (run == 0) return WanRun::Unknown;
+  if (run == done) {
+    switch (result) {
+      case WanResult::WanFailed: return WanRun::WanFailed;
+      case WanResult::NtpFailed: return WanRun::NtpFailed;
+      case WanResult::Verified: return WanRun::Verified;
+      case WanResult::RestoreFault: return WanRun::RestoreFault;
+      default: return WanRun::Unknown;
+    }
+  }
+  return run == current ? WanRun::Pending : WanRun::Unknown;
 }

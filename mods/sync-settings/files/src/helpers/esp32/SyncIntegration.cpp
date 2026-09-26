@@ -33,6 +33,13 @@
 #error "sync-settings requires transmit completion hooks"
 #endif
 
+#if SYNC_SETTINGS_WITH_TIME && defined(WITH_HOTSPOT_OTA) && defined(MOBMESH_HAS_EXTERNAL_POWER)
+#include <helpers/esp32/HotspotOTA.h>
+#define SYNC_TIME_PREFLIGHT 1
+#else
+#define SYNC_TIME_PREFLIGHT 0
+#endif
+
 namespace mobmesh {
 namespace sync {
 
@@ -132,6 +139,9 @@ static uint32_t time_retry_ms;
 static bool time_retry_wait;
 static TimeOutcome time_rx_outcome;
 static int64_t time_rx_delta;
+static uint32_t time_preflight_run;
+static uint32_t time_preflight_for;
+static bool time_preflight_done;
 #endif
 #if SYNC_SETTINGS_WITH_REGION
 static RegionRecord region_record;
@@ -1034,6 +1044,20 @@ static bool timeSend(uint32_t now) {
   return true;
 }
 
+static void timePreflightReset() {
+  time_preflight_run = 0;
+  time_preflight_done = false;
+}
+
+#if SYNC_TIME_PREFLIGHT
+static bool timePreflightEligible() {
+  HotspotOtaConfig cfg;
+  return HotspotOTA::loadConfig(cfg) && cfg.ssid[0] != 0 &&
+         memchr(cfg.ssid, 0, sizeof(cfg.ssid)) != nullptr &&
+         memchr(cfg.password, 0, sizeof(cfg.password)) != nullptr && HotspotOTA::wanProven();
+}
+#endif
+
 static void timeTick() {
   if (!time_ready || !time_record.active) return;
   if (time_tx_pending) {
@@ -1044,6 +1068,17 @@ static void timeTick() {
   if (time_retry_wait && (uint32_t)(millis() - time_retry_ms) < TIME_RETRY_MS) return;
   time_retry_wait = false;
   if (timeRadioLocked()) return;
+#if SYNC_TIME_PREFLIGHT
+  if (time_preflight_run != 0) {
+    HotspotOTA::WanRun result = HotspotOTA::wanVerifyResult(time_preflight_run);
+    if (result == HotspotOTA::WanRun::Pending) return;
+    time_preflight_run = 0;
+    if (result != HotspotOTA::WanRun::Unknown) {
+      time_preflight_done = true;
+      time_preflight_for = time_record.next_sample;
+    }
+  }
+#endif
   uint32_t now = modClockGet();
   if (!clockSane(now)) return;
   TimeStep step = timeScheduleStep(time_record, now);
@@ -1053,7 +1088,19 @@ static void timeTick() {
     if (!saveTime(next)) timeRetryLater();
     return;
   }
-  if (step == TIME_STEP_DUE && !timeSend(now)) timeRetryLater();
+  if (step != TIME_STEP_DUE) return;
+#if SYNC_TIME_PREFLIGHT
+  if (!time_preflight_done || time_preflight_for != time_record.next_sample) {
+    uint32_t run = 0;
+    if (timePreflightEligible() && HotspotOTA::startWanVerify(run)) {
+      time_preflight_run = run;
+      return;
+    }
+    time_preflight_done = true;
+    time_preflight_for = time_record.next_sample;
+  }
+#endif
+  if (!timeSend(now)) timeRetryLater();
 }
 
 static void timeComplete(uint32_t packet_id, bool succeeded) {
@@ -3403,6 +3450,7 @@ static bool timePublish(char* args, char* reply) {
     return true;
   }
   time_retry_wait = false;
+  timePreflightReset();
   char interval[8];
   timeIntervalText(next.interval_hours, interval);
   snprintf(reply, 160, "OK - every %s until %lu", interval, (unsigned long)next.ends);
@@ -3418,6 +3466,7 @@ static bool timeStatus(char* reply) {
   size_t used = time_record.active
       ? (size_t)snprintf(reply, 160, "%s active%s next %lu ends %lu channel %s",
                          time_record.enabled ? "on" : "off",
+                         time_preflight_run != 0 ? " verifying" :
                          time_tx_pending ? " sending" : time_retry_wait ? " retry" : "",
                          (unsigned long)time_record.next_sample,
                          (unsigned long)time_record.ends, channel)
@@ -3459,6 +3508,7 @@ static bool timeCli(char* command, char* reply) {
     else {
       TimeRecord next = time_record;
       timeScheduleClear(next);
+      timePreflightReset();
       strcpy(reply, saveTime(next) ? "OK" : "Err - storage");
     }
     return true;
