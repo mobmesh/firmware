@@ -27,6 +27,7 @@ connected with fellow participants.
 | [**Region**](docs/region.md) | A managed region list overlay | Region changes are maintained locally. |
 | [**Policy**](docs/policy.md) | The mesh's recommended settings | Policy settings are maintained locally. |
 | [**Radio**](docs/radio.md) | Change when the mesh changes | Radio changes require local coordination. |
+| [**Time**](docs/time.md) | Clocks repaired from a trusted publisher | Clocks are set by hand. |
 
 - **Subscribing:** trust a publisher, choose a channel, turn on each campaign type wanted.
 - **Publishing:** needs no subscription; each publish command names its own channel.
@@ -36,7 +37,8 @@ connected with fellow participants.
 
 Every update travels as a **campaign**: a publisher captures a dataset once, signs it,
 and floods it across the mesh in repeated rounds over a set period. Region, policy and
-radio are three kinds of campaign carried by the same machinery.
+radio are three kinds of campaign carried by the same machinery. [Time](docs/time.md) uses the
+same carrier, trust and channels, but each sample is a single fresh signed frame.
 
 ### How a campaign moves
 
@@ -74,8 +76,9 @@ Subscriber: retain collected chunks -> fill gap -> verify -> save -> activate
 ### Running campaigns together
 
 - Region and policy campaigns can run at the same time, independently of each other.
+- Time samples run alongside region and policy campaigns.
 - A radio campaign runs alone: while it is active, no region or policy campaign can start
-  or be accepted.
+  or be accepted, and time samples wait.
 
 ### Campaign Feedback and Reports
 
@@ -87,7 +90,8 @@ view**: what it is doing as a publisher, a subscriber, or neither.
 | `sync.<type> publish.status` | What is happening now, in one line. |
 | `sync.<type> publish.report [page]` | How the most recent campaign ended. |
 
-Replace `<type>` with `region`, `policy` or `radio`.
+Replace `<type>` with `region`, `policy` or `radio`. Time has a status but no report; see
+[time campaigns](docs/time.md#monitoring).
 
 **Region and policy status** shows the first of these that applies:
 
@@ -141,6 +145,7 @@ set sync.channel release
 sync.region on
 sync.policy on
 sync.radio on
+sync.time on
 ```
 
 Turn on any combination of campaign types the installed build supports.
@@ -148,7 +153,7 @@ Turn on any combination of campaign types the installed build supports.
 ### Trusted Publishers
 
 - Trust is by complete 64-character hexadecimal public key.
-- One trusted list covers region, policy and radio campaigns.
+- One trusted list covers region, policy, radio and time campaigns.
 - `remove` revokes trust and cancels that publisher's inbound work, but keeps its replay
   history.
 - `forget`, after `remove`, erases the record and its replay history. Previously seen
@@ -178,7 +183,8 @@ mesh and `early` for a few test repeaters. A subscriber hears only its own chann
 ## Region and policy publishing
 
 Shared by [region](docs/region.md) and [policy](docs/policy.md) campaigns
-([radio campaigns](docs/radio.md) are special and use their own commands).
+([radio](docs/radio.md) and [time](docs/time.md) campaigns are special and use their own
+commands).
 Replace `<dataset>` with `region` or `policy`.
 
 - Initial schedule: every `12h` over `3d`, seven rounds, starting immediately.
@@ -210,7 +216,7 @@ Abort notices can be lost; an unconfirmed transmission leaves a warning.
 ## Hardening and security
 
 - **Authorized updates:** full public-key trust; Ed25519 signs announcements, every chunk,
-  confirmations and abort notices.
+  confirmations, abort notices and time samples.
 - **Replay protection:** saved history per publisher and dataset rejects old updates.
 - **Integrity:** SHA-256 checks complete updates and paired, versioned storage records.
 - **Bounded processing:** queued reception, fixed limits, validation before replacement, and
