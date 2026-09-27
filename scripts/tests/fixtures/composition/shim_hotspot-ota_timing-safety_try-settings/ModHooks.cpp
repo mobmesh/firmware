@@ -5,7 +5,7 @@
 #include <helpers/esp32/TrySetIntegration.h>
 
 bool modRadioInit(const char* build_id) {
-
+  hotspotOtaBeforeRadioInit();
   return hotspotOtaRadioInit(build_id);
 }
 
@@ -14,8 +14,36 @@ void modLoop() {
   trySetLoop();
 }
 
+bool modResolveRegion(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out) {
+  return false;
+}
+
+bool modAllowFlood(const mesh::Packet* packet, bool scope_known) {
+  return true;
+}
+
+int modExportRegions(RegionMap* base, char* out, size_t capacity,
+                     uint8_t excluded_flags) {
+  return -1;
+}
+
+size_t modOwnerInfoMarker(uint8_t out[4]) {
+  return 0;
+}
+
+void modObserveRecv(const mesh::Packet*, bool, const uint8_t*) {}
+
+void modObserveTx(uint32_t, bool) {}
+
 bool modWantsPowerSaving() {
   return false;
+}
+
+bool modLoadAllowed() {
+  return true;
+}
+
+void modBeforeDeepSleep() {
 }
 
 bool     modBoardRadioInit()               { return radio_init(); }

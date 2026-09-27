@@ -19,9 +19,8 @@ GENERATOR_SPEC = importlib.util.spec_from_file_location("generate_board_config_c
 generator = importlib.util.module_from_spec(GENERATOR_SPEC)
 GENERATOR_SPEC.loader.exec_module(generator)
 
-# Upstream objects a mod might reach through. Matched in `x->y` and `x.y` form both --
-# power-guard reaches enterDeepSleep by the global `board` and by `_board->`, so a grep
-# for the arrow form alone sees half the surface.
+# Matched in `x->y` and `x.y` form both: power-guard reaches enterDeepSleep by the global
+# `board` and by `_board->`, so the arrow form alone sees half the surface.
 HOLDERS = ["board", "_board", "prefs", "_prefs", "callbacks", "_callbacks",
            "rtc_clock", "radio_driver", "sensors", r"getRTCClock\(\)"]
 
@@ -30,9 +29,8 @@ CALL_RE = re.compile(
 )
 COMMENT_RE = re.compile(r"//.*$|/\*.*?\*/", re.DOTALL)
 
-# Reaching upstream is the job of these files, not a violation in them. ModHooks is the
-# adapter; variants/ is board mechanism, which conventions.md puts on the hardware side
-# of the line deliberately. Any mod may add a body to either.
+# Reaching upstream is the job of these files, not a violation in them: ModHooks is the
+# adapter, variants/ is board mechanism. Any mod may add a body to either.
 ADAPTER_FILES = {"src/helpers/ModHooks.cpp", "src/helpers/ModHooks.h"}
 
 
@@ -40,11 +38,6 @@ def is_adapter(path):
     return path in ADAPTER_FILES or path.startswith("variants/")
 
 
-# The two reaches that stay. CommonCLICallbacks is the CLI's own accessor for its own
-# strings, reached from inside a CommonCLI method body -- a free hook cannot see `_callbacks`
-# without inventing a global, and the interface exists to be called from exactly here.
-# Empty since the CLI hook moved to MyMesh: the `ver` branch takes the version and build
-# date as arguments from the call site, so nothing reaches CommonCLI's callbacks any more.
 ALLOWED_REACHES = set()
 
 
@@ -90,6 +83,18 @@ def reaches(patch_path):
                 added.append(line[1:].rstrip())
     flush()
     return out
+
+
+def added_source(patch_path):
+    """Added source lines grouped by their upstream target."""
+    out, target = {}, None
+    with open(patch_path, encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith("+++ b/"):
+                target = line[6:].strip()
+            elif line.startswith("+") and not line.startswith("+++") and target:
+                out.setdefault(target, []).append(line[1:])
+    return {target: "".join(lines) for target, lines in out.items()}
 
 
 def survey():
@@ -141,6 +146,123 @@ class UpstreamCouplingTestCase(unittest.TestCase):
             adapter = os.path.join(temp, "src", "helpers", "ModHooks.cpp")
             hits = reaches_in_source(adapter, "src/helpers/ModHooks.cpp")
         self.assertTrue(hits, "regex matches nothing even in ModHooks.cpp")
+
+    def test_group_send_reports_upstream_airtime_in_both_roles(self):
+        header = Path(REPO_ROOT, "mods/shim/files/src/helpers/ModHooks.h").read_text()
+        self.assertRegex(
+            header,
+            r"modSendGroup\([^;]+uint32_t\* packet_id, uint32_t\* airtime_ms\);",
+        )
+
+        patch = Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
+        source = added_source(patch)
+        for role in ("simple_repeater", "simple_room_server"):
+            target = f"examples/{role}/MyMesh.cpp"
+            self.assertIn(target, source)
+            self.assertRegex(
+                source[target],
+                re.compile(
+                    r"bool modSendGroup\(.*?uint32_t\* packet_id, uint32_t\* airtime_ms\)"
+                    r".*?sendFlood(?:Scoped)?\([^;]+;.*?"
+                    r"\*airtime_ms = radio_driver\.getEstAirtimeFor"
+                    r"\(packet->getRawLength\(\)\);",
+                    re.DOTALL,
+                ),
+                f"{target} no longer returns the configured packet's upstream airtime",
+            )
+
+    def test_tempradio_snapshot_tracks_cli_and_loop_transitions(self):
+        patch = Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
+        source = added_source(patch)
+        snapshot = re.compile(
+            r"mod_temp_radio\s*=\s*\{\s*pending_freq,\s*pending_bw,\s*"
+            r"pending_sf,\s*pending_cr,\s*set_radio_at\s*==\s*0\s*&&\s*"
+            r"revert_radio_at\s*!=\s*0\s*&&\s*"
+            r"!millisHasNowPassed\(revert_radio_at\)\s*\};",
+            re.DOTALL,
+        )
+        for role in ("simple_repeater", "simple_room_server"):
+            target = f"examples/{role}/MyMesh.cpp"
+            body = source[target]
+            matches = list(snapshot.finditer(body))
+            self.assertEqual(len(matches), 2, f"{target} must refresh after CLI and timers")
+            dispatch = body.index("if (!modHandleCliCommand")
+            self.assertGreater(matches[0].start(), dispatch)
+
+        patch_text = patch.read_text()
+        self.assertEqual(
+            patch_text.count('MESH_DEBUG_PRINTLN("Radio params restored");\n   }\n \n+  mod_temp_radio'),
+            2,
+            "both role loops refresh only after the revert timer is processed",
+        )
+
+    def test_radio_campaign_adapters_exist_in_both_roles(self):
+        header = Path(REPO_ROOT, "mods/shim/files/src/helpers/ModHooks.h").read_text()
+        self.assertIn("bool modRadioPrefsGet(ModRadioValues* out);", header)
+        self.assertNotIn("modRandomFill", header)
+        source = added_source(
+            Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
+        )
+        for role in ("simple_repeater", "simple_room_server"):
+            body = source[f"examples/{role}/MyMesh.cpp"]
+            self.assertIn("bool modRadioPrefsGet(ModRadioValues* out)", body)
+            self.assertNotIn("modRandomFill", body)
+
+        integration = Path(
+            REPO_ROOT,
+            "mods/sync-settings/files/src/helpers/esp32/SyncIntegration.cpp",
+        ).read_text()
+        self.assertIn("esp_fill_random(&plan.payload.migration_id", integration)
+
+    def test_owner_marker_is_a_bounded_repeater_reply_hook(self):
+        header = Path(REPO_ROOT, "mods/shim/files/src/helpers/ModHooks.h").read_text()
+        self.assertIn("size_t modOwnerInfoMarker(uint8_t out[4]);", header)
+        self.assertNotIn("modAppendOwnerInfo", header)
+        source = added_source(
+            Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
+        )
+        repeater = source["examples/simple_repeater/MyMesh.cpp"]
+        room = source["examples/simple_room_server/MyMesh.cpp"]
+        self.assertEqual(repeater.count("modOwnerInfoMarker("), 1)
+        self.assertIn("uint8_t marker[4]", repeater)
+        self.assertIn("marker_len == sizeof(marker)", repeater)
+        self.assertIn("#ifdef MOD_WITH_OWNER_INFO_HOOK", repeater)
+        self.assertNotIn("modOwnerInfoMarker(", room)
+
+        generator = Path(REPO_ROOT, "scripts/generate-board-config.py").read_text()
+        self.assertIn("has_owner_info_hook = any(", generator)
+        self.assertIn('all_build_flags_lines.append("-D MOD_WITH_OWNER_INFO_HOOK=1")', generator)
+
+        integration = Path(
+            REPO_ROOT,
+            "mods/sync-settings/files/src/helpers/esp32/SyncIntegration.cpp",
+        ).read_text()
+        self.assertIn("size_t syncOwnerInfoMarker(uint8_t out[4])", integration)
+        self.assertNotIn("syncOwnerInfo(char*", integration)
+        self.assertIn("8 + 31 + 1 + 119 + 4 + 2 + 15 <= MAX_PACKET_PAYLOAD", integration)
+        self.assertIn("{0xf0, 0x9f, 0x93, 0xa1}", integration)
+        self.assertIn("{0xf0, 0x9f, 0x93, 0xbb}", integration)
+
+    def test_drift_canary_builds_sync_settings_per_role_and_chip_family(self):
+        workflow = Path(REPO_ROOT, ".github/workflows/patch-drift-canary.yml").read_text()
+        self.assertIn("CANARY_EXTRA_MODS: sync-settings", workflow)
+        self.assertIn("groups.setdefault((t['role'], family(t['board_id'])), [])", workflow)
+        self.assertIn("t['mods'] + extras", workflow)
+        self.assertIn('compose-mods --upstream dev-src --mods "$mods"', workflow)
+
+    def test_radio_build_epoch_reaches_release_and_canary_builds(self):
+        for name in ("build-release.yml", "patch-drift-canary.yml"):
+            workflow = Path(REPO_ROOT, ".github/workflows", name).read_text()
+            self.assertIn("MOBMESH_BUILD_EPOCH", workflow, name)
+
+    def test_drift_canary_probes_the_stats_serial_gate(self):
+        """power-guard's remote stats forward breaks silently; only the canary grep sees it."""
+        workflow = Path(REPO_ROOT, ".github/workflows/patch-drift-canary.yml").read_text()
+        source = Path(REPO_ROOT, "mods/power-guard/files/src/helpers/esp32/PowerGuardIntegration.cpp").read_text()
+        for cmd in ("stats-core", "stats-radio", "stats-packets"):
+            self.assertIn(f'"{cmd}"', source)
+            self.assertIn(cmd, workflow)
+
 
 
 if __name__ == "__main__":

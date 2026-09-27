@@ -6,6 +6,7 @@
 #include <helpers/esp32/PowerGuardIntegration.h>
 
 bool modRadioInit(const char* build_id) {
+  hotspotOtaBeforeRadioInit();
   powerGuardBeforeRadioInit();
   return hotspotOtaRadioInit(build_id);
 }
@@ -16,8 +17,37 @@ void modLoop() {
   powerGuardLoop();
 }
 
+bool modResolveRegion(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out) {
+  return false;
+}
+
+bool modAllowFlood(const mesh::Packet* packet, bool scope_known) {
+  return true;
+}
+
+int modExportRegions(RegionMap* base, char* out, size_t capacity,
+                     uint8_t excluded_flags) {
+  return -1;
+}
+
+size_t modOwnerInfoMarker(uint8_t out[4]) {
+  return 0;
+}
+
+void modObserveRecv(const mesh::Packet*, bool, const uint8_t*) {}
+
+void modObserveTx(uint32_t, bool) {}
+
 bool modWantsPowerSaving() {
   return powerGuardWantsPowerSaving();
+}
+
+bool modLoadAllowed() {
+  return powerGuardLoadAllowed();
+}
+
+void modBeforeDeepSleep() {
+  powerGuardBeforeDeepSleep();
 }
 
 bool     modBoardRadioInit()               { return radio_init(); }

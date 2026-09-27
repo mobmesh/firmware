@@ -1,6 +1,5 @@
-// Footer line reporting whether the page being viewed is the newest deploy.
-// CI writes build-stamp.json into this directory on every publish; the check
-// compares it against the latest commit touching pages/flasher.
+// Reports whether the page being viewed is the newest deploy: CI writes build-stamp.json
+// here on every publish, and the check compares it against the latest pages/flasher commit.
 
 const REPO = 'mobmesh/firmware';
 const COMMITS_URL = `https://api.github.com/repos/${REPO}/commits?path=pages/flasher&per_page=1`;

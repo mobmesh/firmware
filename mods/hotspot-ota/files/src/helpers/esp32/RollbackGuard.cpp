@@ -1,21 +1,28 @@
 #include "RollbackGuard.h"
+#include "RadioFailPolicy.h"
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
 #include <esp_system.h>   // esp_restart()
 #include <esp_image_format.h>   // esp_image_verify() -- bootloader_support, linked into the app
 #include <SPIFFS.h>
+#include <helpers/ModHooks.h>
 
 // Long enough to catch an early crash/boot-loop; short enough not to add much to the ~2 minutes a
 // hotspot-fetch update can already take.
 #define OTA_ROLLBACK_CONFIRM_DELAY_MS   90000
 
-// Cross-boot retry cap for onRadioInitFailure(). The counter lives in SPIFFS, not RTC memory,
-// which is unreliable across esp_restart() on this chip/IDF combination.
-// Spacing between confirm retries: the call writes otadata, so it must not run every loop().
+// The counter lives in SPIFFS, not RTC memory, which is unreliable across esp_restart().
+// Confirm retries are spaced because the call writes otadata.
 #define CONFIRM_RETRY_MS   5000
 
 #define RADIO_INIT_RESET_CAP   5
 #define RADIO_FAIL_COUNT_PATH  "/radio_fail_count"
+#ifndef OTA_RADIO_FAIL_SLEEP_START_SECS
+#define OTA_RADIO_FAIL_SLEEP_START_SECS  60
+#endif
+#ifndef OTA_RADIO_FAIL_SLEEP_MAX_SECS
+#define OTA_RADIO_FAIL_SLEEP_MAX_SECS    900
+#endif
 
 // Arduino confirms inside initArduino(), before setup() and too early to judge; this defers to
 // RollbackGuard. extern "C" because the weak symbol it replaces is declared in a .c file.
@@ -25,8 +32,7 @@ static uint32_t boot_time_ms = 0;
 static bool confirmed_or_not_applicable = false;
 static uint32_t last_confirm_attempt_ms = 0;
 
-// begin() runs deep in MeshCore's init chain, where a SPIFFS write added enough stack depth to
-// reproduce the handleGetCmd() boot instability (987639c). Deferred to poll(), called shallower.
+// Defer the SPIFFS write to poll() to avoid adding stack depth inside MeshCore's init chain.
 static char pending_version[24] = {0};
 static bool version_write_pending = false;
 
@@ -104,11 +110,13 @@ static uint8_t readFailCount() {
   return count;
 }
 
-static void writeFailCount(uint8_t count) {
+// Read back, because an unmounted or full volume can accept the open and still lose the byte.
+static bool writeFailCount(uint8_t count) {
   File f = SPIFFS.open(RADIO_FAIL_COUNT_PATH, "w");
-  if (!f) return;
-  f.write(&count, 1);
+  if (!f) return false;
+  size_t written = f.write(&count, 1);
   f.close();
+  return written == 1 && readFailCount() == count;
 }
 
 // The app image header carries the prebuilt Arduino core's build info, not FIRMWARE_VERSION, so
@@ -170,13 +178,25 @@ void RollbackGuard::onRadioInitFailure() {
   // Not on probation -- transient or genuine radio failure unrelated to any update. Retry with cap
   // instead of hanging forever on the first attempt.
   uint8_t count = readFailCount();
-  if (count < RADIO_INIT_RESET_CAP) {
-    writeFailCount(count + 1);
+  bool durable = writeFailCount(count < 255 ? count + 1 : count);
+  RadioFailAction action = radioFailAction(count, durable, RADIO_INIT_RESET_CAP,
+                                           OTA_RADIO_FAIL_SLEEP_START_SECS,
+                                           OTA_RADIO_FAIL_SLEEP_MAX_SECS);
+  if (action.restart) {
     esp_restart();   // does not return
   }
 
-  // Cap exhausted -- same terminal behavior as before this feature existed.
-  while (1) ;
+  // Cap exhausted, or the count could not be kept -- one retry per wake, until begin() clears it.
+  if (durable) {
+    Serial.printf("radio init failed %u times -- deep sleep %us\n", (unsigned)count + 1,
+                  (unsigned)action.sleep_secs);
+  } else {
+    Serial.printf("radio init failed; fail count not saved -- deep sleep %us\n",
+                  (unsigned)action.sleep_secs);
+  }
+  Serial.flush();
+  modBeforeDeepSleep();
+  modBoardDeepSleep(action.sleep_secs);   // does not return
 }
 
 RollbackGuard::Slots RollbackGuard::slots() {

@@ -1,17 +1,11 @@
 {
-  "_comment": "Settings for the GulfCoastMesh Mobile option, sent to the device's CLI after a flash. Run in order; a leading underscore parks a note or a command without deleting it.",
+  "_commands": "Sent to the device's CLI in order after a flash. A leading underscore parks a line.",
+  "_if_mod": "Runs then when the image just flashed reports that mod in its metadata, else otherwise -- stock always takes else.",
 
-  "_name_prefix": "Prepended to the name the user types before it is written to the device: 'Bob's House' becomes 'al-Bob's House'. Advertised names are capped at 23 bytes when location is included, which a repeater always is, so the prefix spends part of that budget.",
   "name_prefix": "al-",
 
-  "_units": "advert.interval: minutes (60-240). flood.advert.interval: hours (3-168). agc.reset.interval: seconds, rounded down to a multiple of 4. Both intervals take 0 to disable.",
-  "_radio": "Sets freq/bw/sf/cr together, COMMA-separated -- spaces parse as one field and the command is rejected. Out-of-range is rejected, not clamped. Needs a reboot, which the flasher sends itself after the list.",
-  "_regions": "def walks a cursor from the wildcard *: a bare token creates a child and moves onto it, 'name|jump' creates a child then jumps elsewhere. Cursor resets to * per command. 160 chars max per line.",
-  "_regions_tree": "The def line above builds: us > (us-gc, us-southeast, us-south, us-east, us-al, us-ms, us-fl); us-al > (us-al-mob, us-al-fhp, us-al-guf); us-fl > us-fl-pns. 139 chars of the 160 limit. Provisional -- the naming convention is not settled.",
-  "_regions_notes": "def merges into the existing tree rather than replacing it; 'region remove' first for a clean slate. 'region save' persists it. 'region allowf *' is what carries unscoped floods -- they match no named region, so the wildcard's flag decides, and a preserved region file could have it denied.",
-
   "commands": [
-    "set radio 910.525,62.5,7,6",
+    "set radio 910.525,62.5,7,8",
     "set advert.interval 240",
     "set flood.advert.interval 23",
     "set path.hash.mode 1",
@@ -19,7 +13,25 @@
     "set agc.reset.interval 4",
     "set multi.acks 1",
 
-    "region def us us-gc|us us-southeast|us us-south|us us-east|us us-al us-al-mob|us-al us-al-fhp|us-al us-al-guf|us us-ms|us us-fl us-fl-pns|*",
+    {
+      "if_mod": "sync-settings",
+      "then": [
+        "sync.publisher add A1AB0184CFC95016C09C3623F68101C9184F42D7E831DB306498FCD6F4CDC596",
+        "sync.publisher add A1AB022CBEF6C4E6C2D724660FD14DC55AEC7BE77A192DD5CA0965E91488B620",
+        "sync.publisher add A1AB03109DDC62D94CAF0C0CE5E386614FDF5B2EAF0DDA8A37ABC7B6A97CCE82",
+        "sync.publisher add A1AB04BC9FFCB01E368169AB66696298997494F33BA62ED48DD45F64C158989E",
+        "sync.publisher add A1AB055D6A29A7D70AB7222C3F933C00719ED0960E136E6C5CC0429BC5F73B5F",
+        "set sync.channel public",
+        "sync.region def us us-southeast|us us-south|us us-east|us us-gc|us us-al us-al-mob|us-al us-al-fhp|us-al us-al-guf|us us-ms|us us-fl us-fl-nw",
+        "sync.region save",
+        "sync.region on",
+        "sync.policy on",
+        "sync.time on"
+      ],
+      "else": [
+        "region def us us-southeast|us us-south|us us-east|us us-gc|us us-al us-al-mob|us-al us-al-fhp|us-al us-al-guf|us us-ms|us us-fl us-fl-nw"
+      ]
+    },
     "region allowf *",
     "region save"
   ]

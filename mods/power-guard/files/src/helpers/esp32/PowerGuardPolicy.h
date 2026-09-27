@@ -23,8 +23,7 @@
 #ifndef POWER_GUARD_CONSECUTIVE_SAMPLES
   #define POWER_GUARD_CONSECUTIVE_SAMPLES 3
 #endif
-// Bypass the FEM LNA while saving. Off by default: measured at only ~0.3mA of
-// a ~5.5mA sleeping floor, which does not justify the lost RX sensitivity.
+// Bypass the FEM LNA while saving. Off by default: ~9mA is not worth the lost RX sensitivity.
 #ifndef POWER_GUARD_AUTO_DROP_FEM_LNA
   #define POWER_GUARD_AUTO_DROP_FEM_LNA 0
 #endif

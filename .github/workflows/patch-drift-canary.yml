@@ -1,8 +1,7 @@
-# Early warning for patch drift. Never builds, never publishes.
+# Early warning for patch and integration drift. Never publishes.
 #
-# build-release only notices drift when upstream tags a release, which is the worst moment
-# to find out, so this probes upstream's moving branches daily. It also flags patches that
-# have stopped being needed -- one duplicating a merged upstream fix still applies cleanly.
+# build-release only notices drift when upstream tags a release, so this probes the moving
+# branches daily. It also flags patches duplicating a merged fix, which still apply cleanly.
 name: patch-drift-canary
 
 on:
@@ -17,6 +16,7 @@ permissions:
 env:
   UPSTREAM_REPO: meshcore-dev/MeshCore
   ISSUE_TITLE: "Patch drift against upstream branches"
+  CANARY_EXTRA_MODS: sync-settings
 
 jobs:
   canary:
@@ -38,14 +38,24 @@ jobs:
           DRIFT=false
 
           # --- 1. do the patches still apply? -------------------------------------
-          # Probe the ordered union so target-specific mods are included without
-          # applying any patch more than once.
-          MODS=$(python3 scripts/generate-board-config.py project-info --field ordered-mods)
+          # The ordered union, so target-specific mods are included without applying
+          # any patch twice.
+          MODS=$(printf '%s\n' \
+            "$(python3 scripts/generate-board-config.py project-info --field ordered-mods)" \
+            "$CANARY_EXTRA_MODS" | tr ' ' '\n' | awk 'NF && !seen[$0]++' | xargs)
           echo "mods: $MODS"
+          # The release build-release builds from; the command contracts are taken from it.
+          BASE=$(gh api "repos/${UPSTREAM_REPO}/releases" \
+            --jq '[.[] | select(.tag_name | startswith("repeater-v"))][0].tag_name' 2>/dev/null || true)
+          [ -n "$BASE" ] || BASE=$(git ls-remote --tags --refs "https://github.com/${UPSTREAM_REPO}.git" 'repeater-v*' \
+            | sed 's|.*refs/tags/||' | sort -V | tail -1)
+          echo "base: $BASE"
+          BOARDS=$(python3 scripts/generate-board-config.py resolve-targets \
+            | python3 -c "import json,sys; print(','.join(sorted({t['board_id'] for t in json.load(sys.stdin)['include']})))")
+          CONTRACTS=contracts.md
+          : > "$CONTRACTS"
 
-          # Three-way on failure keeps the tree realistic, so one broken patch does not
-          # cascade into every later one. Conflicts resolve to upstream's side: the patch
-          # side drags the old base's code back in and the tree stops being dev at all.
+          # Conflicts resolve to upstream's side, or the patch drags the old base back in.
           # Never --depth 1: three-way silently degrades without the preimage blobs.
           for ref in main dev; do
             rm -rf probe-src
@@ -55,6 +65,26 @@ jobs:
                 continue
               }
             sha=$(git -C probe-src rev-parse --short HEAD)
+            # Replaying the series on the release writes each patch's preimage blobs, which three-way needs.
+            rm -rf seed-src
+            git -C probe-src worktree add --quiet --detach ../seed-src "$BASE"
+            python3 scripts/generate-board-config.py copy-src \
+              --upstream seed-src --mods "$(echo $MODS | tr ' ' ',')" >/dev/null
+            python3 scripts/generate-board-config.py compose-mods \
+              --upstream seed-src --mods "$(echo $MODS | tr ' ' ',')" >/dev/null
+            git -C seed-src add -A
+            for mod in $MODS; do
+              for patch in "mods/$mod/patches"/*.patch; do
+                [ -e "$patch" ] || continue
+                if git -C seed-src apply "../$patch"; then
+                  git -C seed-src add -A
+                else
+                  echo "- \`$mod/$(basename "$patch")\` does not apply to \`$BASE\` itself -- its three-way results below are unreliable" >> "$REPORT"
+                  DRIFT=true
+                fi
+              done
+            done
+            git -C probe-src worktree remove --force ../seed-src
             python3 scripts/generate-board-config.py copy-src \
               --upstream probe-src --mods "$(echo $MODS | tr ' ' ',')" >/dev/null
             python3 scripts/generate-board-config.py compose-mods \
@@ -69,8 +99,8 @@ jobs:
                   git -C probe-src apply "../$patch"
                   continue
                 fi
-                # Explained before three-way touches anything: the point is where upstream
-                # put the code, which a half-merged tree no longer shows.
+                # Before three-way touches anything: a half-merged tree no longer shows
+                # where upstream put the code.
                 base=$(git -C probe-src describe --tags --abbrev=0 --match 'repeater-v*' 2>/dev/null || true)
                 {
                   echo "<details><summary><code>$name</code> -- what moved</summary>"
@@ -82,9 +112,11 @@ jobs:
                 } >> "$EXPLAIN"
 
                 err=$(git -C probe-src apply -3 "../$patch" 2>&1) || true
+                # Still missing after seeding means the patch was cut against a tree nobody can rebuild.
                 if echo "$err" | grep -q "lacks the necessary blob"; then
-                  echo "::error::probe-src lacks preimage blobs -- three-way degraded to plain apply silently; the clone must not be shallow" >&2
-                  exit 1
+                  echo "::warning::$name: preimage blob missing -- regenerate the patch against $BASE" >&2
+                  conflicted="$conflicted $name(no-preimage)"
+                  continue
                 fi
                 unmerged=$(git -C probe-src diff --name-only --diff-filter=U)
                 if [ -n "$unmerged" ]; then
@@ -104,6 +136,12 @@ jobs:
                                    || echo "dev_buildable=false" >> "$GITHUB_OUTPUT"
               rm -rf dev-src && cp -a probe-src dev-src
             fi
+            # Commands move without conflicting, so a rename or a move to another board is only visible here.
+            rc=0
+            python3 scripts/check_command_contracts.py --tree probe-src --base "$BASE" \
+              --head HEAD --ref "$ref" --boards "$BOARDS" >> "$CONTRACTS" || rc=$?
+            [ "$rc" = 2 ] && DRIFT=true
+            [ "$rc" != 0 ] && [ "$rc" != 2 ] && echo "- \`$ref\`: command contract check **crashed** (exit $rc) -- see the run log" >> "$CONTRACTS"
             if [ -z "$placed$conflicted" ]; then
               echo "- \`$ref\` (\`$sha\`): all patches apply" >> "$REPORT"
             else
@@ -152,8 +190,7 @@ jobs:
 
           # --- 4. does upstream still sleep the radio the way power-guard assumes? --
           # power-guard's poweroff relies on radio_driver.powerOff() reaching the SX1262's
-          # sleep. Losing that means higher current through a hibernation, not a stranded
-          # node, so warn rather than fail. Goes quiet if no target builds the mod.
+          # sleep. Losing it costs current through a hibernation, not the node: warn only.
           if [ -d probe-src ] && echo " $MODS " | grep -q " power-guard "; then
             if grep -qE 'sleep\(false\)' \
               probe-src/src/helpers/radiolib/CustomSX1262Wrapper.h 2>/dev/null; then
@@ -164,6 +201,68 @@ jobs:
             fi
           fi
 
+          # --- 5. does upstream still serial-gate the stats commands? ---------------
+          # power-guard forwards these over the mesh by re-dispatching with timestamp 0.
+          # A rename, a removal, or a second gate breaks that silently: no patch conflicts
+          # and the tree still compiles, so only a grep catches it.
+          if [ -d probe-src ] && echo " $MODS " | grep -q " power-guard "; then
+            for cmd in stats-core stats-radio stats-packets; do
+              len=${#cmd}
+              if grep -qE "sender_timestamp == 0 && memcmp\\(command, \"$cmd\", $len\\)" \
+                probe-src/src/helpers/CommonCLI.cpp 2>/dev/null; then
+                echo "- upstream still serial-gates \`$cmd\` on \`sender_timestamp == 0\`; power-guard's remote forward relies on it" >> "$REPORT"
+              else
+                DRIFT=true
+                echo "- upstream's \`$cmd\` serial gate changed shape -- power-guard may forward a command that no longer exists, or one that is now blocked for another reason (see mods/power-guard/README.md)" >> "$REPORT"
+              fi
+            done
+          fi
+
+          # --- 6. do sync-settings' room-server assumptions still hold? ------------
+          # The repeat.gate patch adds one line to the room server's allowPacketForward and
+          # reads state upstream owns. None of the four below conflict when they change.
+          if [ -d probe-src ] && echo " $MODS " | grep -q " sync-settings "; then
+            ROOM=probe-src/examples/simple_room_server/MyMesh.cpp
+            # Upstream fixing the repeater/room-server asymmetry itself makes the repeat.gate patch redundant.
+            if grep -qE 'recv_pkt_region == NULL' "$ROOM" 2>/dev/null; then
+              DRIFT=true
+              echo "- upstream's room-server \`allowPacketForward\` now bails on \`recv_pkt_region == NULL\` itself -- the repeat.gate patch is likely redundant, and \`set repeat.gate off\` may no longer disable gating (see mods/sync-settings/README.md)" >> "$REPORT"
+            else
+              echo "- upstream's room server still forwards regardless of region; the repeat.gate patch is still needed" >> "$REPORT"
+            fi
+            # The gate reads this to decide scope; a rename compiles but measures the wrong thing.
+            if grep -q 'recv_pkt_region' "$ROOM" 2>/dev/null; then
+              echo "- upstream's room server still tracks \`recv_pkt_region\`; repeat.gate depends on it" >> "$REPORT"
+            else
+              DRIFT=true
+              echo "- upstream's room server no longer tracks \`recv_pkt_region\` -- repeat.gate's scope test has lost its input" >> "$REPORT"
+            fi
+            # repeat.gate is subtractive only because disable_fwd is tested first.
+            if grep -A 2 'bool MyMesh::allowPacketForward' "$ROOM" 2>/dev/null | grep -q '_prefs.disable_fwd'; then
+              echo "- upstream's room server still tests \`disable_fwd\` first; repeat.gate stays inert behind \`repeat off\`" >> "$REPORT"
+            else
+              DRIFT=true
+              echo "- upstream's room server no longer tests \`disable_fwd\` first in \`allowPacketForward\` -- repeat.gate may now affect a node with repeating off" >> "$REPORT"
+            fi
+            # sync-settings claims 'set repeat on' to append a notice; a rename drops it silently.
+            if grep -qE 'memcmp\(config, "repeat ", 7\)' probe-src/src/helpers/CommonCLI.cpp 2>/dev/null; then
+              echo "- upstream still parses \`set repeat <on|off>\`; sync-settings' repeat.gate notice relies on it" >> "$REPORT"
+            else
+              DRIFT=true
+              echo "- upstream's \`set repeat\` parser changed shape -- sync-settings' repeat.gate notice will stop appending, silently" >> "$REPORT"
+            fi
+            # ROOM_PASSWORD is how the mod compiles the notice into room servers only.
+            if grep -q 'ROOM_PASSWORD' probe-src/variants/heltec_v4/platformio.ini 2>/dev/null; then
+              echo "- \`ROOM_PASSWORD\` still marks the room-server env; sync-settings uses it to target the repeat.gate notice" >> "$REPORT"
+            else
+              DRIFT=true
+              echo "- \`ROOM_PASSWORD\` no longer marks the heltec_v4 room-server env -- sync-settings' repeat.gate notice will compile out of every build" >> "$REPORT"
+            fi
+          fi
+
+          # --- 7. do the upstream commands the mods send or intercept still exist? --
+          cat "$CONTRACTS" >> "$REPORT"
+
           echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"
           # Appended, not merged into $REPORT: the explanations are collapsed detail under
           # the summary lines, and only exist when something failed.
@@ -171,10 +270,10 @@ jobs:
           { echo 'report<<REPORT_EOF'; cat "$REPORT"; echo 'REPORT_EOF'; } >> "$GITHUB_OUTPUT"
           cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
 
-      # Applying and compiling are different questions. On 2026-08-27 power-guard applied
-      # cleanly against dev and would not have built: upstream had deleted the FEM virtual
-      # it called. A failure counts as drift only if the same ref builds vanilla, so that
-      # runs as a control rather than reporting upstream's own broken days as drift.
+      # Applying and compiling are different questions: a patch can apply against a tree
+      # that has deleted the virtual it calls. The widest composition per upstream role,
+      # since shim bridges are implemented separately in both. Drift only if vanilla builds.
+      # One build per chip family too: toolchains break separately, boards of one family rarely do.
       - id: buildcheck
         name: Build the patched tree against dev
         if: steps.probe.outputs.dev_buildable == 'true'
@@ -183,29 +282,52 @@ jobs:
           pip install --quiet platformio==6.1.19
           # FEM bypass on: it is off in every shipped build, so a default build would
           # preprocess away the code that broke.
-          FLAGS="-D 'OTA_MOD_BUILD_DATE=\"canary\"' -D 'OTA_MOD_SHORT_SHA=\"canary\"' -D POWER_GUARD_AUTO_DROP_FEM_LNA=1"
-          # The target carrying the most mods, so one build covers the widest surface.
-          SPEC=$(python3 scripts/generate-board-config.py resolve-targets | python3 -c "
-          import json, sys
-          t = max(json.load(sys.stdin)['include'], key=lambda x: len(x['mods']))
-          print('|'.join([','.join(t['mods']), t['board_id'], t['build_env']]))
+          FLAGS="-D 'OTA_MOD_BUILD_DATE=\"canary\"' -D 'OTA_MOD_SHORT_SHA=\"canary\"' -D MOBMESH_BUILD_EPOCH=$(date -u +%s) -D POWER_GUARD_AUTO_DROP_FEM_LNA=1"
+          SPECS=$(python3 scripts/generate-board-config.py resolve-targets | python3 -c "
+          import json, os, sys, yaml
+          targets = json.load(sys.stdin)['include']
+          extras = os.environ.get('CANARY_EXTRA_MODS', '').split()
+          def family(board):
+              with open(f'variants/{board}/overrides.yaml') as f:
+                  return ((yaml.safe_load(f) or {}).get('qemu') or {}).get('mcu') or board
+          groups = {}
+          for t in targets:
+              groups.setdefault((t['role'], family(t['board_id'])), []).append(t)
+          for key in sorted(groups):
+              t = max(groups[key], key=lambda x: len(x['mods']))
+              mods = list(dict.fromkeys(t['mods'] + extras))
+              print('|'.join([','.join(mods), t['board_id'], t['build_env']]))
           ")
-          mods=${SPEC%%|*}; rest=${SPEC#*|}; board=${rest%%|*}; env=${rest##*|}
-          python3 scripts/generate-board-config.py inject-env \
-            --board "$board" --env "$env" \
-            --platformio-ini "dev-src/variants/$board/platformio.ini" --mods "$mods"
-          if (cd dev-src && PLATFORMIO_BUILD_FLAGS="$FLAGS" pio run -e "$env" > ../patched.log 2>&1); then
+          FAILED=""
+          for SPEC in $SPECS; do
+            mods=${SPEC%%|*}; rest=${SPEC#*|}; board=${rest%%|*}; env=${rest##*|}
+            # The probe composed hooks for the union of mods; a target without one of them cannot link that.
+            rm -f dev-src/src/helpers/ModHooks.cpp dev-src/src/helpers/esp32/CommonCliMods.cpp
+            python3 scripts/generate-board-config.py compose-mods --upstream dev-src --mods "$mods" >/dev/null
+            python3 scripts/generate-board-config.py inject-env \
+              --board "$board" --env "$env" \
+              --platformio-ini "dev-src/variants/$board/platformio.ini" --mods "$mods"
+            if ! (cd dev-src && PLATFORMIO_BUILD_FLAGS="$FLAGS" pio run -e "$env" > "../patched-$env.log" 2>&1); then
+              tail -30 "patched-$env.log"
+              FAILED="$FAILED $SPEC"
+            fi
+          done
+          if [ -z "$FAILED" ]; then
             echo "verdict=ok" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          tail -30 ../patched.log 2>/dev/null || tail -30 patched.log
           rm -rf vanilla-src
           git clone --quiet --branch dev "https://github.com/${UPSTREAM_REPO}.git" vanilla-src
-          if (cd vanilla-src && pio run -e "$env" > ../vanilla.log 2>&1); then
-            echo "verdict=patches" >> "$GITHUB_OUTPUT"
-          else
-            echo "verdict=upstream" >> "$GITHUB_OUTPUT"
-          fi
+          VERDICT=upstream
+          for SPEC in $FAILED; do
+            rest=${SPEC#*|}; env=${rest##*|}
+            if (cd vanilla-src && pio run -e "$env" > "../vanilla-$env.log" 2>&1); then
+              VERDICT=patches
+            else
+              tail -30 "vanilla-$env.log"
+            fi
+          done
+          echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
 
       # One long-lived tracking issue rather than a new one per day.
       - name: Open, update, or close the tracking issue

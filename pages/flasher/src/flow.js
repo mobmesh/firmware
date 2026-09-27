@@ -10,6 +10,7 @@ import * as plans from './flash-plan.js';
 import { partitionTablesMatch } from './partitions.js';
 import { buildProvisionCommands, provisionDevice } from './provision.js';
 import { STOCK_RELAY_BASE } from './constants.js';
+import { flashedModBits, resolveSettings } from './settings.js';
 
 /** Which half of the mesh a node is for. Chosen early so the role list stays short. */
 export const USAGE = { INFRASTRUCTURE: 'infrastructure', CLIENT: 'client' };
@@ -194,9 +195,8 @@ function reportExistingConfig(config, onStatus) {
 
 async function armEsp32(flow, onStatus) {
   const s = flow.state;
-  // One session: the mode probe's own `ver` is the liveness gate, and the settings come
-  // back with it. Download mode is entered below and serves no CLI, so this is the last
-  // chance to read them.
+  // One session: the mode probe's `ver` is the liveness gate and the settings come back
+  // with it. Download mode is entered below and serves no CLI.
   const { mode, version, config } = await esp32.resolveEsp32Mode(s.port);
   s.mode = mode;
   onStatus(`found in ${mode}${version ? ` — ${version}` : ''}`);
@@ -334,12 +334,8 @@ export const STEPS = [
         );
       }
       if (s.family === 'esp32') return armEsp32(flow, onStatus);
-      // Stays in application mode here — the bootloader gate (nrf52-bootloader-plan.md)
-      // needs to read it before any DFU transition, since DFU serves no CLI at all. DFU
-      // entry now happens just before the write, in the `flash` step.
-      // One session for both, same as the ESP32 side: the bootloader gate's reading and
-      // the settings the Upgrade path pre-fills from. DFU serves no CLI, and this family
-      // stays in the application until the write, so nothing is lost by reading now.
+      // Stays in application mode: DFU serves no CLI, and entry happens just before the
+      // write, so the bootloader gate and the Upgrade pre-fill both read in one session.
       onStatus('Reading the current settings…');
       const appState = await nrf52.readAppState(s.port);
       s.bootloaderVersion = appState.bootloaderVersion;
@@ -428,8 +424,7 @@ export const STEPS = [
     id: 'maker',
     title: 'Who makes your device?',
     desc: "Choose your device's manufacturer from the choices below.",
-    // Same square picture tiles as the device step. Upstream ships no maker artwork, so
-    // the icon slot renders empty until the placeholder lands.
+    // Upstream ships no maker artwork, so the icon slot renders empty.
     layout: 'board',
     kind: 'choice',
     applies: (flow) => flow.state.source === SOURCE.STOCK,
@@ -493,10 +488,8 @@ export const STEPS = [
         // A screen-first board ships only a `gui` build, so under Infrastructure it would
         // reach the role step with nothing to offer.
         .filter((d) => servesUsage(d, flow.state.usage))
-        // `tooltip` is upstream's picture as raw HTML and nothing else — the normaliser has
-        // already pulled the src out, so a renderer never injects a third party's markup.
-        // Value stays the upstream name — it keys the manifest — while the label is the
-        // override's when one renames a device.
+        // The normaliser has already pulled the src out of upstream's raw HTML, so no
+        // renderer injects a third party's markup. Value keys the manifest, label does not.
         .map((d) => ({
           value: d.name,
           label: d.label ?? d.name,
@@ -641,9 +634,8 @@ export const STEPS = [
           'it now is strongly recommended.'
         : "This device's factory bootloader updates over Bluetooth unreliably.",
     kind: 'action',
-    // New Device only (nrf52-bootloader-plan.md): needs a double-tap and a Chromium file
-    // picker, both New-device-grade asks, and a half-finished write costs nothing only
-    // because the next stages erase and reflash anyway.
+    // New Device only: needs a double-tap and a Chromium file picker, and a half-finished
+    // write costs nothing only because the next stages erase and reflash anyway.
     applies: (flow) => {
       // The dry-run harness calls an action step's run() with no hardware or window
       // present; this step needs both, so it never applies there — same as connect/arm.
@@ -667,9 +659,8 @@ export const STEPS = [
       // Re-entered after the checkpoint's click already did the write: nothing left to do.
       if (s.bootloaderUpdated) return;
 
-      // Checked here, not at connect: this is the first point we know the step is needed,
-      // and failing before the fetch means the user reads this instead of double-tapping
-      // for a picker that was never going to open (Brave ships this off by default).
+      // The first point we know the step is needed: failing before the fetch beats a
+      // double-tap for a picker that was never going to open.
       const copy = fileSystemAccessCopy();
       if (copy) throw new FlowBlockedError(`${copy.title} — ${copy.body} ${copy.suggestion}`);
 
@@ -725,16 +716,23 @@ export const STEPS = [
     applies: () => true,
     async run(flow, { onStatus, onProgress }) {
       const s = flow.state;
+      s.flashedMods = null;
       await buildPlan(flow, onStatus);
+      const enhanced = s.source === SOURCE.ENHANCED;
+      const plan = s.plan;
+      const modBits = enhanced ? flashedModBits(plan) : 0;
+      resolveSettings(s.zoneCommands ?? [], modBits);
+      if (enhanced) onStatus(`firmware mods: 0x${modBits.toString(16).padStart(8, '0')}`);
       if (flow.dryRun) {
         onStatus(`dry run — would write a ${s.plan.engine} plan, eraseAll=${s.plan.eraseAll}`);
         s.result = { dryRun: true };
+        s.flashedMods = enhanced ? modBits : null;
         return;
       }
 
       if (s.plan.engine === 'esptool') {
         const startedAt = performance.now();
-        const written = await esp32.executeFlashPlan(s.session, s.plan, { onProgress, onStatus });
+        const written = await esp32.executeFlashPlan(s.session, plan, { onProgress, onStatus });
         onStatus(`write took ${((performance.now() - startedAt) / 1000).toFixed(1)}s`);
         if (s.plan.preserveFs && s.evidence) {
           const restored = await esp32.restoreFilesystem(
@@ -746,6 +744,7 @@ export const STEPS = [
         }
         await esp32.returnToApplication(s.session, { onStatus });
         s.result = written;
+        s.flashedMods = enhanced ? modBits : null;
         return;
       }
 
@@ -908,9 +907,7 @@ async function loadZoneCommands(file) {
     const res = await fetch(new URL(`../data/${file}`, import.meta.url), { cache: 'no-store' });
     if (!res.ok) return [];
     const doc = await res.json();
-    return (doc.commands ?? []).filter(
-      (command) => typeof command === 'string' && !command.startsWith('_')
-    );
+    return doc.commands ?? [];
   } catch (error) {
     console.warn(`[flow] No regional settings in ${file}:`, error);
     return [];

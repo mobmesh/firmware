@@ -19,7 +19,7 @@ every release.
 
 **Note:** Requires `ota.wan.wifi` to be set first (see below). Joins the configured WiFi network as
 a station, downloads the file, verifies it against the SHA-256 the image carries in its own final
-32 bytes (or against `ota.fw.sha256` when one has been pinned), confirms the download is actually a
+32 bytes, confirms the download is actually a
 build of this project (refuses otherwise, even if the checksum matches -- catches `<url>` mistakenly
 pointing at a different, unmodified MeshCore build), and queues the service with an immediate
 `OK - OTA queued` response. The service reboots on success and leaves the current firmware running
@@ -119,24 +119,6 @@ need to be resupplied for future updates unless the network's credentials change
 
 ---
 
-#### View or change the manually-supplied firmware hash used by `start ota wan`
-**Usage:**
-- `set ota.fw.sha256 <hex>`
-- `set ota.fw.sha256 clear`
-
-**Parameters:**
-- `hex`: 64-character lowercase hex SHA-256 digest of the target firmware `.bin`
-
-**Note:** RAM-only — cleared on every boot, never persisted. Pinning a hash here is the only
-integrity check that does not come from the same host as the image, so it is what to use when the
-source is not trusted. Once set it takes precedence over the image's own embedded digest. `set
-ota.fw.sha256 clear` returns to that digest — do this before pointing `start ota wan` at a different
-firmware image, or a stale pin will block it.
-
-**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
-
----
-
 #### View or change the default URL used by `start ota wan update`
 **Usage:**
 - `get ota.fw.url`
@@ -145,7 +127,7 @@ firmware image, or a stale pin will block it.
 **Parameters:**
 - `url`: HTTP(S) URL of the firmware `.bin` to download and flash
 
-**Note:** Persisted — unlike `ota.fw.sha256`/`ota.fw.marker`, this names a stable download location
+**Note:** Persisted — unlike `ota.fw.marker`, this names a stable download location
 for this device rather than a one-time override. Overwrite to change it; there is no `clear`.
 Rejects (does not truncate) a URL longer than the field allows.
 
@@ -191,7 +173,9 @@ confirm or force the rail off if state is ever in doubt (e.g. after a crash or w
 **Usage:**
 - `ota wan join`
 - `ota wan check`
+- `ota wan verify`
 - `ota wan leave`
+- `get ota.wan.health`
 
 **Note:** `ota wan join` joins the configured WiFi network only (no WAN check, no download),
 returning in one quick attempt (~15s worst case) instead of `start ota wan`'s full patient join
@@ -199,6 +183,20 @@ budget (~115s). `ota wan check` checks WAN reachability on demand, repeatable wi
 `ota wan leave` disconnects and drops WAN power for a clean retry. A successful `ota wan join` lets
 `start ota wan` skip its own join step right after. These commands refuse to interfere with an
 active OTA service.
+
+`ota wan verify` is the unattended health check. It powers and joins the configured hotspot when
+needed, checks WAN access twice, and then attempts a fresh NTP synchronization twice. On completion
+it restores WiFi first and hotspot power second, then verifies both match their starting state.
+The command queues the work and returns immediately. When it finishes, `get ota.status` shows
+`wan-complete` whether verification passed or failed; `get ota.wan.health` holds the result.
+A reboot cancels the check; it does not automatically power hardware or rejoin WiFi during
+startup. Where power-guard is installed, `ota wan join`, `ota wan verify` and OTA updates refuse
+with `ERR: battery low; hotspot not powered` while the battery is below its resume level.
+
+`get ota.wan.health` reports `WAN_0|NTP_0`, `WAN_1|NTP_0`, `WAN_1|NTP_1`, or
+`RESTORE_FAULT`, plus `proven=yes|no`. A successful result stays proven across later transient
+failures. Changing `ota.wan.wifi` clears it. A restore fault records a failed runtime cleanup but
+does not create a persistent lock.
 
 **Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
 

@@ -11,7 +11,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from mobmesh_tools.model import ProjectModel
+from project_config import ProjectModel
 
 
 class ModManifestTestCase(unittest.TestCase):

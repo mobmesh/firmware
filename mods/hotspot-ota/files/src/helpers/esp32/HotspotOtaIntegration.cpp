@@ -20,6 +20,10 @@
 #define OTA_MOD_BUILD_DATE "unknown"
 #endif
 
+void hotspotOtaBeforeRadioInit() {
+  HotspotOTA::setPower(false);
+}
+
 bool hotspotOtaRadioInit(const char* build_id) {
   SPIFFS.begin(true);
   for (int attempt = 0; attempt < 3; attempt++) {
@@ -38,7 +42,7 @@ bool hotspotOtaRadioInit(const char* build_id) {
 // never stops either. This mod owns both instead, so the listener can actually be closed.
 #define OTA_AP_DEADLINE_MS  (20UL * 60 * 1000)
 #define OTA_AP_STALL_MS     (10UL * 60 * 1000)
-// Long enough for AsyncTCP to drain the response now that the callback no longer blocks.
+// Long enough for AsyncTCP to drain the response.
 #define OTA_ADVERT_MIN_GAP_MS  10000UL   // airtime is shared -- one press per ten seconds
 #define OTA_ADVERT_DELAY_MS    1500      // lets the reply leave before the radio transmits
 #define OTA_CLOCK_SANITY_FLOOR 1700000000UL   // ~Nov 2023 -- rules out a stuck or truncated epoch
@@ -103,10 +107,8 @@ static void apUploadFail(ApUpload* upload, const char* reason) {
   apUploadRelease(upload);
 }
 
-// Routes outlive a session: AsyncWebServer holds them independently of the listening socket, and
-// re-registering on each start would stack duplicate handlers.
-// Formatted per request, not once at apStart: battery voltage and probation state both move
-// while the AP is up, and a page loaded later would otherwise show the first visitor's values.
+// Formatted per request, not once at apStart: battery voltage and probation state both
+// move while the AP is up.
 static const char* buildIdentity() {
   RollbackGuard::Slots sl = RollbackGuard::slots();
   RollbackGuard::ProbationState pr = RollbackGuard::probation();
@@ -114,8 +116,9 @@ static const char* buildIdentity() {
   char ver[17] = "", sha[13] = "", role[25] = "";
   HotspotOTA::runningMetadata(ver, sha, role);
 
-  const char* mac = WiFi.softAPmacAddress().c_str();
-  const char* tail = strlen(mac) > 8 ? mac + 9 : mac;   // last three octets identify the node
+  String mac = WiFi.softAPmacAddress();
+  const char* mac_text = mac.c_str();
+  const char* tail = strlen(mac_text) > 8 ? mac_text + 9 : mac_text;   // last three octets identify the node
 
   snprintf(ota_identity, sizeof(ota_identity),
            "{\"nm\":\"%s\",\"id\":\"%s\",\"k\":\"%s\",\"hw\":\"%s\",\"cid\":%d,"
@@ -262,9 +265,8 @@ static void apStart(const char* id, char* reply) {
   sprintf(reply, "Started: http://%s/update", WiFi.softAPIP().toString().c_str());
 }
 
-// Ending the server frees the listening socket, so the port is released and a later `start ota`
-// binds again. softAPdisconnect stays in its wifi-on form -- the wifi-off form hung a Heltec V4 --
-// so the mode captured at start is restored separately, leaving no radio up that was not up before.
+// softAPdisconnect stays in its wifi-on form: the wifi-off form hangs a Heltec V4, so the
+// mode captured at start is restored separately.
 static bool apTeardown() {
   ota_server.end();
   // Ending the server destroys any in-flight request, freeing the state ap_upload_owner points at.
@@ -294,7 +296,10 @@ static bool refuseWhileApWriting(char* reply) {
 }
 
 static void apPoll() {
-  if (ap_reboot_pending && millis() - ap_reboot_ms >= OTA_REBOOT_GRACE_MS) modBoardReboot();
+  if (ap_reboot_pending && millis() - ap_reboot_ms >= OTA_REBOOT_GRACE_MS) {
+    HotspotOTA::setPower(false);
+    modBoardReboot();
+  }
   if (!ap_up) return;
   if (Update.isRunning()) {
     size_t written = Update.progress();
@@ -364,6 +369,15 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
   if (isDestructive(context, command)
       && (HotspotOTA::refuseWhileActive(reply) || refuseWhileApWriting(reply))) return true;
 
+  // Any reset while pending verify rolls back, and a timed sleep is a reset.
+  if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
+    RollbackGuard::ProbationState probation = RollbackGuard::probation();
+    if (probation.pending) {
+      sprintf(reply, "ERR: firmware on probation; retry in %us", (unsigned)probation.remaining_secs);
+      return true;
+    }
+  }
+
   if (memcmp(command, "ver", 3) == 0) {
     sprintf(reply, "%s (%s) + ota (%s)", context.fw_version, context.fw_build_date,
             OTA_MOD_BUILD_DATE);
@@ -417,6 +431,9 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
       HotspotOTA::wifiDisconnect();
       strcpy(reply, "OK - disconnected");
     }
+  } else if (strcmp(command, "ota wan verify") == 0) {
+    if (refuseWhileApUp(reply)) return true;
+    HotspotOTA::verifyWan(reply);
   } else if (memcmp(command, "ota wan check", 13) == 0) {
     HotspotOTA::checkWan(reply);
   } else if (memcmp(command, "ota slot boot ", 14) == 0) {
@@ -426,6 +443,7 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
     } else if (refuseWhileApWriting(reply)) {
       return true;
     } else if (RollbackGuard::setActivePartition(command[14], reply)) {
+      HotspotOTA::setPower(false);
       modBoardReboot();
     }
   } else {
@@ -437,6 +455,10 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
 static bool handleSet(char* command, char* reply) {
   char* config = &command[4];
   if (memcmp(config, "ota.wan.wifi ", 13) == 0) {
+    if (HotspotOTA::isActive()) {
+      strcpy(reply, "ERR: OTA/WAN operation active");
+      return true;
+    }
     HotspotOtaConfig cfg;
     HotspotOTA::loadConfig(cfg);
     char* comma = strchr(&config[13], ',');
@@ -444,14 +466,16 @@ static bool handleSet(char* command, char* reply) {
       *comma = 0;
       StrHelper::strncpy(cfg.ssid, &config[13], sizeof(cfg.ssid));
       StrHelper::strncpy(cfg.password, comma + 1, sizeof(cfg.password));
-      HotspotOTA::saveConfig(cfg);
-      strcpy(reply, "OK");
+      if (!HotspotOTA::saveConfig(cfg)) {
+        strcpy(reply, "ERR: could not save WiFi settings");
+      } else if (!HotspotOTA::resetWanHealth()) {
+        strcpy(reply, "ERR: WiFi saved; WAN health reset failed");
+      } else {
+        strcpy(reply, "OK");
+      }
     } else {
       strcpy(reply, "ERR: expected <ssid>,<password>");
     }
-  } else if (memcmp(config, "ota.fw.sha256 ", 14) == 0) {
-    HotspotOTA::setSha256Hex(memcmp(&config[14], "clear", 5) == 0 ? "" : &config[14]);
-    strcpy(reply, "OK");
   } else if (memcmp(config, "ota.fw.url ", 11) == 0) {
     HotspotOtaConfig cfg;
     HotspotOTA::loadConfig(cfg);
@@ -498,6 +522,8 @@ static bool handleGet(char* command, char* reply) {
     sprintf(reply, "> %s", cfg.url[0] ? cfg.url : "(not set)");
   } else if (memcmp(config, "ota.wan.pwr", 11) == 0) {
     sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
+  } else if (memcmp(config, "ota.wan.health", 14) == 0) {
+    HotspotOTA::wanHealth(reply);
   } else if (memcmp(config, "ota.status", 10) == 0) {
     HotspotOTA::status(reply);
   } else if (memcmp(config, "ota.ap", 6) == 0) {

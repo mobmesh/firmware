@@ -1,12 +1,9 @@
-/* flasher.css
-   Components the shared sheet does not have yet. Kept separate only while the
-   design language is being settled — it folds into shared/style.css at cutover,
-   so nothing here may redefine a shared token. */
+/* Components the shared sheet does not have yet.
+   Nothing here may redefine a shared token. */
 
 :root {
-  /* A floor, not a ceiling -- GCM's own `min-h-[600px]`. Short steps are padded out to
-     it so the panel never shrinks; long ones grow past it rather than scrolling. */
-  /* GCM's max-w-2xl is 672px on the panel itself; .wrap's 20px sides sit outside it. */
+  /* A floor, not a ceiling: short steps pad out to it, long ones grow past rather
+     than scrolling. GCM's max-w-2xl is the panel alone; .wrap's 20px sides sit outside. */
   --cell-w: 784px;
   --cell-min-h: 600px;
 
@@ -15,11 +12,10 @@
   --choice-gap: 1rem;
   --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
 
-  /* GCM's own tile-hover values. Spread -40 against blur 80 puts the visible reach at
-     blur/2 - spread = 0px, so it pools under the card instead of haloing around it, and
-     the colour is gulf-500 -- their shadows use the darker teal, not the bright one. */
+  /* Spread -40 against blur 80 puts the visible reach at blur/2 - spread = 0px, so it
+     pools under the card instead of haloing around it. Colour is gulf-500, the darker teal. */
   --glow-accent: 0 30px 80px -40px rgba(17, 182, 164, 0.4);
-  /* Teal at 45%, not full strength. The hard opaque edge was the harsh part, not the glow. */
+  /* Teal at 45%: a full-strength opaque edge reads as harsh. */
   --hover-edge: rgba(45, 209, 189, 0.45);
 }
 
@@ -51,13 +47,17 @@
 }
 
 .wrap {
-  width: clamp(320px, 90%, var(--cell-w));
+  width: clamp(320px, 94%, 960px);
+  padding-top: 2.75rem;
 }
 
 /* .card supplies the surface; this sets the floor. The panel grows with its content. */
 .cell {
   min-height: var(--cell-min-h);
   padding: 3rem;
+  width: 100%;
+  max-width: var(--cell-w);
+  margin-inline: auto;
 }
 
 .step {
@@ -67,9 +67,8 @@
   min-height: 0;
 }
 
-/* Shrink-wraps its text. Any fixed trailing space here reads as gap *above* the
-   body, which pushed a vertically centred step visibly low — measured 151px above
-   against 120px below. Centring supplies the separation instead. */
+/* Shrink-wraps its text: fixed trailing space here reads as gap *above* the body and
+   drops a centred step visibly low. Centring supplies the separation instead. */
 .step-head {
   flex: none;
 }
@@ -87,9 +86,8 @@
   padding-top: 0;
 }
 
-/* .card is a flex column, so the step is a flex child. `height: 100%` resolved against
-   the old fixed height; with a min-height it collapses to auto and the body's `flex: 1`
-   has nothing to expand into, dropping every centred step to the top of the card. */
+/* Against a min-height, `height: 100%` collapses to auto, leaving the body's `flex: 1`
+   nothing to expand into and dropping every centred step to the top of the card. */
 .step {
   flex: 1;
 }
@@ -166,10 +164,8 @@
   transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
 }
 
-/* 1px ring that only lights at the top-left and bottom-right corners, so the card
-   reads as catching light from one direction. Masked to the border, not the fill.
-   The tile rules live in the shared sheet, so the ring is added here to leave
-   the shipped flasher alone. */
+/* 1px ring lit at the top-left and bottom-right corners only, masked to the border
+   rather than the fill, so the card reads as catching light from one direction. */
 .tile,
 .board-tile {
   position: relative;
@@ -295,9 +291,8 @@
   margin-inline: auto;
 }
 
-/* Option grids, where a step change otherwise reads as the same screen. `--tile-delay`
-   is set per tile by ui.js: a board grid waves diagonally and needs its column count,
-   which is only known there. The row layout stays still — it is a list, not a grid. */
+/* `--tile-delay` is set per tile by ui.js: a diagonal wave needs the column count,
+   which is only known there. Row layouts stay still -- a list is not a grid. */
 .board-tiles > .board-tile,
 .choice-grid > .choice {
   animation: tile-rise 0.38s cubic-bezier(0.22, 0.61, 0.36, 1) both;
@@ -354,10 +349,8 @@
   position: relative;
 }
 
-/* Was GCM's flat h-64, which letterboxed to about 2.3:1 in this card — too little sky
-   above a pin and too little below. An aspect ratio holds the shape as the card narrows;
-   the min-height keeps it usable on a phone, where the ratio would otherwise starve it.
-   A measured height matters either way: the map renders an empty canvas without one. */
+/* The ratio holds the shape as the card narrows; the min-height keeps it usable on a
+   phone. A measured height either way: the map renders an empty canvas without one. */
 .map-frame {
   aspect-ratio: 1.8;
   min-height: 240px;
@@ -467,9 +460,8 @@
   font-size: 0.9rem;
 }
 
-/* Only while the line is actually shown: `:has(.identity-line)` still matches a hidden
-   one, and space-between left-aligns a lone child, which walked the button across the
-   card on an Upgrade. Without it the foot falls back to .actions' own flex-end. */
+/* `:has(.identity-line)` matches a hidden one too, and space-between left-aligns a
+   lone child, walking the button across the card on an Upgrade. */
 .step-foot:has(.identity-line:not([hidden])) {
   display: flex;
   align-items: center;
@@ -502,9 +494,8 @@
   color: var(--fg-muted);
 }
 
-/* mobmesh.org's own .gcm-mark-badge, scaled down: the mark is knocked out of a
-   teal-to-amber chip, not drawn in line colour. Proportions kept -- their 40px badge
-   carries a 20px glyph and a 12px radius. */
+/* mobmesh.org's .gcm-mark-badge scaled down: knocked out of a teal-to-amber chip, not
+   drawn in line colour. Their 40px badge carries a 20px glyph and a 12px radius. */
 .identity-mark {
   display: grid;
   place-items: center;
@@ -677,9 +668,8 @@
 .step.is-map-expanded .identity-line,
 .step.is-map-expanded .actions { display: none; }
 
-/* The counter belongs to the name field, which is hidden here; left on its own it reads
-   as a count of something on the map. The heading introduces a form that is no longer
-   on screen, so it goes too — expanded is the map and nothing else. */
+/* Expanded is the map and nothing else: the counter and heading both belong to the
+   name field, which is hidden here. */
 .step.is-map-expanded .name-count { display: none; }
 .step.is-map-expanded .step-head { display: none; }
 
@@ -698,14 +688,12 @@
 }
 
 /* MapLibre paints its own light chrome; pull it back to the sheet's palette. Label
-   contrast is set on the style's own layers in ui.js, not with a filter over the canvas —
-   there is no composited label image to correct any more. */
+   contrast is set on the style's own layers in ui.js, not by filtering the canvas. */
 .map-frame .maplibregl-map { background: var(--bg-1); }
 .map-frame .maplibregl-canvas { outline: none; }
 
-/* Attribution sits under the hint bar rather than beside it: it has to be present for
-   CARTO's and OSM's terms, not read. Smaller, dimmer, and below .map-hint's z-index so
-   the instruction wins wherever they overlap. */
+/* Attribution has to be present for CARTO's and OSM's terms, not read: below
+   .map-hint's z-index so the instruction wins wherever they overlap. */
 .map-frame .maplibregl-ctrl-bottom-right,
 .map-frame .maplibregl-ctrl-bottom-left {
   z-index: 1000;

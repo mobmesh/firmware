@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-# Builds the whole-flash -merged.bin published alongside the app-only image: one file a
-# user writes at offset 0 to a blank board, rather than four written at four offsets.
+# Builds the whole-flash -merged.bin: one file written at offset 0 to a blank board.
 #
-# Chip and flash size are read out of the built images' own headers rather than declared
-# in config, so they cannot drift from what was actually built. esptool rewrites the flash
-# size into the bootloader header only -- the app is copied through untouched, so its
-# appended SHA-256 stays valid whatever size is passed.
+# Chip and flash size are read from the built images' own headers, so they cannot drift
+# from what was built. esptool rewrites the size into the bootloader header only, leaving
+# the app's appended SHA-256 valid whatever size is passed.
 
 import argparse
 import json

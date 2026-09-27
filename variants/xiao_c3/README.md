@@ -9,6 +9,6 @@ Board-specific notes for firmware built for this board. `overrides.yaml` in this
 
 These requirements only apply if this board is built with the `hotspot-ota` mod -- see `build-targets.yaml` at the repo root for which mods each board's build includes.
 
-## No automated boot-loop check -- already attempted, not just unscoped
+## Boot check
 
-`heltec_v4` gets an automated QEMU boot-loop regression check (`qemu-boot-check.yml`) on every release, using `qemu-system-xtensa`. RISC-V (ESP32-C3, this board's chip) needs a different QEMU machine target entirely, and this was already tried: a RISC-V-capable QEMU build was put together and couldn't even boot a known-good upstream MeshCore binary. This isn't a "someone should scope this" backlog item -- the available tooling was tried and found not to work as a testing platform. Manual hardware testing is the only verification path for this board until/unless the RISC-V QEMU tooling situation actually changes.
+Every release boots in QEMU (`esp32c3` machine) and gets a quick CLI check, same as heltec_v4. Settings are in the `qemu:` block of `overrides.yaml`.

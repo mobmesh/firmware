@@ -1,27 +1,12 @@
-# Single source of truth for what gets built and released.
+# What gets built and released. Board hardware facts live in variants/<board>/overrides.yaml,
+# and resolve-targets computes asset_basename as <board>_<role_abbrev>_mobmesh.
 #
-# Roles own asset naming, upstream tag selection, and publication facts. Each target is
-# one (board, role) combination this project ships. `mods`
-# lists which mods/<name>/ this target includes -- every target lists every
-# mod it wants explicitly, nothing is applied by default. Board hardware
-# facts (pins, timeouts, partitions, flasher notes) live in
-# variants/<board>/overrides.yaml, not here; this file only decides what
-# combinations exist and which features go into each one.
-#
-# asset_basename is not listed here -- it's computed by
-# `scripts/generate-board-config.py resolve-targets` as
-# <board>_<asset_role_abbrev>_mobmesh -- a label, not a mod inventory.
-#
-# vendor_flasher_assets: exactly one target per BOARD should be true. It controls
-# whether this target's build vendors that board's bootloader.bin/partitions.bin/
-# boot_app0.bin into pages/flasher/<board>/ for the web flasher's "New device" (full
-# erase) flow. These files are NOT shared/generic across boards or roles -- each
-# board's partition table (see variants/<board>/overrides.yaml's partitions_override)
-# is different, so they're always sourced fresh from THIS target's own build output,
-# never copied from another board or reused across runs.
+# Every target lists every mod it wants; nothing applies by default except core_mods.
+# vendor_flasher_assets: exactly one target per BOARD, since bootloader.bin, partitions.bin
+# and boot_app0.bin are partition-table specific and never shared between boards.
+
 # Applied to every target, in this order, before any target-specific mods below.
-# Keep entries here only while they genuinely ship everywhere -- a mod that becomes
-# optional belongs in a target's own `mods:` list instead.
+# A mod that stops shipping everywhere belongs in a target's own `mods:` list instead.
 core_mods: [shim, hotspot-ota, timing-safety, try-settings]
 
 roles:
@@ -42,7 +27,7 @@ targets:
     build_env: heltec_v4_repeater
     vendor_flasher_assets: true
     # heltec_v4 only: its battery divider is the one that has been bench-measured.
-    mods: [power-guard]
+    mods: [power-guard, sync-settings]
     # Headless: drops the OLED and the button's long-press power-off.
     # Joined form -- PlatformIO splits "-U FOO" into a bare -U.
     build_flags_append: ["-UDISPLAY_CLASS"]
@@ -51,17 +36,17 @@ targets:
     role: room_server
     build_env: heltec_v4_room_server
     vendor_flasher_assets: false
-    mods: []      # extras beyond core_mods
+    mods: [sync-settings]      # extras beyond core_mods
     # qemu_boot_check: false   # opt this role out of the emulator gate
 
   - board: xiao_c3
     role: repeater
     build_env: Xiao_C3_repeater
     vendor_flasher_assets: true
-    mods: []      # extras beyond core_mods
+    mods: [sync-settings]
 
   - board: xiao_c3
     role: room_server
     build_env: Xiao_C3_room_server
     vendor_flasher_assets: false
-    mods: []      # extras beyond core_mods
+    mods: [sync-settings]      # extras beyond core_mods

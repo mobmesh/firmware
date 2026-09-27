@@ -151,12 +151,8 @@ export const ESP32_MODE = {
   UNKNOWN: 'unknown',
 };
 
-// Affirmative signals only, CLI first: silence from both is a real state, and calling it
-// "bootloader" is what erases a live device. Takes a closed port and returns it closed.
-//
-// The app's settings come back with the mode: `ver` proves the CLI is alive and the reads
-// that follow ride the same session, because this is the last moment they are reachable —
-// download mode is entered immediately after and serves no CLI.
+// Affirmative signals only: silence from both is a real state, and calling it "bootloader"
+// is what erases a live device. Takes a closed port and returns it closed.
 export async function resolveEsp32Mode(port) {
   await port.open({ baudRate: CLI_BAUD_RATE });
   let config = null;

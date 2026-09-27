@@ -30,21 +30,38 @@ for several agreeing readings, so a transmit dip never triggers one.
 
 Values are gauge millivolts, not volts at the pins.
 
-## Commands
+## CLI Commands
 
-    powersaving safe              on/off, threshold, last reading
-    powersaving safe.mv <mv>      set threshold, or 0 to disable
-    powersaving safe on|off       toggle the rung, leaving the threshold alone
-    powersaving auto              state, active flag, transition count
-    powersaving auto on|off       toggle automatic power saving
+<table>
+<thead><tr><th align="left">Command</th><th align="left">What it does</th></tr></thead>
+<tbody>
+<tr><td><code>powersaving safe</code></td><td>Show on/off, threshold, and last reading.</td></tr>
+<tr><td><code>powersaving safe.mv &lt;mv&gt;</code></td><td>Set the threshold, or <code>0</code> to disable.</td></tr>
+<tr><td><code>powersaving safe on|off</code></td><td>Toggle the failsafe, leaving the threshold alone.</td></tr>
+<tr><td><code>powersaving auto</code></td><td>Show state, active flag, and transition count.</td></tr>
+<tr><td><code>powersaving auto on|off</code></td><td>Toggle automatic power saving.</td></tr>
+<tr><td><code>poweroff &lt;secs&gt;</code></td><td>Deep sleep for 60 to 86400 seconds, then wake. Works over the mesh too.</td></tr>
+<tr><td><code>stats-core</code></td><td>Battery, uptime, errors, queue length.</td></tr>
+<tr><td><code>stats-radio</code></td><td>Noise floor, RSSI/SNR, airtime.</td></tr>
+<tr><td><code>stats-packets</code></td><td>Packet counters.</td></tr>
+</tbody>
+</table>
 
-    poweroff <secs>               deep sleep, then reboot
+Upstream's `poweroff` never wakes. This replaces it with a version that requires a wake time
+and refuses a bare `poweroff`. Over the mesh, the reply goes out first and the node sleeps
+5 seconds later. Builds without this mod refuse `poweroff` altogether.
 
-Upstream's `poweroff` never wakes and is reachable over the mesh; this replaces it with
-a serial-only version that requires a wake time and refuses a bare invocation.
+The three `stats-` commands are upstream's own, gated to serial there. This mod forwards
+them when they arrive over the mesh, so a remote operator can read a battery level without
+a site visit. The remote CLI path is already authenticated and the replies only read state.
 
 It also rebases the clock after a brownout, which upstream leaves scrambled until NTP
 or a battery pull corrects it.
+
+Where [`hotspot-ota`](../hotspot-ota) is also installed, the hotspot modem is not powered
+while the battery is below the resume mark, so an update, WAN check or clock refresh cannot
+add the load that browns the node out. power-guard answers through a shim hook; neither mod
+depends on the other, and without power-guard the hotspot is never held back.
 
 ## Enabling
 
@@ -55,9 +72,9 @@ board that states nothing gets a mod that does nothing. Power saving additionall
 `POWER_GUARD_AUTO_DEFAULT` or `powersaving auto on`.
 
 Optionally bypasses the FEM LNA while power saving
-(`POWER_GUARD_AUTO_DROP_FEM_LNA: 1`, off by default): ~0.3 mA saved for ~10 dB of RX
-sensitivity, which usually is not worth it -- a repeater that hears less than it
-advertises is a routing hazard.
+(`POWER_GUARD_AUTO_DROP_FEM_LNA: 1`, off by default): about 9 mA saved at idle on a Heltec V4
+(bench, 2026-09-16) for ~10 dB of RX sensitivity. Off by default because a repeater that
+hears less than it advertises is a routing hazard.
 
 Requires the `battery_measurement` capability; `fem_lna_control` and
 `deep_sleep_rail_shutdown` are optional.

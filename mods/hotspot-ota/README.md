@@ -1,173 +1,196 @@
-# hotspot-ota - Remote OTA Firmware Updates for MeshCore
+# hotspot-ota - Fully Remote Firmware Updates
 
-Adds a WiFi-based over-the-air update path to MeshCore, along with automatic rollback protection if an update doesn't work correctly.
+Adds a WiFi-based over-the-air update path to MeshCore, along with automatic rollback
+protection if an update doesn't work.
 
-MeshCore already has a built-in `start ota` command. This starts a WiFi access point on the device and lets someone nearby upload a `.bin` firmware file through a web page.
+MeshCore already has a built-in `start ota` command. It starts a WiFi access point on the
+device and lets someone nearby upload a `.bin` firmware file through a web page. That means
+someone has to be standing next to the node, and remote nodes are exactly the ones that are
+hard to get to.
 
-This mod adds another way to update the device. Instead of creating its own WiFi network, the device powers on the external power rail for its hotspot, if one is connected, and joins an existing WiFi network. It checks that the network has internet access, downloads the firmware from a URL, verifies it, and then installs it.
+This mod adds another way. Instead of creating its own WiFi network, the device powers on
+its hotspot, if one is connected, and joins an existing WiFi network. It checks that the
+network reaches the internet, downloads the firmware from a URL, verifies it, and installs it.
+No laptop or phone has to go to the site.
 
-This means you don't need to bring a laptop or phone to the location of the device just to perform an update.
+The commands are regular MeshCore CLI commands, so they can be sent remotely over the LoRa
+mesh. You don't have to be connected to the device.
 
-The commands are also regular MeshCore CLI commands, so they can be sent remotely over the LoRa mesh. You don't have to be connected directly to the device.
+It also adds rollback protection. After an update, the new firmware is tested before it's
+considered good. If it fails during startup, the device goes back to the previous working
+firmware on its own, so a bad update can't leave a remote node deaf to the mesh.
 
-The mod also adds rollback protection. After an update, the new firmware is tested before it is considered good. If the new firmware fails during startup, the device automatically goes back to the previous working firmware.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Op as Operator
+    participant N as Node
+    participant H as Hotspot
+    participant S as Firmware server
+    Op->>N: start ota wan update (over LoRa)
+    N-->>Op: OK - OTA queued
+    N->>H: power on
+    N->>H: join WiFi, check internet, sync clock
+    N->>S: download firmware.bin
+    Note over N: check build stamp, board and SHA-256
+    N->>H: power off
+    N->>N: reboot into new firmware (on probation)
+```
 
-## What ships
+MeshCore's own local `start ota` still works too, with a long list of fixes. See
+[Local Access Point](#4-local-access-point---start-ota).
 
-| Where | What |
-| ----- | ---- |
-| `files/src/helpers/esp32/HotspotOTA.{cpp,h}` | hotspot join, fetch, verify, flash, NTP clock set |
-| `files/src/helpers/esp32/HotspotOtaBoard.cpp` | `modBoardStartOtaFromUrl()`, reached from the CLI hook |
-| `files/src/helpers/esp32/HotspotOtaIntegration.{cpp,h}` | radio policy, loop polling, and CLI handler |
-| `files/src/helpers/esp32/RollbackGuard.{cpp,h}` | rollback protection after an update |
+---
 
-`files/` is copied into the upstream clone before composition. `mod.yaml` declares the
-integration phases, and the shim generator wires them into its aggregate sources. This mod
-has no patch and touches no upstream or shim-owned source file.
+## 1. Hardware Requirements
 
-The patches don't contain board-specific settings such as the GPIO pin used for the power switch or WiFi and HTTP timing values.
+Only the hotspot power control needs extra hardware: a switch on a GPIO pin that powers a
+WiFi hotspot or cell modem. The node turns it on for an update and off again afterwards, so
+a cellular hotspot has **zero idle (vampire) draw** between updates. That matters on a solar
+or battery node.
 
-Those settings come from each board's `variants/<board>/overrides.yaml` file and are passed into the build as `-D` flags. See the root README for more information about how board configuration works.
+> [!TIP]
+> **No hotspot needed if WiFi is already in range.** Save the network with `set ota.wan.wifi`
+> and the node joins it directly. The power switch and hotspot are only for sites with no WiFi.
 
-## Hardware Requirements
+The pin is held high for the whole update, not pulsed, so a load-switch enable line has to
+stay asserted and should have a pulldown. See `variants/<board>/README.md` for each board's
+pin. Rollback protection and clock sync need no extra hardware.
 
-This mod expects an external switch on a GPIO pin controlling power to a WiFi hotspot or cellular modem. The firmware raises that pin before joining WiFi and drops it again when it's finished, so the hotspot only draws power during an update.
+The node switches the hotspot off at every startup, before the radio starts, and before any
+reboot it triggers itself, so a reset or crash never leaves a modem drawing current. Where
+[`power-guard`](../power-guard) is also installed, the hotspot is not powered while the
+battery is below its resume mark: `ota wan join`, `ota wan verify` and updates reply
+`ERR: battery low; hotspot not powered`. `set ota.wan.pwr on` is not held back.
 
-The pin is held high for the whole update rather than pulsed. If the switch is a load-switch IC, its enable line needs to stay asserted the entire time, and a hardware pulldown on that line is recommended so the rail defaults to off after any reset regardless of what the firmware is doing.
+---
 
-**Which GPIO to use is per-board.** See `variants/<board>/README.md` for the confirmed pin, any documented fallback, and other wiring notes for that board. The machine-readable value lives beside it in `variants/<board>/overrides.yaml`.
+## 2. CLI Commands
 
-Rollback protection and clock sync need no extra hardware. Only the hotspot power control does.
+All of these work over serial or remotely over the mesh. Full details are in
+[`docs/cli-additions.md`](docs/cli-additions.md).
 
-## CLI Commands
+<table>
+<thead><tr><th align="left">Command</th><th align="left">What it does</th></tr></thead>
+<tbody>
+<tr><td><code>set ota.wan.wifi &lt;ssid&gt;,&lt;password&gt;</code></td><td>Save the WiFi network to use. Survives firmware updates.</td></tr>
+<tr><td><code>set ota.fw.url &lt;url&gt;</code></td><td>Save a default firmware URL.</td></tr>
+<tr><td><code>start ota wan &lt;url&gt;</code></td><td>Join WiFi, download from <code>&lt;url&gt;</code>, check it, and install it.</td></tr>
+<tr><td><code>start ota wan update</code></td><td>Same, using the saved <code>ota.fw.url</code>.</td></tr>
+<tr><td><code>get ota.status</code></td><td>Current step, download progress, or the final result.</td></tr>
+<tr><td><code>ota cancel</code></td><td>Stop an update any time before it starts verifying.</td></tr>
+<tr><td><code>set ota.fw.marker &lt;on|off&gt;</code></td><td>Turn the build-stamp check off for the next update only. See below.</td></tr>
+<tr><td><code>ota wan join</code> / <code>ota wan leave</code></td><td>Join WiFi without downloading, or disconnect and cut hotspot power.</td></tr>
+<tr><td><code>ota wan check</code></td><td>Check the node can reach the internet.</td></tr>
+<tr><td><code>ota wan verify</code></td><td>Test WAN and NTP, then restore the current WiFi and hotspot-power state.</td></tr>
+<tr><td><code>get ota.wan.health</code></td><td>Show the latest verification and whether this WiFi setup has succeeded before.</td></tr>
+<tr><td><code>get|set ota.wan.pwr</code></td><td>Read or switch the hotspot power directly.</td></tr>
+<tr><td><code>get ota.slot</code></td><td>Version and state of both slots.</td></tr>
+<tr><td><code>ota slot boot &lt;A|B&gt;</code></td><td>Boot the other slot, if it holds a valid image.</td></tr>
+</tbody>
+</table>
 
-These commands are available on devices built with these patches. They can be used alongside the standard MeshCore CLI commands.
+> [!IMPORTANT]
+> `set ota.fw.marker off` lets the next update install firmware that isn't from this project,
+> including stock MeshCore. That firmware has no `start ota wan`, so the node can't be updated
+> remotely again until someone flashes it by hand.
 
-| Command                                         | Description                                                                                                                                                                                                                                                                   |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `set ota.wan.wifi <ssid>,<password>`            | Saves the WiFi network and password that will be used for future updates. The settings survive firmware updates, so you only need to set them once.                                                                                                                           |
-| `set ota.fw.sha256 <hex>`                       | Sets the expected SHA-256 checksum for the next firmware download. This takes priority over a checksum downloaded automatically. The value is kept in RAM and is cleared after every reboot.                                                                                  |
-| `set ota.fw.sha256 clear`                       | Clears a manually configured checksum so the automatically downloaded checksum can be used again.                                                                                                                                                                             |
-| `start ota wan <url>`                           | Connects to the configured WiFi network, downloads the firmware from `<url>`, verifies it, checks that it is actually a build from this project, and flashes it.                                                                                                              |
-| `set ota.fw.url <url>`                          | Saves a default firmware URL. This setting can only be overwritten and cannot be cleared.                                                                                                                                                                                     |
-| `start ota wan update`                          | Same as `start ota wan <url>`, but uses the saved `ota.fw.url`. If no URL has been configured, the command returns `ota.fw.url not configured`. This shorter command is useful for remote updates over LoRa, where every character matters.                                   |
-| `get ota.status`                                | Reports the current OTA service state, download progress, or the final failure/cancellation result.                                                                                                                                                                           |
-| `ota cancel`                                    | Requests cancellation while the service is queued, joining, checking connectivity, opening the URL, or downloading.                                                                                                                                                           |
-| `set ota.fw.marker <on\|off>`                   | Controls the firmware authenticity check. It is `on` by default. Setting it to `off` temporarily disables the check for the next `start ota wan` command. The setting is stored only in RAM and is turned back on after a reboot. The SHA-256 check is still always enforced. |
-| `ota wan join` / `ota wan leave`                | Connects to the configured WiFi network without downloading firmware, or disconnects and turns off the WAN power.                                                                                                                                                             |
-| `ota wan check`                                 | Checks whether the device can reach the internet after joining the WiFi network.                                                                                                                                                                                              |
-| `get ota.wan.pwr` / `set ota.wan.pwr <on\|off>` | Reads or directly controls the WAN power switch. This is mainly useful for diagnostics and recovery.                                                                                                                                                                          |
-| `stop ota`                                      | Shuts down the `start ota` access point and its upload server. Refused while an upload is writing. The session also ends by itself 20 minutes after `start ota`, or 10 minutes after a writing upload stops making progress, so an abandoned session no longer stays open until the node reboots. Ending it releases port 80, so `start ota` can be used again in the same boot. |
-| `get ota.ap`                                    | Reports whether the `start ota` access point is up, how long it has left, and whether an upload is in progress.                                                                                                                                                                |
-| `get ota.slot`                                  | Shows the version and state of both OTA slots. For the inactive slot it reports two separate facts: what the bootloader records (`recorded-valid`, `aborted`, ...) and whether the image actually verifies (`image-ok`, `image-invalid`). Only `image-ok` means a rollback target exists. |
-| `ota slot boot <A\|B>`                          | Changes the bootloader configuration to use the other OTA slot and reboots into it. It refuses to switch if the selected slot is already active or doesn't contain a valid image. Rollback testing is also started again for the selected slot.                               |
-
-For example:
+Every character counts over LoRa, so save the URL once and every future update is one short
+command:
 
 ```text
 set ota.wan.wifi MyHotspot,hunter2
-start ota wan https://example.com/firmware/heltec_v4_repeater-v1.16.0.bin
-```
-
-The firmware is verified against a SHA-256 the image carries in its own final 32 bytes, so nothing is fetched but the image. You only need to set a checksum manually when the firmware comes from a source you do not trust to serve it honestly.
-
-For complete details about these commands, see `docs/cli-additions.md`. The standard MeshCore CLI commands are documented in the upstream `docs/cli_commands.md`.
-
-### Short Commands for Remote Updates
-
-When updating a device remotely over LoRa, it's useful to keep the commands as short as possible.
-
-You can save the firmware URL once:
-
-```text
+ota wan verify
+get ota.wan.health
 set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin
-```
-
-That address serves the same file as the copy on GitHub, but it is shorter to type
-and it does not redirect on the way. If a device has trouble fetching it, the
-GitHub address still works:
-
-```text
-set ota.fw.url https://github.com/mobmesh/firmware/raw/refs/heads/main/pages/flasher/heltec_v4/repeater/firmware.bin
-```
-
-After that, future updates can use:
-
-```text
 start ota wan update
 ```
 
-This is much shorter than sending the full URL every time.
+---
 
-### OTA Update Timing
+## 3. How an Update Runs
 
-The `start ota wan` command queues the update and responds immediately with `OK - OTA queued`.
-The OTA service then connects to WiFi, downloads, verifies, and flashes in a dedicated task while
-the normal command loop remains available. Use `get ota.status` to inspect its current state or
-download byte count. Use `ota cancel` to stop it before verification begins.
+`start ota wan` replies `OK - OTA queued` right away and runs in the background, so the node
+keeps repeating while it works. It takes up to about two minutes. Cancel any time before
+verifying with `ota cancel`; on a cancel or failure the current firmware keeps running and
+`get ota.status` shows what happened.
 
-The whole process can take up to around two minutes.
+To save data, the node decides from the first 1 KB whether a download is worth finishing, and
+hangs up straight away if the image is:
 
-After a successful update, the main loop reboots into the new firmware and starts automatic
-rollback protection. A failure or cancellation leaves the current firmware running and preserves
-the terminal result in `get ota.status` for inspection.
+| Problem | Reply |
+| --- | --- |
+| Not a MobMesh build | `no H0TSP0T metadata -- not a build of this project` |
+| A build without hotspot-ota | `image has no OTA support` |
+| For a different board or role | `image is for X, this node is Y` |
+| The firmware already running | `already running vX (sha) -- nothing to do` |
 
-## [Web-Based Flasher](https://tools.mobmesh.org/flasher)
+A good image downloads in full and is then checked against its SHA-256. The SHA-256 and the
+build stamp catch a corrupt download or the wrong image; they do not prove who published it.
 
-Some boards need a repartitioned flash layout to make room for this mod's expanded feature set. The flasher will let the user know if this is the case.
+---
 
-### Full Flash (Reset)
+## 4. Local Access Point - Start OTA
 
-Use this option for a blank board or a board that has been bricked.
+MeshCore's `start ota` turns the node into a WiFi access point so someone nearby can upload
+firmware from a phone or laptop. This mod replaces it with a tighter version:
 
-### Update Existing Device
+- **New commands:** `stop ota` closes the access point, and `get ota.ap` shows whether it's up
+  and how long it has left.
+- **It doesn't stay up forever.** It closes itself after 20 minutes, or 10 minutes after an
+  upload stalls. Stock leaves an open upload page running until a reboot.
+- **It won't start at a bad moment:** not during probation, not during a remote update.
+- **It protects the upload.** `reboot`, `poweroff` and `erase` are refused while it writes.
+- **A better upload page** shows the node's name, battery and slots, can set the clock, and
+  checks the firmware file before sending anything.
 
-Use this option when available to preserve any settings that have already been configured on the device.
+<details>
+<summary>📂 <b>Upload fixes and file checks</b> <sub>(click to expand)</sub></summary>
 
-Slot switching is still a device-side operation, separate from flashing. The flasher does not change which slot the device boots from. After a USB flash, slot A is automatically set as the primary slot, leaving slot B available for the first OTA update. To switch slots from the device itself, use:
+| Stock MeshCore | This mod |
+| --- | --- |
+| The MD5 is never actually checked. | The MD5 the page sends is checked. |
+| A second upload can collide with the first. | One upload at a time. |
+| A rejected upload can still look like a success. | Every failure returns a real error. |
+| Reboots before the browser hears back. | Replies first, so the page shows "Update complete". |
+| A stalled upload leaves the flash writer locked. | A stalled upload is cleared. |
+| New firmware is trusted immediately. | New firmware goes on probation. |
 
-```text
-ota slot boot <A|B>
+The page blocks a file that can't be read, is too small, is a full-flash image, is for a
+different chip, or won't fit the slot. It warns, and needs **I know what I'm doing** ticked,
+when the file has no MobMesh stamp, is for a different board or role, or matches the running
+version.
+
+</details>
+
+---
+
+## 5. Automatic Rollback Protection
+
+Stock MeshCore halts when the radio won't start, and the node stays dead until someone
+visits. This mod gives new firmware a trial period instead:
+
+```mermaid
+flowchart TD
+    A[New firmware boots<br/>after start ota or start ota wan] --> B{Radio starts?}
+    B -- yes --> C[Run for 90 seconds]
+    C --> D([Marked good, kept])
+    B -- no --> E[Roll back to previous firmware]
+    E --> F([Reboot into old firmware])
 ```
 
-## Automatic Rollback Protection
+- Works after either update path, with no extra hardware.
+- `poweroff` is refused during the trial, since sleeping then would roll back a good update.
+- A radio failure with no recent update gets a few quick retries, then the node deep-sleeps
+  and tries again on each wake, backing off to once every 15 minutes.
 
-Automatic rollback protection is added by this mod. It is not part of the standard MeshCore behavior.
+---
 
-Normally, if a bad firmware update boots and `radio_init()` fails, MeshCore calls `halt()`. The device then becomes unresponsive and there is no automatic way to return to the previous firmware.
+## 6. Automatic Clock Sync
 
-This mod changes that behavior.
-
-After a firmware update using either `start ota` or `start ota wan`, the new firmware is placed into a probation period. It is not immediately marked as confirmed.
-
-The device needs to run for about 90 seconds with a working radio before the new firmware is considered stable.
-
-If `radio_init()` fails while the new firmware is still on probation, the device assumes the update is bad. It automatically rolls back to the previous firmware and reboots.
-
-This is especially useful for nodes that are installed somewhere remote. If a bad firmware update causes the radio to stop working, you may not be able to reach the device to re-flash it.
-
-With rollback protection enabled, the device can recover on its own instead of remaining stuck on the broken firmware.
-
-Radio failures that are unrelated to a recent update are handled differently. The device will retry the reboot a limited number of times and then halt instead of getting stuck in an endless reboot loop.
-
-No extra hardware is required for rollback protection. It uses the ESP-IDF app rollback feature that is already available in the MeshCore upstream toolchain.
-
-## Automatic Clock Sync
-
-Neither of the boards this mod currently targets has a battery-backed clock chip, so their sense of time resets to a fixed placeholder date every time they reboot (see the `timing-safety` mod for more on why that happens and what else it affects).
-
-This mod fixes that for free, as a side effect of something it's already doing. Every time the device joins WiFi for OTA purposes -- whether from `ota wan join`, `start ota wan`, or `start ota wan update` -- it also asks an NTP server (`us.pool.ntp.org`, falling back to the global `pool.ntp.org` if that doesn't answer) what time it is and sets the device's clock from the answer. No extra command, no admin step, and no separate WiFi connection just for this -- it rides along with a connection the device was already making.
-
-This happens automatically and can't be turned off from the CLI. If the NTP request fails or times out, the clock is simply left as it was; nothing else about the OTA flow is affected either way.
-
-## Why This Exists
-
-Remote MeshCore nodes can be difficult or impossible to access physically.
-
-A normal firmware update can leave a remote node unusable if the new firmware has a problem. If the radio fails during startup, the node may stop responding to commands sent over the mesh.
-
-The hotspot OTA feature makes it possible to download and install firmware remotely using an existing WiFi connection.
-
-The rollback protection adds another layer of safety. If the new firmware doesn't start correctly, the node can automatically return to the last known working firmware.
-
-Together, these features make it much safer to manage MeshCore nodes that are installed in remote or hard-to-reach locations.
+Whenever the node joins WiFi for OTA, `ota wan join` or `ota wan verify`, it also sets its
+clock from `us.pool.ntp.org` (falling back to `pool.ntp.org`). A
+[`sync-settings`](../sync-settings/docs/time.md) time publisher uses `ota wan verify` to
+refresh its own clock before it broadcasts. These boards lose the time on every reboot, and the
+[`timing-safety`](../timing-safety) mod explains why that matters. If the time server doesn't
+answer, the update carries on.

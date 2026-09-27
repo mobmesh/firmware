@@ -24,10 +24,15 @@
 #ifndef POWER_GUARD_POWEROFF_MAX_SECS
 #define POWER_GUARD_POWEROFF_MAX_SECS 86400
 #endif
+#ifndef POWER_GUARD_POWEROFF_GRACE_MS
+#define POWER_GUARD_POWEROFF_GRACE_MS 5000
+#endif
 
 static PowerGuardPolicy power_guard;
 RTC_DATA_ATTR static uint32_t boot_pwr_check_magic;
 RTC_DATA_ATTR static uint32_t boot_pwr_check_fails;
+static uint32_t poweroff_secs = 0;
+static uint32_t poweroff_at_ms = 0;
 
 static void bootPowerCheck() {
 #ifdef POWER_GUARD_HAS_POWERDOWN
@@ -76,7 +81,17 @@ void powerGuardBeforeRadioInit() {
   bootPowerCheck();
 }
 
+static void powerOffNow(uint32_t secs) {
+#ifdef POWER_GUARD_HAS_POWERDOWN
+  powerGuardDownPostRadio();
+#endif
+  modBoardDeepSleep(secs);
+}
+
 void powerGuardLoop() {
+  if (poweroff_secs != 0 && millis() - poweroff_at_ms >= POWER_GUARD_POWEROFF_GRACE_MS) {
+    powerOffNow(poweroff_secs);
+  }
   power_guard.loop();
 }
 
@@ -84,10 +99,52 @@ bool powerGuardWantsPowerSaving() {
   return power_guard.isActive();
 }
 
+// No reading means no battery to protect, as in the policy loop.
+bool powerGuardLoadAllowed() {
+#if POWER_GUARD_RESUME_MV > 0
+  uint16_t mv = modBoardBattMilliVolts();
+  return mv == 0 || mv >= POWER_GUARD_RESUME_MV;
+#else
+  return true;
+#endif
+}
+
+void powerGuardBeforeDeepSleep() {
+#ifdef POWER_GUARD_HAS_POWERDOWN
+  powerGuardDownPreRadio();   // self-contained SPI, so it works whether or not radio_init() began the bus
+#endif
+}
+
+static bool isStatsCommand(const char* command) {
+  static const char* const names[] = { "stats-core", "stats-radio", "stats-packets" };
+  for (const char* name : names) {
+    size_t len = strlen(name);
+    if (memcmp(command, name, len) == 0 && (command[len] == 0 || command[len] == ' ')) return true;
+  }
+  return false;
+}
+
+static bool parseDecimalU32(const char* text, uint32_t* out) {
+  if (*text == 0) return false;
+  uint32_t value = 0;
+  while (*text != 0) {
+    if (*text < '0' || *text > '9') return false;
+    uint32_t digit = (uint32_t)(*text++ - '0');
+    if (value > (UINT32_MAX - digit) / 10) return false;
+    value = value * 10 + digit;
+  }
+  *out = value;
+  return true;
+}
+
 bool powerGuardHandleCli(const ModCliContext& context, char* command, char* reply) {
   if (memcmp(command, "powersaving safe.mv ", 20) == 0) {
-    uint32_t mv = (uint32_t)atol(command + 20);
-    if (!power_guard.setSleepMilliVolts((uint16_t)mv)) {
+    uint32_t mv = 0;
+    bool valid = parseDecimalU32(command + 20, &mv)
+                 && mv <= UINT16_MAX
+                 && (mv == 0 || (mv >= POWER_GUARD_SAFE_FLOOR_MV
+                                 && mv <= POWER_GUARD_SAFE_MAX_MV));
+    if (!valid || !power_guard.setSleepMilliVolts((uint16_t)mv)) {
       sprintf(reply, "ERR: %u-%u or 0", (unsigned)POWER_GUARD_SAFE_FLOOR_MV,
               (unsigned)POWER_GUARD_SAFE_MAX_MV);
     } else if (mv == 0) {
@@ -105,14 +162,14 @@ bool powerGuardHandleCli(const ModCliContext& context, char* command, char* repl
     if (*arg == 0) {
       sprintf(reply, "safe %s, %umV, batt %umV", power_guard.safeEnabled() ? "on" : "off",
               (unsigned)power_guard.sleepMilliVolts(), (unsigned)power_guard.lastMilliVolts());
-    } else if (memcmp(arg, "on", 2) == 0) {
+    } else if (strcmp(arg, "on") == 0) {
       if (power_guard.sleepMilliVolts() == 0) {
         strcpy(reply, "ERR: no threshold -- set powersaving safe.mv first");
       } else {
         power_guard.setSafeEnabled(true);
         sprintf(reply, "OK - safe on, %umV", (unsigned)power_guard.sleepMilliVolts());
       }
-    } else if (memcmp(arg, "off", 3) == 0) {
+    } else if (strcmp(arg, "off") == 0) {
       power_guard.setSafeEnabled(false);
       sprintf(reply, "OK - safe off (%umV kept)", (unsigned)power_guard.sleepMilliVolts());
     } else {
@@ -127,12 +184,19 @@ bool powerGuardHandleCli(const ModCliContext& context, char* command, char* repl
     if (*arg == 0) {
       sprintf(reply, "auto %s, active %s, transitions %u", power_guard.isAuto() ? "on" : "off",
               power_guard.isActive() ? "yes" : "no", (unsigned)power_guard.transitionCount());
-    } else if (memcmp(arg, "on", 2) == 0 || memcmp(arg, "off", 3) == 0) {
-      power_guard.setAuto(*arg == 'o' && arg[1] == 'n');
+    } else if (strcmp(arg, "on") == 0 || strcmp(arg, "off") == 0) {
+      power_guard.setAuto(arg[1] == 'n');
       sprintf(reply, "OK - auto %s", power_guard.isAuto() ? "on" : "off");
     } else {
       strcpy(reply, "ERR: usage: powersaving auto [on|off]");
     }
+    return true;
+  }
+
+  // Upstream serial-gates the stats commands; re-dispatching with timestamp 0 clears that
+  // gate. Safe remotely: the mesh CLI path is authenticated and these replies are read-only.
+  if (context.sender_timestamp != 0 && isStatsCommand(command)) {
+    modCliDispatch(0, command, reply);
     return true;
   }
 
@@ -142,21 +206,21 @@ bool powerGuardHandleCli(const ModCliContext& context, char* command, char* repl
 
   const char* arg = command + 8;
   uint32_t secs = *arg == ' ' ? (uint32_t)atol(arg + 1) : 0;
-  if (context.sender_timestamp != 0) {
-    strcpy(reply, "ERR: poweroff is serial-only");
-  } else if (secs < POWER_GUARD_POWEROFF_MIN_SECS || secs > POWER_GUARD_POWEROFF_MAX_SECS) {
+  if (secs < POWER_GUARD_POWEROFF_MIN_SECS || secs > POWER_GUARD_POWEROFF_MAX_SECS) {
     sprintf(reply, "ERR: usage: poweroff <secs> (%u-%u)",
             (unsigned)POWER_GUARD_POWEROFF_MIN_SECS,
             (unsigned)POWER_GUARD_POWEROFF_MAX_SECS);
-  } else {
-    Serial.printf("OK - deep sleep %us (%uh%um), then reboots\n",
-                  (unsigned)secs, (unsigned)(secs / 3600),
-                  (unsigned)((secs % 3600) / 60));
-    Serial.flush();
-#ifdef POWER_GUARD_HAS_POWERDOWN
-    powerGuardDownPostRadio();
-#endif
-    modBoardDeepSleep(secs);
+    return true;
   }
+  sprintf(reply, "OK - deep sleep %us (%uh%um), then wakes",
+          (unsigned)secs, (unsigned)(secs / 3600), (unsigned)((secs % 3600) / 60));
+  if (context.sender_timestamp != 0) {
+    poweroff_secs = secs;   // deferred so the reply leaves the radio first
+    poweroff_at_ms = millis();
+    return true;
+  }
+  Serial.println(reply);
+  Serial.flush();
+  powerOffNow(secs);
   return true;
 }

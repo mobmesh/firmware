@@ -34,9 +34,8 @@ export async function loadDfuApi() {
   return loadedApi;
 }
 
-// Mirrors `PortSelectionRequiredError`: `showSaveFilePicker()` needs a fresh click, so a
-// step that calls it from `run()` (no gesture) must throw this instead — the UI answers it
-// with a checkpoint button, whose click is what actually calls the picker.
+// `showSaveFilePicker()` needs a fresh click, so a step calling it from `run()` throws
+// this instead and the UI answers with a checkpoint button.
 export class FilePickerRequiredError extends Error {
   constructor(prompt, { bytes, suggestedName }) {
     super(prompt);
@@ -94,13 +93,9 @@ async function reacquireAfterTransition(before, heldPort, { prompt, onStatus, re
 }
 
 /**
- * Everything the CLI can tell us before a DFU transition, in one session: the bootloader
- * version the OTAFIX gate reads, and the settings the Upgrade path pre-fills from. DFU
- * serves no CLI, so this is the only window for either.
- *
- * Takes a closed port and returns it closed, like esp32's `resolveEsp32Mode`. Returns
- * `{ bootloaderVersion, config }`, both nullable — silence is "cannot tell", never
- * evidence that a device lacks a bootloader.
+ * Everything the CLI can tell us in one session before a DFU transition, which serves
+ * no CLI. Takes a closed port and returns it closed; both fields are nullable, and
+ * silence is "cannot tell", never evidence that a device lacks a bootloader.
  */
 export async function readAppState(port) {
   await port.open({ baudRate: CLI_BAUD_RATE });
@@ -117,22 +112,17 @@ export async function readAppState(port) {
 }
 
 /**
- * Writes a bootloader UF2 to the mounted drive via the file-system picker, then waits for
- * the device to come back as the application on USB. The bootloader boots the app once the
- * write lands — measured on a SenseCAP P1, never over DFU. `w.close()` throwing is normal:
- * the board reboots as the last block lands and the drive unmounts before close() settles.
- *
- * Must be called from a real click — `showSaveFilePicker()` needs a fresh user gesture, so
- * this cannot be called from a step's `run()` directly. Throw `FilePickerRequiredError`
- * there instead; the UI calls this from the checkpoint button it renders in response.
+ * Writes a bootloader UF2 to the mounted drive, then waits for the device to return as
+ * the application on USB. `w.close()` throwing is normal: the board reboots as the last
+ * block lands. Must be called from a real click -- throw `FilePickerRequiredError` from
+ * a step's `run()` instead.
  */
 export async function writeBootloaderUf2(appPort, bytes, suggestedName, { onStatus } = {}) {
   if (typeof window === 'undefined' || !window.showSaveFilePicker) {
     throw new Error('This browser cannot write to the UF2 drive directly — use Chrome or Edge.');
   }
-  // The picker must be the first thing called here — any await ahead of it risks the
-  // browser deciding the click's user activation has lapsed, which can fail the call
-  // silently rather than throwing something a caller could act on.
+  // First call in the function: any await ahead of it risks the click's user activation
+  // lapsing, which fails silently rather than throwing.
   const handle = await window.showSaveFilePicker({
     suggestedName,
     types: [{ description: 'UF2 firmware', accept: { 'application/octet-stream': ['.uf2'] } }],
@@ -180,9 +170,8 @@ export async function executeDfuPlan(port, plan, { onProgress, onStatus } = {}) 
   const { Dfu } = await loadDfuApi();
   let target = port;
 
-  // Order is load-bearing: the erase package clears the filesystem, then the firmware goes
-  // back. The bootloader is a guided pre-flash step now, never a stage here — see
-  // nrf52-bootloader-plan.md.
+  // Order is load-bearing: the erase package clears the filesystem, then the firmware
+  // goes back.
   const stages = [];
   if (plan.erasePackage) stages.push({ package: plan.erasePackage, label: 'Erasing the device…' });
   stages.push({ package: plan.package, label: 'Writing firmware…' });

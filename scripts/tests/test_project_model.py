@@ -6,7 +6,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from mobmesh_tools.model import ProjectModel, ProjectModelError
+from project_config import ProjectModel, ProjectModelError
 
 
 class CurrentProjectModelTestCase(unittest.TestCase):
@@ -28,9 +28,12 @@ class CurrentProjectModelTestCase(unittest.TestCase):
         self.assertEqual(rows[("heltec_v4", "repeater")].asset_basename, "heltec_v4_rep_mobmesh")
         self.assertEqual(rows[("xiao_c3", "room_server")].asset_basename, "xiao_c3_room_mobmesh")
         self.assertEqual(rows[("heltec_v4", "repeater")].mods,
-                         ("shim", "hotspot-ota", "timing-safety", "try-settings", "power-guard"))
+                         ("shim", "hotspot-ota", "timing-safety", "try-settings", "power-guard", "sync-settings"))
         self.assertEqual(rows[("xiao_c3", "repeater")].mods,
-                         ("shim", "hotspot-ota", "timing-safety", "try-settings"))
+                         ("shim", "hotspot-ota", "timing-safety", "try-settings", "sync-settings"))
+        for board in ("heltec_v4", "xiao_c3"):
+            self.assertEqual(rows[(board, "room_server")].mods,
+                             ("shim", "hotspot-ota", "timing-safety", "try-settings", "sync-settings"))
 
     def test_build_plan_serialization_is_deterministic(self):
         self.assertEqual(self.model.build_plan.to_json(), ProjectModel.load(REPO_ROOT).build_plan.to_json())

@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
 # Boots a real, unmodified release firmware image in QEMU and holds a conversation with it.
+# A pass means the node answered: absence of a crash is not a pass, since an image that
+# never executes an application instruction produces no crash either.
 #
-# A pass means the node came up and answered: the emulator models the LoRa radio, the flash
-# and the SoC's USB console, so the firmware reaches loop() and serves its CLI exactly as it
-# does on hardware. Absence of a crash is not a pass -- an image that never executes an
-# application instruction produces no crash either.
-#
-# Which commands run depends on the image. The mod bit register (mods/bit-registry.md) says
-# which mods were built in, so a mod's CLI is only exercised when its bit is set.
-#
-# The image under test is never opened for writing: booting a node writes to its flash --
-# SPIFFS, NVS, the identity it generates on first boot -- so QEMU is always pointed at a
-# freshly composed copy in the workdir. The vendored artifacts are hashed before and after
-# to prove it.
+# The mod bit register says which mods were built in, so a mod's CLI is only exercised when
+# its bit is set. QEMU is always pointed at a freshly composed copy, never the image under
+# test: booting a node writes SPIFFS, NVS and a first-boot identity to its flash.
 
 import argparse
 import hashlib
@@ -32,17 +25,13 @@ CRASH_SIGNATURES = ("Guru Meditation Error", "Backtrace:", "abort() was called")
 MOD_BITS_OFFSET = 272
 MOD_BIT_HOTSPOT_OTA = 0x00000002
 
-# Board wiring the emulator needs as run-time properties. These are facts about the physical
-# board -- the radio's chip-select pin and the SPI controller it hangs off -- that the device
-# models take as qdev properties so one binary serves every board. strap-mode selects SPI boot
-# and differs per chip; the wrong value drops the ROM into download mode.
+# The device models take board wiring as qdev properties so one binary serves every board.
+# strap-mode selects SPI boot and differs per chip; the wrong value forces download mode.
 def merge_flash_image(board, variant, flasher_dir, out_path):
     """Compose a fresh flash image from the vendored parts. Never modifies its inputs."""
     offsets = {k: int(v, 16) for k, v in board["offsets"].items()}
-    # 16MB regardless of the board's real flash size. QEMU picks the emulated chip from the
-    # drive size (4MB->gd25q32, 8MB->gd25q64, 16MB->is25lp128) and only the ISSI part gets past
-    # esp_flash_init_default_chip() -- 4 and 8MB assert in do_core_init and boot-loop, upstream's
-    # own images included. Measured 2026-08-27; the size is a chip selector, not a size check.
+    # 16MB regardless of the board's real flash: QEMU picks the emulated chip from the drive
+    # size and only the 16MB ISSI part gets past esp_flash_init_default_chip().
     flash_size = 16 * 1024 * 1024
     img = bytearray([0xFF] * flash_size)
 
@@ -262,9 +251,8 @@ def main():
         driver, _, name = prop.rpartition(".")
         cmd += ["-global", f"driver={driver},property={name},value={value}"]
 
-    # Retried once. An occasional first-boot SPIFFS mount failure and stack-canary panic
-    # has been seen about one run in twelve and does not reproduce on a rerun; a gate that
-    # blocks a release on that would end up switched off. Two failures in a row is real.
+    # A first-boot SPIFFS mount failure and stack-canary panic appears about one run in
+    # twelve and does not reproduce; two failures in a row is real.
     failures = run_once(cmd, variant, mod_bits, uart_log)
     retried = bool(failures)
     if failures:

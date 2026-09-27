@@ -1,8 +1,8 @@
 diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
-index 7d0179f..c2d1558 100644
+index 7d0179f..7519ca4 100644
 --- a/examples/simple_repeater/MyMesh.cpp
 +++ b/examples/simple_repeater/MyMesh.cpp
-@@ -1,6 +1,30 @@
+@@ -1,6 +1,196 @@
  #include "MyMesh.h"
 +#include <helpers/ModHooks.h>
  #include <algorithm>
@@ -10,6 +10,11 @@ index 7d0179f..c2d1558 100644
 +// Reverse hooks that need MyMesh's own members: ModHooks.cpp sees neither _cli nor the tempradio
 +// timers, and MyMesh.h carries no patch, so state is snapshotted here instead of exposed.
 +static CommonCLI* mod_cli_ref = nullptr;
++static NodePrefs* mod_prefs_ref = nullptr;
++static MyMesh* mod_mesh_ref = nullptr;
++static RegionMap* mod_region_map_ref = nullptr;
++static ModRegionMatch mod_recv_region;
++static bool mod_recv_region_active;
 +
 +static struct {
 +  float freq, bw;
@@ -19,6 +24,167 @@ index 7d0179f..c2d1558 100644
 +
 +void modCliDispatch(uint32_t sender_timestamp, char* command, char* reply) {
 +  if (mod_cli_ref) mod_cli_ref->handleCommand(sender_timestamp, command, reply);
++}
++
++bool modPolicyRead(ModPolicyValues* out) {
++  if (out == nullptr || mod_prefs_ref == nullptr) return false;
++  out->flood_max = mod_prefs_ref->flood_max;
++  out->flood_max_unscoped = mod_prefs_ref->flood_max_unscoped;
++  out->flood_max_advert = mod_prefs_ref->flood_max_advert;
++  out->advert_interval = mod_prefs_ref->advert_interval;
++  out->flood_advert_interval = mod_prefs_ref->flood_advert_interval;
++  out->path_hash_mode = mod_prefs_ref->path_hash_mode;
++  out->loop_detect = mod_prefs_ref->loop_detect;
++  out->multi_acks = mod_prefs_ref->multi_acks;
++  out->airtime_factor = mod_prefs_ref->airtime_factor;
++  out->tx_delay_factor = mod_prefs_ref->tx_delay_factor;
++  out->agc_reset_interval = mod_prefs_ref->agc_reset_interval;
++  return true;
++}
++
++bool modRadioPrefsGet(ModRadioValues* out) {
++  if (out == nullptr || mod_prefs_ref == nullptr) return false;
++  out->freq = mod_prefs_ref->freq;
++  out->bw = mod_prefs_ref->bw;
++  out->sf = mod_prefs_ref->sf;
++  out->cr = mod_prefs_ref->cr;
++  return true;
++}
++
++bool modResolveRegionName(const char* name, ModRegionMatch* out) {
++  if (name == nullptr || out == nullptr || mod_region_map_ref == nullptr) return false;
++  memset(out, 0, sizeof(*out));
++  RegionEntry* entry = strcmp(name, "*") == 0
++                     ? &mod_region_map_ref->getWildcard()
++                     : mod_region_map_ref->findByName(name);
++  if (entry == nullptr) return true;
++  if ((entry->flags & REGION_DENY_FLOOD) != 0) {
++    out->state = MOD_REGION_DENY;
++    return true;
++  }
++  out->state = MOD_REGION_ALLOW;
++  if (entry->isWildcard()) return true;
++  TransportKey key;
++  if (mod_region_map_ref->getTransportKeysFor(*entry, &key, 1) != 1) return false;
++  memcpy(out->key, key.key, sizeof(out->key));
++  return true;
++}
++
++bool modRegionNameForKey(const uint8_t key[16], char* out, size_t capacity) {
++  if (key == nullptr || out == nullptr || capacity == 0 ||
++      mod_region_map_ref == nullptr) return false;
++  for (int i = 0; i < mod_region_map_ref->getCount(); ++i) {
++    const RegionEntry* entry = mod_region_map_ref->getByIdx(i);
++    if (entry == nullptr || entry->isWildcard()) continue;
++    TransportKey keys[4];
++    int count = mod_region_map_ref->getTransportKeysFor(*entry, keys, 4);
++    bool match = false;
++    for (int k = 0; k < count; ++k) {
++      if (memcmp(keys[k].key, key, 16) == 0) match = true;
++    }
++    if (!match) continue;
++    const char* name = entry->name[0] == '#' ? entry->name + 1 : entry->name;
++    size_t len = strlen(name);
++    if (len + 1 > capacity) return false;
++    memcpy(out, name, len + 1);
++    return true;
++  }
++  return false;
++}
++
++bool modPublisherKey(uint8_t out[32]) {
++  if (out == nullptr || mod_mesh_ref == nullptr) return false;
++  memcpy(out, mod_mesh_ref->getSelfId().pub_key, 32);
++  return true;
++}
++
++bool modSignDetached(const uint8_t* data, size_t len, uint8_t signature[64]) {
++  if (data == nullptr || len == 0 || signature == nullptr ||
++      mod_mesh_ref == nullptr || len > 0x7fffffffu) return false;
++  mod_mesh_ref->getSelfId().sign(signature, data, (int)len);
++  return true;
++}
++
++#ifdef MOD_WITH_TX_HOOKS
++static mesh::PacketManager* mod_packet_mgr_ref = nullptr;
++static mesh::MeshTables* mod_tables_ref = nullptr;
++struct ModPendingTx {
++  const mesh::Packet* packet;
++  uint32_t id;
++};
++static ModPendingTx mod_pending_tx[4];
++static uint32_t mod_next_tx_id = 1;
++
++static bool modRememberTx(const mesh::Packet* packet, uint32_t id) {
++  for (uint8_t i = 0; i < 4; ++i) {
++    if (mod_pending_tx[i].packet != nullptr) continue;
++    mod_pending_tx[i].packet = packet;
++    mod_pending_tx[i].id = id;
++    return true;
++  }
++  return false;
++}
++
++static uint32_t modForgetTx(const mesh::Packet* packet) {
++  for (uint8_t i = 0; i < 4; ++i) {
++    if (mod_pending_tx[i].packet != packet) continue;
++    uint32_t id = mod_pending_tx[i].id;
++    mod_pending_tx[i] = {};
++    return id;
++  }
++  return 0;
++}
++#endif
++
++bool modSendGroup(const uint8_t* secret, uint8_t hash, const uint8_t* data,
++                  size_t len, bool scoped, const uint8_t scope_key[16],
++                  uint32_t* packet_id, uint32_t* airtime_ms) {
++#ifndef MOD_WITH_TX_HOOKS
++  (void)secret; (void)hash; (void)data; (void)len; (void)scoped;
++  (void)scope_key; (void)packet_id; (void)airtime_ms;
++  return false;
++#else
++  if (secret == nullptr || data == nullptr || len == 0 || len > 255 ||
++      mod_mesh_ref == nullptr || mod_packet_mgr_ref == nullptr ||
++      (mod_prefs_ref != nullptr && mod_prefs_ref->path_hash_mode > 2) ||
++      (scoped && scope_key == nullptr)) return false;
++  mesh::GroupChannel channel = {};
++  channel.hash[0] = hash;
++  memcpy(channel.secret, secret, sizeof(channel.secret));
++  mesh::Packet* packet = mod_mesh_ref->createGroupDatagram(
++      PAYLOAD_TYPE_GRP_DATA, channel, data, len);
++  if (packet == nullptr) return false;
++  uint32_t id = 0;
++#ifdef MOD_WITH_TX_HOOKS
++  id = mod_next_tx_id++;
++  if (mod_next_tx_id == 0) mod_next_tx_id = 1;
++  if (!modRememberTx(packet, id)) {
++    mod_mesh_ref->releasePacket(packet);
++    return false;
++  }
++#endif
++  uint8_t path_size = mod_prefs_ref == nullptr ? 1 : mod_prefs_ref->path_hash_mode + 1;
++  if (scoped) {
++    TransportKey scope;
++    memcpy(scope.key, scope_key, sizeof(scope.key));
++    mod_mesh_ref->sendFloodScoped(scope, packet, 0, path_size);
++  } else {
++    mod_mesh_ref->sendFlood(packet, 0, path_size);
++  }
++  bool queued = false;
++  for (int i = 0; i < mod_packet_mgr_ref->getOutboundTotal(); ++i) {
++    if (mod_packet_mgr_ref->getOutboundByIdx(i) == packet) queued = true;
++  }
++  if (!queued) {
++    modForgetTx(packet);
++    return false;
++  }
++  if (packet_id != nullptr) *packet_id = id;
++  if (airtime_ms != nullptr) {
++    *airtime_ms = radio_driver.getEstAirtimeFor(packet->getRawLength());
++  }
++  return true;
++#endif
 +}
 +
 +bool modTempRadioGet(float* freq, float* bw, uint8_t* sf, uint8_t* cr) {
@@ -33,89 +199,201 @@ index 7d0179f..c2d1558 100644
  /* ------------------------------ Config -------------------------------- */
  
  #ifndef LORA_FREQ
-@@ -878,6 +902,7 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
+@@ -157,7 +347,14 @@ uint8_t MyMesh::handleAnonRegionsReq(const mesh::Identity& sender, uint32_t send
+     uint32_t now = getRTCClock()->getCurrentTime();
+     memcpy(&reply_data[4], &now, 4);     // include our clock (for easy clock sync, and packet hash uniqueness)
+ 
+-    return 8 + region_map.exportNamesTo((char *) &reply_data[8], sizeof(reply_data) - 12, REGION_DENY_FLOOD);   // reply length
++    int exported = modExportRegions(&region_map, (char *)&reply_data[8],
++                                    sizeof(reply_data) - 12, REGION_DENY_FLOOD);
++    if (exported < 0) {
++      exported = region_map.exportNamesTo((char *)&reply_data[8],
++                                          sizeof(reply_data) - 12,
++                                          REGION_DENY_FLOOD);
++    }
++    return 8 + exported;
+   }
+   return 0;
+ }
+@@ -175,6 +372,16 @@ uint8_t MyMesh::handleAnonOwnerReq(const mesh::Identity& sender, uint32_t sender
+     uint32_t now = getRTCClock()->getCurrentTime();
+     memcpy(&reply_data[4], &now, 4);     // include our clock (for easy clock sync, and packet hash uniqueness)
+     sprintf((char *) &reply_data[8], "%s\n%s", _prefs.node_name, _prefs.owner_info);
++#ifdef MOD_WITH_OWNER_INFO_HOOK
++    uint8_t marker[4];
++    size_t marker_len = modOwnerInfoMarker(marker);
++    size_t owner_len = strlen((char *)&reply_data[8]);
++    if (marker_len == sizeof(marker) &&
++        owner_len + marker_len < sizeof(reply_data) - 8) {
++      memcpy(&reply_data[8 + owner_len], marker, marker_len);
++      reply_data[8 + owner_len + marker_len] = 0;
++    }
++#endif
+ 
+     return 8 + strlen((char *) &reply_data[8]);   // reply length
+   }
+@@ -415,6 +622,11 @@ void MyMesh::sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, ui
+   bool is_wildcard = recv_pkt_region != NULL && recv_pkt_region->isWildcard();
+   bool req_scope_known = recv_pkt_region != NULL && !is_wildcard
+                       && region_map.getTransportKeysFor(*recv_pkt_region, &req_scope, 1) > 0;
++  if (mod_recv_region_active) {
++    is_wildcard = false;
++    req_scope_known = mod_recv_region.state == MOD_REGION_ALLOW;
++    if (req_scope_known) memcpy(req_scope.key, mod_recv_region.key, sizeof(req_scope.key));
++  }
+ 
+   switch (mesh::chooseReplyScope(req_scope_known, is_wildcard, !default_scope.isNull())) {
+     case mesh::REPLY_SCOPE_REQUEST:
+@@ -503,6 +715,9 @@ void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
+ }
+ 
+ void MyMesh::logTx(mesh::Packet *pkt, int len) {
++#ifdef MOD_WITH_TX_HOOKS
++  modObserveTx(modForgetTx(pkt), true);
++#endif
+ #ifdef WITH_BRIDGE
+   if (_prefs.bridge_pkt_src == 0) {
+     bridge.sendPacket(pkt);
+@@ -528,6 +743,9 @@ void MyMesh::logTx(mesh::Packet *pkt, int len) {
+ }
+ 
+ void MyMesh::logTxFail(mesh::Packet *pkt, int len) {
++#ifdef MOD_WITH_TX_HOOKS
++  modObserveTx(modForgetTx(pkt), false);
++#endif
+   if (_logging) {
+     File f = openAppend(PACKET_LOG_FILE);
+     if (f) {
+@@ -554,8 +772,16 @@ uint32_t MyMesh::getDirectRetransmitDelay(const mesh::Packet *packet) {
+ }
+ 
+ mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
++  mod_recv_region_active = false;
++#ifdef MOD_WITH_TX_HOOKS
++  if (pkt->isRouteFlood() && pkt->getPayloadType() == PAYLOAD_TYPE_GRP_DATA &&
++      pkt->payload_len > 3 && mod_tables_ref->wasSeen(pkt)) return ACTION_RELEASE;
++#endif
+   if (pkt->getRouteType() == ROUTE_TYPE_TRANSPORT_FLOOD) {
+-    recv_pkt_region = region_map.findMatch(pkt, REGION_DENY_FLOOD);
++    mod_recv_region_active = modResolveRegion(pkt, &region_map, &mod_recv_region);
++    recv_pkt_region = mod_recv_region_active
++                    ? (mod_recv_region.state == MOD_REGION_ALLOW ? &region_map.getWildcard() : NULL)
++                    : region_map.findMatch(pkt, REGION_DENY_FLOOD);
+   } else if (pkt->getRouteType() == ROUTE_TYPE_FLOOD) {
+     if (region_map.getWildcard().flags & REGION_DENY_FLOOD) {
+       recv_pkt_region = NULL;
+@@ -565,6 +791,24 @@ mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
+   } else {
+     recv_pkt_region = NULL;
+   }
++  uint8_t scope_key[16];
++  const uint8_t* scope = NULL;
++  if (pkt->getRouteType() == ROUTE_TYPE_TRANSPORT_FLOOD && recv_pkt_region != NULL) {
++    if (mod_recv_region_active && mod_recv_region.state == MOD_REGION_ALLOW) {
++      memcpy(scope_key, mod_recv_region.key, sizeof(scope_key));
++      scope = scope_key;
++    } else {
++      TransportKey keys[4];
++      int count = region_map.getTransportKeysFor(*recv_pkt_region, keys, 4);
++      for (int i = 0; i < count; ++i) {
++        if (keys[i].calcTransportCode(pkt) != pkt->transport_codes[0]) continue;
++        memcpy(scope_key, keys[i].key, sizeof(scope_key));
++        scope = scope_key;
++        break;
++      }
++    }
++  }
++  modObserveRecv(pkt, recv_pkt_region != NULL, scope);
+   return Mesh::onRecvPacket(pkt);
+ }
+ 
+@@ -878,6 +1122,14 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
    next_local_advert = next_flood_advert = 0;
    dirty_contacts_expiry = 0;
    set_radio_at = revert_radio_at = 0;
 +  mod_cli_ref = &_cli;
++  mod_prefs_ref = &_prefs;
++  mod_mesh_ref = this;
++#ifdef MOD_WITH_TX_HOOKS
++  mod_packet_mgr_ref = _mgr;
++  mod_tables_ref = &tables;
++#endif
++  mod_region_map_ref = &region_map;
    _logging = false;
    region_load_active = false;
    recv_pkt_region = NULL;
-@@ -1280,6 +1305,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -1280,7 +1532,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
        strcpy(reply, "OK - Discover sent");
      }
    } else{
-+    // Liveness is decided here, where the timers are in scope: pending_* are untested before
-+    // the 2s apply and stale after the revert, which clears only the timer.
+-    _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
++    // Mods first: this is the only call site both the release tag and dev spell the same way.
++    if (!modHandleCliCommand(sender_timestamp, command, reply,
++                             FIRMWARE_VERSION, FIRMWARE_BUILD_DATE)) {
++      _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
++    }
 +    mod_temp_radio = { pending_freq, pending_bw, pending_sf, pending_cr,
 +                       set_radio_at == 0 && revert_radio_at != 0
 +                         && !millisHasNowPassed(revert_radio_at) };
-+    // Mods first: this is the only call site both the release tag and dev spell the same way.
-+    if (modHandleCliCommand(sender_timestamp, command, reply,
-+                            FIRMWARE_VERSION, FIRMWARE_BUILD_DATE)) return;
-     _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
    }
  }
+ 
+@@ -1317,6 +1576,10 @@ void MyMesh::loop() {
+     MESH_DEBUG_PRINTLN("Radio params restored");
+   }
+ 
++  mod_temp_radio = { pending_freq, pending_bw, pending_sf, pending_cr,
++                     set_radio_at == 0 && revert_radio_at != 0
++                       && !millisHasNowPassed(revert_radio_at) };
++
+   // is pending dirty contacts write needed?
+   if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
+     acl.save(_fs);
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
 index a714db6..0909307 100644
 --- a/examples/simple_repeater/main.cpp
 +++ b/examples/simple_repeater/main.cpp
-@@ -2,6 +2,7 @@
- #include <Mesh.h>
- 
+@@ -4,2 +4,3 @@
  #include "MyMesh.h"
 +#include <helpers/ModHooks.h>
  
- #ifdef DISPLAY_CLASS
-   #include "UITask.h"
-@@ -18,6 +19,10 @@ SimpleMeshTables tables;
- 
- MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
+@@ -20,2 +21,6 @@ MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock,
  
 +// Defined here, not in the generated hook file, which sees neither MyMesh nor the_mesh.
 +void modSendZeroHopAdvert(int delay_millis) { the_mesh.sendSelfAdvertisement(delay_millis, false); }
 +
 +
  void halt() {
-   while (1) ;
- }
-@@ -60,7 +65,7 @@ void setup() {
-   }
- #endif
+@@ -62,3 +67,3 @@ void setup() {
  
 -  if (!radio_init()) {
 +  if (!modRadioInit(FIRMWARE_VERSION "-" OTA_MOD_SHORT_SHA)) {
      MESH_DEBUG_PRINTLN("Radio init failed!");
-     halt();
-   }
-@@ -123,6 +128,7 @@ void setup() {
- }
- 
+@@ -125,2 +130,3 @@ void setup() {
  void loop() {
 +  modLoop();
    // Handle Serial CLI
-   int len = strlen(command);
-   while (Serial.available() && len < sizeof(command)-1) {
-@@ -195,7 +201,7 @@ void loop() {
- #ifdef HAS_EXTERNAL_WATCHDOG
-   external_watchdog.loop();
+@@ -197,3 +203,3 @@ void loop() {
  #endif
 -  if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
 +  if ((the_mesh.getNodePrefs()->powersaving_enabled || modWantsPowerSaving()) && !the_mesh.hasPendingWork()) {
  #if defined(NRF52_PLATFORM)
-     board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
- #else
 diff --git a/examples/simple_room_server/MyMesh.cpp b/examples/simple_room_server/MyMesh.cpp
-index 546d094..0514e70 100644
+index 546d094..d7d8fb8 100644
 --- a/examples/simple_room_server/MyMesh.cpp
 +++ b/examples/simple_room_server/MyMesh.cpp
-@@ -1,4 +1,28 @@
+@@ -1,4 +1,194 @@
  #include "MyMesh.h"
 +#include <helpers/ModHooks.h>
 +
 +// Reverse hooks that need MyMesh's own members: ModHooks.cpp sees neither _cli nor the tempradio
 +// timers, and MyMesh.h carries no patch, so state is snapshotted here instead of exposed.
 +static CommonCLI* mod_cli_ref = nullptr;
++static NodePrefs* mod_prefs_ref = nullptr;
++static MyMesh* mod_mesh_ref = nullptr;
++static RegionMap* mod_region_map_ref = nullptr;
++static ModRegionMatch mod_recv_region;
++static bool mod_recv_region_active;
 +
 +static struct {
 +  float freq, bw;
@@ -125,6 +403,167 @@ index 546d094..0514e70 100644
 +
 +void modCliDispatch(uint32_t sender_timestamp, char* command, char* reply) {
 +  if (mod_cli_ref) mod_cli_ref->handleCommand(sender_timestamp, command, reply);
++}
++
++bool modPolicyRead(ModPolicyValues* out) {
++  if (out == nullptr || mod_prefs_ref == nullptr) return false;
++  out->flood_max = mod_prefs_ref->flood_max;
++  out->flood_max_unscoped = mod_prefs_ref->flood_max_unscoped;
++  out->flood_max_advert = mod_prefs_ref->flood_max_advert;
++  out->advert_interval = mod_prefs_ref->advert_interval;
++  out->flood_advert_interval = mod_prefs_ref->flood_advert_interval;
++  out->path_hash_mode = mod_prefs_ref->path_hash_mode;
++  out->loop_detect = mod_prefs_ref->loop_detect;
++  out->multi_acks = mod_prefs_ref->multi_acks;
++  out->airtime_factor = mod_prefs_ref->airtime_factor;
++  out->tx_delay_factor = mod_prefs_ref->tx_delay_factor;
++  out->agc_reset_interval = mod_prefs_ref->agc_reset_interval;
++  return true;
++}
++
++bool modRadioPrefsGet(ModRadioValues* out) {
++  if (out == nullptr || mod_prefs_ref == nullptr) return false;
++  out->freq = mod_prefs_ref->freq;
++  out->bw = mod_prefs_ref->bw;
++  out->sf = mod_prefs_ref->sf;
++  out->cr = mod_prefs_ref->cr;
++  return true;
++}
++
++bool modResolveRegionName(const char* name, ModRegionMatch* out) {
++  if (name == nullptr || out == nullptr || mod_region_map_ref == nullptr) return false;
++  memset(out, 0, sizeof(*out));
++  RegionEntry* entry = strcmp(name, "*") == 0
++                     ? &mod_region_map_ref->getWildcard()
++                     : mod_region_map_ref->findByName(name);
++  if (entry == nullptr) return true;
++  if ((entry->flags & REGION_DENY_FLOOD) != 0) {
++    out->state = MOD_REGION_DENY;
++    return true;
++  }
++  out->state = MOD_REGION_ALLOW;
++  if (entry->isWildcard()) return true;
++  TransportKey key;
++  if (mod_region_map_ref->getTransportKeysFor(*entry, &key, 1) != 1) return false;
++  memcpy(out->key, key.key, sizeof(out->key));
++  return true;
++}
++
++bool modRegionNameForKey(const uint8_t key[16], char* out, size_t capacity) {
++  if (key == nullptr || out == nullptr || capacity == 0 ||
++      mod_region_map_ref == nullptr) return false;
++  for (int i = 0; i < mod_region_map_ref->getCount(); ++i) {
++    const RegionEntry* entry = mod_region_map_ref->getByIdx(i);
++    if (entry == nullptr || entry->isWildcard()) continue;
++    TransportKey keys[4];
++    int count = mod_region_map_ref->getTransportKeysFor(*entry, keys, 4);
++    bool match = false;
++    for (int k = 0; k < count; ++k) {
++      if (memcmp(keys[k].key, key, 16) == 0) match = true;
++    }
++    if (!match) continue;
++    const char* name = entry->name[0] == '#' ? entry->name + 1 : entry->name;
++    size_t len = strlen(name);
++    if (len + 1 > capacity) return false;
++    memcpy(out, name, len + 1);
++    return true;
++  }
++  return false;
++}
++
++bool modPublisherKey(uint8_t out[32]) {
++  if (out == nullptr || mod_mesh_ref == nullptr) return false;
++  memcpy(out, mod_mesh_ref->getSelfId().pub_key, 32);
++  return true;
++}
++
++bool modSignDetached(const uint8_t* data, size_t len, uint8_t signature[64]) {
++  if (data == nullptr || len == 0 || signature == nullptr ||
++      mod_mesh_ref == nullptr || len > 0x7fffffffu) return false;
++  mod_mesh_ref->getSelfId().sign(signature, data, (int)len);
++  return true;
++}
++
++#ifdef MOD_WITH_TX_HOOKS
++static mesh::PacketManager* mod_packet_mgr_ref = nullptr;
++static mesh::MeshTables* mod_tables_ref = nullptr;
++struct ModPendingTx {
++  const mesh::Packet* packet;
++  uint32_t id;
++};
++static ModPendingTx mod_pending_tx[4];
++static uint32_t mod_next_tx_id = 1;
++
++static bool modRememberTx(const mesh::Packet* packet, uint32_t id) {
++  for (uint8_t i = 0; i < 4; ++i) {
++    if (mod_pending_tx[i].packet != nullptr) continue;
++    mod_pending_tx[i].packet = packet;
++    mod_pending_tx[i].id = id;
++    return true;
++  }
++  return false;
++}
++
++static uint32_t modForgetTx(const mesh::Packet* packet) {
++  for (uint8_t i = 0; i < 4; ++i) {
++    if (mod_pending_tx[i].packet != packet) continue;
++    uint32_t id = mod_pending_tx[i].id;
++    mod_pending_tx[i] = {};
++    return id;
++  }
++  return 0;
++}
++#endif
++
++bool modSendGroup(const uint8_t* secret, uint8_t hash, const uint8_t* data,
++                  size_t len, bool scoped, const uint8_t scope_key[16],
++                  uint32_t* packet_id, uint32_t* airtime_ms) {
++#ifndef MOD_WITH_TX_HOOKS
++  (void)secret; (void)hash; (void)data; (void)len; (void)scoped;
++  (void)scope_key; (void)packet_id; (void)airtime_ms;
++  return false;
++#else
++  if (secret == nullptr || data == nullptr || len == 0 || len > 255 ||
++      mod_mesh_ref == nullptr || mod_packet_mgr_ref == nullptr ||
++      (mod_prefs_ref != nullptr && mod_prefs_ref->path_hash_mode > 2) ||
++      (scoped && scope_key == nullptr)) return false;
++  mesh::GroupChannel channel = {};
++  channel.hash[0] = hash;
++  memcpy(channel.secret, secret, sizeof(channel.secret));
++  mesh::Packet* packet = mod_mesh_ref->createGroupDatagram(
++      PAYLOAD_TYPE_GRP_DATA, channel, data, len);
++  if (packet == nullptr) return false;
++  uint32_t id = 0;
++#ifdef MOD_WITH_TX_HOOKS
++  id = mod_next_tx_id++;
++  if (mod_next_tx_id == 0) mod_next_tx_id = 1;
++  if (!modRememberTx(packet, id)) {
++    mod_mesh_ref->releasePacket(packet);
++    return false;
++  }
++#endif
++  uint8_t path_size = mod_prefs_ref == nullptr ? 1 : mod_prefs_ref->path_hash_mode + 1;
++  if (scoped) {
++    TransportKey scope;
++    memcpy(scope.key, scope_key, sizeof(scope.key));
++    mod_mesh_ref->sendFloodScoped(scope, packet, 0, path_size);
++  } else {
++    mod_mesh_ref->sendFlood(packet, 0, path_size);
++  }
++  bool queued = false;
++  for (int i = 0; i < mod_packet_mgr_ref->getOutboundTotal(); ++i) {
++    if (mod_packet_mgr_ref->getOutboundByIdx(i) == packet) queued = true;
++  }
++  if (!queued) {
++    modForgetTx(packet);
++    return false;
++  }
++  if (packet_id != nullptr) *packet_id = id;
++  if (airtime_ms != nullptr) {
++    *airtime_ms = radio_driver.getEstAirtimeFor(packet->getRawLength());
++  }
++  return true;
++#endif
 +}
 +
 +bool modTempRadioGet(float* freq, float* bw, uint8_t* sf, uint8_t* cr) {
@@ -138,66 +577,149 @@ index 546d094..0514e70 100644
  
  #define REPLY_DELAY_MILLIS          1500
  #define PUSH_NOTIFY_DELAY_MILLIS    2000
-@@ -641,6 +665,7 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
+@@ -245,6 +435,9 @@ void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
+   }
+ }
+ void MyMesh::logTx(mesh::Packet *pkt, int len) {
++#ifdef MOD_WITH_TX_HOOKS
++  modObserveTx(modForgetTx(pkt), true);
++#endif
+   if (_logging) {
+     File f = openAppend(PACKET_LOG_FILE);
+     if (f) {
+@@ -263,6 +456,9 @@ void MyMesh::logTx(mesh::Packet *pkt, int len) {
+   }
+ }
+ void MyMesh::logTxFail(mesh::Packet *pkt, int len) {
++#ifdef MOD_WITH_TX_HOOKS
++  modObserveTx(modForgetTx(pkt), false);
++#endif
+   if (_logging) {
+     File f = openAppend(PACKET_LOG_FILE);
+     if (f) {
+@@ -303,12 +499,21 @@ bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
+       && mesh::isFloodHopLimitExceeded(packet, _prefs.flood_max, _prefs.flood_max_unscoped, _prefs.flood_max_advert)) {
+     return false;
+   }
++  if (packet->isRouteFlood() && !modAllowFlood(packet, recv_pkt_region != NULL)) return false;
+   return true;
+ }
+ 
+ mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
++  mod_recv_region_active = false;
++#ifdef MOD_WITH_TX_HOOKS
++  if (pkt->isRouteFlood() && pkt->getPayloadType() == PAYLOAD_TYPE_GRP_DATA &&
++      pkt->payload_len > 3 && mod_tables_ref->wasSeen(pkt)) return ACTION_RELEASE;
++#endif
+   if (pkt->getRouteType() == ROUTE_TYPE_TRANSPORT_FLOOD) {
+-    recv_pkt_region = region_map.findMatch(pkt, REGION_DENY_FLOOD);
++    mod_recv_region_active = modResolveRegion(pkt, &region_map, &mod_recv_region);
++    recv_pkt_region = mod_recv_region_active
++                    ? (mod_recv_region.state == MOD_REGION_ALLOW ? &region_map.getWildcard() : NULL)
++                    : region_map.findMatch(pkt, REGION_DENY_FLOOD);
+   } else if (pkt->getRouteType() == ROUTE_TYPE_FLOOD) {
+     if (region_map.getWildcard().flags & REGION_DENY_FLOOD) {
+       recv_pkt_region = NULL;
+@@ -318,6 +523,24 @@ mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
+   } else {
+     recv_pkt_region = NULL;
+   }
++  uint8_t scope_key[16];
++  const uint8_t* scope = NULL;
++  if (pkt->getRouteType() == ROUTE_TYPE_TRANSPORT_FLOOD && recv_pkt_region != NULL) {
++    if (mod_recv_region_active && mod_recv_region.state == MOD_REGION_ALLOW) {
++      memcpy(scope_key, mod_recv_region.key, sizeof(scope_key));
++      scope = scope_key;
++    } else {
++      TransportKey keys[4];
++      int count = region_map.getTransportKeysFor(*recv_pkt_region, keys, 4);
++      for (int i = 0; i < count; ++i) {
++        if (keys[i].calcTransportCode(pkt) != pkt->transport_codes[0]) continue;
++        memcpy(scope_key, keys[i].key, sizeof(scope_key));
++        scope = scope_key;
++        break;
++      }
++    }
++  }
++  modObserveRecv(pkt, recv_pkt_region != NULL, scope);
+   return Mesh::onRecvPacket(pkt);
+ }
+ 
+@@ -641,6 +864,14 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
    _logging = false;
    region_load_active = false;
    set_radio_at = revert_radio_at = 0;
 +  mod_cli_ref = &_cli;
++  mod_prefs_ref = &_prefs;
++  mod_mesh_ref = this;
++#ifdef MOD_WITH_TX_HOOKS
++  mod_packet_mgr_ref = _mgr;
++  mod_tables_ref = &tables;
++#endif
++  mod_region_map_ref = &region_map;
    recv_pkt_region = NULL;
  
    // defaults
-@@ -984,6 +1009,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -754,6 +985,11 @@ void MyMesh::sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, ui
+   bool is_wildcard = recv_pkt_region != NULL && recv_pkt_region->isWildcard();
+   bool req_scope_known = recv_pkt_region != NULL && !is_wildcard
+                       && region_map.getTransportKeysFor(*recv_pkt_region, &req_scope, 1) > 0;
++  if (mod_recv_region_active) {
++    is_wildcard = false;
++    req_scope_known = mod_recv_region.state == MOD_REGION_ALLOW;
++    if (req_scope_known) memcpy(req_scope.key, mod_recv_region.key, sizeof(req_scope.key));
++  }
+ 
+   switch (mesh::chooseReplyScope(req_scope_known, is_wildcard, !default_scope.isNull())) {
+     case mesh::REPLY_SCOPE_REQUEST:
+@@ -984,7 +1220,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
        snprintf(reply, MAX_POST_TEXT_LEN, "OK");
      }
    } else{
-+    // Liveness is decided here, where the timers are in scope: pending_* are untested before
-+    // the 2s apply and stale after the revert, which clears only the timer.
+-    _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
++    // Mods first: this is the only call site both the release tag and dev spell the same way.
++    if (!modHandleCliCommand(sender_timestamp, command, reply,
++                             FIRMWARE_VERSION, FIRMWARE_BUILD_DATE)) {
++      _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
++    }
 +    mod_temp_radio = { pending_freq, pending_bw, pending_sf, pending_cr,
 +                       set_radio_at == 0 && revert_radio_at != 0
 +                         && !millisHasNowPassed(revert_radio_at) };
-+    // Mods first: this is the only call site both the release tag and dev spell the same way.
-+    if (modHandleCliCommand(sender_timestamp, command, reply,
-+                            FIRMWARE_VERSION, FIRMWARE_BUILD_DATE)) return;
-     _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
    }
  }
+ 
+@@ -1064,6 +1307,10 @@ void MyMesh::loop() {
+     MESH_DEBUG_PRINTLN("Radio params restored");
+   }
+ 
++  mod_temp_radio = { pending_freq, pending_bw, pending_sf, pending_cr,
++                     set_radio_at == 0 && revert_radio_at != 0
++                       && !millisHasNowPassed(revert_radio_at) };
++
+   // is pending dirty contacts write needed?
+   if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
+     acl.save(_fs, MyMesh::saveFilter);
 diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
 index d833fff..2af9258 100644
 --- a/examples/simple_room_server/main.cpp
 +++ b/examples/simple_room_server/main.cpp
-@@ -2,6 +2,7 @@
- #include <Mesh.h>
- 
+@@ -4,2 +4,3 @@
  #include "MyMesh.h"
 +#include <helpers/ModHooks.h>
  
- #ifdef ETHERNET_ENABLED
-   #define ETHERNET_CLI_BANNER "MeshCore Room Server CLI"
-@@ -17,6 +18,10 @@ StdRNG fast_rng;
- SimpleMeshTables tables;
- MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
+@@ -19,2 +20,6 @@ MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock,
  
 +// Defined here, not in the generated hook file, which sees neither MyMesh nor the_mesh.
 +void modSendZeroHopAdvert(int delay_millis) { the_mesh.sendSelfAdvertisement(delay_millis, false); }
 +
 +
  void halt() {
-   while (1) ;
- }
-@@ -45,7 +50,7 @@ void setup() {
-   }
- #endif
+@@ -47,3 +52,3 @@ void setup() {
  
 -  if (!radio_init()) { halt(); }
 +  if (!modRadioInit(FIRMWARE_VERSION "-" OTA_MOD_SHORT_SHA)) { halt(); }
  
-   fast_rng.begin(radio_driver.getRngSeed());
- 
-@@ -104,6 +109,7 @@ void setup() {
- }
- 
+@@ -106,2 +111,3 @@ void setup() {
  void loop() {
 +  modLoop();
    int len = strlen(command);
-   while (Serial.available() && len < sizeof(command)-1) {
-     char c = Serial.read();

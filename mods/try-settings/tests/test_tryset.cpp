@@ -63,10 +63,10 @@ static void failedApplyRestoresAndClears() {
 static void expiryRestoresTheSnapshot() {
   start();
   cli("tryset 300 tx 14");
-  fake.clock += 299;
+  fake.ms += 299000;
   trySetLoop();
   check(fake.prefs["tx"] == "14", "the trial holds until it expires");
-  fake.clock += 2;
+  fake.ms += 2000;
   trySetLoop();
   check(fake.prefs["tx"] == "20", "expiry restores the snapshot");
   check(!fake.saved, "expiry clears the record");
@@ -94,14 +94,30 @@ static void failedRestoreKeepsTheRecord() {
   start();
   cli("tryset 300 tx 14");
   fake.set_fails.insert("tx");
-  fake.clock += 400;
+  fake.ms += 400000;
   trySetLoop();
   check(fake.saved, "a refused restore keeps the record for a retry");
   fake.set_fails.clear();
-  fake.clock += 1;   // the retry is rate-limited to one attempt per second
+  fake.ms += 1000;   // the retry is rate-limited to one attempt per second
   trySetLoop();
   check(fake.prefs["tx"] == "20", "the retry restores the snapshot");
   check(!fake.saved, "a successful retry clears the record");
+}
+
+static void clockCorrectionCannotMoveExpiry() {
+  start();
+  cli("tryset 300 tx 14");
+  modClockSet(fake.clock - 30u * 86400u);
+  fake.ms += 301000;
+  trySetLoop();
+  check(fake.prefs["tx"] == "20", "a backward RTC correction does not postpone the rollback");
+
+  start();
+  cli("tryset 300 tx 14");
+  modClockSet(fake.clock + 30u * 86400u);
+  fake.ms += 1000;
+  trySetLoop();
+  check(fake.prefs["tx"] == "14", "a forward RTC correction does not cut the trial short");
 }
 
 static void revertReportsRestoreFailure() {
@@ -124,14 +140,14 @@ static void failedRestoreIsRateLimited() {
   start();
   cli("tryset 300 tx 14");
   fake.set_fails.insert("tx");
-  fake.clock += 400;
+  fake.ms += 400000;
 
   size_t before = fake.dispatched.size();
   for (int i = 0; i < 50; i++) trySetLoop();   // many loop passes inside one RTC second
   size_t attempts = fake.dispatched.size() - before;
   check(attempts <= 1, "a failing restore is attempted at most once per second");
 
-  fake.clock += 1;
+  fake.ms += 1000;
   before = fake.dispatched.size();
   for (int i = 0; i < 50; i++) trySetLoop();
   check(fake.dispatched.size() - before <= 1, "the next second allows one more attempt");
@@ -197,6 +213,7 @@ int main(int argc, char** argv) {
   expiryRestoresTheSnapshot();
   failedRestoreKeepsTheRecord();
   revertReportsRestoreFailure();
+  clockCorrectionCannotMoveExpiry();
   failedRestoreIsRateLimited();
   trialsCannotOverlap();
   radioRejectsPartialMinutes();

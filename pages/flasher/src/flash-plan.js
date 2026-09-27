@@ -184,9 +184,8 @@ export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}
   return { baseUrl, version: raw._version ?? null, boards, displays, variantIcons };
 }
 
-// The image's own SHA-256 is its last 32 bytes, so nothing is fetched. Header byte 23 says
-// the digest is there -- a build setting, not a format guarantee -- and an image carrying
-// none returns null so the UI says unverified. A mismatch raises: bad bytes are never written.
+// The image's own SHA-256 is its last 32 bytes. Header byte 23 says the digest is there --
+// a build setting, not a format guarantee -- so an image carrying none returns null.
 async function verifyEmbeddedDigest(bytes, label) {
   if (bytes.length < 56 || bytes[0] !== 0xe9 || bytes[23] !== 1) return null;
 
@@ -350,9 +349,8 @@ function absoluteStockAsset(path) {
 }
 
 /**
- * Corrections we maintain over upstream's catalogue: maker display names and logos,
- * device artwork, and `hidden`. Absent or unreadable applies nothing — an override file
- * is a nicety and must never cost a user their flash.
+ * Corrections over upstream's catalogue. Absent or unreadable applies nothing: an
+ * override file must never cost a user their flash.
  */
 async function loadCatalogueOverrides() {
   try {
@@ -376,9 +374,8 @@ function overrideAsset(base, path) {
   return base && path ? new URL(path, base).href : null;
 }
 
-// Named rather than free-form CSS: an override file should not be able to put arbitrary
-// filter syntax into a style attribute. `brightness(0)` flattens art of any colour to a
-// silhouette, which `invert(1)` then turns white.
+// Named rather than free-form: an override file must not put arbitrary filter syntax in a
+// style attribute. `brightness(0)` flattens art to a silhouette, `invert(1)` turns it white.
 const IMAGE_FILTERS = {
   invert: 'invert(1)',
   white: 'brightness(0) invert(1)',
@@ -470,9 +467,8 @@ const OTAFIX_NOTICES = new Set(['otafixNeeded', 'otafixRecommended']);
 const OTAFIX_VERSION_RE = /OTAFIX(\d+(?:\.\d+)*)/i;
 
 /**
- * True when a `get bootloader.ver` answer already carries OTAFIX >= 2.2 — the gate's "skip,
- * already fine" reading. A missing or unparsable answer returns false: "cannot tell" means
- * offer the update, never skip on silence.
+ * True when the answer already carries OTAFIX >= 2.2. Missing or unparsable returns
+ * false: "cannot tell" offers the update rather than skipping on silence.
  */
 export function bootloaderAlreadyCurrent(answer) {
   const match = OTAFIX_VERSION_RE.exec(answer ?? '');
@@ -482,10 +478,8 @@ export function bootloaderAlreadyCurrent(answer) {
 }
 
 /**
- * The bootloader UF2 for a device, or null when upstream flags no notice or ships no file
- * (Muzi Works R1 Neo: notice with no bootloader files at all — deliberate null, not a miss).
- * Throws on more than one `.uf2` candidate (Xiao nRF52 WIO's `_ble`/`_ble_sense` pair) rather
- * than guessing, since a wrong pick writes another board's bootloader.
+ * Null when upstream flags no notice or ships no file. Throws on more than one `.uf2`
+ * candidate rather than guessing: a wrong pick writes another board's bootloader.
  */
 export function resolveBootloaderUpdate(device, entry) {
   if (!OTAFIX_NOTICES.has(entry?.notice)) return null;
@@ -528,9 +522,8 @@ function selectStockFile(device, entry, version, wipe) {
   );
 }
 
-// Stage one, the peer of `loadCustomFirmwareSource`. Bytes come through the relay. Upstream
-// builds carry no MobMesh metadata but are still ESP32 images, so the appended digest is
-// checked where one is present and `verify` stays null where it is not.
+// Upstream builds carry no MobMesh metadata but are still ESP32 images, so the appended
+// digest is checked where present and `verify` stays null where it is not.
 export async function loadStockFirmwareSource(
   manifest,
   { deviceName, firmwareIndex = 0, version, wipe = false },
@@ -594,10 +587,8 @@ export function buildStockFlashPlan(source, { partitions = [] } = {}) {
     return createFlashPlan({
       engine: 'dfu',
       package: new Blob([bytes]),
-      // The bootloader is a guided pre-flash step now (nrf52-bootloader-plan.md), never a
-      // DFU stage: the .zip route stages every payload in the app region and destroys it.
-      // The wipe. `Dfu`'s own `eraseBeforeUpdate` clears the application region the write
-      // is about to overwrite anyway, so `eraseAll` stays false and this carries it.
+      // `Dfu`'s own `eraseBeforeUpdate` already clears the application region the write
+      // overwrites, so `eraseAll` stays false and this carries the wipe.
       erasePackage: eraseBytes ? new Blob([eraseBytes]) : null,
       // Filesystem preservation is custom-path-only, and DFU cannot read flash back regardless.
       preserveFs: false,
@@ -702,10 +693,9 @@ export async function readUploadedFirmware(file) {
   return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()), blob: file };
 }
 
-/** The nRF52 package must parse before hardware is touched, not mid-transfer. */
 /**
- * Nordic legacy DFU update modes. `dfu.js` defines only `application`; the transport
- * underneath takes all four. Unverified on hardware beyond `application`.
+ * Nordic legacy DFU update modes. `dfu.js` defines only `application`, though the
+ * transport takes all four. Unverified on hardware beyond `application`.
  */
 export const DFU_UPDATE_MODES = {
   softdevice: 1,

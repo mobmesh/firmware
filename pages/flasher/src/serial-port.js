@@ -125,8 +125,7 @@ async function probeSerialPortUsable(port) {
 }
 
 /**
- * Firmware family from the USB vendor. A bridge names itself, not the MCU, but in this
- * catalogue a bridge is a legacy ESP32 — nRF52840 has native USB and does not need one.
+ * A bridge names itself, not the MCU, but in this catalogue a bridge is a legacy ESP32.
  * A wrong guess costs a failed sync at the arm step, not a bad write.
  */
 export function deviceFamily(port) {

@@ -152,10 +152,8 @@ jobs:
           python3 scripts/generate-board-config.py validate-mods \
             --mods "${{ join(matrix.mods, ',') }}"
 
-      # Strict apply is the gate: a patch that does not apply cleanly never ships. The
-      # three-way retry only produces a rebase starting point -- the step fails either way.
-      # Mod-owned files arrive by copy, before any patch: a file nobody else owns needs no
-      # diff to land, so patches carry only what edits upstream's own source.
+      # Strict apply is the gate; the three-way retry only produces a rebase starting
+      # point. Mod-owned files arrive by copy, so patches carry only edits to upstream's own.
       - name: Copy each mod's own source into the upstream clone
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
@@ -253,7 +251,8 @@ jobs:
           cd upstream-src
           OTA_MOD_SHA="$(git -C .. rev-parse --short HEAD)"
           OTA_MOD_DATE="$(date -u +"%-d %b %Y") - $OTA_MOD_SHA"
-          PLATFORMIO_BUILD_FLAGS="-D 'OTA_MOD_BUILD_DATE=\"$OTA_MOD_DATE\"' -D 'OTA_MOD_SHORT_SHA=\"$OTA_MOD_SHA\"'" \
+          MOBMESH_BUILD_EPOCH="${SOURCE_DATE_EPOCH:-$(date -u +%s)}"
+          PLATFORMIO_BUILD_FLAGS="-D 'OTA_MOD_BUILD_DATE=\"$OTA_MOD_DATE\"' -D 'OTA_MOD_SHORT_SHA=\"$OTA_MOD_SHA\"' -D MOBMESH_BUILD_EPOCH=$MOBMESH_BUILD_EPOCH" \
             pio run -e ${{ matrix.build_env }}
 
       - id: rollback_check
@@ -450,15 +449,14 @@ jobs:
           mkdir -p "$DEST"
           cp "${{ steps.artifact.outputs.name }}" "$DEST/firmware.bin"
 
-      # Gate: boot what is about to be published and talk to it. Everything downstream --
-      # committing the vendored image, publishing the release -- is behind this, so an image
-      # that cannot reach its command loop is never shipped.
+      # Everything downstream sits behind this, so an image that cannot reach its command
+      # loop is never shipped.
       - name: Fetch the emulator
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.qemu_boot_check
         env:
           GH_TOKEN: ${{ github.token }}
           QEMU_REPO: HeyVern/espressif-qemu
-          QEMU_TAG: v9.2.2
+          QEMU_TAG: v9.2.2-2
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libgcrypt20 libpixman-1-0 libsdl2-2.0-0 zstd
@@ -517,9 +515,8 @@ jobs:
               echo "::error::failed to push ${{ matrix.board_id }}/${{ matrix.id }} firmware.bin/boards.json after 5 attempts"
               exit 1
             fi
-            # auto_boards.json is fully re-serialized each run, so concurrent targets conflict on a
-            # textual rebase even when their entries do not overlap. Regenerating against the
-            # remote tip is idempotent: boards-json only touches this target's own entry.
+            # Fully re-serialized each run, so concurrent targets conflict on a textual
+            # rebase; regenerating against the remote tip touches only this target's entry.
             git reset --hard HEAD~1
             git fetch origin "${{ github.ref_name }}"
             git reset --hard "origin/${{ github.ref_name }}"
@@ -592,11 +589,8 @@ jobs:
               ].join('\n')
             });
 
-  # Runs only after every matrix combination succeeds, so a red build cannot publish.
   # Requires Settings -> Pages -> Source set to "GitHub Actions", a one-time manual step.
-  # One issue for the whole run, naming every variant that failed the gate and quoting the
-  # end of each one's console output. Filed from a single job so parallel matrix jobs cannot
-  # race and open duplicates.
+  # One issue per run, filed from a single job so parallel matrix jobs cannot open duplicates.
   boot-check-report:
     needs: build
     if: always()

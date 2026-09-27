@@ -4,9 +4,8 @@ name: hotspot-ota
 
 env_flags: [WITH_HOTSPOT_OTA, WITH_OTA_ROLLBACK_GUARD]
 
-# A mod earns a bit only if the built image carries something that proves it is compiled
-# in. Bits are permanent: never renumber one, never reuse a retired mod's. See
-# mods/bit-registry.md before assigning the next.
+# A bit needs something in the built image proving the mod is compiled in. Bits are
+# permanent: never renumber one, never reuse a retired mod's.
 bit: 1
 image_marker: "H0TSP0T"
 
@@ -21,6 +20,7 @@ requirements:
 integration:
   header: helpers/esp32/HotspotOtaIntegration.h
   hooks:
+    before_radio_init: hotspotOtaBeforeRadioInit
     radio_init_policy: hotspotOtaRadioInit
     loop: hotspotOtaLoop
     cli:

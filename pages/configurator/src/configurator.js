@@ -372,9 +372,8 @@
   }
 
   /**
-   * Confirm the USB serial session is still live before a command or button
-   * action. Clears stale "Connected" UI when the port/streams are gone
-   * (e.g. after an unacknowledged reboot or unplug).
+   * Confirm the serial session is live, clearing stale "Connected" UI when the port
+   * is gone -- after an unacknowledged reboot or an unplug.
    * @param {string} [actionLabel]
    * @returns {Promise<object|null>} RepeaterSerial or null
    */
@@ -893,9 +892,8 @@
   }
 
   /**
-   * MeshCore requires child regions removed before parents. Scope codes are
-   * hierarchical by dash (us-al-mob under us-al under us), so segment count
-   * is the depth.
+   * MeshCore requires children removed before parents, and scope codes are
+   * hierarchical by dash, so segment count is the depth.
    */
   function regionHierarchyDepth(code) {
     if (!code || code === "*") return 0;
@@ -1046,8 +1044,7 @@
   }
 
   /**
-   * Detect location from a repeater name prefix (GC- / GC-XXX-).
-   * City segment preferred over state when both could match.
+   * Location from a name prefix, preferring the city segment over the state.
    */
   function detectLocationFromDeviceName(deviceName) {
     const name = String(deviceName || "").trim();
@@ -1126,10 +1123,8 @@
   }
 
   /**
-   * Fallback location when the name has no prefix: `region home` only.
-   * The allow list is deliberately not consulted -- it says which regions a
-   * node floods, not where it sits, so its order would pick a location at
-   * random among the neighbours it allows.
+   * `region home` only: the allow list says which regions a node floods, not where it
+   * sits, so consulting it would pick a location at random among the neighbours.
    */
   function detectLocationFromRegionHints(homeRegion) {
     const ordered = [];
@@ -2681,9 +2676,8 @@
   };
 
   /**
-   * Preferred radio preset on load: the plan the flasher writes
-   * (pages/flasher/data/us-al-mob-settings.json, `set radio 910.525,62.5,7,6`).
-   * Differs from MeshCore firmware `set radio` default (see FIRMWARE_DEFAULT_RADIO).
+   * The plan the flasher writes, which differs from the MeshCore firmware default
+   * (see FIRMWARE_DEFAULT_RADIO).
    */
   const DEFAULT_RADIO_PRESET_INDEX = Math.max(
     0,
@@ -3532,10 +3526,8 @@
   }
 
   /**
-   * Add state/be ancestors for cities and be for states when those
-   * codes appear in policy selections. Skips auto-adding ancestors for the
-   * selected home city and home state so region def lines follow home
-   * Allow checkboxes only.
+   * Ancestors for codes appearing in policy selections, skipping the selected home
+   * city and state so region def lines follow the home Allow checkboxes only.
    */
   function expandRegionNeeded(needed, anchor) {
     const homeCity =
@@ -3629,10 +3621,9 @@
   }
 
   /**
-   * Pack region def tokens into CLI lines (≤ RepeaterSerial.MAX_LINE_LEN / 160).
-   * One line per root child of * when possible. Within a long subtree, cut only
-   * after a `name|jump` token; strip that jump (line ends) and start the next
-   * line with path reposition `a|a b|b …` (cursor resets to * between commands).
+   * One line per root child of * where it fits. A long subtree may be cut only after a
+   * `name|jump` token, and the next line repositions, since the cursor resets between
+   * commands.
    */
   function packRegionDefLines(tokens, entries) {
     const PREFIX = "region def ";
@@ -3948,10 +3939,8 @@
   }
 
   /**
-   * Automatic default flood scope. Deliberately recommends nothing: changing
-   * `region default` shifts which hop budget a node's own adverts get, so the
-   * automatic choice is to keep whatever the device already reported and
-   * otherwise leave it null.
+   * Recommends nothing: changing `region default` shifts the hop budget a node's own
+   * adverts get, so keep what the device reported and otherwise leave it null.
    */
   function recommendedDefaultScopeCode(_anchor) {
     const dev = deviceDefaultRegionFromRead;
@@ -3960,9 +3949,7 @@
   }
 
   /**
-   * Repopulate the home-override dropdown: No home, Default, every
-   * Allow-checked scope, plus * (wildcard root). Option text shows full name
-   * in brackets where known.
+   * No home, Default, every Allow-checked scope, plus the wildcard root.
    */
   function refreshHomeOverrideSelect() {
     const sel = document.getElementById("policy-home-override-select");
@@ -4063,9 +4050,8 @@
   }
 
   /**
-   * Full `region home …` line for the CLI, or null to omit the command.
-   * Override off, or on with empty select → automatic smallest home Allow, else *.
-   * Override on with "No home" → omit line. Override on with a code → that code.
+   * The `region home …` line, or null to omit it. Off or empty picks the smallest home
+   * Allow and otherwise *; "No home" omits the line; a code is used as given.
    */
   function regionHomeLineForCli(anchor) {
     const ov = document.getElementById("policy-home-override");
@@ -4111,9 +4097,8 @@
   }
 
   /**
-   * Neighbour scopes: shown, and Allow/Deny enabled, only when the
-   * matching home row (be / state / place) has Allow or Deny checked.
-   * Otherwise the whole subsection is hidden and its checkboxes cleared.
+   * Shown, and Allow/Deny enabled, only when the matching home row is checked;
+   * otherwise the subsection is hidden and its checkboxes cleared.
    */
   function applyNeighborPolicyGating(anchor) {
     if (!policyCard) return;
@@ -4619,8 +4604,6 @@
     ["set ota.wan.wifi ", "Set OTA WiFi credentials: ssid,password"],
     ["get ota.wan.pwr", "Get the WAN power switch state"],
     ["set ota.wan.pwr ", "Set the WAN power switch (on|off)"],
-    ["set ota.fw.sha256 ", "Set the firmware SHA-256 (RAM only)"],
-    ["set ota.fw.sha256 clear", "Clear the firmware SHA-256"],
     ["set ota.fw.marker ", "Marker check for the next OTA (on|off)"],
     ["get ota.slot", "Show OTA slots and rollback state"],
     ["ota slot boot ", "Boot into OTA slot A or B"],
@@ -4865,9 +4848,7 @@
     const defLines = buildOrderedRegionDefLines(needed, homeCityRow);
     const lines = [];
 
-    // Drop named regions that were on the device at last read but are no
-    // longer selected (Allow/Deny) and not required as ancestors. Children
-    // before parents — MeshCore removeRegion fails if children remain.
+    // Children before parents: MeshCore removeRegion fails while children remain.
     const toRemove = [];
     if (deviceNamedRegionsFromRead && deviceNamedRegionsFromRead.size) {
       deviceNamedRegionsFromRead.forEach(function (code) {
@@ -4896,9 +4877,8 @@
       lines.push(line);
     });
 
-    // region def sets flood-allowed (flags = 0). Skip redundant allowf for
-    // named regions. Wildcard * is not created by def — still needs allowf/denyf.
-    // Deny rows still need region denyf (def would leave them allowed).
+    // region def sets flood-allowed (flags = 0), so named allows need no allowf.
+    // It never creates the wildcard, and never denies: both still need allowf/denyf.
     if (allowUntagged) {
       lines.push("region allowf *");
     }

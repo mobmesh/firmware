@@ -14,6 +14,8 @@ integration:
     before_radio_init: powerGuardBeforeRadioInit
     loop: powerGuardLoop
     wants_power_saving: powerGuardWantsPowerSaving
+    load_allowed: powerGuardLoadAllowed
+    before_deep_sleep: powerGuardBeforeDeepSleep
     cli:
       handler: powerGuardHandleCli
       priority: 200

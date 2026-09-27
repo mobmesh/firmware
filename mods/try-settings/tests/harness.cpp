@@ -12,6 +12,7 @@ void Fake::reset() {
   prefs.clear();
   dispatched.clear();
   clock = 1000000;
+  ms = 5000;
   save_ok = true;
   saved = false;
   record = TrySetSlot{};
@@ -22,6 +23,7 @@ void Fake::reset() {
 }
 
 uint32_t modClockGet() { return fake.clock; }
+uint32_t millis() { return fake.ms; }
 void modClockSet(uint32_t epoch) { fake.clock = epoch; }
 
 bool modTempRadioGet(float* freq, float* bw, uint8_t* sf, uint8_t* cr) {

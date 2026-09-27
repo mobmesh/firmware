@@ -40,7 +40,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from mobmesh_tools.model import (
+from project_config import (
     Capability,
     CliIntegration,
     IntegrationPhase,
@@ -51,9 +51,8 @@ from mobmesh_tools.model import (
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SYMBOL_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-# Bootloader isn't part of the partition table itself -- its flash offset is
-# a fixed constant per chip family (ESP-IDF/Arduino convention), not encoded
-# in partitions.bin.
+# The bootloader offset is a fixed per-chip-family constant, not encoded in
+# partitions.bin.
 BOOTLOADER_OFFSET_BY_MCU_PREFIX = {
     "esp32": "0x1000",     # original ESP32 only
     "esp32s2": "0x0",
@@ -164,6 +163,10 @@ def load_integrations(mods: list) -> list:
     integrations = []
     symbols = {}
     radio_owner = None
+    route_owner = None
+    allow_forward_owner = None
+    region_export_owner = None
+    owner_info_owner = None
     for order, mod_name in enumerate(mods):
         definition = load_mod_definition(mod_name)
         integration = definition.integration
@@ -210,6 +213,30 @@ def load_integrations(mods: list) -> list:
                         f"radio_init_policy is exclusive but claimed by '{radio_owner}' and '{mod_name}'"
                     )
                 radio_owner = mod_name
+            if phase is IntegrationPhase.ROUTE:
+                if route_owner is not None:
+                    raise ValueError(
+                        f"route is exclusive but claimed by '{route_owner}' and '{mod_name}'"
+                    )
+                route_owner = mod_name
+            if phase is IntegrationPhase.ALLOW_FORWARD:
+                if allow_forward_owner is not None:
+                    raise ValueError(
+                        f"allow_forward is exclusive but claimed by '{allow_forward_owner}' and '{mod_name}'"
+                    )
+                allow_forward_owner = mod_name
+            if phase is IntegrationPhase.REGION_EXPORT:
+                if region_export_owner is not None:
+                    raise ValueError(
+                        f"region_export is exclusive but claimed by '{region_export_owner}' and '{mod_name}'"
+                    )
+                region_export_owner = mod_name
+            if phase is IntegrationPhase.OWNER_INFO:
+                if owner_info_owner is not None:
+                    raise ValueError(
+                        f"owner_info is exclusive but claimed by '{owner_info_owner}' and '{mod_name}'"
+                    )
+                owner_info_owner = mod_name
         integrations.append(parsed)
     return integrations
 
@@ -222,13 +249,52 @@ def render_mod_hooks(integrations: list) -> str:
              for item in integrations if "radio_init_policy" in item["hooks"]]
     loops = [item["hooks"]["loop"]["symbol"]
              for item in integrations if "loop" in item["hooks"]]
+    routes = [item["hooks"]["route"]["symbol"]
+              for item in integrations if "route" in item["hooks"]]
+    allow_forwards = [item["hooks"]["allow_forward"]["symbol"]
+                      for item in integrations if "allow_forward" in item["hooks"]]
+    region_exports = [item["hooks"]["region_export"]["symbol"]
+                      for item in integrations if "region_export" in item["hooks"]]
+    owner_infos = [item["hooks"]["owner_info"]["symbol"]
+                   for item in integrations if "owner_info" in item["hooks"]]
+    recvs = [item["hooks"]["recv"]["symbol"]
+             for item in integrations if "recv" in item["hooks"]]
+    txs = [item["hooks"]["tx"]["symbol"]
+           for item in integrations if "tx" in item["hooks"]]
     wants = [item["hooks"]["wants_power_saving"]["symbol"]
              for item in integrations if "wants_power_saving" in item["hooks"]]
+    loads = [item["hooks"]["load_allowed"]["symbol"]
+             for item in integrations if "load_allowed" in item["hooks"]]
+    sleeps = [item["hooks"]["before_deep_sleep"]["symbol"]
+              for item in integrations if "before_deep_sleep" in item["hooks"]]
 
     before_calls = "\n".join(f"  {symbol}();" for symbol in before)
     loop_calls = "\n".join(f"  {symbol}();" for symbol in loops)
+    sleep_calls = "".join(f"  {symbol}();\n" for symbol in sleeps)
     radio_call = f"{radio[0]}(build_id)" if radio else "modBoardRadioInit()"
+    route_call = f"{routes[0]}(packet, base, out)" if routes else "false"
+    allow_forward_call = (f"{allow_forwards[0]}(packet, scope_known)"
+                          if allow_forwards else "true")
+    region_export_call = (
+        f"{region_exports[0]}(base, out, capacity, excluded_flags)"
+        if region_exports else "-1"
+    )
+    owner_info_call = f"return {owner_infos[0]}(out);" if owner_infos else "return 0;"
+    recv_block = (
+        "void modObserveRecv(const mesh::Packet* packet, bool accepted,\n"
+        "                    const uint8_t scope_key[16]) {\n"
+        + "\n".join(f"  {symbol}(packet, accepted, scope_key);" for symbol in recvs)
+        + "\n}"
+        if recvs else "void modObserveRecv(const mesh::Packet*, bool, const uint8_t*) {}"
+    )
+    tx_block = (
+        "void modObserveTx(uint32_t packet_id, bool succeeded) {\n"
+        + "\n".join(f"  {symbol}(packet_id, succeeded);" for symbol in txs)
+        + "\n}"
+        if txs else "void modObserveTx(uint32_t, bool) {}"
+    )
     wants_expr = " || ".join(f"{symbol}()" for symbol in wants) or "false"
+    load_expr = " && ".join(f"{symbol}()" for symbol in loads) or "true"
     return f"""// Generated by generate-board-config.py compose-mods. Do not edit.
 #include <helpers/ModHooks.h>
 #include <target.h>
@@ -243,9 +309,37 @@ void modLoop() {{
 {loop_calls}
 }}
 
+bool modResolveRegion(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out) {{
+  return {route_call};
+}}
+
+bool modAllowFlood(const mesh::Packet* packet, bool scope_known) {{
+  return {allow_forward_call};
+}}
+
+int modExportRegions(RegionMap* base, char* out, size_t capacity,
+                     uint8_t excluded_flags) {{
+  return {region_export_call};
+}}
+
+size_t modOwnerInfoMarker(uint8_t out[4]) {{
+  {owner_info_call}
+}}
+
+{recv_block}
+
+{tx_block}
+
 bool modWantsPowerSaving() {{
   return {wants_expr};
 }}
+
+bool modLoadAllowed() {{
+  return {load_expr};
+}}
+
+void modBeforeDeepSleep() {{
+{sleep_calls}}}
 
 bool     modBoardRadioInit()               {{ return radio_init(); }}
 void     modBoardReboot()                  {{ board.reboot(); }}
@@ -282,6 +376,7 @@ def render_mod_cli(integrations: list) -> str:
         f"  if ({symbol}(context, command, reply)) return true;" for _, _, symbol in handlers
     )
     return f"""// Generated by generate-board-config.py compose-mods. Do not edit.
+#include <string.h>
 #include <helpers/ModHooks.h>
 {includes}
 
@@ -289,6 +384,11 @@ bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
                          const char* fw_version, const char* fw_build_date) {{
   const ModCliContext context = {{sender_timestamp, fw_version, fw_build_date}};
 {calls}
+  // Upstream's poweroff never wakes, so it is never reachable; a mod that can wake handles it above.
+  if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {{
+    strcpy(reply, "ERR: poweroff not available in this build");
+    return true;
+  }}
   return false;
 }}
 """
@@ -330,10 +430,8 @@ def load_upstream_board_json(upstream_dir: Path, board: str) -> dict:
         with path.open() as f:
             return json.load(f)
 
-    # Not every board upstream builds actually ships a boards/<name>.json -- xiao_c3 has a
-    # working variants/xiao_c3/ but no such file. Fall back to a copy of this chip's
-    # PlatformIO board manifest vendored in this repo (see variants/<board>/board.json's
-    # own _source_note for provenance) rather than failing outright.
+    # Not every board upstream builds ships a boards/<name>.json -- xiao_c3 has none.
+    # Fall back to the vendored copy rather than failing outright.
     fallback_path = REPO_ROOT / "variants" / board / "board.json"
     if fallback_path.exists():
         with fallback_path.open() as f:
@@ -358,17 +456,11 @@ def cmd_boards_json(args):
         "label": board.flasher.label,
         "connectNote": board.flasher.connect_note,
         "postFlashNote": board.flasher.post_flash_note,
-        # True when this board's partition table (variants/<board>/overrides.yaml's
-        # partitions_override) differs from upstream's stock scheme -- e.g. a resized
-        # spiffs partition. The web flasher uses this to know when it can't assume an
-        # already-flashed device's on-flash partition table matches this one, and must
-        # probe the running firmware first (see pages/flasher/src/flow.js) rather than offer an
-        # in-place "Update" blind.
+        # True when this board's table differs from upstream's stock scheme, so the web
+        # flasher must probe a flashed device rather than offer an in-place Update blind.
         "partitionsOverridden": bool(board.partitions_override),
-        # How to boot this board under emulation: the machine and binary, and the board
-        # wiring the device models take as run-time properties. Absent, or enabled: false,
-        # means the QEMU boot check skips this board rather than failing it -- for a board
-        # whose hardware there is no model for.
+        # Absent, or enabled: false, means the QEMU boot check skips this board rather
+        # than failing it -- for hardware there is no device model for.
         "qemu": {
             "enabled": board.qemu.enabled,
             "machine": board.qemu.machine,
@@ -400,11 +492,8 @@ def cmd_boards_json(args):
         "firmwareFile": args.firmware_file,
     }
 
-    # Optional per-variant CLI settings from overrides.yaml's
-    # flasher.post_flash_commands. The flasher prepends these to the location
-    # commands from the per-area settings under pages/flasher/data/, so a region can
-    # override a board default. Omitted entirely when a variant has none, which
-    # the flasher reads as an empty list.
+    # The flasher prepends these to the per-area location commands, so a region can
+    # override a board default. Omitted entirely when a variant has none.
     post_flash = board.flasher.post_flash_commands.get(args.variant_id)
     if post_flash:
         variant_entry["postFlashCommands"] = list(post_flash)
@@ -577,6 +666,16 @@ def cmd_inject_env(args):
     ini_path = Path(args.platformio_ini)
     mods = selected_mods(args.mods)
     board_profile = load_board_profile(board)
+    has_tx_hooks = any(
+        definition.integration is not None and
+        IntegrationPhase.TX in definition.integration.hooks
+        for definition in (load_mod_definition(name) for name in mods)
+    )
+    has_owner_info_hook = any(
+        definition.integration is not None and
+        IntegrationPhase.OWNER_INFO in definition.integration.hooks
+        for definition in (load_mod_definition(name) for name in mods)
+    )
 
     env_flag_owner = {}
     env_flag_lines = []
@@ -584,9 +683,8 @@ def cmd_inject_env(args):
     seen_src_filter = set()
 
     for mod_name in mods:
-        # A mod that ships its own source declares its flags once, in mod.yaml, and its
-        # build_src_filter is derived from what is actually under files/ rather than
-        # restated by hand. Sidecars still carry both for mods that are patch-only.
+        # build_src_filter is derived from what is under files/, never restated by hand.
+        # Sidecars still carry both for mods that are patch-only.
         definition = load_mod_definition(mod_name)
         mod_src = REPO_ROOT / "mods" / mod_name / "files" / "src"
         declared = [{"env_flag": f} for f in definition.env_flags]
@@ -623,15 +721,16 @@ def cmd_inject_env(args):
     build_values = dict(board_profile.build_values)
     if board_profile.capability(Capability.FEM_LNA_CONTROL).satisfies_requirement:
         build_values["MOBMESH_HAS_FEM_LNA"] = 1
+    if board_profile.capability(Capability.EXTERNAL_POWER_CONTROL).satisfies_requirement:
+        build_values["MOBMESH_HAS_EXTERNAL_POWER"] = 1
     for key, value in build_values.items():
         if isinstance(value, str):
             override_flag_lines.append(f'-D {key}=\'"{value}"\'')
         else:
             override_flag_lines.append(f"-D {key}={value}")
 
-    # Raw flags appended after upstream's own, so they win when both set the same
-    # macro (e.g. "-UDISPLAY_CLASS"). Prepended flags cannot. Board-level first,
-    # then this target's.
+    # Appended after upstream's own so they win when both set the same macro
+    # (e.g. "-UDISPLAY_CLASS"); prepended flags cannot.
     append_flag_lines = list(board_profile.build_flags_append)
     append_flag_lines += [f.strip() for f in (getattr(args, "append_flags", "") or "").split(",") if f.strip()]
 
@@ -639,6 +738,10 @@ def cmd_inject_env(args):
     # upstream's OTA page, and one that includes it always gets the header the mod compiles.
     ota_page_mod = next((m for m in mods if load_mod_definition(m).ota_web_page), None)
     all_build_flags_lines = env_flag_lines + override_flag_lines
+    if has_tx_hooks:
+        all_build_flags_lines.append("-D MOD_WITH_TX_HOOKS=1")
+    if has_owner_info_hook:
+        all_build_flags_lines.append("-D MOD_WITH_OWNER_INFO_HOOK=1")
     if ota_page_mod:
         # Upstream's own startOTAUpdate() is unreachable once the mod consumes `start ota`, but it
         # still compiles and still pulls in the library dropped below.
@@ -659,18 +762,16 @@ def cmd_inject_env(args):
                 f"error: [env:{env}] in {ini_path} already has a board_build.partitions line "
                 "-- refusing to insert a duplicate"
             )
-        # The CSV lives in this repo (variants/<board>/), not in the freshly-cloned upstream
-        # tree -- vendor it in before the build, since board_build.partitions is meaningless
-        # if PlatformIO can't actually find the file at build time.
+        # The CSV lives in this repo, not the freshly-cloned upstream tree: vendor it in
+        # before the build or PlatformIO cannot find it.
         src_csv = REPO_ROOT / "variants" / board / partitions_override
         if not src_csv.exists():
             sys.exit(f"error: partitions_override '{partitions_override}' for board '{board}' "
                       f"not found at {src_csv}")
         dest_csv = ini_path.parent / partitions_override
         shutil.copy(src_csv, dest_csv)
-        # board_build.partitions resolves relative to the PlatformIO project root (where `pio
-        # run` is invoked), not relative to this variant's own platformio.ini -- so the injected
-        # value must include the variants/<board>/ prefix, not just the bare filename.
+        # board_build.partitions resolves against the PlatformIO project root, not this
+        # variant's platformio.ini, so the value needs the variants/<board>/ prefix.
         project_relative_path = f"variants/{board}/{partitions_override}"
         section_lines[bf_idx:bf_idx] = [f"board_build.partitions = {project_relative_path}\n"]
         bf_idx += 1
