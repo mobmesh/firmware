@@ -77,12 +77,12 @@ class CommandContractTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def run_check(self, head="HEAD"):
-        return contracts.check(self.tree, "base", head, ["ours"], self.mods)
+    def run_check(self, head="HEAD", acknowledged=None):
+        return contracts.check(self.tree, "base", head, ["ours"], self.mods, acknowledged or {})
 
     def test_release_against_itself_is_clean(self):
-        problems, moved, ok, replies = self.run_check("base")
-        self.assertEqual((problems, moved, replies), ([], [], []))
+        problems, moved, ok, replies, noted = self.run_check("base")
+        self.assertEqual((problems, moved, replies, noted), ([], [], [], []))
         self.assertEqual(ok, 4)
 
     def test_url_literal_does_not_hide_later_literals(self):
@@ -92,7 +92,7 @@ class CommandContractTest(unittest.TestCase):
         self.assertNotIn("tempradio", contracts.mod_candidates(self.mods))
 
     def test_mod_only_verbs_are_not_contracts(self):
-        problems, moved, ok, _ = self.run_check()
+        problems, moved, ok, _, _ = self.run_check()
         keys = {p[0] for p in problems} | {m[0] for m in moved}
         self.assertNotIn("mod.owned", keys)
         self.assertNotIn("mod.only", keys)
@@ -112,19 +112,29 @@ class CommandContractTest(unittest.TestCase):
         self.assertEqual(fem[0][3], ["variants/other/OtherBoard.cpp:3"])
 
     def test_verb_prefixed_move_counts_as_moved_not_missing(self):
-        problems, moved, _, _ = self.run_check()
+        problems, moved, _, _, _ = self.run_check()
         self.assertNotIn("af", {p[0] for p in problems})
         self.assertIn(("af", "demo", ["src/helpers/CommonCLI.cpp"], ["src/helpers/CommonRadioPrefs.cpp"]), moved)
 
     def test_board_we_build_satisfies_the_contract(self):
-        problems, *_ = contracts.check(self.tree, "base", "HEAD", ["other"], self.mods)
+        problems, *_ = contracts.check(self.tree, "base", "HEAD", ["other"], self.mods, {})
         self.assertNotIn("radio.fem.txgain", {p[0] for p in problems})
+
+    def test_acknowledged_move_is_noted_not_a_problem(self):
+        problems, _, _, _, noted = self.run_check(acknowledged={"radio.fem.txgain": "planned"})
+        self.assertNotIn("radio.fem.txgain", {p[0] for p in problems})
+        self.assertEqual([(n[0], n[2]) for n in noted], [("radio.fem.txgain", "planned")])
+
+    def test_acknowledgement_does_not_excuse_a_removal(self):
+        problems, _, _, _, noted = self.run_check(acknowledged={"reboot": "planned"})
+        self.assertIn("reboot", {p[0] for p in problems})
+        self.assertEqual(noted, [])
 
     def test_lost_reply_contract_is_reported(self):
         (self.tree / "src/helpers/ESP32Board.h").write_text("tv.tv_sec = 0;\n")
         git(self.tree, "add", "-A")
         git(self.tree, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "epoch")
-        *_, replies = self.run_check()
+        _, _, _, replies, _ = self.run_check()
         self.assertEqual([r[0] for r in replies], ["default clock epoch 1715770351"])
 
 

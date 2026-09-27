@@ -26,6 +26,12 @@ REPLY_CONTRACTS = [
     ("default clock epoch 1715770351", "1715770351", "power-guard, sync-settings"),
 ]
 
+# Findings understood and needing no action, with why; only a move to other boards is excused.
+ACKNOWLEDGED = {
+    "radio.fem.txgain": "FEM TX gain is board-specific upstream; neither heltec_v4 nor xiao_c3 "
+                        "can control it, and try-settings already declines it as unsupported",
+}
+
 
 def git(tree, *args):
     return subprocess.run(["git", "-C", str(tree), *args], capture_output=True, text=True).stdout
@@ -82,12 +88,12 @@ def board_of(path):
     return parts[1] if parts[0] == "variants" and len(parts) > 1 else None
 
 
-def check(tree, base, head, boards, mods_dir):
-    """(problems, moved, ok_count, reply_problems) for `head` against the contracts at `base`."""
+def check(tree, base, head, boards, mods_dir, acknowledged=ACKNOWLEDGED):
+    """(problems, moved, ok_count, reply_problems, noted) for `head` against the contracts at `base`."""
     wanted = mod_candidates(mods_dir)
     base_sites = upstream_sites(tree, base)
     head_sites = upstream_sites(tree, head)
-    problems, moved, ok = [], [], 0
+    problems, moved, noted, ok = [], [], [], 0
     for key in sorted(k for k in wanted if k in base_sites):
         users = ", ".join(sorted(wanted[key]))
         sites = head_sites.get(key, [])
@@ -96,7 +102,10 @@ def check(tree, base, head, boards, mods_dir):
             problems.append((key, users, "no longer parsed anywhere", hints(tree, head, key)))
         elif not ours:
             where = sorted({f"{p}:{n}" for p, n in sites})[:MAX_HINTS]
-            problems.append((key, users, f"only handled by boards we do not build ({', '.join(boards)})", where))
+            if key in acknowledged:
+                noted.append((key, users, acknowledged[key], where))
+            else:
+                problems.append((key, users, f"only handled by boards we do not build ({', '.join(boards)})", where))
         else:
             ok += 1
             before = {p for p, _ in base_sites[key]}
@@ -107,10 +116,10 @@ def check(tree, base, head, boards, mods_dir):
     for label, text, users in REPLY_CONTRACTS:
         if not git(tree, "grep", "-lF", text, head, "--", *SEARCH_PATHS).strip():
             reply_problems.append((label, users))
-    return problems, moved, ok, reply_problems
+    return problems, moved, ok, reply_problems, noted
 
 
-def report(ref, problems, moved, ok, reply_problems):
+def report(ref, problems, moved, ok, reply_problems, noted=()):
     lines = []
     if not problems and not reply_problems:
         lines.append(f"- `{ref}`: all {ok} upstream commands the mods rely on are still handled")
@@ -120,6 +129,8 @@ def report(ref, problems, moved, ok, reply_problems):
             lines.append(f"  - look at: {', '.join(f'`{w}`' for w in where)}")
     for label, users in reply_problems:
         lines.append(f"- `{ref}`: reply contract **gone**: {label} ({users})")
+    for key, users, why, where in noted:
+        lines.append(f"- `{ref}`: command `{key}` ({users}) only on other boards -- acknowledged: {why}")
     if moved:
         lines.append(f"<details><summary><code>{ref}</code> -- {len(moved)} command(s) moved but still handled</summary>")
         lines.append("")
@@ -140,8 +151,8 @@ def main():
     parser.add_argument("--mods-dir", default=str(REPO_ROOT / "mods"))
     args = parser.parse_args()
     boards = [b for b in args.boards.split(",") if b]
-    problems, moved, ok, reply_problems = check(args.tree, args.base, args.head, boards, args.mods_dir)
-    print(report(args.ref, problems, moved, ok, reply_problems))
+    problems, moved, ok, reply_problems, noted = check(args.tree, args.base, args.head, boards, args.mods_dir)
+    print(report(args.ref, problems, moved, ok, reply_problems, noted))
     return 2 if problems or reply_problems else 0
 
 
