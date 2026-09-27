@@ -187,8 +187,10 @@ export async function readNodeConfig(port, { timeoutMs = CLI_COMMAND_TIMEOUT_MS 
     const name = await read('get name');
     // Degrees, not the ×1000 scale the radio fields use — measured on a P1. Stored as
     // float32 on the device, so a value read back is not textually what was written.
-    const latitude = numberOrNull(await read('get lat'));
-    const longitude = numberOrNull(await read('get lon'));
+    let latitude = numberOrNull(await read('get lat'));
+    let longitude = numberOrNull(await read('get lon'));
+    // MeshCore stores an unset position as 0,0; treating it as real centres the map off Africa.
+    if (latitude === 0 && longitude === 0) latitude = longitude = null;
     // One call returns all four fields `set radio` writes, so this read decides whether
     // an upgrade has to restart a working node.
     const radio = parseRadio(await read('get radio'));
