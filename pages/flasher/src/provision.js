@@ -146,9 +146,8 @@ function radioCommandMatches(command, current) {
 export function buildProvisionCommands(state) {
   const steps = [];
 
-  // What the device already had, read at arm. Absent on a New install and on any device
-  // that answered nothing, in which case everything below counts as changed.
-  const existing = state.existingConfig ?? null;
+  // What the device had before the flash; a New install erases it, so nothing counts as unchanged.
+  const existing = state.install === 'new' ? null : (state.existingConfig ?? null);
 
   // An unpowered device comes up with a bogus clock. Forward-only in the firmware, so it
   // is safe unconditionally, and being first it doubles as the liveness check.
