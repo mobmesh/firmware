@@ -17,6 +17,20 @@ import { resolveSettings } from './settings.js';
 // only signal available; a false negative shows a warning, it never fails the flash.
 const FAILED_ANSWER = /^(unknown command|err|error|invalid|usage:)/i;
 
+// Refusals that mean the node already holds what the command asks for, as on a reflash.
+export function alreadyApplied(command, answer) {
+  if (!answer) return false;
+  if (command.startsWith('sync.publisher add ')) return /^err - already authorized/i.test(answer);
+  const channel = /^set sync\.channel (\S+)$/.exec(command);
+  const current = /^err - sync must be off; channel (\S+)/i.exec(answer);
+  return channel !== null && current !== null && channel[1].toLowerCase() === current[1].toLowerCase();
+}
+
+export function answerOk(step, answer) {
+  return answer === null || step.tolerateFailure === true || !FAILED_ANSWER.test(answer) ||
+    alreadyApplied(step.command, answer);
+}
+
 function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -157,6 +171,10 @@ export function buildProvisionCommands(state) {
     if (command.startsWith('set radio ') && radioCommandMatches(command, existing?.radio)) {
       continue;
     }
+    // A live overlay may hold newer campaign data; re-defining it on a reflash would roll that back.
+    if (existing?.syncRegionOn === true && (command.startsWith('sync.region def ') || command === 'sync.region save')) {
+      continue;
+    }
     steps.push({ command, label: 'Applying regional settings', stopOnFailure: state.flashedMods != null });
   }
 
@@ -236,7 +254,7 @@ export async function sendProvisionCommands(port, commands, { onStatus, onProgre
         awaitReply: step.awaitReply !== false,
         ...(index === 0 ? { timeoutMs: CLI_FIRST_COMMAND_TIMEOUT_MS } : {}),
       });
-      const ok = answer === null || step.tolerateFailure === true || !FAILED_ANSWER.test(answer);
+      const ok = answerOk(step, answer);
       if (!ok) onStatus?.(`${step.command} → ${answer}`);
       results.push({ command: step.command, answer, ok });
       onProgress?.((index + 1) / commands.length);

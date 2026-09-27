@@ -192,7 +192,10 @@ export async function readNodeConfig(port, { timeoutMs = CLI_COMMAND_TIMEOUT_MS 
     // One call returns all four fields `set radio` writes, so this read decides whether
     // an upgrade has to restart a working node.
     const radio = parseRadio(await read('get radio'));
-    return { version, name, latitude, longitude, radio };
+    // Null on firmware without sync-settings, which answers this as an unknown command.
+    const syncStatus = await read('sync.region publish.status');
+    const syncRegionOn = syncStatus === null || /^unknown/i.test(syncStatus) ? null : /^on\b/.test(syncStatus);
+    return { version, name, latitude, longitude, radio, syncRegionOn };
   } finally {
     await session.close();
   }

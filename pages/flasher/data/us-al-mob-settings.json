@@ -26,7 +26,8 @@
         "sync.region save",
         "sync.region on",
         "sync.policy on",
-        "sync.time on"
+        "sync.time on",
+        "sync.radio on"
       ],
       "else": [
         "region def us us-southeast|us us-south|us us-east|us us-gc|us us-al us-al-mob|us-al us-al-fhp|us-al us-al-guf|us us-ms|us us-fl us-fl-nw"
