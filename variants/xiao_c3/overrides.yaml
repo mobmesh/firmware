@@ -47,3 +47,6 @@ flasher:
   label: "Xiao ESP32-C3"
   connect_note: "Put the board into flash mode first (hold BOOT, tap RESET, then release BOOT), then connect over USB."
   post_flash_note: "Press RESET once to put the board back into normal operation."
+  post_flash_commands:
+    repeater:
+      - "set ota.fw.url https://tools.mobmesh.org/flasher/xiao_c3/repeater/firmware.bin"

@@ -77,7 +77,10 @@
         "label": "Repeater",
         "assetBasename": "xiao_c3_rep_mobmesh",
         "version": "v1.17.1",
-        "firmwareFile": "xiao_c3/repeater/firmware.bin"
+        "firmwareFile": "xiao_c3/repeater/firmware.bin",
+        "postFlashCommands": [
+          "set ota.fw.url https://tools.mobmesh.org/flasher/xiao_c3/repeater/firmware.bin"
+        ]
       },
       "room_server": {
         "label": "Room",

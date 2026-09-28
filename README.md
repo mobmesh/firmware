@@ -20,6 +20,8 @@ Mods add features or changes to the standard MeshCore firmware. Each mod can shi
 | [`power-guard`](https://github.com/mobmesh/firmware/tree/main/mods/power-guard) | Keeps a bad situation from becoming an unrecoverable one, and puts the battery under its own management. Brownouts happen -- a flat pack, a cold morning, a cloudy week. Left alone, a node that browns out reboots straight into a loop that burns whatever charge is left and ends in a trip up the tower. This hibernates before it gets there, retries on a widening schedule, and comes back by itself once the battery does. Beyond the standard `powersaving on` / `off` it adds `powersaving auto`, which saves power only when the battery says to, and `powersaving safe`, the brownout failsafe. It also stops a mistyped `poweroff` from ending a node permanently. | Hibernation before the bootloop threshold, automatic recovery, power saving that engages only when it's needed, thresholds set over serial or the mesh and kept across reboots, bounded `poweroff` with a required wake time, remote operation over the authenticated mesh CLI, and the hotspot modem held off while the battery is low |
 
 More information about each mod can be found in its own README under `mods/<name>/`.
+For setup, workflows, and the complete command reference, see the
+[📘 MeshCore Enhanced+ Owner's Manual](docs/owners-manual.md).
 
 ### Web-Based Flasher
 ⚡️[our web-based flasher](https://tools.mobmesh.org/flasher)

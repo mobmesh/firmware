@@ -1,4 +1,4 @@
-"""Enforce docs/conventions.md: no first or second person in comments.
+"""Enforce local/conventions.md: no first or second person in comments.
 
 The convention scopes itself to code comments, workflow comments, operator-facing strings
 and commit messages. Comments and Python docstrings are what is mechanically checkable, so
@@ -92,7 +92,7 @@ class CommentVoiceTestCase(unittest.TestCase):
                 word = offending_word(text)
                 if word:
                     violations.append(f"{name}:{number}: [{word}] {line.strip()[:80]}")
-        self.assertEqual(violations, [], "docs/conventions.md forbids first or second person "
+        self.assertEqual(violations, [], "local/conventions.md forbids first or second person "
                                          "in comments:\n" + "\n".join(violations))
 
 
