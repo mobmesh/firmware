@@ -1,0 +1,41 @@
+{
+  "_commands": "Sent to the device's CLI in order after a flash. A leading underscore parks a line.",
+  "_if_mod": "Runs then when the image just flashed reports that mod in its metadata, else otherwise -- stock always takes else.",
+
+  "name_prefix": "fl-",
+
+  "commands": [
+    "set radio 910.525,62.5,7,8",
+    "set advert.interval 240",
+    "set flood.advert.interval 23",
+    "set path.hash.mode 1",
+    "set loop.detect minimal",
+    "set agc.reset.interval 4",
+    "set multi.acks 1",
+
+    {
+      "if_mod": "sync-settings",
+      "then": [
+        "sync.publisher add F1A12C79B8DB1E32452660785CB853B04AE205D5034C4D1740BD5B95ED1BE628",
+        "sync.publisher add F1A123FFD30F4BD05B94C27F79232FA5C657BB92A6650E85616797977411792F",
+        "sync.publisher add F1A11AB058E3262F98B63FC8297F5BE2D2394114A21FDC082A6B5BE70BE400DB",
+        "sync.publisher add A1AB0184CFC95016C09C3623F68101C9184F42D7E831DB306498FCD6F4CDC596",
+        "sync.publisher add A1AB022CBEF6C4E6C2D724660FD14DC55AEC7BE77A192DD5CA0965E91488B620",
+        "set sync.channel public-fl",
+        "sync.region def us us-southeast|us us-south|us us-east|us us-gc|us us-al us-al-mob|us-al us-al-fhp|us-al us-al-guf",
+        "sync.region def us us-fl us-fl-nw|us-fl us-fl-gulf|us-fl us-pns us-fl-pns-mm",
+        "sync.region save",
+        "sync.region on",
+        "sync.policy on",
+        "sync.time on",
+        "sync.radio on"
+      ],
+      "else": [
+        "region def us us-southeast|us us-south|us us-east|us us-gc|us us-al us-al-mob|us-al us-al-fhp|us-al us-al-guf",
+        "region def us us-fl us-fl-nw|us-fl us-fl-gulf|us-fl us-pns us-fl-pns-mm"
+      ]
+    },
+    "region allowf *",
+    "region save"
+  ]
+}
