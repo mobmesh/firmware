@@ -698,8 +698,9 @@ static bool radioGuardZero(const RadioRecord& record) {
          record.latest_generation == 0 && record.flags == 0 && record.result == 0;
 }
 
+// Stored schedules are structural only; execution revalidates current policy.
 static StoreResult radioRecordValid(const RadioRecord& record) {
-  if (!radioScheduleValid(record.schedule) || !radioReplayValid(record) ||
+  if (!radioScheduleWellFormed(record.schedule) || !radioReplayValid(record) ||
       record.phase > RADIO_GUARD_ABORT_PENDING || record.role > RADIO_ROLE_RECEIVER ||
       record.route_kind > 1 || (record.flags & 0xfc) != 0 ||
       record.result > RADIO_RESULT_FAULT || record.channel_len > CHANNEL_MAX) {
@@ -729,7 +730,7 @@ static StoreResult radioRecordValid(const RadioRecord& record) {
       record.resolved_cr < 5 || record.resolved_cr > 8 ||
       !anyNonzero(record.target_digest, sizeof(record.target_digest)) ||
       record.start == 0 || record.cutover <= record.start ||
-      !radioScheduleValid(record.captured) || record.channel_len == 0 ||
+      !radioScheduleWellFormed(record.captured) || record.channel_len == 0 ||
       !validChannel((const uint8_t*)record.channel, record.channel_len) ||
       record.channel[record.channel_len] != 0 ||
       (record.latest_generation == 0 && !publisher_before_first) ||

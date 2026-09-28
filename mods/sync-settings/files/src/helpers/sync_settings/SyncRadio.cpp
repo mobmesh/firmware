@@ -51,35 +51,29 @@ bool radioToFloats(const RadioValues& value, float& freq_mhz, float& bw_khz) {
   return true;
 }
 
-bool radioScheduleValid(const RadioSchedule& value) {
-#ifdef SYNC_SETTINGS_RADIO_BENCH_TIMING
+bool radioScheduleWellFormed(const RadioSchedule& value) {
   if (value.campaign_interval == 0 || value.campaign_duration == 0 ||
       value.campaign_duration >= 1441 ||
       value.campaign_interval >= value.campaign_duration ||
       value.confirm_interval == 0 ||
       value.confirm_interval >= value.confirm_window ||
-      value.confirm_window < 2 ||
       value.confirm_window > RADIO_CONFIRM_WINDOW_MAX) return false;
-#else
-  if (value.campaign_interval <= 5 || value.campaign_duration == 0 ||
-      value.campaign_duration >= 1441 ||
-      value.campaign_interval >= value.campaign_duration ||
-      value.confirm_interval == 0 ||
-      value.confirm_interval >= value.confirm_window ||
-      value.confirm_window <= 14 ||
-      value.confirm_window > RADIO_CONFIRM_WINDOW_MAX) return false;
-#endif
   bool tests_off = value.test_interval == 0 && value.test_window == 0;
   if (tests_off) return true;
-#ifdef SYNC_SETTINGS_RADIO_BENCH_TIMING
-  if (value.test_interval < 2 || value.test_window == 0 ||
+  if (value.test_interval == 0 || value.test_window == 0 ||
       value.test_window >= value.test_interval) return false;
-#else
-  if (value.test_interval <= 30 || value.test_window == 0 ||
-      value.test_window >= 25 || value.test_window >= value.test_interval) return false;
-#endif
   return (uint32_t)value.test_interval + value.test_window + 1u <=
          value.campaign_duration;
+}
+
+bool radioScheduleValid(const RadioSchedule& value) {
+  if (!radioScheduleWellFormed(value)) return false;
+#ifndef SYNC_SETTINGS_RADIO_BENCH_TIMING
+  if (value.campaign_interval <= 5 || value.confirm_window <= 14) return false;
+  if (value.test_interval != 0 &&
+      (value.test_interval <= 30 || value.test_window >= 25)) return false;
+#endif
+  return true;
 }
 
 bool radioTimelineValid(const RadioSchedule& schedule, uint32_t start,
