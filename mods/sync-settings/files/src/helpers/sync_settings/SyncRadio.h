@@ -52,6 +52,7 @@ bool radioValuesEqual(const RadioValues& first, const RadioValues& second);
 bool radioFromFloats(float freq_mhz, float bw_khz, uint8_t sf, uint8_t cr,
                      bool allow_keep_cr, RadioValues& out);
 bool radioToFloats(const RadioValues& value, float& freq_mhz, float& bw_khz);
+bool radioScheduleWellFormed(const RadioSchedule& value);
 bool radioScheduleValid(const RadioSchedule& value);
 bool radioTimelineValid(const RadioSchedule& schedule, uint32_t start,
                         uint32_t cutover);
