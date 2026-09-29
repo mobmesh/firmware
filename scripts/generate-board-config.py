@@ -442,6 +442,24 @@ def load_upstream_board_json(upstream_dir: Path, board: str) -> dict:
     )
 
 
+# Flasher images live flat under pages/flasher/bin/: apps by role, boot files by board name.
+FLASHER_BIN_DIR = "bin"
+FLASHER_BOOT_DIR = f"{FLASHER_BIN_DIR}/boot"
+FLASHER_BOOT_APP0 = f"{FLASHER_BOOT_DIR}/boot_app0.bin"
+
+
+def flasher_firmware_file(board: str, role: str) -> str:
+    return f"{FLASHER_BIN_DIR}/{role}/{board}.bin"
+
+
+def cmd_flasher_paths(args):
+    """Print one board/role's flasher paths as shell assignments, for the release workflow."""
+    print(f"FIRMWARE={flasher_firmware_file(args.board, args.variant_id)}")
+    print(f"BOOTLOADER={FLASHER_BOOT_DIR}/{args.board}_bootloader.bin")
+    print(f"PARTITIONS={FLASHER_BOOT_DIR}/{args.board}_partitions.bin")
+    print(f"BOOT_APP0={FLASHER_BOOT_APP0}")
+
+
 def cmd_boards_json(args):
     board = load_board_profile(args.board)
     upstream = load_upstream_board_json(Path(args.upstream_dir), args.board)
@@ -493,7 +511,7 @@ def cmd_boards_json(args):
         "label": args.variant_label,
         "assetBasename": args.asset_basename,
         "version": args.version,
-        "firmwareFile": args.firmware_file,
+        "firmwareFile": flasher_firmware_file(args.board, args.variant_id),
     }
 
     # The flasher prepends these to the per-area location commands, so a region can
@@ -503,9 +521,9 @@ def cmd_boards_json(args):
         variant_entry["postFlashCommands"] = list(post_flash)
 
     board_entry["variants"][args.variant_id] = variant_entry
-    board_entry["bootApp0"] = existing.get("bootApp0", f"{args.board}/boot_app0.bin")
-    board_entry["bootloaderFile"] = existing.get("bootloaderFile", f"{args.board}/bootloader.bin")
-    board_entry["partitionsFile"] = existing.get("partitionsFile", f"{args.board}/partitions.bin")
+    board_entry["bootApp0"] = FLASHER_BOOT_APP0
+    board_entry["bootloaderFile"] = f"{FLASHER_BOOT_DIR}/{args.board}_bootloader.bin"
+    board_entry["partitionsFile"] = f"{FLASHER_BOOT_DIR}/{args.board}_partitions.bin"
 
     all_boards[args.board] = board_entry
     all_boards["_generated"] = GENERATED_NOTICE
@@ -853,9 +871,13 @@ def main():
     p_bj.add_argument("--variant-label", required=True)
     p_bj.add_argument("--asset-basename", required=True)
     p_bj.add_argument("--version", required=True)
-    p_bj.add_argument("--firmware-file", required=True)
     p_bj.add_argument("--output", required=True)
     p_bj.set_defaults(func=cmd_boards_json)
+
+    p_fp = sub.add_parser("flasher-paths", help="print a board/role's pages/flasher paths as shell assignments")
+    p_fp.add_argument("--board", required=True)
+    p_fp.add_argument("--variant-id", required=True)
+    p_fp.set_defaults(func=cmd_flasher_paths)
 
     p_rt = sub.add_parser("resolve-targets", help="emit the CI build matrix from build-targets.yaml")
     p_rt.add_argument("--out", help="write JSON to this file instead of stdout")

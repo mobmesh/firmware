@@ -20,7 +20,7 @@ spec = importlib.util.spec_from_file_location("patch_ota_metadata", SCRIPT_PATH)
 pom = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pom)
 
-VENDORED = sorted((REPO / "pages" / "flasher").glob("*/*/firmware.bin"))
+VENDORED = sorted(p for role in ("repeater", "room_server") for p in (REPO / "pages" / "flasher" / "bin" / role).glob("*.bin"))
 REGISTRY = pom.load_mod_registry()
 MARKER = REGISTRY["hotspot-ota"][1]
 
@@ -88,7 +88,7 @@ class ParserGroundTruth(unittest.TestCase):
                 self.assertIsNotNone(meta, "vendored image carries no metadata block")
                 self.assertEqual(meta["layout_version"], pom.LAYOUT_VERSION)
                 board, _, role = meta["board_role"].partition("/")
-                self.assertEqual((board, role), (image.parent.parent.name, image.parent.name))
+                self.assertEqual((board, role), (image.stem, image.parent.name))
                 self.assertTrue(meta["mods"] & (1 << REGISTRY["hotspot-ota"][0]))
 
 

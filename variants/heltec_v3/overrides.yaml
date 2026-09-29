@@ -40,4 +40,4 @@ flasher:
   post_flash_note: "Press RST once to put the board back into normal operation."
   post_flash_commands:
     repeater:
-      - "set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v3/repeater/firmware.bin"
+      - "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/heltec_v3.bin"

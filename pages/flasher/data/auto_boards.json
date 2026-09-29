@@ -30,9 +30,9 @@
         "label": "Repeater",
         "assetBasename": "heltec_v4_rep_mobmesh",
         "version": "v1.17.1",
-        "firmwareFile": "heltec_v4/repeater/firmware.bin",
+        "firmwareFile": "bin/repeater/heltec_v4.bin",
         "postFlashCommands": [
-          "set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin",
+          "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/heltec_v4.bin",
           "set tx 20"
         ]
       },
@@ -40,12 +40,12 @@
         "label": "Room",
         "assetBasename": "heltec_v4_room_mobmesh",
         "version": "v1.17.1",
-        "firmwareFile": "heltec_v4/room_server/firmware.bin"
+        "firmwareFile": "bin/room_server/heltec_v4.bin"
       }
     },
-    "bootApp0": "heltec_v4/boot_app0.bin",
-    "bootloaderFile": "heltec_v4/bootloader.bin",
-    "partitionsFile": "heltec_v4/partitions.bin"
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/heltec_v4_bootloader.bin",
+    "partitionsFile": "bin/boot/heltec_v4_partitions.bin"
   },
   "xiao_c3": {
     "label": "Xiao ESP32-C3",
@@ -77,21 +77,21 @@
         "label": "Repeater",
         "assetBasename": "xiao_c3_rep_mobmesh",
         "version": "v1.17.1",
-        "firmwareFile": "xiao_c3/repeater/firmware.bin",
+        "firmwareFile": "bin/repeater/xiao_c3.bin",
         "postFlashCommands": [
-          "set ota.fw.url https://tools.mobmesh.org/flasher/xiao_c3/repeater/firmware.bin"
+          "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/xiao_c3.bin"
         ]
       },
       "room_server": {
         "label": "Room",
         "assetBasename": "xiao_c3_room_mobmesh",
         "version": "v1.17.1",
-        "firmwareFile": "xiao_c3/room_server/firmware.bin"
+        "firmwareFile": "bin/room_server/xiao_c3.bin"
       }
     },
-    "bootApp0": "xiao_c3/boot_app0.bin",
-    "bootloaderFile": "xiao_c3/bootloader.bin",
-    "partitionsFile": "xiao_c3/partitions.bin"
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/xiao_c3_bootloader.bin",
+    "partitionsFile": "bin/boot/xiao_c3_partitions.bin"
   },
   "_version": "v1.17.1"
 }

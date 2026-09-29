@@ -92,5 +92,5 @@ flasher:
   # default. Never `powersaving on`: light sleep has no serial wake, so later commands drop.
   post_flash_commands:
     repeater:
-      - "set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin"
+      - "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/heltec_v4.bin"
       - "set tx 20"

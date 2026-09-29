@@ -1,10 +1,7 @@
 name: build-release
 
 permissions:
-  contents: write
-  issues: write
-  pages: write
-  id-token: write
+  contents: read
 
 on:
   schedule:
@@ -25,7 +22,7 @@ on:
         type: boolean
         default: false
       dry_run:
-        description: 'Build and run every check, but publish nothing: no release, no vendored-asset commits, no Pages deploy. The built .bin is uploaded as a workflow artifact instead. Use with force_rebuild to exercise a tag that has already shipped.'
+        description: 'Build and run every check, but publish nothing: no release, no vendored-asset commit, no Pages deploy. The build bundle is uploaded as a workflow artifact instead. Use with force_rebuild to exercise a tag that has already shipped.'
         required: false
         type: boolean
         default: false
@@ -34,6 +31,13 @@ env:
   UPSTREAM_REPO: meshcore-dev/MeshCore
   # xiao_c3 sits near 75% of its 1.9MB OTA slot; heltec_v4 near 20% of 6.5MB.
   WARN_PCT: 85
+
+# A second invocation may queue, but it must not publish from an older checkout while
+# another invocation is updating the same release assets and flasher catalogue.
+concurrency:
+  group: build-release-${{ github.ref }}
+  cancel-in-progress: false
+  queue: max
 
 jobs:
   compute-matrix:
@@ -53,11 +57,9 @@ jobs:
 
   build:
     needs: compute-matrix
-    # Boards sharing a role publish to one release tag, so same-role jobs queue rather
-    # than race to create it. Different roles still build in parallel.
-    concurrency:
-      group: release-${{ github.workflow }}-${{ matrix.upstream_tag_prefix }}
-      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.compute-matrix.outputs.matrix) }}
@@ -291,8 +293,8 @@ jobs:
               ].join('\n')
             });
 
-      - name: Update pages/flasher's bootloader.bin/partitions.bin/boot_app0.bin for the web flasher
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.vendor_flasher_assets
+      - name: Stage this build's own boot files for merged-image and QEMU checks
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
           BOOT="upstream-src/.pio/build/${{ matrix.build_env }}/bootloader.bin"
           PART="upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin"
@@ -303,36 +305,11 @@ jobs:
           test -f "$BOOT"
           test -f "$PART"
           test -n "$APP0" && test -f "$APP0"
-          DEST="pages/flasher/${{ matrix.board_id }}"
-          mkdir -p "$DEST"
-          cp "$BOOT" "$DEST/bootloader.bin"
-          cp "$PART" "$DEST/partitions.bin"
-          cp "$APP0" "$DEST/boot_app0.bin"
-
-      - name: Commit vendored flasher assets if changed
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.vendor_flasher_assets && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          for i in 1 2 3 4 5; do
-            git add "pages/flasher/${{ matrix.board_id }}/bootloader.bin" "pages/flasher/${{ matrix.board_id }}/partitions.bin" "pages/flasher/${{ matrix.board_id }}/boot_app0.bin"
-            git diff --staged --quiet && break
-            git commit -m "docs: sync ${{ matrix.board_id }} flasher assets with ${{ steps.pick.outputs.ref }}"
-            git push && break
-            if [ "$i" -eq 5 ]; then
-              echo "::error::failed to push ${{ matrix.board_id }} flasher assets after 5 attempts"
-              exit 1
-            fi
-            git reset --hard HEAD~1
-            git fetch origin "${{ github.ref_name }}"
-            git reset --hard "origin/${{ github.ref_name }}"
-            # Per-board build output, so re-copy from THIS run's .pio/build, never another
-            # board's. boot_app0.bin is generic but re-copied too, for consistency.
-            FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
-            cp "upstream-src/.pio/build/${{ matrix.build_env }}/bootloader.bin" "pages/flasher/${{ matrix.board_id }}/bootloader.bin"
-            cp "upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin" "pages/flasher/${{ matrix.board_id }}/partitions.bin"
-            cp "$(find "$FRAMEWORK_DIR" -name 'boot_app0.bin' | head -1)" "pages/flasher/${{ matrix.board_id }}/boot_app0.bin"
-          done
+          eval "$(python3 scripts/generate-board-config.py flasher-paths --board ${{ matrix.board_id }} --variant-id ${{ matrix.id }})"
+          mkdir -p pages/flasher/bin/boot
+          cp "$BOOT" "pages/flasher/$BOOTLOADER"
+          cp "$PART" "pages/flasher/$PARTITIONS"
+          cp "$APP0" "pages/flasher/$BOOT_APP0"
 
       - name: Locate app-only .bin (not the merged/full-flash image)
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
@@ -356,22 +333,6 @@ jobs:
             --mods "${{ join(matrix.mods, ',') }}" \
             --show
 
-      - name: Locate bootloader.bin and partitions.bin (needed for the partition-layout drift check below)
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
-        id: flash_parts
-        run: |
-          cd upstream-src
-          BOOT=".pio/build/${{ matrix.build_env }}/bootloader.bin"
-          PART=".pio/build/${{ matrix.build_env }}/partitions.bin"
-          test -f "$BOOT"
-          test -f "$PART"
-          BOOT_NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}-bootloader.bin"
-          PART_NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}-partitions.bin"
-          cp "$BOOT" "../$BOOT_NAME"
-          cp "$PART" "../$PART_NAME"
-          echo "bootloader_name=$BOOT_NAME" >> "$GITHUB_OUTPUT"
-          echo "partitions_name=$PART_NAME" >> "$GITHUB_OUTPUT"
-
       - name: Regenerate pages/flasher/data/auto_boards.json from overrides.yaml + upstream + this build's real partitions.bin
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
@@ -384,7 +345,6 @@ jobs:
             --variant-label "${{ matrix.release_title }}" \
             --asset-basename ${{ matrix.asset_basename }} \
             --version "${{ steps.pick.outputs.version }}" \
-            --firmware-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" \
             --output pages/flasher/data/auto_boards.json
 
       - name: Verify firmware.bin fits within its OTA app partition
@@ -408,22 +368,6 @@ jobs:
         run: |
           python3 scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" --check
 
-      # One target per board vendors these, so any other target would merge against a copy
-      # from a different build. Fail rather than ship a mismatched bootloader.
-      - name: Check the vendored bootloader/partitions match this build's own
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && !matrix.vendor_flasher_assets
-        run: |
-          for f in bootloader partitions; do
-            BUILT="upstream-src/.pio/build/${{ matrix.build_env }}/$f.bin"
-            VENDORED="pages/flasher/${{ matrix.board_id }}/$f.bin"
-            if ! cmp -s "$BUILT" "$VENDORED"; then
-              echo "::error::$f.bin from this build differs from the vendored pages/flasher copy."
-              echo "The vendored copy comes from ${{ matrix.board_id }}'s vendor_flasher_assets target."
-              echo "Rebuild that target first, or the -merged.bin would pair this app with a bootloader it was not built alongside."
-              exit 1
-            fi
-          done
-
       # Pinned rather than taking PlatformIO's bundled copy: esptool 4.x spells this
       # merge_bin/--flash_size and 5.x merge-bin/--flash-size.
       - name: Build the whole-flash -merged.bin
@@ -442,12 +386,12 @@ jobs:
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
 
-      - name: Vendor firmware.bin for the web flasher (GitHub Release assets have no CORS headers, so the page's fetch() can't read them cross-origin)
+      - name: Stage this app for merged-image and QEMU checks
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
-          DEST="pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}"
-          mkdir -p "$DEST"
-          cp "${{ steps.artifact.outputs.name }}" "$DEST/firmware.bin"
+          eval "$(python3 scripts/generate-board-config.py flasher-paths --board ${{ matrix.board_id }} --variant-id ${{ matrix.id }})"
+          mkdir -p "$(dirname "pages/flasher/$FIRMWARE")"
+          cp "${{ steps.artifact.outputs.name }}" "pages/flasher/$FIRMWARE"
 
       # Everything downstream sits behind this, so an image that cannot reach its command
       # loop is never shipped.
@@ -501,60 +445,44 @@ jobs:
           path: qemu-workdir/uart0.log
           retention-days: 14
 
-      - name: Commit vendored firmware.bin and this variant's auto_boards.json entry if changed
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
+      - name: Package this successful build for the single publisher
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          for i in 1 2 3 4 5; do
-            git add "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" pages/flasher/data/auto_boards.json
-            git diff --staged --quiet && break
-            git commit -m "docs: vendor ${{ matrix.board_id }}/${{ matrix.id }} firmware.bin (${{ steps.pick.outputs.version }}) and refresh boards.json for the web flasher"
-            git push && break
-            if [ "$i" -eq 5 ]; then
-              echo "::error::failed to push ${{ matrix.board_id }}/${{ matrix.id }} firmware.bin/boards.json after 5 attempts"
-              exit 1
-            fi
-            # Fully re-serialized each run, so concurrent targets conflict on a textual
-            # rebase; regenerating against the remote tip touches only this target's entry.
-            git reset --hard HEAD~1
-            git fetch origin "${{ github.ref_name }}"
-            git reset --hard "origin/${{ github.ref_name }}"
-            python3 scripts/generate-board-config.py boards-json \
-              --board ${{ matrix.board_id }} \
-              --upstream-dir upstream-src \
-              --partitions-bin "upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin" \
-              --variant-id ${{ matrix.id }} \
-              --variant-label "${{ matrix.release_title }}" \
-              --asset-basename ${{ matrix.asset_basename }} \
-              --version "${{ steps.pick.outputs.version }}" \
-              --firmware-file "${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin" \
-                --output pages/flasher/data/auto_boards.json
-            mkdir -p "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}"
-            cp "${{ steps.artifact.outputs.name }}" "pages/flasher/${{ matrix.board_id }}/${{ matrix.id }}/firmware.bin"
-          done
+          mkdir -p release-input
+          eval "$(python3 scripts/generate-board-config.py flasher-paths --board ${{ matrix.board_id }} --variant-id ${{ matrix.id }})"
+          FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
+          APP0=$(find "$FRAMEWORK_DIR" -name 'boot_app0.bin' | head -1)
+          cp "${{ steps.artifact.outputs.name }}" release-input/app.bin
+          cp "${{ steps.merged.outputs.name }}" release-input/merged.bin
+          cp "upstream-src/.pio/build/${{ matrix.build_env }}/bootloader.bin" release-input/bootloader.bin
+          cp "upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin" release-input/partitions.bin
+          cp "$APP0" release-input/boot_app0.bin
+          cp release-notes.md release-input/release-notes.md
+          jq '."${{ matrix.board_id }}"' pages/flasher/data/auto_boards.json > release-input/board-entry.json
+          jq -n \
+            --arg board "${{ matrix.board_id }}" \
+            --arg role "${{ matrix.id }}" \
+            --arg version "${{ steps.pick.outputs.version }}" \
+            --arg release_tag "${{ steps.pick.outputs.release_tag }}" \
+            --arg release_title "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - mobmesh" \
+            --arg app_asset "${{ steps.artifact.outputs.name }}" \
+            --arg merged_asset "${{ steps.merged.outputs.name }}" \
+            --arg firmware_path "$FIRMWARE" \
+            --argjson make_latest '${{ matrix.make_latest }}' \
+            --argjson vendor_flasher_assets '${{ matrix.vendor_flasher_assets }}' \
+            '{board:$board, role:$role, version:$version, release_tag:$release_tag,
+              release_title:$release_title, app_asset:$app_asset,
+              merged_asset:$merged_asset, firmware_path:$firmware_path,
+              make_latest:$make_latest, vendor_flasher_assets:$vendor_flasher_assets}' \
+            > release-input/meta.json
 
-      - name: Upload the built image when nothing is being published
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && !(github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true')
+      - name: Upload this successful build
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         uses: actions/upload-artifact@v7
         with:
-          name: firmware-${{ matrix.board_id }}-${{ matrix.id }}
-          path: |
-            ${{ steps.artifact.outputs.name }}
-            ${{ steps.merged.outputs.name }}
+          name: release-input-${{ matrix.board_id }}-${{ matrix.id }}
+          path: release-input/
           retention-days: 7
-
-      - name: Publish release
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ steps.pick.outputs.release_tag }}
-          name: "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - mobmesh"
-          body_path: release-notes.md
-          make_latest: ${{ matrix.make_latest }}
-          files: |
-            ${{ steps.artifact.outputs.name }}
-            ${{ steps.merged.outputs.name }}
 
       - name: Notify on patch/build failure
         if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && steps.rollback_check.outputs.failed != 'true'
@@ -588,6 +516,97 @@ jobs:
                 detail,
               ].join('\n')
             });
+
+  publish:
+    needs: [compute-matrix, build]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Start from the current branch tip
+        run: git pull --ff-only origin "${{ github.ref_name }}"
+
+      - name: Download every successful build
+        uses: actions/download-artifact@v7
+        continue-on-error: true
+        with:
+          pattern: release-input-*
+          path: release-inputs
+
+      - name: Assemble release assets and the web-flasher update
+        run: |
+          mkdir -p release-inputs release-assets
+          python3 scripts/assemble-release.py \
+            --inputs release-inputs \
+            --flasher-dir pages/flasher \
+            --boards-json pages/flasher/data/auto_boards.json \
+            --output-dir release-assets \
+            --summary publish-summary.json
+          {
+            echo '## Release assembly'
+            echo
+            echo '### Web flasher updates'
+            jq -r '.web_published[]? | "- \(.board)/\(.role)"' publish-summary.json
+            echo
+            echo '### Withheld web-flasher boards'
+            jq -r '.web_skipped[]? | "- \(.board): \(.reason)"' publish-summary.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - id: vendor
+        name: Commit and push the assembled web-flasher update once
+        if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pages/flasher/bin pages/flasher/data/auto_boards.json
+          if git diff --staged --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "docs: publish assembled firmware and flasher catalogue"
+          for attempt in 1 2 3 4 5; do
+            if git push origin "HEAD:${{ github.ref_name }}"; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::failed to push the assembled flasher update after 5 attempts"
+              exit 1
+            fi
+            git pull --rebase origin "${{ github.ref_name }}"
+          done
+
+      - name: Create or update each shared release once
+        if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          jq -r '.releases[].release_tag' publish-summary.json | sort -u | while read -r tag; do
+            [ -n "$tag" ] || continue
+            title=$(jq -r --arg tag "$tag" '.releases[] | select(.release_tag==$tag) | .release_title' publish-summary.json | sort -u)
+            latest=$(jq -r --arg tag "$tag" '.releases[] | select(.release_tag==$tag) | .make_latest' publish-summary.json | sort -u)
+            notes=$(jq -r --arg tag "$tag" '.releases[] | select(.release_tag==$tag) | .notes_file' publish-summary.json | head -1)
+            if [ "$(printf '%s\n' "$title" | wc -l)" -ne 1 ] || [ "$(printf '%s\n' "$latest" | wc -l)" -ne 1 ]; then
+              echo "::error::inconsistent release metadata for $tag"
+              exit 1
+            fi
+            mapfile -t assets < <(jq -r --arg tag "$tag" '.releases[] | select(.release_tag==$tag) | .release_files[]' publish-summary.json)
+            if gh release view "$tag" > /dev/null 2>&1; then
+              edit_args=("$tag" --title "$title" --notes-file "$notes")
+              [ "$latest" = true ] && edit_args+=(--latest)
+              gh release edit "${edit_args[@]}"
+              gh release upload "$tag" --clobber "${assets[@]}"
+            else
+              gh release create "$tag" "${assets[@]}" \
+                --title "$title" --notes-file "$notes" --latest="$latest"
+            fi
+          done
 
   # Requires Settings -> Pages -> Source set to "GitHub Actions", a one-time manual step.
   # One issue per run, filed from a single job so parallel matrix jobs cannot open duplicates.
@@ -658,7 +677,7 @@ jobs:
             }
 
   publish-pages:
-    needs: build
+    needs: publish
     # Only from the default branch, and never on a dry run. Without the ref guard a run
     # started on any branch deployed production Pages from that branch's tree.
     if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
@@ -674,7 +693,7 @@ jobs:
       - name: Checkout this repo
         uses: actions/checkout@v7
 
-      - name: Pull latest commits (the build job(s) above may have just pushed vendored assets)
+      - name: Pull the assembled flasher commit
         run: git pull --ff-only origin "${{ github.ref_name }}"
 
       - name: Configure Pages

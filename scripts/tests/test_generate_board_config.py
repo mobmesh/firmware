@@ -347,7 +347,6 @@ class BoardsJsonTestCase(unittest.TestCase):
             variant_label="Repeater",
             asset_basename="heltec_v4_rep_mobmesh",
             version="1.16.0",
-            firmware_file="heltec_v4/repeater/firmware.bin",
             output=str(out),
         ))
         return json.loads(out.read_text())["heltec_v4"]["variants"][variant_id]
@@ -368,6 +367,14 @@ class BoardsJsonTestCase(unittest.TestCase):
             variant["postFlashCommands"],
             ["set ota.fw.url https://x/f.bin"],
         )
+
+    def test_flasher_paths_are_flat_under_bin(self):
+        self._run(self.FLASHER_BASE, "room_server")
+        board = json.loads((self.repo_root / "boards.json").read_text())["heltec_v4"]
+        self.assertEqual(board["variants"]["room_server"]["firmwareFile"], "bin/room_server/heltec_v4.bin")
+        self.assertEqual(board["bootloaderFile"], "bin/boot/heltec_v4_bootloader.bin")
+        self.assertEqual(board["partitionsFile"], "bin/boot/heltec_v4_partitions.bin")
+        self.assertEqual(board["bootApp0"], "bin/boot/boot_app0.bin")
 
     def test_variant_without_commands_omits_the_key(self):
         # the flasher reads a missing key as an empty list, so don't emit noise.

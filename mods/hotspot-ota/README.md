@@ -102,7 +102,7 @@ command:
 set ota.wan.wifi MyHotspot,hunter2
 ota wan verify
 get ota.wan.health
-set ota.fw.url https://tools.mobmesh.org/flasher/heltec_v4/repeater/firmware.bin
+set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/heltec_v4.bin
 start ota wan update
 ```
 

@@ -49,4 +49,4 @@ flasher:
   post_flash_note: "Press RESET once to put the board back into normal operation."
   post_flash_commands:
     repeater:
-      - "set ota.fw.url https://tools.mobmesh.org/flasher/xiao_c3/repeater/firmware.bin"
+      - "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/xiao_c3.bin"
