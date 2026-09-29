@@ -479,6 +479,10 @@ def cmd_boards_json(args):
         },
     }
 
+    # Written only when non-default, so boards on the hardware USB console keep their existing entry.
+    if board.qemu.console != "usb":
+        board_entry["qemu"]["console"] = board.qemu.console
+
     output_path = Path(args.output)
     all_boards = json.loads(output_path.read_text()) if output_path.exists() else {}
     existing = all_boards.get(args.board, {})
@@ -772,7 +776,7 @@ def cmd_inject_env(args):
         shutil.copy(src_csv, dest_csv)
         # board_build.partitions resolves against the PlatformIO project root, not this
         # variant's platformio.ini, so the value needs the variants/<board>/ prefix.
-        project_relative_path = f"variants/{board}/{partitions_override}"
+        project_relative_path = f"variants/{board_profile.upstream_variant}/{partitions_override}"
         section_lines[bf_idx:bf_idx] = [f"board_build.partitions = {project_relative_path}\n"]
         bf_idx += 1
 

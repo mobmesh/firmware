@@ -24,9 +24,20 @@ class CurrentProjectModelTestCase(unittest.TestCase):
             ("heltec_v4", "room_server"),
             ("xiao_c3", "repeater"),
             ("xiao_c3", "room_server"),
+            ("heltec_v3", "repeater"),
+            ("heltec_v3", "room_server"),
+            ("xiao_s3_wio", "repeater"),
+            ("xiao_s3_wio", "room_server"),
+            ("rak3112", "repeater"),
+            ("rak3112", "room_server"),
+            ("eora_s3", "repeater"),
+            ("eora_s3", "room_server"),
+            ("station_g3", "repeater"),
+            ("station_g3", "room_server"),
         })
         self.assertEqual(rows[("heltec_v4", "repeater")].asset_basename, "heltec_v4_rep_mobmesh")
         self.assertEqual(rows[("xiao_c3", "room_server")].asset_basename, "xiao_c3_room_mobmesh")
+        self.assertEqual(rows[("station_g3", "repeater")].asset_basename, "station_g3_rep_mobmesh_beta")
         self.assertEqual(rows[("heltec_v4", "repeater")].mods,
                          ("shim", "hotspot-ota", "timing-safety", "try-settings", "power-guard", "sync-settings"))
         self.assertEqual(rows[("xiao_c3", "repeater")].mods,
@@ -112,6 +123,40 @@ requirements:
     def test_calibrated_capability_is_rejected(self):
         self.project(capability="calibrated", requirement="optional")
         with self.assertRaisesRegex(ProjectModelError, "expected true, false, or unverified"):
+            ProjectModel.load(self.root)
+
+    def test_beta_target_marks_its_asset_name(self):
+        self.project(requirement="optional")
+        targets = self.root / "build-targets.yaml"
+        targets.write_text(targets.read_text().replace("    qemu_boot_check: false\n", "    qemu_boot_check: false\n    beta: true\n"))
+        self.assertEqual(ProjectModel.load(self.root).build_plan.targets[0].asset_basename, "board_rep_mobmesh_beta")
+
+    def test_upstream_variant_defaults_to_board_id(self):
+        self.project(requirement="optional")
+        self.assertEqual(ProjectModel.load(self.root).boards["board"].upstream_variant, "board")
+
+    def test_upstream_variant_is_carried_into_the_plan(self):
+        self.project(requirement="optional")
+        path = self.root / "variants/board/overrides.yaml"
+        path.write_text("upstream_variant: long_upstream_name\n" + path.read_text())
+        target = ProjectModel.load(self.root).build_plan.targets[0]
+        self.assertEqual((target.board_id, target.upstream_variant), ("board", "long_upstream_name"))
+
+    def test_board_role_longer_than_the_stamp_is_rejected(self):
+        self.project(requirement="optional")
+        target = self.root / "variants/board_id_too_long/overrides.yaml"
+        target.parent.mkdir(parents=True)
+        target.write_text((self.root / "variants/board/overrides.yaml").read_text())
+        targets = self.root / "build-targets.yaml"
+        targets.write_text(targets.read_text().replace("board: board", "board: board_id_too_long"))
+        with self.assertRaisesRegex(ProjectModelError, "exceeds the 23-byte image stamp"):
+            ProjectModel.load(self.root)
+
+    def test_unknown_qemu_console_is_rejected(self):
+        self.project()
+        path = self.root / "variants/board/overrides.yaml"
+        path.write_text(path.read_text().replace("  enabled: false\n", "  enabled: false\n  console: uart1\n"))
+        with self.assertRaisesRegex(ProjectModelError, "qemu.console"):
             ProjectModel.load(self.root)
 
     def test_duplicate_tag_prefix_is_rejected(self):

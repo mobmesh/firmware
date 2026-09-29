@@ -296,17 +296,17 @@ jobs:
           for key in sorted(groups):
               t = max(groups[key], key=lambda x: len(x['mods']))
               mods = list(dict.fromkeys(t['mods'] + extras))
-              print('|'.join([','.join(mods), t['board_id'], t['build_env']]))
+              print('|'.join([','.join(mods), t['board_id'], t['build_env'], t['upstream_variant']]))
           ")
           FAILED=""
           for SPEC in $SPECS; do
-            mods=${SPEC%%|*}; rest=${SPEC#*|}; board=${rest%%|*}; env=${rest##*|}
+            mods=${SPEC%%|*}; rest=${SPEC#*|}; board=${rest%%|*}; rest=${rest#*|}; env=${rest%%|*}; upstream=${rest##*|}
             # The probe composed hooks for the union of mods; a target without one of them cannot link that.
             rm -f dev-src/src/helpers/ModHooks.cpp dev-src/src/helpers/esp32/CommonCliMods.cpp
             python3 scripts/generate-board-config.py compose-mods --upstream dev-src --mods "$mods" >/dev/null
             python3 scripts/generate-board-config.py inject-env \
               --board "$board" --env "$env" \
-              --platformio-ini "dev-src/variants/$board/platformio.ini" --mods "$mods"
+              --platformio-ini "dev-src/variants/$upstream/platformio.ini" --mods "$mods"
             if ! (cd dev-src && PLATFORMIO_BUILD_FLAGS="$FLAGS" pio run -e "$env" > "../patched-$env.log" 2>&1); then
               tail -30 "patched-$env.log"
               FAILED="$FAILED $SPEC"

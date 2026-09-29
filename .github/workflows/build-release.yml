@@ -229,13 +229,13 @@ jobs:
           python3 scripts/generate-board-config.py inject-env \
             --board ${{ matrix.board_id }} \
             --env ${{ matrix.build_env }} \
-            --platformio-ini "upstream-src/variants/${{ matrix.board_id }}/platformio.ini" \
+            --platformio-ini "upstream-src/variants/${{ matrix.upstream_variant }}/platformio.ini" \
             --mods "${{ join(matrix.mods, ',') }}" \
             --append-flags="${{ join(matrix.build_flags_append, ',') }}"
           cd upstream-src
-          DIFF=$(git diff -- "variants/${{ matrix.board_id }}/platformio.ini")
+          DIFF=$(git diff -- "variants/${{ matrix.upstream_variant }}/platformio.ini")
           if [ -z "$DIFF" ]; then
-            echo "::error::inject-env ran but produced no change to variants/${{ matrix.board_id }}/platformio.ini -- nothing was actually injected."
+            echo "::error::inject-env ran but produced no change to variants/${{ matrix.upstream_variant }}/platformio.ini -- nothing was actually injected."
             exit 1
           fi
           echo "$DIFF"
@@ -456,7 +456,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           QEMU_REPO: HeyVern/espressif-qemu
-          QEMU_TAG: v9.2.2-2
+          QEMU_TAG: v9.2.2-4
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libgcrypt20 libpixman-1-0 libsdl2-2.0-0 zstd

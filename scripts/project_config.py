@@ -186,6 +186,13 @@ class ModDefinition:
     patches: tuple[PatchDefinition, ...]
 
 
+# The image stamp's board/role field is 24 bytes including its NUL (scripts/patch_ota_metadata.py).
+BOARD_ROLE_MAX = 23
+
+# usb: hardware CDC; uart0: CLI behind a USB-UART bridge; otg: TinyUSB CDC on the OTG controller (fork serial 3).
+QEMU_CONSOLES = frozenset({"usb", "uart0", "otg"})
+
+
 @dataclass(frozen=True)
 class QemuProfile:
     enabled: bool
@@ -194,6 +201,7 @@ class QemuProfile:
     mcu: str | None
     mem: str
     globals: Mapping[str, Scalar]
+    console: str = "usb"
 
 
 @dataclass(frozen=True)
@@ -215,6 +223,7 @@ class PartitionLayout:
 @dataclass(frozen=True)
 class BoardProfile:
     board_id: str
+    upstream_variant: str
     source_path: Path
     capabilities: Mapping[Capability, CapabilityState]
     build_values: Mapping[str, Scalar]
@@ -245,12 +254,14 @@ class TargetDefinition:
     mods: tuple[str, ...]
     build_flags_append: tuple[str, ...]
     qemu_boot_check: bool
+    beta: bool = False
 
 
 @dataclass(frozen=True)
 class ResolvedTarget:
     target_id: str
     board_id: str
+    upstream_variant: str
     role: str
     build_env: str
     upstream_tag_prefix: str
@@ -267,6 +278,7 @@ class ResolvedTarget:
         return {
             "id": self.target_id,
             "board_id": self.board_id,
+            "upstream_variant": self.upstream_variant,
             "role": self.role,
             "build_env": self.build_env,
             "upstream_tag_prefix": self.upstream_tag_prefix,
@@ -357,7 +369,7 @@ class ProjectModel:
         if not isinstance(value, list) or not value:
             raise ProjectModelError(f"{path}:targets: expected a nonempty list")
         targets = []
-        allowed = {"board", "role", "build_env", "vendor_flasher_assets", "mods", "build_flags_append", "qemu_boot_check"}
+        allowed = {"board", "role", "build_env", "vendor_flasher_assets", "mods", "build_flags_append", "qemu_boot_check", "beta"}
         for index, raw in enumerate(value):
             field_name = f"targets[{index}]"
             item = _mapping(path, field_name, raw)
@@ -370,6 +382,7 @@ class ProjectModel:
                 mods=_strings(path, f"{field_name}.mods", item.get("mods")),
                 build_flags_append=_strings(path, f"{field_name}.build_flags_append", item.get("build_flags_append")),
                 qemu_boot_check=_boolean(path, f"{field_name}.qemu_boot_check", item.get("qemu_boot_check", True)),
+                beta=_boolean(path, f"{field_name}.beta", item.get("beta", False)),
             ))
         return tuple(targets)
 
@@ -377,7 +390,8 @@ class ProjectModel:
     def _load_board(root: Path, board_id: str) -> BoardProfile:
         path = root / "variants" / board_id / "overrides.yaml"
         data = _load_yaml(path)
-        _keys(path, "root", data, {"capabilities", "build_values", "build_flags_append", "partitions_override", "qemu", "flasher"})
+        _keys(path, "root", data, {"upstream_variant", "capabilities", "build_values", "build_flags_append", "partitions_override", "qemu", "flasher"})
+        upstream_variant = _string(path, "upstream_variant", data.get("upstream_variant", board_id))
 
         raw_capabilities = _mapping(path, "capabilities", data.get("capabilities"))
         capabilities = {
@@ -387,7 +401,7 @@ class ProjectModel:
         build_values = _scalars(path, "build_values", data.get("build_values"))
 
         qemu_raw = _mapping(path, "qemu", data.get("qemu"))
-        _keys(path, "qemu", qemu_raw, {"enabled", "machine", "binary", "mcu", "mem", "globals"})
+        _keys(path, "qemu", qemu_raw, {"enabled", "machine", "binary", "mcu", "mem", "globals", "console"})
         enabled = _boolean(path, "qemu.enabled", qemu_raw.get("enabled", False))
         qemu = QemuProfile(
             enabled=enabled,
@@ -396,7 +410,10 @@ class ProjectModel:
             mcu=_string(path, "qemu.mcu", qemu_raw.get("mcu")) if enabled else None,
             mem=_string(path, "qemu.mem", qemu_raw.get("mem")) if enabled and qemu_raw.get("mem") != "" else "",
             globals=_scalars(path, "qemu.globals", qemu_raw.get("globals")),
+            console=_string(path, "qemu.console", qemu_raw.get("console", "usb")),
         )
+        if qemu.console not in QEMU_CONSOLES:
+            raise ProjectModelError(f"{path}:qemu.console: expected one of {sorted(QEMU_CONSOLES)}, got '{qemu.console}'")
 
         flasher_raw = _mapping(path, "flasher", data.get("flasher"))
         _keys(path, "flasher", flasher_raw, {"label", "connect_note", "post_flash_note", "post_flash_commands"})
@@ -417,6 +434,7 @@ class ProjectModel:
             raise ProjectModelError(f"{path}:partitions_override: expected null or a filename")
         return BoardProfile(
             board_id=board_id,
+            upstream_variant=upstream_variant,
             source_path=path,
             capabilities=capabilities,
             build_values=build_values,
@@ -659,14 +677,20 @@ class ProjectModel:
                     raise ProjectModelError(
                         f"{self.root / 'build-targets.yaml'}:targets: {target.board}/{target.role} selects '{mod_name}' but board capabilities do not satisfy {missing}"
                     )
+            if len(f"{target.board}/{target.role}".encode()) > BOARD_ROLE_MAX:
+                raise ProjectModelError(
+                    f"{self.root / 'build-targets.yaml'}:targets: '{target.board}/{target.role}' exceeds the "
+                    f"{BOARD_ROLE_MAX}-byte image stamp; shorten the board id and set upstream_variant"
+                )
             rows.append(ResolvedTarget(
                 target_id=target.role,
                 board_id=target.board,
+                upstream_variant=board.upstream_variant,
                 role=target.role,
                 build_env=target.build_env,
                 upstream_tag_prefix=role.upstream_tag_prefix,
                 release_title=role.release_title,
-                asset_basename=f"{target.board}_{role.asset_role_abbrev}_mobmesh",
+                asset_basename=f"{target.board}_{role.asset_role_abbrev}_mobmesh" + ("_beta" if target.beta else ""),
                 vendor_flasher_assets=target.vendor_flasher_assets,
                 make_latest=role.make_latest,
                 mods=mod_names,

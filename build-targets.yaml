@@ -50,3 +50,77 @@ targets:
     build_env: Xiao_C3_room_server
     vendor_flasher_assets: false
     mods: [sync-settings]      # extras beyond core_mods
+
+  # Beta boards: `beta: true` appends _beta to every release asset name until each is proven in the field.
+
+  - board: heltec_v3
+    role: repeater
+    build_env: Heltec_v3_repeater
+    vendor_flasher_assets: true
+    beta: true
+    mods: [sync-settings]
+    # Headless, as heltec_v4.
+    build_flags_append: ["-UDISPLAY_CLASS"]
+
+  - board: heltec_v3
+    role: room_server
+    build_env: Heltec_v3_room_server
+    vendor_flasher_assets: false
+    beta: true
+    mods: [sync-settings]
+
+  - board: xiao_s3_wio
+    role: repeater
+    build_env: Xiao_S3_WIO_repeater
+    vendor_flasher_assets: true
+    beta: true
+    mods: [sync-settings]
+
+  - board: xiao_s3_wio
+    role: room_server
+    build_env: Xiao_S3_WIO_room_server
+    vendor_flasher_assets: false
+    beta: true
+    mods: [sync-settings]
+
+  - board: rak3112
+    role: repeater
+    build_env: RAK_3112_repeater
+    vendor_flasher_assets: true
+    beta: true
+    mods: [sync-settings]
+
+  - board: rak3112
+    role: room_server
+    build_env: RAK_3112_room_server
+    vendor_flasher_assets: false
+    beta: true
+    mods: [sync-settings]
+
+  - board: eora_s3
+    role: repeater
+    build_env: Ebyte_EoRa-S3_Repeater
+    vendor_flasher_assets: true
+    beta: true
+    mods: [sync-settings]
+
+  - board: eora_s3
+    role: room_server
+    build_env: Ebyte_EoRa-S3_room_server
+    vendor_flasher_assets: false
+    beta: true
+    mods: [sync-settings]
+
+  - board: station_g3
+    role: repeater
+    build_env: Station_G3_ESP32_repeater
+    vendor_flasher_assets: true
+    beta: true
+    mods: [sync-settings]
+
+  - board: station_g3
+    role: room_server
+    build_env: Station_G3_ESP32_room_server
+    vendor_flasher_assets: false
+    beta: true
+    mods: [sync-settings]

@@ -1,0 +1,48 @@
+# Override-only board config for station_g3: only what this project adds on top of upstream.
+
+upstream_variant: station_g3_esp32   # upstream directory name; too long for the image stamp
+
+capabilities:
+  wifi_station: true
+  dual_ota: true
+  battery_measurement: unverified
+  external_power_control: unverified
+  fem_lna_control: false
+  deep_sleep_rail_shutdown: false
+
+build_values:
+  PIN_HOTSPOT_PWR: 8   # IO socket; confirmed on hardware 2026-09-28 (LED on for set ota.wan.pwr on only, off through reboot)
+  OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS: 15000
+  OTA_WIFI_JOIN_RETRY_DELAY_MS: 5000
+  OTA_WIFI_JOIN_MAX_ATTEMPTS: 6
+  OTA_HTTP_TIMEOUT_MS: 20000
+  OTA_DIAG_WIFI_JOIN_ATTEMPTS: 1
+  OTA_WAN_CHECK_ATTEMPTS: 3
+  OTA_WAN_CHECK_RETRY_DELAY_MS: 10000
+  OTA_RADIO_FAIL_SLEEP_START_SECS: 60
+  OTA_RADIO_FAIL_SLEEP_MAX_SECS: 900
+
+# Upstream sets no table for this 16MB board, leaving 1.25MB OTA slots; stock default_16MB gives 6.25MB.
+partitions_override: partitions_station_g3.csv
+
+qemu:
+  enabled: true
+  machine: esp32s3
+  binary: qemu-system-xtensa
+  mcu: esp32s3
+  mem: 8M
+  console: otg   # TinyUSB CDC (ARDUINO_USB_MODE=0) on the OTG controller
+  globals:
+    bramble.gpio.strap-mode: 4
+    bramble.gpspi2.cs-gpio: 11
+    bramble.gpspi2.spi-base: "0x60025000"
+    bramble.gpio.idle-high: 274877906945   # GPIO0 (BOOT) and GPIO38 (button) idle high; GPIO47 is radio BUSY
+    bramble.sx1262.dio1-gpio: 48
+
+flasher:
+  label: "Station G3"
+  connect_note: "Put the board into flash mode first (hold BOOT, tap RESET, then release BOOT), then connect over USB."
+  post_flash_note: "Press RESET once to put the board back into normal operation."
+  post_flash_commands:
+    repeater:
+      - "set ota.fw.url https://tools.mobmesh.org/flasher/station_g3/repeater/firmware.bin"

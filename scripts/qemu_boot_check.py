@@ -188,6 +188,18 @@ def run_once(cmd, variant, mod_bits, uart_log):
     return failures
 
 
+def serial_args(console, uart_log):
+    """Serial 0 is UART0 (boot ROM, panics), 2 hardware USB, 3 the OTG CDC; the CLI rides uart0, usb or otg."""
+    cli = f"tcp:127.0.0.1:{CONSOLE_PORT},server=on,wait=off"
+    if console == "uart0":
+        # UART0 carries the CLI and any panic: the guest waits for the harness, and every byte is logged for the crash scan.
+        return ["-chardev", f"socket,id=uart0,host=127.0.0.1,port={CONSOLE_PORT},server=on,wait=on,logfile={uart_log}",
+                "-serial", "chardev:uart0", "-serial", "null", "-serial", "null"]
+    if console == "otg":
+        return ["-serial", f"file:{uart_log}", "-serial", "null", "-serial", "null", "-serial", cli]
+    return ["-serial", f"file:{uart_log}", "-serial", "null", "-serial", cli]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--board-id", required=True)
@@ -239,12 +251,7 @@ def main():
         "-machine", machine,
         "-L", str(rom_dir),
         "-drive", f"file={flash_image},if=mtd,format=raw",
-        # Serial 0 carries the boot ROM and any panic; serial 2 is the SoC's USB console,
-        # where a hardware-CDC build serves its CLI.
-        "-serial", f"file:{uart_log}",
-        "-serial", "null",
-        "-serial", f"tcp:127.0.0.1:{CONSOLE_PORT},server=on,wait=off",
-    ]
+    ] + serial_args(emu.get("console", "usb"), uart_log)
     if mem:
         cmd += ["-m", mem]
     for prop, value in (emu.get("globals") or {}).items():

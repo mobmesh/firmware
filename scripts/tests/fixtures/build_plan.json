@@ -9,6 +9,7 @@
     {
       "id": "repeater",
       "board_id": "heltec_v4",
+      "upstream_variant": "heltec_v4",
       "role": "repeater",
       "build_env": "heltec_v4_repeater",
       "upstream_tag_prefix": "repeater",
@@ -40,6 +41,7 @@
     {
       "id": "room_server",
       "board_id": "heltec_v4",
+      "upstream_variant": "heltec_v4",
       "role": "room_server",
       "build_env": "heltec_v4_room_server",
       "upstream_tag_prefix": "room-server",
@@ -68,6 +70,7 @@
     {
       "id": "repeater",
       "board_id": "xiao_c3",
+      "upstream_variant": "xiao_c3",
       "role": "repeater",
       "build_env": "Xiao_C3_repeater",
       "upstream_tag_prefix": "repeater",
@@ -96,11 +99,304 @@
     {
       "id": "room_server",
       "board_id": "xiao_c3",
+      "upstream_variant": "xiao_c3",
       "role": "room_server",
       "build_env": "Xiao_C3_room_server",
       "upstream_tag_prefix": "room-server",
       "release_title": "Room",
       "asset_basename": "xiao_c3_room_mobmesh",
+      "vendor_flasher_assets": false,
+      "make_latest": false,
+      "mods": [
+        "shim",
+        "hotspot-ota",
+        "timing-safety",
+        "try-settings",
+        "sync-settings"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": true,
+      "capabilities": {
+        "wifi_station": "available",
+        "dual_ota": "available",
+        "battery_measurement": "unverified",
+        "external_power_control": "unverified",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      }
+    },
+    {
+      "id": "repeater",
+      "board_id": "heltec_v3",
+      "upstream_variant": "heltec_v3",
+      "role": "repeater",
+      "build_env": "Heltec_v3_repeater",
+      "upstream_tag_prefix": "repeater",
+      "release_title": "Repeater",
+      "asset_basename": "heltec_v3_rep_mobmesh_beta",
+      "vendor_flasher_assets": true,
+      "make_latest": true,
+      "mods": [
+        "shim",
+        "hotspot-ota",
+        "timing-safety",
+        "try-settings",
+        "sync-settings"
+      ],
+      "build_flags_append": [
+        "-UDISPLAY_CLASS"
+      ],
+      "qemu_boot_check": true,
+      "capabilities": {
+        "wifi_station": "available",
+        "dual_ota": "available",
+        "battery_measurement": "unverified",
+        "external_power_control": "unverified",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      }
+    },
+    {
+      "id": "room_server",
+      "board_id": "heltec_v3",
+      "upstream_variant": "heltec_v3",
+      "role": "room_server",
+      "build_env": "Heltec_v3_room_server",
+      "upstream_tag_prefix": "room-server",
+      "release_title": "Room",
+      "asset_basename": "heltec_v3_room_mobmesh_beta",
+      "vendor_flasher_assets": false,
+      "make_latest": false,
+      "mods": [
+        "shim",
+        "hotspot-ota",
+        "timing-safety",
+        "try-settings",
+        "sync-settings"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": true,
+      "capabilities": {
+        "wifi_station": "available",
+        "dual_ota": "available",
+        "battery_measurement": "unverified",
+        "external_power_control": "unverified",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      }
+    },
+    {
+      "id": "repeater",
+      "board_id": "xiao_s3_wio",
+      "upstream_variant": "xiao_s3_wio",
+      "role": "repeater",
+      "build_env": "Xiao_S3_WIO_repeater",
+      "upstream_tag_prefix": "repeater",
+      "release_title": "Repeater",
+      "asset_basename": "xiao_s3_wio_rep_mobmesh_beta",
+      "vendor_flasher_assets": true,
+      "make_latest": true,
+      "mods": [
+        "shim",
+        "hotspot-ota",
+        "timing-safety",
+        "try-settings",
+        "sync-settings"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": true,
+      "capabilities": {
+        "wifi_station": "available",
+        "dual_ota": "available",
+        "battery_measurement": "unverified",
+        "external_power_control": "unverified",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      }
+    },
+    {
+      "id": "room_server",
+      "board_id": "xiao_s3_wio",
+      "upstream_variant": "xiao_s3_wio",
+      "role": "room_server",
+      "build_env": "Xiao_S3_WIO_room_server",
+      "upstream_tag_prefix": "room-server",
+      "release_title": "Room",
+      "asset_basename": "xiao_s3_wio_room_mobmesh_beta",
+      "vendor_flasher_assets": false,
+      "make_latest": false,
+      "mods": [
+        "shim",
+        "hotspot-ota",
+        "timing-safety",
+        "try-settings",
+        "sync-settings"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": true,
+      "capabilities": {
+        "wifi_station": "available",
+        "dual_ota": "available",
+        "battery_measurement": "unverified",
+        "external_power_control": "unverified",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      }
+    },
+    {
+      "id": "repeater",
+      "board_id": "rak3112",
+      "upstream_variant": "rak3112",
+      "role": "repeater",
+      "build_env": "RAK_3112_repeater",
+      "upstream_tag_prefix": "repeater",
+      "release_title": "Repeater",
+      "asset_basename": "rak3112_rep_mobmesh_beta",
+      "vendor_flasher_assets": true,
+      "make_latest": true,
+      "mods": [
+        "shim",
+        "hotspot-ota",
+        "timing-safety",
+        "try-settings",
+        "sync-settings"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": true,
+      "capabilities": {
+        "wifi_station": "available",
+        "dual_ota": "available",
+        "battery_measurement": "unverified",
+        "external_power_control": "unverified",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      }
+    },
+    {
+      "id": "room_server",
+      "board_id": "rak3112",
+      "upstream_variant": "rak3112",
+      "role": "room_server",
+      "build_env": "RAK_3112_room_server",
+      "upstream_tag_prefix": "room-server",
+      "release_title": "Room",
+      "asset_basename": "rak3112_room_mobmesh_beta",
+      "vendor_flasher_assets": false,
+      "make_latest": false,
+      "mods": [
+        "shim",
+        "hotspot-ota",
+        "timing-safety",
+        "try-settings",
+        "sync-settings"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": true,
+      "capabilities": {
+        "wifi_station": "available",
+        "dual_ota": "available",
+        "battery_measurement": "unverified",
+        "external_power_control": "unverified",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      }
+    },
+    {
+      "id": "repeater",
+      "board_id": "eora_s3",
+      "upstream_variant": "ebyte_eora_s3",
+      "role": "repeater",
+      "build_env": "Ebyte_EoRa-S3_Repeater",
+      "upstream_tag_prefix": "repeater",
+      "release_title": "Repeater",
+      "asset_basename": "eora_s3_rep_mobmesh_beta",
+      "vendor_flasher_assets": true,
+      "make_latest": true,
+      "mods": [
+        "shim",
+        "hotspot-ota",
+        "timing-safety",
+        "try-settings",
+        "sync-settings"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": true,
+      "capabilities": {
+        "wifi_station": "available",
+        "dual_ota": "available",
+        "battery_measurement": "unverified",
+        "external_power_control": "unverified",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      }
+    },
+    {
+      "id": "room_server",
+      "board_id": "eora_s3",
+      "upstream_variant": "ebyte_eora_s3",
+      "role": "room_server",
+      "build_env": "Ebyte_EoRa-S3_room_server",
+      "upstream_tag_prefix": "room-server",
+      "release_title": "Room",
+      "asset_basename": "eora_s3_room_mobmesh_beta",
+      "vendor_flasher_assets": false,
+      "make_latest": false,
+      "mods": [
+        "shim",
+        "hotspot-ota",
+        "timing-safety",
+        "try-settings",
+        "sync-settings"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": true,
+      "capabilities": {
+        "wifi_station": "available",
+        "dual_ota": "available",
+        "battery_measurement": "unverified",
+        "external_power_control": "unverified",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      }
+    },
+    {
+      "id": "repeater",
+      "board_id": "station_g3",
+      "upstream_variant": "station_g3_esp32",
+      "role": "repeater",
+      "build_env": "Station_G3_ESP32_repeater",
+      "upstream_tag_prefix": "repeater",
+      "release_title": "Repeater",
+      "asset_basename": "station_g3_rep_mobmesh_beta",
+      "vendor_flasher_assets": true,
+      "make_latest": true,
+      "mods": [
+        "shim",
+        "hotspot-ota",
+        "timing-safety",
+        "try-settings",
+        "sync-settings"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": true,
+      "capabilities": {
+        "wifi_station": "available",
+        "dual_ota": "available",
+        "battery_measurement": "unverified",
+        "external_power_control": "unverified",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      }
+    },
+    {
+      "id": "room_server",
+      "board_id": "station_g3",
+      "upstream_variant": "station_g3_esp32",
+      "role": "room_server",
+      "build_env": "Station_G3_ESP32_room_server",
+      "upstream_tag_prefix": "room-server",
+      "release_title": "Room",
+      "asset_basename": "station_g3_room_mobmesh_beta",
       "vendor_flasher_assets": false,
       "make_latest": false,
       "mods": [
