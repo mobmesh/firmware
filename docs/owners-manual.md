@@ -803,7 +803,7 @@ These commands are available on the Heltec V4 repeater.
 
 | Command / syntax | Purpose and important limits |
 |---|---|
-| `sync.region [offset]` | List RAM overlay entries; use returned `next` offset for another page. |
+| `sync.region [offset]` | Show the RAM overlay as an indented tree; use the final `next` offset for another page. |
 | `sync.region put <name> [<parent>]` | Add or update a flood-enabled entry; parent must already exist. |
 | `sync.region def <token> [<token> ...]` | Load compact MeshCore-style hierarchy notation into RAM. |
 | `sync.region allowf <name>` | Flood-enable an existing overlay entry. |

@@ -2258,28 +2258,28 @@ static void listRegions(const char* arg, char* reply) {
     strcpy(reply, "Err - syntax: sync.region [offset]");
     return;
   }
+  uint8_t depth[REGION_MAX] = {};
+  for (uint8_t i = 0; i < regions.count(); ++i) {
+    RegionView entry;
+    regions.get(i, entry);
+    depth[i] = entry.parent == 0 ? 0 : (uint8_t)(depth[entry.parent - 1] + 1);
+  }
   size_t used = 0;
   reply[0] = 0;
   uint8_t i = offset;
   for (; i < regions.count(); ++i) {
     RegionView entry;
     regions.get(i, entry);
-    RegionView parent;
-    char item[2 * REGION_NAME_MAX + 10];
-    int n = entry.parent == 0
-          ? snprintf(item, sizeof(item), "%s%.*s%s", used ? " " : "",
-                     entry.name_len, (const char*)entry.name, entry.denied ? "" : " F")
-          : (regions.get((uint8_t)(entry.parent - 1), parent),
-             snprintf(item, sizeof(item), "%s%.*s (%.*s)%s", used ? " " : "",
-                      entry.name_len, (const char*)entry.name,
-                      parent.name_len, (const char*)parent.name,
-                      entry.denied ? "" : " F"));
+    char item[REGION_DEPTH_MAX + REGION_NAME_MAX + 5];
+    int n = snprintf(item, sizeof(item), "%s%*s%.*s%s", used ? "\n" : "",
+                     depth[i], "", entry.name_len, (const char*)entry.name,
+                     entry.denied ? "" : " F");
     size_t reserve = i + 1 < regions.count() ? 9 : 1;
     if (n < 0 || (size_t)n >= sizeof(item) || (size_t)n + reserve > 160 - used) break;
     memcpy(reply + used, item, (size_t)n + 1);
     used += (size_t)n;
   }
-  if (i < regions.count()) snprintf(reply + used, 160 - used, " next %u", i);
+  if (i < regions.count()) snprintf(reply + used, 160 - used, "\nnext %u", i);
   else if (used == 0) strcpy(reply, "empty");
 }
 #endif

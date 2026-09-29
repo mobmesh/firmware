@@ -94,7 +94,7 @@ This clears overlays only, never native lists. `-empty` also works with `publish
 
 | Command | What it does |
 |---|---|
-| `sync.region [offset]` | Show RAM entries; follow `next <offset>` for more. `F` means flood-enabled. |
+| `sync.region [offset]` | Show the RAM overlay as an indented tree; follow the final `next <offset>` line for more. `F` means flood-enabled. |
 | `sync.region put <name> [<parent>]` | Add or update a flood-enabled entry. Parent must exist; omission means top level. |
 | `sync.region def <token> [<token> ...]` | Define a hierarchy in compact MeshCore-style notation. |
 | `sync.region allowf <name>` | Allow flooding for an existing entry. |
