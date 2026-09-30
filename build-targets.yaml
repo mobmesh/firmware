@@ -97,28 +97,28 @@ targets:
     beta: true
     mods: [sync-settings]
 
-  - board: eora_s3
+  - board: ebyte_eora_s3
     role: repeater
     build_env: Ebyte_EoRa-S3_Repeater
     vendor_flasher_assets: true
     beta: true
     mods: [sync-settings]
 
-  - board: eora_s3
+  - board: ebyte_eora_s3
     role: room_server
     build_env: Ebyte_EoRa-S3_room_server
     vendor_flasher_assets: false
     beta: true
     mods: [sync-settings]
 
-  - board: station_g3
+  - board: station_g3_esp32
     role: repeater
     build_env: Station_G3_ESP32_repeater
     vendor_flasher_assets: true
     beta: true
     mods: [sync-settings]
 
-  - board: station_g3
+  - board: station_g3_esp32
     role: room_server
     build_env: Station_G3_ESP32_room_server
     vendor_flasher_assets: false

@@ -1,6 +1,4 @@
-# Override-only board config for eora_s3: only what this project adds on top of upstream.
-
-upstream_variant: ebyte_eora_s3   # upstream directory name; too long for the image stamp
+# Override-only board config for ebyte_eora_s3: only what this project adds on top of upstream.
 
 capabilities:
   wifi_station: true
@@ -23,7 +21,7 @@ build_values:
   OTA_RADIO_FAIL_SLEEP_MAX_SECS: 900
 
 # Stock 4MB scheme leaves 1.25MB OTA slots; this gives both slots 0x1D0000, as on xiao_c3.
-partitions_override: partitions_eora_s3.csv
+partitions_override: partitions_ebyte_eora_s3.csv
 
 qemu:
   enabled: true
@@ -43,4 +41,4 @@ flasher:
   post_flash_note: "Press RST once to put the board back into normal operation."
   post_flash_commands:
     repeater:
-      - "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/eora_s3.bin"
+      - "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/ebyte_eora_s3.bin"

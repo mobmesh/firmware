@@ -1,5 +1,5 @@
 {
-  "_source_note": "Copied from upstream MeshCore's boards/station-g3-esp32.json -- the upstream file name differs from the variant directory station_g3, so scripts/generate-board-config.py falls back to this file.",
+  "_source_note": "Copied from upstream MeshCore's boards/station-g3-esp32.json -- the upstream board-file name differs from its variant directory, so scripts/generate-board-config.py falls back to this file.",
   "build": {
     "arduino": {
       "ldscript": "esp32s3_out.ld",

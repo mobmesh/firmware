@@ -329,7 +329,7 @@ jobs:
             --upstream-version "${{ steps.pick.outputs.version }}" \
             --repo-sha "$(echo "${{ github.sha }}" | cut -c1-7)" \
             --board "${{ matrix.board_id }}" \
-            --role "${{ matrix.id }}" \
+            --role "${{ matrix.ota_role }}" \
             --mods "${{ join(matrix.mods, ',') }}" \
             --show
 

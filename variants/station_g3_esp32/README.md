@@ -2,11 +2,9 @@
 
 Board-specific notes for firmware built for this board. `overrides.yaml` in this same folder holds the machine-readable config; this file holds the hardware notes a human needs.
 
-Not yet in `build-targets.yaml`: nothing builds or releases for this board until a target is added.
-
 ## Board id
 
-- The id is `station_g3`; `upstream_variant: station_g3_esp32` names upstream's directory. The full name does not fit the image stamp's 24-byte `board/role` field.
+- The project and upstream variant id is `station_g3_esp32`.
 
 ## Hardware requirements (for the `hotspot-ota` mod)
 
@@ -16,7 +14,7 @@ Not yet in `build-targets.yaml`: nothing builds or releases for this board until
 
 ## Build notes
 
-- 16 MB flash, but upstream sets no partition table, leaving the stock 1.25 MB OTA slots; this build does not fit them. `partitions_station_g3.csv` is the stock `default_16MB.csv`, giving both slots 6.25 MB. Moving a stock board onto it needs a full erase.
+- 16 MB flash, but upstream sets no partition table, leaving the stock 1.25 MB OTA slots; this build does not fit them. `partitions_station_g3_esp32.csv` is the stock `default_16MB.csv`, giving both slots 6.25 MB. Moving a stock board onto it needs a full erase.
 - Upstream's board file is `boards/station-g3-esp32.json`, which matches neither directory name; `board.json` here is a copy of it.
 - `LORA_TX_POWER` is 7: the SX1262 drives an external PA. Do not copy heltec_v4's `set tx 20`.
 

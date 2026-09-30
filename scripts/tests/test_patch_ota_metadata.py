@@ -100,7 +100,8 @@ class Payload(unittest.TestCase):
         self.assertEqual(payload[8], pom.LAYOUT_VERSION)
 
     def test_longest_real_board_role_fits(self):
-        pom.build_payload("v1.17.1", "ceb8915", "heltec_v4", "room_server")
+        payload = pom.build_payload("v1.17.1", "ceb8915", "station_g3_esp32", "room")
+        self.assertEqual(payload[40:64].split(b"\0", 1)[0], b"station_g3_esp32/room")
 
     def test_oversized_field_is_refused(self):
         with self.assertRaises(pom.ImageError):

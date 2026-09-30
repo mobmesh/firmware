@@ -30,14 +30,17 @@ class CurrentProjectModelTestCase(unittest.TestCase):
             ("xiao_s3_wio", "room_server"),
             ("rak3112", "repeater"),
             ("rak3112", "room_server"),
-            ("eora_s3", "repeater"),
-            ("eora_s3", "room_server"),
-            ("station_g3", "repeater"),
-            ("station_g3", "room_server"),
+            ("ebyte_eora_s3", "repeater"),
+            ("ebyte_eora_s3", "room_server"),
+            ("station_g3_esp32", "repeater"),
+            ("station_g3_esp32", "room_server"),
         })
         self.assertEqual(rows[("heltec_v4", "repeater")].asset_basename, "heltec_v4_rep_mobmesh")
         self.assertEqual(rows[("xiao_c3", "room_server")].asset_basename, "xiao_c3_room_mobmesh")
-        self.assertEqual(rows[("station_g3", "repeater")].asset_basename, "station_g3_rep_mobmesh_beta")
+        self.assertEqual(rows[("station_g3_esp32", "repeater")].asset_basename,
+                         "station_g3_esp32_rep_mobmesh_beta")
+        self.assertEqual(rows[("station_g3_esp32", "room_server")].ota_role, "room")
+        self.assertEqual(rows[("heltec_v4", "room_server")].ota_role, "room_server")
         self.assertEqual(rows[("heltec_v4", "repeater")].mods,
                          ("shim", "hotspot-ota", "timing-safety", "try-settings", "power-guard", "sync-settings"))
         self.assertEqual(rows[("xiao_c3", "repeater")].mods,
@@ -142,13 +145,27 @@ requirements:
         target = ProjectModel.load(self.root).build_plan.targets[0]
         self.assertEqual((target.board_id, target.upstream_variant), ("board", "long_upstream_name"))
 
+    def test_ota_stamp_role_defaults_to_v2_abbreviation_and_v1_preserves_role(self):
+        self.project(requirement="optional")
+        self.assertEqual(ProjectModel.load(self.root).build_plan.targets[0].ota_role, "rep")
+        path = self.root / "variants/board/overrides.yaml"
+        path.write_text("ota_stamp_v: 1\n" + path.read_text())
+        self.assertEqual(ProjectModel.load(self.root).build_plan.targets[0].ota_role, "repeater")
+
+    def test_unknown_ota_stamp_version_is_rejected(self):
+        self.project(requirement="optional")
+        path = self.root / "variants/board/overrides.yaml"
+        path.write_text("ota_stamp_v: 3\n" + path.read_text())
+        with self.assertRaisesRegex(ProjectModelError, "ota_stamp_v: expected 1 or 2"):
+            ProjectModel.load(self.root)
+
     def test_board_role_longer_than_the_stamp_is_rejected(self):
         self.project(requirement="optional")
-        target = self.root / "variants/board_id_too_long/overrides.yaml"
+        target = self.root / "variants/board_identifier_far_too_long/overrides.yaml"
         target.parent.mkdir(parents=True)
         target.write_text((self.root / "variants/board/overrides.yaml").read_text())
         targets = self.root / "build-targets.yaml"
-        targets.write_text(targets.read_text().replace("board: board", "board: board_id_too_long"))
+        targets.write_text(targets.read_text().replace("board: board", "board: board_identifier_far_too_long"))
         with self.assertRaisesRegex(ProjectModelError, "exceeds the 23-byte image stamp"):
             ProjectModel.load(self.root)
 

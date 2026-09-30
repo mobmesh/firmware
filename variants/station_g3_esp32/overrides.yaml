@@ -1,6 +1,4 @@
-# Override-only board config for station_g3: only what this project adds on top of upstream.
-
-upstream_variant: station_g3_esp32   # upstream directory name; too long for the image stamp
+# Override-only board config for station_g3_esp32: only what this project adds on top of upstream.
 
 capabilities:
   wifi_station: true
@@ -23,7 +21,7 @@ build_values:
   OTA_RADIO_FAIL_SLEEP_MAX_SECS: 900
 
 # Upstream sets no table for this 16MB board, leaving 1.25MB OTA slots; stock default_16MB gives 6.25MB.
-partitions_override: partitions_station_g3.csv
+partitions_override: partitions_station_g3_esp32.csv
 
 qemu:
   enabled: true
@@ -45,4 +43,4 @@ flasher:
   post_flash_note: "Press RESET once to put the board back into normal operation."
   post_flash_commands:
     repeater:
-      - "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/station_g3.bin"
+      - "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/station_g3_esp32.bin"
