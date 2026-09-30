@@ -340,9 +340,13 @@ struct TrailingDigest {
 // Best-effort, never gates the caller; offsets are 0 because RTCClock's epoch is UTC. Bypasses
 // the "time" command's cannot-go-backwards guard -- with no RTC there is nothing to go back from.
 static bool syncNtpTime() {
-  if (esp_sntp_enabled()) esp_sntp_stop();
+  // Every SNTP call runs on the lwIP thread; configTime() stops and starts SNTP from this task.
+  esp_sntp_stop();
+  esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
+  esp_sntp_setservername(0, OTA_NTP_SERVER);   // blocks until the queued calls above have run
   esp_sntp_set_sync_status(SNTP_SYNC_STATUS_RESET);
-  configTime(0, 0, OTA_NTP_SERVER, OTA_NTP_SERVER_FALLBACK);
+  esp_sntp_setservername(1, OTA_NTP_SERVER_FALLBACK);
+  esp_sntp_init();
   uint32_t start = millis();
   bool synced = false;
   while (millis() - start < OTA_NTP_SYNC_TIMEOUT_MS) {
@@ -352,6 +356,7 @@ static bool syncNtpTime() {
     }
     delay(100);
   }
+  esp_sntp_stop();   // no client outlives the call, so the next join has nothing to race
   time_t now;
   time(&now);
   if (synced && now > OTA_NTP_SANITY_FLOOR) {
