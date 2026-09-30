@@ -24,7 +24,7 @@ For setup, workflows, and the complete command reference, see the
 [📘 MeshCore Enhanced+ Owner's Manual](docs/owners-manual.md).
 
 ### Web-Based Flasher
-⚡️[our web-based flasher](https://tools.mobmesh.org/flasher)
+⚡️[custom web-based flasher](https://tools.mobmesh.org/flasher)
 
 This isn't a generic MeshCore flasher. It's custom built for this project's releases and offers features not found in others.
 
