@@ -36,7 +36,7 @@ class CurrentProjectModelTestCase(unittest.TestCase):
             ("station_g3_esp32", "room_server"),
         })
         self.assertEqual(rows[("heltec_v4", "repeater")].asset_basename, "heltec_v4_rep_mobmesh")
-        self.assertEqual(rows[("xiao_c3", "room_server")].asset_basename, "xiao_c3_room_mobmesh")
+        self.assertEqual(rows[("xiao_c3", "room_server")].asset_basename, "xiao_c3_room_mobmesh_beta")
         self.assertEqual(rows[("station_g3_esp32", "repeater")].asset_basename,
                          "station_g3_esp32_rep_mobmesh_beta")
         self.assertEqual(rows[("station_g3_esp32", "room_server")].ota_role, "room")

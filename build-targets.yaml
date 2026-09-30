@@ -43,12 +43,14 @@ targets:
     role: repeater
     build_env: Xiao_C3_repeater
     vendor_flasher_assets: true
+    beta: true
     mods: [sync-settings]
 
   - board: xiao_c3
     role: room_server
     build_env: Xiao_C3_room_server
     vendor_flasher_assets: false
+    beta: true
     mods: [sync-settings]      # extras beyond core_mods
 
   # Beta boards: `beta: true` appends _beta to every release asset name until each is proven in the field.

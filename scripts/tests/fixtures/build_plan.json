@@ -78,7 +78,7 @@
       "build_env": "Xiao_C3_repeater",
       "upstream_tag_prefix": "repeater",
       "release_title": "Repeater",
-      "asset_basename": "xiao_c3_rep_mobmesh",
+      "asset_basename": "xiao_c3_rep_mobmesh_beta",
       "vendor_flasher_assets": true,
       "make_latest": true,
       "mods": [
@@ -108,7 +108,7 @@
       "build_env": "Xiao_C3_room_server",
       "upstream_tag_prefix": "room-server",
       "release_title": "Room",
-      "asset_basename": "xiao_c3_room_mobmesh",
+      "asset_basename": "xiao_c3_room_mobmesh_beta",
       "vendor_flasher_assets": false,
       "make_latest": false,
       "mods": [
