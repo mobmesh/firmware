@@ -24,6 +24,9 @@
       "app1": "0x650000",
       "appMaxSize": "0x640000"
     },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/heltec_v4_bootloader.bin",
+    "partitionsFile": "bin/boot/heltec_v4_partitions.bin",
     "variants": {
       "repeater": {
         "label": "Repeater",
@@ -41,10 +44,7 @@
         "version": "v1.17.1",
         "firmwareFile": "bin/room_server/heltec_v4.bin"
       }
-    },
-    "bootApp0": "bin/boot/boot_app0.bin",
-    "bootloaderFile": "bin/boot/heltec_v4_bootloader.bin",
-    "partitionsFile": "bin/boot/heltec_v4_partitions.bin"
+    }
   },
   "xiao_c3": {
     "label": "Xiao ESP32-C3",
@@ -71,6 +71,9 @@
       "app1": "0x1e0000",
       "appMaxSize": "0x1d0000"
     },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/xiao_c3_bootloader.bin",
+    "partitionsFile": "bin/boot/xiao_c3_partitions.bin",
     "variants": {
       "repeater": {
         "label": "Repeater",
@@ -87,10 +90,7 @@
         "version": "v1.17.1",
         "firmwareFile": "bin/room_server/xiao_c3.bin"
       }
-    },
-    "bootApp0": "bin/boot/boot_app0.bin",
-    "bootloaderFile": "bin/boot/xiao_c3_bootloader.bin",
-    "partitionsFile": "bin/boot/xiao_c3_partitions.bin"
+    }
   },
   "heltec_v3": {
     "label": "Heltec V3",
@@ -118,6 +118,9 @@
       "app1": "0x340000",
       "appMaxSize": "0x330000"
     },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/heltec_v3_bootloader.bin",
+    "partitionsFile": "bin/boot/heltec_v3_partitions.bin",
     "variants": {
       "repeater": {
         "label": "Repeater",
@@ -134,10 +137,7 @@
         "version": "v1.17.1",
         "firmwareFile": "bin/room_server/heltec_v3.bin"
       }
-    },
-    "bootApp0": "bin/boot/boot_app0.bin",
-    "bootloaderFile": "bin/boot/heltec_v3_bootloader.bin",
-    "partitionsFile": "bin/boot/heltec_v3_partitions.bin"
+    }
   },
   "xiao_s3_wio": {
     "label": "Xiao ESP32-S3 + Wio-SX1262",
@@ -165,6 +165,9 @@
       "app1": "0x340000",
       "appMaxSize": "0x330000"
     },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/xiao_s3_wio_bootloader.bin",
+    "partitionsFile": "bin/boot/xiao_s3_wio_partitions.bin",
     "variants": {
       "repeater": {
         "label": "Repeater",
@@ -181,10 +184,7 @@
         "version": "v1.17.1",
         "firmwareFile": "bin/room_server/xiao_s3_wio.bin"
       }
-    },
-    "bootApp0": "bin/boot/boot_app0.bin",
-    "bootloaderFile": "bin/boot/xiao_s3_wio_bootloader.bin",
-    "partitionsFile": "bin/boot/xiao_s3_wio_partitions.bin"
+    }
   },
   "rak3112": {
     "label": "RAK3112",
@@ -260,6 +260,9 @@
       "app1": "0x1e0000",
       "appMaxSize": "0x1d0000"
     },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/ebyte_eora_s3_bootloader.bin",
+    "partitionsFile": "bin/boot/ebyte_eora_s3_partitions.bin",
     "variants": {
       "repeater": {
         "label": "Repeater",
@@ -276,10 +279,7 @@
         "version": "v1.17.1",
         "firmwareFile": "bin/room_server/ebyte_eora_s3.bin"
       }
-    },
-    "bootApp0": "bin/boot/boot_app0.bin",
-    "bootloaderFile": "bin/boot/ebyte_eora_s3_bootloader.bin",
-    "partitionsFile": "bin/boot/ebyte_eora_s3_partitions.bin"
+    }
   },
   "station_g3_esp32": {
     "label": "Station G3",
