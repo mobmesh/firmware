@@ -28,6 +28,8 @@
 #define OTA_NTP_VERIFY_ATTEMPTS   2
 #define OTA_WAN_RESTORE_ATTEMPTS  2
 
+// Each WPA2 session leaks ~158 B in the core's WiFi library; OTA_WPA2_SESSION_LIMIT comes per board from overrides.yaml.
+
 // Keep referenced: --gc-sections drops an unreferenced build marker.
 static const char OTA_MOD_MARKER[] = "H0TSP0T";   // must never change
 
@@ -368,6 +370,9 @@ static bool syncNtpTime() {
   return false;
 }
 
+static uint16_t wpa2_sessions = 0;   // WPA2 associations this boot; open networks do not leak
+static bool session_ended = false;  // set when WiFi is switched off, read by poll()
+
 // The service is unattended and can be patient; wifiConnect() runs inline and must fail fast.
 static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int max_attempts,
                             bool cancellable, bool sync_clock) {
@@ -384,6 +389,7 @@ static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int
       delay(250);
     }
     if (WiFi.status() == WL_CONNECTED) {
+      if (pwd[0] != 0 && wpa2_sessions < UINT16_MAX) wpa2_sessions++;
       if (sync_clock) syncNtpTime();
       return true;
     }
@@ -957,7 +963,13 @@ void HotspotOTA::poll() {
     wan_done_result = service_wan_result;
     portEXIT_CRITICAL(&service_mux);
   }
-  if (state == OtaServiceState::Succeeded) {
+  if (release_sleep) session_ended = true;
+  bool session_limit = false;
+  if (session_ended && !HotspotOTA::isActive()) {
+    session_ended = false;
+    session_limit = WiFi.getMode() == WIFI_OFF && wpa2_sessions >= OTA_WPA2_SESSION_LIMIT;
+  }
+  if (state == OtaServiceState::Succeeded || session_limit) {
     HotspotOTA::setPower(false);
     modBoardReboot();
   }
@@ -1023,6 +1035,7 @@ void HotspotOTA::wifiDisconnect() {
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
   digitalWrite(PIN_HOTSPOT_PWR, LOW);
+  session_ended = true;   // poll() acts after this command's reply has gone out
 }
 
 bool HotspotOTA::checkWan(char reply[]) {
