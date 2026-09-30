@@ -11,6 +11,7 @@ fixture this file made up.
 import hashlib
 import importlib.util
 import struct
+import sys
 import unittest
 from pathlib import Path
 
@@ -21,6 +22,12 @@ pom = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pom)
 
 VENDORED = sorted(p for role in ("repeater", "room_server") for p in (REPO / "pages" / "flasher" / "bin" / role).glob("*.bin"))
+
+sys.path.insert(0, str(REPO / "scripts"))
+from project_config import ProjectModel  # noqa: E402
+
+# (board, role folder) -> the role as the build stamps it, so the test reads the same source CI does.
+STAMP_ROLES = {(t.board_id, t.role): t.ota_role for t in ProjectModel.load(REPO).build_plan.targets}
 REGISTRY = pom.load_mod_registry()
 MARKER = REGISTRY["hotspot-ota"][1]
 
@@ -88,7 +95,9 @@ class ParserGroundTruth(unittest.TestCase):
                 self.assertIsNotNone(meta, "vendored image carries no metadata block")
                 self.assertEqual(meta["layout_version"], pom.LAYOUT_VERSION)
                 board, _, role = meta["board_role"].partition("/")
-                self.assertEqual((board, role), (image.stem, image.parent.name))
+                # The stamp's role is the board's ota_stamp_role, which is the short abbreviation
+                # unless the board pins the full name to keep matching images already in the field.
+                self.assertEqual((board, role), (image.stem, STAMP_ROLES[(image.stem, image.parent.name)]))
                 self.assertTrue(meta["mods"] & (1 << REGISTRY["hotspot-ota"][0]))
 
 
