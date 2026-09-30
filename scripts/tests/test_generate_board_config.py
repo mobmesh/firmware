@@ -390,6 +390,108 @@ class BoardsJsonTestCase(unittest.TestCase):
         self.assertNotIn("postFlashCommands", variant)
 
 
+class AllBoardsJsonTestCase(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo_root = Path(self.tmp.name)
+        self._orig_repo_root = gbc.REPO_ROOT
+        gbc.REPO_ROOT = self.repo_root
+        self.addCleanup(self._restore)
+        self.addCleanup(self.tmp.cleanup)
+
+    def _restore(self):
+        gbc.REPO_ROOT = self._orig_repo_root
+
+    def _write(self, rel_path: str, content: str) -> Path:
+        path = self.repo_root / rel_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        return path
+
+    def _partitions_bin(self, path: Path):
+        entries = [
+            (gbc.PARTITION_TYPE_DATA, gbc.DATA_SUBTYPE_OTA, 0xE000, 0x2000),
+            (gbc.PARTITION_TYPE_APP, gbc.APP_SUBTYPE_OTA_0, 0x10000, 0x300000),
+            (gbc.PARTITION_TYPE_APP, gbc.APP_SUBTYPE_OTA_1, 0x310000, 0x300000),
+        ]
+        blob = b""
+        for ptype, subtype, offset, size in entries:
+            blob += gbc.PARTITION_MAGIC + bytes([ptype, subtype])
+            blob += struct.pack("<II", offset, size)
+            blob += b"\x00" * (gbc.PARTITION_ENTRY_SIZE - 12)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(blob + b"\xff" * gbc.PARTITION_ENTRY_SIZE)
+
+    def test_complete_catalogue_contains_every_target_and_firmware_path(self):
+        self._write("mods/shim/mod.yaml", "name: shim\n")
+        self._write("build-targets.yaml", (
+            "core_mods: [shim]\n"
+            "roles:\n"
+            "  repeater:\n"
+            "    asset_role_abbrev: rep\n"
+            "    upstream_tag_prefix: repeater\n"
+            "    release_title: Repeater\n"
+            "    make_latest: true\n"
+            "  room_server:\n"
+            "    asset_role_abbrev: room\n"
+            "    upstream_tag_prefix: room-server\n"
+            "    release_title: Room\n"
+            "    make_latest: false\n"
+            "targets:\n"
+            "  - board: test_board\n"
+            "    role: repeater\n"
+            "    build_env: test_repeater\n"
+            "    vendor_flasher_assets: true\n"
+            "    qemu_boot_check: false\n"
+            "    mods: []\n"
+            "  - board: test_board\n"
+            "    role: room_server\n"
+            "    build_env: test_room\n"
+            "    vendor_flasher_assets: false\n"
+            "    qemu_boot_check: false\n"
+            "    beta: true\n"
+            "    mods: []\n"
+        ))
+        self._write("variants/test_board/overrides.yaml", (
+            "capabilities: {}\n"
+            "build_values: {}\n"
+            "partitions_override: null\n"
+            "qemu:\n  enabled: false\n"
+            "flasher:\n"
+            "  label: Test Board\n"
+            "  connect_note: Connect it.\n"
+            "  post_flash_note: Reset it.\n"
+            "  post_flash_commands:\n"
+            "    repeater:\n"
+            "      - set example value\n"
+        ))
+        self._write("variants/test_board/board.json", '{"build":{"mcu":"esp32s3"}}')
+        flasher = self.repo_root / "flasher"
+        self._partitions_bin(flasher / "bin/boot/test_board_partitions.bin")
+        output = self.repo_root / "auto_boards.json"
+
+        gbc.cmd_boards_json_all(argparse.Namespace(
+            upstream_dir=str(self.repo_root / "upstream"),
+            flasher_dir=str(flasher),
+            version="v1.17.1",
+            output=str(output),
+        ))
+
+        catalogue = json.loads(output.read_text())
+        variants = catalogue["test_board"]["variants"]
+        self.assertEqual(set(variants), {"repeater", "room_server"})
+        self.assertEqual(variants["repeater"]["firmwareFile"],
+                         "bin/repeater/test_board.bin")
+        self.assertEqual(variants["room_server"]["firmwareFile"],
+                         "bin/room_server/test_board.bin")
+        self.assertEqual(variants["repeater"]["assetBasename"],
+                         "test_board_rep_mobmesh")
+        self.assertEqual(variants["room_server"]["assetBasename"],
+                         "test_board_room_mobmesh_beta")
+        self.assertEqual(variants["repeater"]["postFlashCommands"],
+                         ["set example value"])
+
+
 class ResolveTargetsTestCase(unittest.TestCase):
     """cmd_resolve_targets: mod resolution and the fixed asset_basename."""
 
