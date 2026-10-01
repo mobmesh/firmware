@@ -2918,6 +2918,85 @@ static bool routeLabel(bool scoped, const uint8_t key[16],
   return modRegionNameForKey(key, out, REGION_NAME_MAX + 1);
 }
 
+// Every error condition status() counts and publish.status.err pages. Spelled out these run to 139
+// bytes each, which is why the status line carries only a count. Order is fixed so a page number means
+// the same thing across calls. The first two pairs are exclusive: a failed save is either retryable or
+// clock-blocked, and the receive path either lost its storage or has no channel, never both.
+struct SyncStatusError {
+  const char* token;
+  const char* detail;
+};
+
+static uint8_t errorList(uint8_t dataset, bool region, const DatasetState& state,
+                         const TxState* outbound, SyncStatusError* out, uint8_t capacity) {
+  uint8_t count = 0;
+  auto add = [&](const char* token, const char* detail) {
+    if (out != nullptr && count < capacity) out[count] = SyncStatusError{token, detail};
+    ++count;
+  };
+  if (housekeeping_failures[dataset == REGION ? 0 : SYNC_SETTINGS_WITH_REGION] != 0 ||
+      (outbound != nullptr && outbound->finish_failures != 0)) {
+    if (clockSane(modClockGet())) {
+      add("wrn:retry", "Campaign state save failed. Auto-retry active (2s -> 15m backoff). "
+                       "Check later; act only if persistent.");
+    } else {
+      add("wrn:clock", "Campaign state save failed; invalid clock likely cause. Set time. "
+                       "Auto-retry remains active.");
+    }
+  }
+  if (state.enabled && (!config_ready || !trust_ready)) {
+    add("rx:store", "Channel settings or publisher list failed to load at boot. All campaigns "
+                    "refused. Re-set channel; re-add publishers.");
+  } else if (state.enabled && config.channel_len == 0) {
+    add("rx:chnl", "No channel configured; campaigns cannot match this node. "
+                   "Run 'set sync.channel'.");
+  }
+#if SYNC_SETTINGS_WITH_REGION
+  if (region && state.enabled && !region_receive_ready) {
+    add("rx:state", "Receive state unresolved: stored replay names an untrusted publisher, or a "
+                    "settlement did not finish. Re-add the publisher.");
+  }
+#endif
+  // One entry per record, because the remedy differs and a generic one would send the reader to a
+  // command that cannot clear the flag. A write targets the other slot, so a re-save repairs it.
+  if (config_degraded) {
+    add("stor:degraded", "Lost redundancy: channel record. Node operational. Re-save with "
+                         "'set sync.channel <name>'.");
+  }
+  if (trust_degraded) {
+    add("stor:degraded", "Lost redundancy: publisher record. Node operational. Re-save with "
+                         "'sync.publisher add <key>'.");
+  }
+#if SYNC_SETTINGS_WITH_REGION
+  if (region && overlay_degraded) {
+    add("stor:degraded", "Lost redundancy: overlay record. Node operational. Re-save with "
+                         "'sync.region save'.");
+  }
+  if (region && region_state_degraded) {
+    add("stor:degraded", "Lost redundancy: region state. Node operational. Re-save by re-issuing "
+                         "its current 'sync.region on|off'.");
+  }
+#else
+  (void)region;
+#endif
+#if SYNC_SETTINGS_WITH_POLICY
+  if (!region && policy_state_degraded) {
+    add("stor:degraded", "Lost redundancy: policy state. Node operational. Re-save by re-issuing "
+                         "its current 'sync.policy on|off'.");
+  }
+  if (!region && recovery_degraded) {
+    add("stor:degraded", "Lost redundancy: recovery record. Node operational. Repaired "
+                         "automatically on the next policy recovery.");
+  }
+#endif
+  return count;
+}
+
+static uint8_t errorCount(uint8_t dataset, bool region, const DatasetState& state,
+                          const TxState* outbound) {
+  return errorList(dataset, region, state, outbound, nullptr, 0);
+}
+
 static void status(uint8_t dataset, char* reply) {
   bool region = dataset == REGION;
   bool state_ready = region ? overlay_ready && region_state_ready
@@ -2946,47 +3025,43 @@ static void status(uint8_t dataset, char* reply) {
   bool has_route = false;
   size_t at = 0;
   reply[0] = 0;
-  if (!append(reply, at, "%s", state.enabled ? "on" : "off")) goto overflow;
-  if (region && !append(reply, at, " %s%s", enabled ? "active" : "inactive",
-                        dirty ? " dirty" : "")) goto overflow;
+  if (!append(reply, at, "sync:%s", state.enabled ? "on" : "off")) goto overflow;
+  if (region && !append(reply, at, " layr:%s%s", enabled ? "on" : "off",
+                        dirty ? ",dirty" : "")) goto overflow;
 
   if (outbound != nullptr && outbound->aborting) {
-    if (!append(reply, at, " aborting notices %u/2", outbound->abort_sent)) goto overflow;
+    if (!append(reply, at, " step:aborting notes:%u/2", outbound->abort_sent)) goto overflow;
   } else if (outbound != nullptr && outbound->active) {
-    if (!append(reply, at, " publishing gen %lu round %u/%u",
+    if (!append(reply, at, " step:publishing gen:%lu rnd:%u/%u",
                 (unsigned long)outbound->generation, outbound->rounds_done,
                 outbound->rounds)) goto overflow;
   } else if (inbound.state != RECEIVE_IDLE) {
-    uint8_t fingerprint[32];
-    hash(inbound.publisher_key, sizeof(inbound.publisher_key), fingerprint, nullptr);
     if (!append(reply, at, inbound.state == RECEIVE_STAGED
-                           ? " staged %02x%02x%02x%02x%02x%02x%02x%02x gen %lu"
-                           : " receiving %02x%02x%02x%02x%02x%02x%02x%02x gen %lu chunks %u/%u",
-                fingerprint[0], fingerprint[1], fingerprint[2], fingerprint[3],
-                fingerprint[4], fingerprint[5], fingerprint[6], fingerprint[7],
+                           ? " step:staged gen:%lu"
+                           : " step:receiving gen:%lu chnk:%u/%u",
                 (unsigned long)inbound.generation,
                 bitCount(inbound.received), inbound.chunks)) goto overflow;
     if (inbound.state == RECEIVE_ACTIVE) {
       int32_t left = (int32_t)(inbound.deadline - millis());
-      if (left > 0 && !append(reply, at, " timeout %lus",
-                              (unsigned long)((uint32_t)left / 1000u))) goto overflow;
+      if (left > 0 && !append(reply, at, " tout:%lum",
+                              (unsigned long)((uint32_t)left / 60000u))) goto overflow;
     }
 #if SYNC_SETTINGS_WITH_POLICY
   } else if (!region && policy_recovery.phase != RECOVERY_IDLE) {
-    if (!append(reply, at, " recovering")) goto overflow;
+    if (!append(reply, at, " step:recovering")) goto overflow;
 #endif
   } else if (state.guard != GUARD_IDLE) {
-    if (!append(reply, at, " quiet gen %lu", (unsigned long)state.guard_generation)) {
+    if (!append(reply, at, " step:quiet gen:%lu", (unsigned long)state.guard_generation)) {
       goto overflow;
     }
-  } else if (!append(reply, at, " idle")) goto overflow;
+  } else if (!append(reply, at, " step:idle")) goto overflow;
 
   if (state.guard != GUARD_IDLE && clockSane(modClockGet())) {
     uint64_t end = (uint64_t)state.campaign_start +
                    (uint64_t)state.guard_days * 86400u;
     uint32_t now = modClockGet();
-    if (end > now && !append(reply, at, " lock %lus",
-                             (unsigned long)(end - now))) goto overflow;
+    if (end > now && !append(reply, at, " lock:%lum",
+                             (unsigned long)((end - now) / 60u))) goto overflow;
   }
   if (outbound != nullptr) {
     has_route = routeLabel(outbound->scoped, outbound->key, route);
@@ -2995,26 +3070,18 @@ static void status(uint8_t dataset, char* reply) {
   } else if (state.guard != GUARD_IDLE) {
     has_route = routeLabel(state.route_kind != 0, state.route_key, route);
   }
-  if (has_route && !append(reply, at, " region %s", route)) goto overflow;
-  if (!append(reply, at, " channel %s", channel)) goto overflow;
-  if ((housekeeping_failures[dataset == REGION ? 0 : SYNC_SETTINGS_WITH_REGION] != 0 ||
-       (outbound != nullptr && outbound->finish_failures != 0)) &&
-      !append(reply, at, clockSane(modClockGet()) ? " storage retry" : " clock unavailable")) {
-    goto overflow;
+  if (has_route && !append(reply, at, " regn:%s", route)) goto overflow;
+  if (!append(reply, at, " chnl:%s", channel)) goto overflow;
+  // The six error conditions are counted here and named by publish.status.err: spelled out they cost
+  // up to 92 bytes, which does not fit beside a 30-character region and a 16-character channel.
+  {
+    uint8_t errors = errorCount(dataset, region, state, outbound);
+    if (errors != 0 && !append(reply, at, " ERR:%u", errors)) goto overflow;
   }
-  if (state.enabled && (!config_ready || !trust_ready) &&
-      !append(reply, at, " receive fault storage")) goto overflow;
-#if SYNC_SETTINGS_WITH_REGION
-  if (region && state.enabled && !region_receive_ready &&
-      !append(reply, at, " receive fault state")) goto overflow;
-#endif
-  if (state.enabled && config_ready && trust_ready && config.channel_len == 0 &&
-      !append(reply, at, " receive unavailable")) goto overflow;
-  if (degraded && !append(reply, at, " storage degraded")) goto overflow;
   {
     uint8_t count = (state.warning_reason != 0) +
                     (reportFor(dataset).reason != REPORT_NONE);
-    if (count != 0 && !append(reply, at, " reports:%u", count)) goto overflow;
+    if (count != 0 && !append(reply, at, " rpts:%u", count)) goto overflow;
   }
 
   if (!region && outbound == nullptr && inbound.state == RECEIVE_IDLE &&
@@ -3027,7 +3094,8 @@ static void status(uint8_t dataset, char* reply) {
     ModPolicyValues value;
     if (modPolicyRead(&value) &&
         !append(reply, at,
-                " policy flood %u/%u/%u adv %um/%uh path %u loop %u ack %u gate %u af %.6g tx %.6g agc %us",
+                " policy flood:%u/%u/%u adv:%um/%uh path:%u loop:%u ack:%u gate:%u af:%.6g"
+                " tx:%.6g agc:%us",
                 value.flood_max, value.flood_max_unscoped,
                 value.flood_max_advert, (unsigned)value.advert_interval * 2u,
                 value.flood_advert_interval, value.path_hash_mode,
@@ -3042,7 +3110,7 @@ overflow:
   strcpy(reply, "Err - status too long");
 }
 
-// Tallies the recorded hop counts onto the report line as "hops <hops>x<frames>,...".
+// Tallies the recorded hop counts onto the report line as "hops:<hops>x<frames>,...".
 static void appendHops(const RuntimeReport& notice, char* reply, size_t cap) {
   uint8_t tally[64];
   memset(tally, 0, sizeof(tally));
@@ -3054,7 +3122,7 @@ static void appendHops(const RuntimeReport& notice, char* reply, size_t cap) {
   }
   if (!any) return;
   size_t at = strlen(reply);
-  const char* lead = " hops ";
+  const char* lead = " hops:";
   for (uint8_t h = 0; h < 64; ++h) {
     if (tally[h] == 0) continue;
     char term[16];
@@ -3091,12 +3159,12 @@ static bool reportCommand(uint8_t dataset, const char* page_text, char* reply) {
   if (count == 0) strcpy(reply, "empty");
   else if (page > count) strcpy(reply, "Err - page range");
   else if (state.warning_reason != 0 && page == 1) snprintf(reply, 160,
-                "1/1 abort gen %lu notices %u reason deadline at %lu until %lu",
+                "page:1/1 kind:abort gen:%lu notes:%u reason:deadline at:%lu until:%lu",
                 (unsigned long)state.warning_generation, state.abort_sent,
                 (unsigned long)state.warning_time,
                 (unsigned long)state.warning_expiry);
   else {
-    snprintf(reply, 160, "%u/%u gen %lu %s", page, count,
+    snprintf(reply, 160, "page:%u/%u gen:%lu result:%s", page, count,
              (unsigned long)notice.generation,
              notice.reason == REPORT_SIGN ? "publication signing failed" :
              notice.reason == REPORT_SETTLEMENT ? "applied; replay settlement pending" :
@@ -3107,6 +3175,35 @@ static bool reportCommand(uint8_t dataset, const char* page_text, char* reply) {
     appendHops(notice, reply, 160);
   }
   return true;
+}
+
+static void statusErr(uint8_t dataset, const char* page_text, char* reply) {
+  uint8_t page;
+  if (!parseOffset(page_text, page)) {
+    strcpy(reply, "Err - page");
+    return;
+  }
+  // parseOffset yields 0 for a missing argument; pages count from one, so that means the first.
+  if (page == 0) page = 1;
+  bool region = dataset == REGION;
+  bool state_ready = region ? overlay_ready && region_state_ready
+                            : policy_state_ready
+#if SYNC_SETTINGS_WITH_POLICY
+                              && policy_recovery_ready
+#endif
+                              ;
+  if (!state_ready) {
+    strcpy(reply, "fault storage");
+    return;
+  }
+  // Capacity matches the most any one dataset can raise at once: REGION reaches seven.
+  SyncStatusError found[8];
+  uint8_t count = errorList(dataset, region, stateFor(dataset), transmitter().state(dataset),
+                            found, 8);
+  if (count == 0) strcpy(reply, "empty");
+  else if (page > count) strcpy(reply, "Err - page range");
+  else snprintf(reply, 160, "%u/%u [%s] %s", page, count,
+                found[page - 1].token, found[page - 1].detail);
 }
 
 static bool publishCommand(char* command, char* reply) {
@@ -3785,12 +3882,28 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   }
 #endif
 #if SYNC_SETTINGS_WITH_REGION
+  {
+    static const char err[] = "sync.region publish.status.err";
+    if (strcmp(command, err) == 0 ||
+        strncmp(command, "sync.region publish.status.err ", sizeof(err)) == 0) {
+      statusErr(REGION, command[sizeof(err) - 1] == ' ' ? command + sizeof(err) : nullptr, reply);
+      return true;
+    }
+  }
   if (strcmp(command, "sync.region publish.status") == 0) {
     status(REGION, reply);
     return true;
   }
 #endif
 #if SYNC_SETTINGS_WITH_POLICY
+  {
+    static const char err[] = "sync.policy publish.status.err";
+    if (strcmp(command, err) == 0 ||
+        strncmp(command, "sync.policy publish.status.err ", sizeof(err)) == 0) {
+      statusErr(POLICY, command[sizeof(err) - 1] == ' ' ? command + sizeof(err) : nullptr, reply);
+      return true;
+    }
+  }
   if (strcmp(command, "sync.policy publish.status") == 0) {
     status(POLICY, reply);
     return true;
