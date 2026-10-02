@@ -2918,10 +2918,7 @@ static bool routeLabel(bool scoped, const uint8_t key[16],
   return modRegionNameForKey(key, out, REGION_NAME_MAX + 1);
 }
 
-// Every error condition status() counts and publish.status.err pages. Spelled out these run to 139
-// bytes each, which is why the status line carries only a count. Order is fixed so a page number means
-// the same thing across calls. The first two pairs are exclusive: a failed save is either retryable or
-// clock-blocked, and the receive path either lost its storage or has no channel, never both.
+// Fixed order, so a page number means the same thing across calls; the first two pairs are exclusive.
 struct SyncStatusError {
   const char* token;
   const char* detail;
@@ -2957,8 +2954,7 @@ static uint8_t errorList(uint8_t dataset, bool region, const DatasetState& state
                     "settlement did not finish. Re-add the publisher.");
   }
 #endif
-  // One entry per record, because the remedy differs and a generic one would send the reader to a
-  // command that cannot clear the flag. A write targets the other slot, so a re-save repairs it.
+  // One entry per record: the remedy differs, and a write targets the other slot so a re-save repairs it.
   if (config_degraded) {
     add("stor:degraded", "Lost redundancy: channel record. Node operational. Re-save with "
                          "'set sync.channel <name>'.");
@@ -2997,6 +2993,13 @@ static uint8_t errorCount(uint8_t dataset, bool region, const DatasetState& stat
   return errorList(dataset, region, state, outbound, nullptr, 0);
 }
 
+// Bracketed only when the value holds spaces, so a reader can tell where it ends.
+static void stepText(const char* value, char* out, size_t capacity) {
+  if (strchr(value, ' ') == nullptr) snprintf(out, capacity, "%s", value);
+  else snprintf(out, capacity, "[%s]", value);
+}
+
+// Four lines -- state, timing, scope, attention -- with "-" where a value does not apply.
 static void status(uint8_t dataset, char* reply) {
   bool region = dataset == REGION;
   bool state_ready = region ? overlay_ready && region_state_ready
@@ -3005,13 +3008,6 @@ static void status(uint8_t dataset, char* reply) {
                               && policy_recovery_ready
 #endif
                               ;
-  bool degraded = config_degraded || trust_degraded ||
-                  (region ? overlay_degraded || region_state_degraded
-                          : policy_state_degraded
-#if SYNC_SETTINGS_WITH_POLICY
-                            || recovery_degraded
-#endif
-                  );
   if (!state_ready) {
     strcpy(reply, "fault storage");
     return;
@@ -3023,46 +3019,66 @@ static void status(uint8_t dataset, char* reply) {
                         (config.channel_len ? config.channel : "unset");
   char route[REGION_NAME_MAX + 1];
   bool has_route = false;
+  uint32_t generation = 0;
+  uint32_t timeout_m = 0;
+  bool has_timeout = false;
   size_t at = 0;
   reply[0] = 0;
+
   if (!append(reply, at, "sync:%s", state.enabled ? "on" : "off")) goto overflow;
   if (region && !append(reply, at, " layr:%s%s", enabled ? "on" : "off",
                         dirty ? ",dirty" : "")) goto overflow;
-
   if (outbound != nullptr && outbound->aborting) {
+    generation = outbound->generation;
     if (!append(reply, at, " step:aborting notes:%u/2", outbound->abort_sent)) goto overflow;
   } else if (outbound != nullptr && outbound->active) {
-    if (!append(reply, at, " step:publishing gen:%lu rnd:%u/%u",
-                (unsigned long)outbound->generation, outbound->rounds_done,
+    generation = outbound->generation;
+    if (!append(reply, at, " step:publishing rnd:%u/%u", outbound->rounds_done,
                 outbound->rounds)) goto overflow;
   } else if (inbound.state != RECEIVE_IDLE) {
-    if (!append(reply, at, inbound.state == RECEIVE_STAGED
-                           ? " step:staged gen:%lu"
-                           : " step:receiving gen:%lu chnk:%u/%u",
-                (unsigned long)inbound.generation,
-                bitCount(inbound.received), inbound.chunks)) goto overflow;
-    if (inbound.state == RECEIVE_ACTIVE) {
+    generation = inbound.generation;
+    if (inbound.state == RECEIVE_STAGED) {
+      if (!append(reply, at, " step:staged")) goto overflow;
+    } else {
+      if (!append(reply, at, " step:receiving chnk:%u/%u",
+                  bitCount(inbound.received), inbound.chunks)) goto overflow;
       int32_t left = (int32_t)(inbound.deadline - millis());
-      if (left > 0 && !append(reply, at, " tout:%lum",
-                              (unsigned long)((uint32_t)left / 60000u))) goto overflow;
+      if (left > 0) {
+        has_timeout = true;
+        timeout_m = (uint32_t)left / 60000u;
+      }
     }
 #if SYNC_SETTINGS_WITH_POLICY
   } else if (!region && policy_recovery.phase != RECOVERY_IDLE) {
     if (!append(reply, at, " step:recovering")) goto overflow;
 #endif
   } else if (state.guard != GUARD_IDLE) {
-    if (!append(reply, at, " step:quiet gen:%lu", (unsigned long)state.guard_generation)) {
-      goto overflow;
-    }
+    generation = state.guard_generation;
+    if (!append(reply, at, " step:quiet")) goto overflow;
   } else if (!append(reply, at, " step:idle")) goto overflow;
 
-  if (state.guard != GUARD_IDLE && clockSane(modClockGet())) {
-    uint64_t end = (uint64_t)state.campaign_start +
-                   (uint64_t)state.guard_days * 86400u;
-    uint32_t now = modClockGet();
-    if (end > now && !append(reply, at, " lock:%lum",
-                             (unsigned long)((end - now) / 60u))) goto overflow;
+  // Minutes, because seconds buy no precision a reader can use.
+  if (generation != 0) {
+    if (!append(reply, at, "\ngen:%lu", (unsigned long)generation)) goto overflow;
+  } else if (!append(reply, at, "\ngen:-")) goto overflow;
+  if (has_timeout) {
+    if (!append(reply, at, " tout:%lum", (unsigned long)timeout_m)) goto overflow;
+  } else if (!append(reply, at, " tout:-")) goto overflow;
+  {
+    bool printed = false;
+    if (state.guard != GUARD_IDLE && clockSane(modClockGet())) {
+      uint64_t end = (uint64_t)state.campaign_start +
+                     (uint64_t)state.guard_days * 86400u;
+      uint32_t now = modClockGet();
+      if (end > now) {
+        printed = true;
+        if (!append(reply, at, " lock:%lum",
+                    (unsigned long)((end - now) / 60u))) goto overflow;
+      }
+    }
+    if (!printed && !append(reply, at, " lock:-")) goto overflow;
   }
+
   if (outbound != nullptr) {
     has_route = routeLabel(outbound->scoped, outbound->key, route);
   } else if (inbound.state != RECEIVE_IDLE) {
@@ -3070,45 +3086,49 @@ static void status(uint8_t dataset, char* reply) {
   } else if (state.guard != GUARD_IDLE) {
     has_route = routeLabel(state.route_kind != 0, state.route_key, route);
   }
-  if (has_route && !append(reply, at, " regn:%s", route)) goto overflow;
+  if (!append(reply, at, "\nregn:%s", has_route ? route : "-")) goto overflow;
   if (!append(reply, at, " chnl:%s", channel)) goto overflow;
-  // The six error conditions are counted here and named by publish.status.err: spelled out they cost
-  // up to 92 bytes, which does not fit beside a 30-character region and a 16-character channel.
-  {
-    uint8_t errors = errorCount(dataset, region, state, outbound);
-    if (errors != 0 && !append(reply, at, " ERR:%u", errors)) goto overflow;
-  }
-  {
-    uint8_t count = (state.warning_reason != 0) +
-                    (reportFor(dataset).reason != REPORT_NONE);
-    if (count != 0 && !append(reply, at, " rpts:%u", count)) goto overflow;
-  }
 
-  if (!region && outbound == nullptr && inbound.state == RECEIVE_IDLE &&
-#if SYNC_SETTINGS_WITH_POLICY
-      policy_recovery.phase == RECOVERY_IDLE) {
-#else
-      false) {
-#endif
-#if SYNC_SETTINGS_WITH_POLICY
-    ModPolicyValues value;
-    if (modPolicyRead(&value) &&
-        !append(reply, at,
-                " policy flood:%u/%u/%u adv:%um/%uh path:%u loop:%u ack:%u gate:%u af:%.6g"
-                " tx:%.6g agc:%us",
-                value.flood_max, value.flood_max_unscoped,
-                value.flood_max_advert, (unsigned)value.advert_interval * 2u,
-                value.flood_advert_interval, value.path_hash_mode,
-                value.loop_detect, value.multi_acks, config.repeat_gate,
-                (double)value.airtime_factor, (double)value.tx_delay_factor,
-                (unsigned)value.agc_reset_interval * 4u)) goto overflow;
-#endif
+  // Always printed, so a zero is a statement rather than a gap.
+  {
+    uint8_t reports = (state.warning_reason != 0) +
+                      (reportFor(dataset).reason != REPORT_NONE);
+    if (!append(reply, at, "\nrpts:%u ERR:%u", reports,
+                errorCount(dataset, region, state, outbound))) goto overflow;
   }
   return;
 
 overflow:
   strcpy(reply, "Err - status too long");
 }
+
+#if SYNC_SETTINGS_WITH_POLICY
+static bool policyLine(const ModPolicyValues& value, char* reply, size_t& at) {
+  return append(reply, at,
+                "flood:%u/%u/%u adv:%um/%uh path:%u loop:%u ack:%u gate:%u af:%.6g tx:%.6g agc:%us",
+                value.flood_max, value.flood_max_unscoped, value.flood_max_advert,
+                (unsigned)value.advert_interval * 2u, value.flood_advert_interval,
+                value.path_hash_mode, value.loop_detect, value.multi_acks, config.repeat_gate,
+                (double)value.airtime_factor, (double)value.tx_delay_factor,
+                (unsigned)value.agc_reset_interval * 4u);
+}
+
+// Bare `sync.policy`, mirroring bare `sync.region`; the only reader for `gate`.
+static void policyValues(char* reply) {
+  ModPolicyValues value;
+  if (!config_ready) {
+    strcpy(reply, "Err - storage");
+    return;
+  }
+  if (!modPolicyRead(&value)) {
+    strcpy(reply, "Err - policy unavailable");
+    return;
+  }
+  size_t at = 0;
+  reply[0] = 0;
+  if (!policyLine(value, reply, at)) strcpy(reply, "Err - status too long");
+}
+#endif
 
 // Tallies the recorded hop counts onto the report line as "hops:<hops>x<frames>,...".
 static void appendHops(const RuntimeReport& notice, char* reply, size_t cap) {
@@ -3322,13 +3342,15 @@ static bool radioStatusCommand(char* reply) {
 #else
   static const char build_kind[] = "";
 #endif
+  char step[52];
+  stepText(state, step, sizeof(step));
   if (radio_record.phase != RADIO_GUARD_IDLE) {
-    snprintf(reply, 160, "%s %s T %lu channel %s%s",
-             radio_record.enabled ? "on" : "off", state,
+    snprintf(reply, 160, "sync:%s step:%s\ncut:%lu\nchnl:%s%s",
+             radio_record.enabled ? "on" : "off", step,
              (unsigned long)radio_record.cutover, channel, build_kind);
   } else {
-    snprintf(reply, 160, "%s %s channel %s%s",
-             radio_record.enabled ? "on" : "off", state, channel, build_kind);
+    snprintf(reply, 160, "sync:%s step:%s\ncut:-\nchnl:%s%s",
+             radio_record.enabled ? "on" : "off", step, channel, build_kind);
   }
   return true;
 }
@@ -3637,24 +3659,35 @@ static bool timeStatus(char* reply) {
   }
   const char* channel = time_record.active ? time_record.channel
                         : config_ready && config.channel_len ? config.channel : "unset";
-  size_t used = time_record.active
-      ? (size_t)snprintf(reply, 160, "%s active%s next %lu ends %lu channel %s",
-                         time_record.enabled ? "on" : "off",
-                         time_preflight_run != 0 ? " verifying" :
-                         !time_watch.established ? " waiting-clock" :
-                         time_tx_pending ? " sending" : time_retry_wait ? " retry" : "",
-                         (unsigned long)time_record.next_sample,
-                         (unsigned long)time_record.ends, channel)
-      : (size_t)snprintf(reply, 160, "%s idle channel %s",
-                         time_record.enabled ? "on" : "off", channel);
+  char phase[48];
+  if (!time_record.active) {
+    snprintf(phase, sizeof(phase), "idle");
+  } else {
+    snprintf(phase, sizeof(phase), "active%s",
+             time_preflight_run != 0 ? " verifying" :
+             !time_watch.established ? " waiting-clock" :
+             time_tx_pending ? " sending" : time_retry_wait ? " retry" : "");
+  }
+  char step[52];
+  stepText(phase, step, sizeof(step));
+  size_t used = (size_t)snprintf(reply, 160, "sync:%s step:%s",
+                                 time_record.enabled ? "on" : "off", step);
+  if (time_record.active) {
+    used += (size_t)snprintf(reply + used, 160 - used, "\nnext:%lu ends:%lu",
+                             (unsigned long)time_record.next_sample,
+                             (unsigned long)time_record.ends);
+  } else {
+    used += (size_t)snprintf(reply + used, 160 - used, "\nnext:- ends:-");
+  }
+  used += (size_t)snprintf(reply + used, 160 - used, "\nchnl:%s", channel);
   static const char* outcome[] = {"", "corrected", "within", "replay", "storage"};
-  if (time_rx_outcome != TIME_RX_NONE && used < 160) {
-    if (time_rx_outcome == TIME_RX_CORRECTED || time_rx_outcome == TIME_RX_WITHIN) {
-      snprintf(reply + used, 160 - used, "; last %s %llds", outcome[time_rx_outcome],
-               (long long)time_rx_delta);
-    } else {
-      snprintf(reply + used, 160 - used, "; last %s", outcome[time_rx_outcome]);
-    }
+  if (time_rx_outcome == TIME_RX_NONE) {
+    snprintf(reply + used, 160 - used, "\nlast:-");
+  } else if (time_rx_outcome == TIME_RX_CORRECTED || time_rx_outcome == TIME_RX_WITHIN) {
+    snprintf(reply + used, 160 - used, "\nlast:%s %llds", outcome[time_rx_outcome],
+             (long long)time_rx_delta);
+  } else {
+    snprintf(reply + used, 160 - used, "\nlast:%s", outcome[time_rx_outcome]);
   }
   return true;
 }
@@ -3796,6 +3829,12 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
   }
 #endif
 #if SYNC_SETTINGS_WITH_REGION
+#if SYNC_SETTINGS_WITH_POLICY
+  if (strcmp(command, "sync.policy") == 0) {
+    policyValues(reply);
+    return true;
+  }
+#endif
   if (strcmp(command, "sync.region") == 0) {
     if (!overlay_ready) strcpy(reply, "Err - storage");
     else listRegions(nullptr, reply);

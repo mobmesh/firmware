@@ -78,12 +78,18 @@ class Console:
         # MeshCore's parser discards \n and completes a line only on \r.
         self.sock.sendall((command + "\r").encode())
 
-    def ask(self, command, timeout=COMMAND_TIMEOUT_SECONDS, quiet=False):
-        """Send a command and return its reply, or None if it never answers.
+    def ask(self, command, timeout=COMMAND_TIMEOUT_SECONDS, quiet=False, settle=0.4):
+        """Send a command and return its whole reply, or None if it never answers.
 
         Only complete lines count. A reply arrives over TCP in whatever chunks the
         emulator's console produces, so matching on the arrow alone can return the empty
         string when the text after it has not landed yet.
+
+        A reply can span several lines: `sync.region` prints one entry per line and
+        `publish.status` groups its fields. The firmware writes the whole reply in a single
+        println, so the remaining lines are already in flight once the arrow line is complete
+        -- `settle` is how long to keep draining for them before giving up on more. Returning
+        only the arrow line, as this used to, reads a seven-entry overlay as its root alone.
         """
         self.buf = ""
         self.send(command)
@@ -91,13 +97,27 @@ class Console:
         while time.time() < deadline:
             self.drain()
             complete, _, _ = self.buf.rpartition("\n")
-            for line in complete.splitlines():
-                if "->" in line:
-                    reply = line.split("->", 1)[1].strip()
-                    if reply:
-                        if not quiet:
-                            print(f"    {command} -> {reply}", flush=True)
-                        return reply
+            lines = complete.splitlines()
+            for index, line in enumerate(lines):
+                if "->" not in line:
+                    continue
+                reply = line.split("->", 1)[1].strip()
+                if not reply:
+                    continue
+                # Anything after the arrow line belongs to this reply: the next command has
+                # not been sent yet, so nothing else can be on the wire.
+                until = time.time() + settle
+                while time.time() < until:
+                    self.drain()
+                    time.sleep(0.05)
+                complete, _, _ = self.buf.rpartition("\n")
+                tail = complete.splitlines()[index + 1:]
+                parts = [reply] + [t.strip() for t in tail if t.strip()]
+                reply = "\n".join(parts)
+                if not quiet:
+                    shown = reply.replace("\n", " | ")
+                    print(f"    {command} -> {shown}", flush=True)
+                return reply
             time.sleep(0.2)
         return None
 
