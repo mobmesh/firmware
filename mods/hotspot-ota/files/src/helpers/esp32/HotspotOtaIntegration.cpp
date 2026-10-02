@@ -331,6 +331,16 @@ static bool apTeardown() { return true; }
 static uint32_t apSecondsLeft() { return 0; }
 #endif
 
+static const char* verbArgument(const char* command, const char* verb) {
+  size_t length = strlen(verb);
+  if (strncmp(command, verb, length) != 0) return nullptr;
+  if (command[length] == 0) return "";
+  if (command[length] != ' ') return nullptr;
+  const char* argument = command + length + 1;
+  while (*argument == ' ') ++argument;
+  return argument;
+}
+
 void hotspotOtaLoop() {
   RollbackGuard::poll();
   HotspotOTA::poll();
@@ -431,6 +441,8 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
       HotspotOTA::wifiDisconnect();
       strcpy(reply, "OK - disconnected");
     }
+  } else if (const char* survey_arg = verbArgument(command, "ota wan survey")) {
+    HotspotOTA::survey(survey_arg, reply);
   } else if (strcmp(command, "ota wan verify") == 0) {
     if (refuseWhileApUp(reply)) return true;
     HotspotOTA::verifyWan(reply);

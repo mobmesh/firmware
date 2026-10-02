@@ -58,4 +58,8 @@ namespace HotspotOTA {
   enum class WanRun : uint8_t { Pending, Unknown, WanFailed, NtpFailed, Verified, RestoreFault };
   bool startWanVerify(uint32_t& run);
   WanRun wanVerifyResult(uint32_t run);
+
+  // `ota wan survey`: one asynchronous scan, paged from the scan API's own result set.
+  void survey(const char* argument, char reply[]);
+  void surveyPoll();
 }

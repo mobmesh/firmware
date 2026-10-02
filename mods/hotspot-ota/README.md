@@ -82,6 +82,9 @@ All of these work over serial or remotely over the mesh. Full details are in
 <tr><td><code>set ota.fw.marker &lt;on|off&gt;</code></td><td>Turn the build-stamp check off for the next update only. See below.</td></tr>
 <tr><td><code>ota wan join</code> / <code>ota wan leave</code></td><td>Join WiFi without downloading, or disconnect and cut hotspot power.</td></tr>
 <tr><td><code>ota wan check</code></td><td>Check the node can reach the internet.</td></tr>
+<tr><td><code>ota wan survey</code></td><td>List nearby WiFi networks and whether each is open. Scans once; paging shows the same result.</td></tr>
+<tr><td><code>ota wan survey &lt;offset&gt;</code></td><td>Show results from <code>&lt;offset&gt;</code> onward, as <code>next N</code> suggests.</td></tr>
+<tr><td><code>ota wan survey refresh</code></td><td>Throw the old result away and scan again.</td></tr>
 <tr><td><code>ota wan verify</code></td><td>Test WAN and NTP, then restore the current WiFi and hotspot-power state.</td></tr>
 <tr><td><code>get ota.wan.health</code></td><td>Show the latest verification and whether this WiFi setup has succeeded before.</td></tr>
 <tr><td><code>get|set ota.wan.pwr</code></td><td>Read or switch the hotspot power directly.</td></tr>
@@ -94,6 +97,22 @@ All of these work over serial or remotely over the mesh. Full details are in
 > `set ota.fw.marker off` lets the next update install firmware that isn't from this project,
 > including stock MeshCore. That firmware has no `start ota wan`, so the node can't be updated
 > remotely again until someone flashes it by hand.
+
+If you don't know the network name, `ota wan survey` lists what the node can hear. A padlock
+marks a protected network; open ones leave that column blank. Results last two minutes, so
+paging through them costs nothing, and `ota wan survey refresh` starts a fresh scan. A name too
+long for `set ota.wan.wifi` to hold is marked, because the node can see more than it can store:
+
+```text
+ota wan survey
+  -> 🔒 0 MyHotspot -54 dBm
+     🔒 1 Library-Staff -72 dBm
+        2 Library-Guest -74 dBm
+     next 3
+```
+
+The survey only looks. It never joins, never powers the hotspot, and refuses while the OTA
+access point is up, the node is already joined, or an update is running.
 
 Every character counts over LoRa, so save the URL once and every future update is one short
 command:

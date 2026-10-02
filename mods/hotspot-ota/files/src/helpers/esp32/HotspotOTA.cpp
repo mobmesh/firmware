@@ -27,6 +27,12 @@
 #define OTA_WAN_VERIFY_ATTEMPTS   2
 #define OTA_NTP_VERIFY_ATTEMPTS   2
 #define OTA_WAN_RESTORE_ATTEMPTS  2
+#define OTA_SURVEY_MODE_SETTLE_MS 150
+#define OTA_SURVEY_TIMEOUT_MS     20000
+#define OTA_SURVEY_EXPIRY_MS      120000
+
+// Four UTF-8 bytes, not one, and it leads each row; two spaces hold the column for an open network.
+#define OTA_SURVEY_LOCK           "\xf0\x9f\x94\x92"
 
 // Each WPA2 session leaks ~158 B in the core's WiFi library; OTA_WPA2_SESSION_LIMIT comes per board from overrides.yaml.
 
@@ -935,7 +941,166 @@ void HotspotOTA::status(char reply[]) {
   }
 }
 
+// One scan's worth of state. RAM only: rows are read straight from the scan API's result set, so
+// nothing here survives a reboot and there is no second buffer to keep in step.
+enum class SurveyState : uint8_t { Idle, Scanning, Ready, Failed };
+static SurveyState survey_state = SurveyState::Idle;
+static uint32_t survey_started_ms = 0;
+static uint32_t survey_ready_ms = 0;
+static int16_t survey_count = 0;
+
+static void surveyForget() {
+  WiFi.scanDelete();
+  survey_count = 0;
+  survey_state = SurveyState::Idle;
+}
+
+static void surveyRelease() {
+  surveyForget();
+  WiFi.mode(WIFI_OFF);
+}
+
+static bool surveyStart(char reply[]) {
+  wifi_mode_t mode = WiFi.getMode();
+  if (mode == WIFI_MODE_AP || mode == WIFI_MODE_APSTA) {
+    strcpy(reply, "ERR: WiFi access point active");
+    return false;
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+    strcpy(reply, "ERR: station connected; ota wan leave first");
+    return false;
+  }
+  if (HotspotOTA::isActive() || HotspotOTA::flashWriteInProgress()) {
+    strcpy(reply, "ERR: OTA/WAN operation active");
+    return false;
+  }
+  WiFi.scanDelete();
+  if (WiFi.getMode() != WIFI_STA) {
+    WiFi.mode(WIFI_STA);
+    delay(OTA_SURVEY_MODE_SETTLE_MS);
+  }
+  if (WiFi.scanNetworks(true) == WIFI_SCAN_FAILED) {
+    WiFi.mode(WIFI_OFF);
+    survey_state = SurveyState::Failed;
+    strcpy(reply, "ERR: scan did not start");
+    return false;
+  }
+  survey_state = SurveyState::Scanning;
+  survey_started_ms = millis();
+  survey_count = 0;
+  strcpy(reply, "OK - scanning");
+  return true;
+}
+
+// Rows are fitted by byte, never by character: the protected marker is four UTF-8 bytes and a split
+// sequence would be dropped silently by every client checked.
+static size_t surveyRow(int index, char* out, size_t capacity) {
+  String ssid = WiFi.SSID(index);
+  bool open_network = WiFi.encryptionType(index) == WIFI_AUTH_OPEN;
+  char name[33] = {0};
+  size_t at = 0;
+  for (size_t i = 0; i < ssid.length() && at < sizeof(name) - 1; ++i) {
+    // Unsigned, so a UTF-8 continuation byte is not read as negative and replaced.
+    uint8_t c = (uint8_t)ssid[i];
+    name[at++] = (c >= 0x20 && c != 0x7f) ? (char)c : '?';
+  }
+  // Storable length comes from the config field, not this display buffer: ssid[32] holds 31 plus a NUL.
+  bool unstorable = ssid.length() > sizeof(HotspotOtaConfig::ssid) - 1;
+  int written = snprintf(out, capacity, "%s %d %s %d dBm%s",
+                         open_network ? "  " : OTA_SURVEY_LOCK, index, name, WiFi.RSSI(index),
+                         unstorable ? " too long for set" : "");
+  if (written < 0 || (size_t)written >= capacity) return 0;
+  return (size_t)written;
+}
+
+static void surveyPage(uint8_t offset, char reply[]) {
+  if (offset >= (uint8_t)survey_count) {
+    strcpy(reply, "ERR: page range");
+    return;
+  }
+  size_t used = 0;
+  reply[0] = 0;
+  int index = offset;
+  for (; index < survey_count; ++index) {
+    char row[MAX_TEXT_LEN];
+    size_t length = surveyRow(index, row, sizeof(row));
+    if (length == 0) continue;
+    size_t reserve = index + 1 < survey_count ? 10 : 1;
+    size_t lead = used ? 1 : 0;
+    if (used + lead + length + reserve > MAX_TEXT_LEN) break;
+    if (lead) reply[used++] = '\n';
+    memcpy(reply + used, row, length + 1);
+    used += length;
+  }
+  if (index < survey_count) snprintf(reply + used, MAX_TEXT_LEN - used, "\nnext %d", index);
+  else if (used == 0) strcpy(reply, "ERR: row too long to show");
+}
+
+void HotspotOTA::surveyPoll() {
+  if (survey_state == SurveyState::Scanning) {
+    int16_t result = WiFi.scanComplete();
+    if (result == WIFI_SCAN_RUNNING) {
+      if (millis() - survey_started_ms >= OTA_SURVEY_TIMEOUT_MS) {
+        surveyRelease();
+        survey_state = SurveyState::Failed;
+      }
+      return;
+    }
+    if (result == WIFI_SCAN_FAILED) {
+      surveyRelease();
+      survey_state = SurveyState::Failed;
+      return;
+    }
+    survey_count = result;
+    survey_ready_ms = millis();
+    survey_state = SurveyState::Ready;
+    WiFi.mode(WIFI_OFF);
+    return;
+  }
+  if (survey_state == SurveyState::Ready &&
+      millis() - survey_ready_ms >= OTA_SURVEY_EXPIRY_MS) {
+    surveyRelease();
+  }
+}
+
+void HotspotOTA::survey(const char* argument, char reply[]) {
+  bool refresh = argument != nullptr && strcmp(argument, "refresh") == 0;
+  if (refresh) {
+    surveyForget();
+    surveyStart(reply);
+    return;
+  }
+  uint8_t offset = 0;
+  if (argument != nullptr && *argument != 0) {
+    char* end;
+    unsigned long value = strtoul(argument, &end, 10);
+    while (*end == ' ') ++end;
+    if (end == argument || *end != 0 || value > 255) {
+      strcpy(reply, "ERR: syntax: ota wan survey [offset|refresh]");
+      return;
+    }
+    offset = (uint8_t)value;
+  }
+  switch (survey_state) {
+    case SurveyState::Scanning:
+      strcpy(reply, "OK - scanning");
+      return;
+    case SurveyState::Failed:
+      survey_state = SurveyState::Idle;
+      strcpy(reply, "ERR: scan failed");
+      return;
+    case SurveyState::Ready:
+      if (survey_count == 0) strcpy(reply, "No networks found");
+      else surveyPage(offset, reply);
+      return;
+    case SurveyState::Idle:
+      surveyStart(reply);
+      return;
+  }
+}
+
 void HotspotOTA::poll() {
+  HotspotOTA::surveyPoll();
   OtaServiceState state;
   bool release_sleep = false;
   uint32_t clock_epoch;
