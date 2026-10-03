@@ -1045,8 +1045,7 @@ function renderDone(step) {
   again.textContent = 'Flash another device';
   again.addEventListener('click', async () => {
     again.disabled = true;
-    // Hand the port back before starting over, or the next run's connect fails as
-    // selection-required with the grant still intact.
+    // Completion already released the port; this also covers an interrupted flow.
     await flowApi.disposeFlow(flow);
     flow = flowApi.createFlow({
       manifestBase: flow.manifestBase,

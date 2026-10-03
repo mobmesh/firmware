@@ -770,41 +770,45 @@ export const STEPS = [
     // Never fails the flash: the bytes are already on the device, so an unreachable
     // settings pass is a warning the user can act on by hand.
     async run(flow, { onStatus, onProgress }) {
-      const s = flow.state;
-      const commands = buildProvisionCommands(s);
-      if (!commands.length) {
-        onStatus('no settings to send for this role');
-        return;
-      }
-
-      if (flow.dryRun) {
-        onStatus(`dry run — would send ${commands.length} command(s)`);
-        s.provision = { dryRun: true, commands: commands.map((step) => step.command) };
-        return;
-      }
-
-      // The write left the esptool session holding the port; it has to go before the
-      // device can be reopened at CLI baud.
-      if (s.session) {
-        await esptool.closeEsptoolSession(s.session).catch(() => {});
-        s.session = null;
-      }
-      await closeSerialPortQuietly(s.port);
-
       try {
-        const done = await provisionDevice(s, { preferredPort: s.port, onStatus, onProgress });
-        s.port = done.port;
-        s.provision = { results: done.results };
-        const failed = done.results.filter((result) => !result.ok);
-        onStatus(
-          failed.length
-            ? `${failed.length} of ${done.results.length} settings were rejected`
-            : `applied ${done.results.length} setting(s)`
-        );
-      } catch (error) {
-        console.warn('[provision] post-flash setup failed:', error);
-        s.provision = { error: error.message };
-        onStatus(`could not finish setup over serial — ${error.message}`);
+        const s = flow.state;
+        const commands = buildProvisionCommands(s);
+        if (!commands.length) {
+          onStatus('no settings to send for this role');
+          return;
+        }
+
+        if (flow.dryRun) {
+          onStatus(`dry run — would send ${commands.length} command(s)`);
+          s.provision = { dryRun: true, commands: commands.map((step) => step.command) };
+          return;
+        }
+
+        // The write left the esptool session holding the port; it has to go before the
+        // device can be reopened at CLI baud.
+        if (s.session) {
+          await esptool.closeEsptoolSession(s.session).catch(() => {});
+          s.session = null;
+        }
+        await closeSerialPortQuietly(s.port);
+
+        try {
+          const done = await provisionDevice(s, { preferredPort: s.port, onStatus, onProgress });
+          s.port = done.port;
+          s.provision = { results: done.results };
+          const failed = done.results.filter((result) => !result.ok);
+          onStatus(
+            failed.length
+              ? `${failed.length} of ${done.results.length} settings were rejected`
+              : `applied ${done.results.length} setting(s)`
+          );
+        } catch (error) {
+          console.warn('[provision] post-flash setup failed:', error);
+          s.provision = { error: error.message };
+          onStatus(`could not finish setup over serial — ${error.message}`);
+        }
+      } finally {
+        await disposeFlow(flow);
       }
     },
   },
