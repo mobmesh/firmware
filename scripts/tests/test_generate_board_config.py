@@ -428,11 +428,13 @@ class AllBoardsJsonTestCase(unittest.TestCase):
             "core_mods: [shim]\n"
             "roles:\n"
             "  repeater:\n"
+            "    ota_role_id: 1\n"
             "    asset_role_abbrev: rep\n"
             "    upstream_tag_prefix: repeater\n"
             "    release_title: Repeater\n"
             "    make_latest: true\n"
             "  room_server:\n"
+            "    ota_role_id: 2\n"
             "    asset_role_abbrev: room\n"
             "    upstream_tag_prefix: room-server\n"
             "    release_title: Room\n"
@@ -453,6 +455,7 @@ class AllBoardsJsonTestCase(unittest.TestCase):
             "    mods: []\n"
         ))
         self._write("variants/test_board/overrides.yaml", (
+            "ota_board_id: 1\n"
             "capabilities: {}\n"
             "build_values: {}\n"
             "partitions_override: null\n"
@@ -518,6 +521,7 @@ class ResolveTargetsTestCase(unittest.TestCase):
     def _run(self, mods, core=None) -> dict:
         head = f"core_mods: [{', '.join(core or [])}]\n"
         self._write("variants/heltec_v4/overrides.yaml", (
+            "ota_board_id: 1\n"
             "capabilities: {}\nbuild_values: {}\npartitions_override: null\n"
             "qemu:\n  enabled: false\n"
             "flasher:\n  label: test\n  connect_note: test\n  post_flash_note: test\n"
@@ -525,6 +529,7 @@ class ResolveTargetsTestCase(unittest.TestCase):
         self._write("build-targets.yaml", head + (
             "roles:\n"
             "  repeater:\n"
+            "    ota_role_id: 1\n"
             "    asset_role_abbrev: rep\n"
             "    upstream_tag_prefix: repeater\n"
             "    release_title: Repeater\n"

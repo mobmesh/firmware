@@ -97,6 +97,12 @@ def _boolean(path: Path, field_name: str, value: Any) -> bool:
     return value
 
 
+def _unsigned_id(path: Path, field_name: str, value: Any, maximum: int, minimum: int = 1) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or not minimum <= value <= maximum:
+        raise ProjectModelError(f"{path}:{field_name}: expected an integer from {minimum} to {maximum}")
+    return value
+
+
 def _strings(path: Path, field_name: str, value: Any) -> tuple[str, ...]:
     if value is None:
         return ()
@@ -186,9 +192,6 @@ class ModDefinition:
     patches: tuple[PatchDefinition, ...]
 
 
-# The image stamp's board/role field is 24 bytes including its NUL (scripts/patch_ota_metadata.py).
-BOARD_ROLE_MAX = 23
-
 # usb: hardware CDC; uart0: CLI behind a USB-UART bridge; otg: TinyUSB CDC on the OTG controller (fork serial 3).
 QEMU_CONSOLES = frozenset({"usb", "uart0", "otg"})
 
@@ -224,7 +227,7 @@ class PartitionLayout:
 class BoardProfile:
     board_id: str
     upstream_variant: str
-    ota_stamp_v: int
+    ota_board_id: int
     source_path: Path
     capabilities: Mapping[Capability, CapabilityState]
     build_values: Mapping[str, Scalar]
@@ -240,6 +243,7 @@ class BoardProfile:
 @dataclass(frozen=True)
 class FirmwareRole:
     role_id: str
+    ota_role_id: int
     asset_role_abbrev: str
     upstream_tag_prefix: str
     release_title: str
@@ -264,7 +268,8 @@ class ResolvedTarget:
     board_id: str
     upstream_variant: str
     role: str
-    ota_role: str
+    ota_board_id: int
+    ota_role_id: int
     build_env: str
     upstream_tag_prefix: str
     release_title: str
@@ -282,7 +287,8 @@ class ResolvedTarget:
             "board_id": self.board_id,
             "upstream_variant": self.upstream_variant,
             "role": self.role,
-            "ota_role": self.ota_role,
+            "ota_board_id": self.ota_board_id,
+            "ota_role_id": self.ota_role_id,
             "build_env": self.build_env,
             "upstream_tag_prefix": self.upstream_tag_prefix,
             "release_title": self.release_title,
@@ -356,10 +362,11 @@ class ProjectModel:
             _string(path, "roles", role_id)
             item = _mapping(path, f"roles.{role_id}", raw)
             _keys(path, f"roles.{role_id}", item, {
-                "asset_role_abbrev", "upstream_tag_prefix", "release_title", "make_latest"
+                "ota_role_id", "asset_role_abbrev", "upstream_tag_prefix", "release_title", "make_latest"
             })
             roles[role_id] = FirmwareRole(
                 role_id=role_id,
+                ota_role_id=_unsigned_id(path, f"roles.{role_id}.ota_role_id", item.get("ota_role_id"), 255),
                 asset_role_abbrev=_string(path, f"roles.{role_id}.asset_role_abbrev", item.get("asset_role_abbrev")),
                 upstream_tag_prefix=_string(path, f"roles.{role_id}.upstream_tag_prefix", item.get("upstream_tag_prefix")),
                 release_title=_string(path, f"roles.{role_id}.release_title", item.get("release_title")),
@@ -393,11 +400,9 @@ class ProjectModel:
     def _load_board(root: Path, board_id: str) -> BoardProfile:
         path = root / "variants" / board_id / "overrides.yaml"
         data = _load_yaml(path)
-        _keys(path, "root", data, {"upstream_variant", "ota_stamp_v", "capabilities", "build_values", "build_flags_append", "partitions_override", "qemu", "flasher"})
+        _keys(path, "root", data, {"upstream_variant", "ota_board_id", "capabilities", "build_values", "build_flags_append", "partitions_override", "qemu", "flasher"})
         upstream_variant = _string(path, "upstream_variant", data.get("upstream_variant", board_id))
-        ota_stamp_v = data.get("ota_stamp_v", 2)
-        if not isinstance(ota_stamp_v, int) or isinstance(ota_stamp_v, bool) or ota_stamp_v not in (1, 2):
-            raise ProjectModelError(f"{path}:ota_stamp_v: expected 1 or 2")
+        ota_board_id = _unsigned_id(path, "ota_board_id", data.get("ota_board_id", 0), 65535, 0)
 
         raw_capabilities = _mapping(path, "capabilities", data.get("capabilities"))
         capabilities = {
@@ -441,7 +446,7 @@ class ProjectModel:
         return BoardProfile(
             board_id=board_id,
             upstream_variant=upstream_variant,
-            ota_stamp_v=ota_stamp_v,
+            ota_board_id=ota_board_id,
             source_path=path,
             capabilities=capabilities,
             build_values=build_values,
@@ -587,12 +592,24 @@ class ProjectModel:
             raise ProjectModelError(f"{self.root / 'build-targets.yaml'}:roles: at least one role is required")
 
         prefixes: dict[str, str] = {}
+        role_ids: dict[int, str] = {}
         for role in self.roles.values():
+            owner_id = role_ids.setdefault(role.ota_role_id, role.role_id)
+            if owner_id != role.role_id:
+                raise ProjectModelError(f"duplicate ota_role_id {role.ota_role_id}: {owner_id}, {role.role_id}")
             owner = prefixes.setdefault(role.upstream_tag_prefix, role.role_id)
             if owner != role.role_id:
                 raise ProjectModelError(
                     f"{self.root / 'build-targets.yaml'}:roles.{role.role_id}.upstream_tag_prefix: also belongs to '{owner}'"
                 )
+
+        board_ids: dict[int, str] = {}
+        for board in self.boards.values():
+            if board.ota_board_id == 0:
+                continue
+            owner = board_ids.setdefault(board.ota_board_id, board.board_id)
+            if owner != board.board_id:
+                raise ProjectModelError(f"duplicate ota_board_id {board.ota_board_id}: {owner}, {board.board_id}")
 
         identities = set()
         environments = set()
@@ -684,19 +701,15 @@ class ProjectModel:
                     raise ProjectModelError(
                         f"{self.root / 'build-targets.yaml'}:targets: {target.board}/{target.role} selects '{mod_name}' but board capabilities do not satisfy {missing}"
                     )
-            ota_role = target.role if board.ota_stamp_v == 1 else role.asset_role_abbrev
-            image_stamp = f"{target.board}/{ota_role}"
-            if len(image_stamp.encode()) > BOARD_ROLE_MAX:
-                raise ProjectModelError(
-                    f"{self.root / 'build-targets.yaml'}:targets: '{image_stamp}' exceeds the "
-                    f"{BOARD_ROLE_MAX}-byte image stamp"
-                )
+            if board.ota_board_id == 0:
+                raise ProjectModelError(f"{board.source_path}:ota_board_id: required for an OTA release target")
             rows.append(ResolvedTarget(
                 target_id=target.role,
                 board_id=target.board,
                 upstream_variant=board.upstream_variant,
                 role=target.role,
-                ota_role=ota_role,
+                ota_board_id=board.ota_board_id,
+                ota_role_id=role.ota_role_id,
                 build_env=target.build_env,
                 upstream_tag_prefix=role.upstream_tag_prefix,
                 release_title=role.release_title,

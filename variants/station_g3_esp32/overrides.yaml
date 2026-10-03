@@ -1,3 +1,5 @@
+ota_board_id: 7
+
 # Override-only board config for station_g3_esp32: only what this project adds on top of upstream.
 
 capabilities:

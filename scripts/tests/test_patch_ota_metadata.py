@@ -23,11 +23,6 @@ spec.loader.exec_module(pom)
 
 VENDORED = sorted(p for role in ("repeater", "room_server") for p in (REPO / "pages" / "flasher" / "bin" / role).glob("*.bin"))
 
-sys.path.insert(0, str(REPO / "scripts"))
-from project_config import ProjectModel  # noqa: E402
-
-# (board, role folder) -> the role as the build stamps it, so the test reads the same source CI does.
-STAMP_ROLES = {(t.board_id, t.role): t.ota_role for t in ProjectModel.load(REPO).build_plan.targets}
 REGISTRY = pom.load_mod_registry()
 MARKER = REGISTRY["hotspot-ota"][1]
 
@@ -40,12 +35,12 @@ def unpatched(data):
     restored the same way the patcher computes them.
     """
     out = bytearray(data)
-    region = slice(pom.RESERVED_OFFSET, pom.RESERVED_OFFSET + pom.RESERVED_LEN)
+    region = slice(208, 288)
     delta = 0
     for byte in out[region]:
         delta ^= byte
     checksum_offset = len(out) - pom.DIGEST_LEN - 1
-    out[region] = bytes(pom.RESERVED_LEN)
+    out[region] = bytes(80)
     out[checksum_offset] ^= delta
     out[-pom.DIGEST_LEN:] = hashlib.sha256(bytes(out[:-pom.DIGEST_LEN])).digest()
     return bytes(out)
@@ -86,40 +81,44 @@ class ParserGroundTruth(unittest.TestCase):
             with self.subTest(image=str(image.relative_to(REPO))):
                 pom.verify(image.read_bytes(), str(image))
 
-    def test_vendored_images_carry_their_metadata(self):
-        # These are CI output, patched at build time. A missing block means the release
-        # step did not run, not that the parser is wrong.
+    def test_old_vendored_layout_is_not_recognized(self):
         for image in VENDORED:
             with self.subTest(image=str(image.relative_to(REPO))):
-                meta = pom.read_metadata(image.read_bytes())
-                self.assertIsNotNone(meta, "vendored image carries no metadata block")
-                self.assertEqual(meta["layout_version"], pom.LAYOUT_VERSION)
-                board, _, role = meta["board_role"].partition("/")
-                # The stamp's role is the board's ota_stamp_role, which is the short abbreviation
-                # unless the board pins the full name to keep matching images already in the field.
-                self.assertEqual((board, role), (image.stem, STAMP_ROLES[(image.stem, image.parent.name)]))
-                self.assertTrue(meta["mods"] & (1 << REGISTRY["hotspot-ota"][0]))
+                self.assertIsNone(pom.read_metadata(image.read_bytes()))
 
 
 class Payload(unittest.TestCase):
-    def test_layout_is_eighty_bytes(self):
-        payload = pom.build_payload("v1.17.1", "ceb8915", "heltec_v4", "repeater")
+    def test_layout_is_36_bytes(self):
+        payload = pom.build_payload("v1.17.1", "ceb8915", 1, 1)
         self.assertEqual(len(payload), pom.RESERVED_LEN)
-        self.assertEqual(payload[:8], pom.MAGIC)
-        self.assertEqual(payload[8], pom.LAYOUT_VERSION)
+        self.assertEqual(payload[28:36], pom.MAGIC)
+        self.assertEqual(payload[27], pom.LAYOUT_VERSION)
+        self.assertEqual(payload[12:20], b"ceb8915\0")
 
-    def test_longest_real_board_role_fits(self):
-        payload = pom.build_payload("v1.17.1", "ceb8915", "station_g3_esp32", "room")
-        self.assertEqual(payload[40:64].split(b"\0", 1)[0], b"station_g3_esp32/room")
+    def test_numeric_board_and_role(self):
+        payload = pom.build_payload("v1.17.1", "ceb8915", 65535, 255)
+        self.assertEqual(payload[24:27], b"\xff\xff\xff")
 
     def test_oversized_field_is_refused(self):
         with self.assertRaises(pom.ImageError):
-            pom.build_payload("v1.17.1", "ceb8915", "a" * 30, "repeater")
+            pom.build_payload("v1.17.1", "ceb8915", 65536, 1)
 
-    def test_reserved_bytes_stay_zero(self):
-        payload = pom.build_payload("v1.17.1", "ceb8915", "heltec_v4", "repeater")
-        self.assertEqual(payload[10:12], b"\0\0")
-        self.assertEqual(payload[68:80], bytes(12))
+    def test_sha_longer_than_seven_characters_is_refused(self):
+        with self.assertRaises(pom.ImageError):
+            pom.build_payload("v1.17.1", "ceb8915a", 1, 1)
+
+    def test_version_longer_than_eleven_characters_is_refused(self):
+        with self.assertRaises(pom.ImageError):
+            pom.build_payload("v1.123456789", "ceb8915", 1, 1)
+
+    def test_previous_45_byte_test_stamp_is_not_recognized(self):
+        image = bytearray(make_image())
+        image[243:259] = b"v1.17.1" + bytes(8)
+        image[259:271] = b"ceb8915" + bytes(5)
+        struct.pack_into("<IHB", image, 271, 2, 1, 1)
+        image[279] = 1
+        image[280:288] = pom.MAGIC
+        self.assertIsNone(pom.read_metadata(image))
 
 
 class ModBits(unittest.TestCase):
@@ -143,7 +142,7 @@ class ModBits(unittest.TestCase):
 
     def test_image_without_ota_is_still_stamped(self):
         # A build with no OTA mod is identified, with the bit clear -- it is not refused.
-        payload = pom.build_payload("v1.17.1", "ceb8915", "heltec_v4", "repeater", mods=0)
+        payload = pom.build_payload("v1.17.1", "ceb8915", 1, 1, mods=0)
         out = pom.patch(make_image(marker=False), payload)
         self.assertEqual(pom.read_metadata(out)["mods"], 0)
 
@@ -156,7 +155,7 @@ class ModBits(unittest.TestCase):
 class Patching(unittest.TestCase):
     def setUp(self):
         self.payload = pom.build_payload(
-            "v1.17.1", "ceb8915", "heltec_v4", "repeater", mods=1 << REGISTRY["hotspot-ota"][0]
+            "v1.17.1", "ceb8915", 1, 1, mods=1 << REGISTRY["hotspot-ota"][0]
         )
 
     def test_round_trip_on_vendored_images(self):
@@ -166,7 +165,7 @@ class Patching(unittest.TestCase):
                 meta = pom.read_metadata(out)
                 self.assertEqual(meta["upstream_version"], "v1.17.1")
                 self.assertEqual(meta["repo_sha"], "ceb8915")
-                self.assertEqual(meta["board_role"], "heltec_v4/repeater")
+                self.assertEqual((meta["board_id"], meta["role_id"]), (1, 1))
                 self.assertEqual(meta["layout_version"], pom.LAYOUT_VERSION)
                 self.assertEqual(meta["mods"], 1 << REGISTRY["hotspot-ota"][0])
 
@@ -179,6 +178,15 @@ class Patching(unittest.TestCase):
         allowed |= set(range(len(original) - pom.DIGEST_LEN, len(original)))
         changed = {i for i in range(len(original)) if original[i] != out[i]}
         self.assertTrue(changed - allowed == set(), f"unexpected bytes changed: {sorted(changed - allowed)[:8]}")
+
+    def test_live_low_descriptor_bytes_are_preserved(self):
+        original = bytearray(make_image())
+        original[208:212] = b"\x01\x02\x03\x04"
+        original[-pom.DIGEST_LEN - 1] ^= 1 ^ 2 ^ 3 ^ 4
+        original[-pom.DIGEST_LEN:] = hashlib.sha256(original[:-pom.DIGEST_LEN]).digest()
+        out = pom.patch(bytes(original), self.payload)
+        self.assertEqual(out[208:252], original[208:252])
+        self.assertEqual(pom.read_metadata(out)["board_id"], 1)
 
     def test_xor_shortcut_matches_full_recompute(self):
         # patch() calls verify() on its own output, which re-walks every segment. If the
@@ -204,7 +212,13 @@ class Patching(unittest.TestCase):
 
     def test_multi_segment_image(self):
         out = pom.patch(make_image(segment_count=3), self.payload)
-        self.assertEqual(pom.read_metadata(out)["board_role"], "heltec_v4/repeater")
+        self.assertEqual((pom.read_metadata(out)["board_id"], pom.read_metadata(out)["role_id"]), (1, 1))
+
+    def test_relocated_record_is_found_from_magic(self):
+        image = bytearray(make_image())
+        relocated = self.payload
+        image[220:220 + len(relocated)] = relocated
+        self.assertEqual(pom.read_metadata(image)["board_id"], 1)
 
 
 if __name__ == "__main__":

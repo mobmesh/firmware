@@ -43,12 +43,13 @@ namespace HotspotOTA {
   void setMarkerBypass(bool on);   // RAM-only, one-time -- see `set ota.fw.marker`
 
   // The running image's own MOBMESH trailer, for the OTA page's identity payload. Buffers must
-  // hold 17, 13 and 25 bytes. False when the running image carries no trailer.
+  // hold 13, 9 and 25 bytes. False when the running image carries no trailer.
   bool runningMetadata(char* version, char* sha, char* role);
 
   // Pre-flight versions of the service's join/WAN-check steps.
   bool wifiConnect(char reply[]);
-  void wifiDisconnect();
+  bool wifiDisconnect();
+  void radioStatus(char reply[]);
   bool checkWan(char reply[]);
   bool verifyWan(char reply[]);
   void wanHealth(char reply[]);

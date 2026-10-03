@@ -1,3 +1,5 @@
+ota_board_id: 6
+
 # Override-only board config for ebyte_eora_s3: only what this project adds on top of upstream.
 
 capabilities:

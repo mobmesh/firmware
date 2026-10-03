@@ -263,6 +263,22 @@ jobs:
           # --- 7. do the upstream commands the mods send or intercept still exist? --
           cat "$CONTRACTS" >> "$REPORT"
 
+          # --- 8. did the ESP32 platform change its descriptor's reserved tail? ---
+          # Metadata layout 1 uses 252-287; recheck esp_app_desc_t on an unknown platform pin.
+          if [ -d probe-src ]; then
+            pin=$(awk '/^\[/{s=($0=="[esp32_base]")} s && /^platform *=/{sub(/^platform *= */,""); print; exit}' \
+              probe-src/platformio.ini 2>/dev/null)
+            if [ -z "$pin" ]; then
+              DRIFT=true
+              echo "- upstream's \`[esp32_base]\` platform pin could not be found -- verify that OTA metadata bytes 252-287 remain reserved" >> "$REPORT"
+            elif [ "$pin" = 'platformio/espressif32@6.11.0' ]; then
+              echo "- upstream's ESP32 platform is \`$pin\` (Arduino 2.x, IDF 4.4); OTA metadata bytes 252-287 remain reserved" >> "$REPORT"
+            else
+              DRIFT=true
+              echo "- upstream's ESP32 platform moved to \`$pin\` -- verify that OTA metadata bytes 252-287 remain reserved before taking it" >> "$REPORT"
+            fi
+          fi
+
           echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"
           # Appended, not merged into $REPORT: the explanations are collapsed detail under
           # the summary lines, and only exist when something failed.

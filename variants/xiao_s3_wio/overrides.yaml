@@ -1,3 +1,5 @@
+ota_board_id: 4
+
 # Override-only board config for xiao_s3_wio: only what this project adds on top of upstream.
 
 capabilities:

@@ -22,7 +22,6 @@ CONSOLE_PORT = 45080
 CRASH_SIGNATURES = ("Guru Meditation Error", "Backtrace:", "abort() was called")
 
 # Mod bit register: file offset of the u32, and the bits this script knows how to exercise.
-MOD_BITS_OFFSET = 272
 MOD_BIT_HOTSPOT_OTA = 0x00000002
 
 # The device models take board wiring as qdev properties so one binary serves every board.
@@ -54,9 +53,11 @@ def merge_flash_image(board, variant, flasher_dir, out_path):
 def read_mod_bits(flasher_dir, variant):
     """The u32 the build stamps into the image naming which mods are present."""
     data = (flasher_dir / variant["firmwareFile"]).read_bytes()
-    if len(data) < MOD_BITS_OFFSET + 4:
-        return 0
-    return int.from_bytes(data[MOD_BITS_OFFSET:MOD_BITS_OFFSET + 4], "little")
+    reserved = data[208:288]
+    for marker in range(len(reserved) - 7):
+        if reserved[marker:marker + 8] == b"MOBMESH\0" and marker >= 28 and reserved[marker - 1] == 1:
+            return int.from_bytes(reserved[marker - 8:marker - 4], "little")
+    return 0
 
 
 class Console:

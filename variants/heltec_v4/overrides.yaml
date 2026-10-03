@@ -1,9 +1,9 @@
+ota_board_id: 1
+
 # Override-only board config for heltec_v4: only what this project adds on top of upstream.
 # Every other board fact is read from upstream at generation time by scripts/generate-board-config.py.
 # The directory name is the mapping to upstream's own variants/<name>/, so there is no reference field.
 
-# Existing downloadable images use the version 1 role names in their OTA stamp.
-ota_stamp_v: 1
 
 capabilities:
   wifi_station: true

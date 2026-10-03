@@ -88,6 +88,7 @@ All of these work over serial or remotely over the mesh. Full details are in
 <tr><td><code>ota wan verify</code></td><td>Test WAN and NTP, then restore the current WiFi and hotspot-power state.</td></tr>
 <tr><td><code>get ota.wan.health</code></td><td>Show the latest verification and whether this WiFi setup has succeeded before.</td></tr>
 <tr><td><code>get|set ota.wan.pwr</code></td><td>Read or switch the hotspot power directly.</td></tr>
+<tr><td><code>get ota.wan.radio</code></td><td>Show ESP32 WiFi, driver, and link state alongside the <code>ota.wan.pwr</code> value.</td></tr>
 <tr><td><code>get ota.slot</code></td><td>Version and state of both slots.</td></tr>
 <tr><td><code>ota slot boot &lt;A|B&gt;</code></td><td>Boot the other slot, if it holds a valid image.</td></tr>
 </tbody>

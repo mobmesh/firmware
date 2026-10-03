@@ -1,3 +1,5 @@
+ota_board_id: 3
+
 # Override-only board config for heltec_v3: only what this project adds on top of upstream.
 
 capabilities:

@@ -14,9 +14,10 @@ function rd(){return !s||up||!s.m||!s.d?!1:s.ok||(s.ov&&O.checked)}
 function R(){U.disabled=!rd();cl.disabled=up}
 function N(g,c,t,o){if(g!=G||!s)return;s.d=!0;s.ok=c=="good";s.ov=!!o;
 Q.className="msg show "+c;T.textContent=t;V.hidden=!o;R()}
-function tr(u,d){if(u.length<W+80||String.fromCharCode.apply(0,u.slice(W,W+7))!="MOBMESH"||u[W+7]||u[W+8]!=1)return null;
-var f=(a,n)=>{for(var r="",i=W+a;i<W+a+n&&u[i];i++)r+=String.fromCharCode(u[i]);return r};
-return{v:f(12,16),s:f(28,12),r:f(40,24),m:d.getUint32(W+64,!0)}}
+function tr(u,d){if(u.length<W+80)return null;
+for(var i=W;i<=W+72;i++){if(String.fromCharCode.apply(0,u.slice(i,i+7))!="MOBMESH"||u[i+7]||i<W+28||u[i-1]!=1)continue;
+var b=i-28,f=(a,n)=>{for(var r="",j=b+a;j<b+a+n&&u[j];j++)r+=String.fromCharCode(u[j]);return r},board=d.getUint16(i-4,!0),role=u[i-2];
+if(board&&role)return{v:f(0,12),s:f(12,8),r:"board "+board+" / role "+role,m:d.getUint32(i-8,!0)}}return null}
 async function va(f,g){var b;
 try{b=await f.slice(0,W+80).arrayBuffer()}catch{return N(g,"bad","Could not read the file.",0)}
 if(g!=G)return;

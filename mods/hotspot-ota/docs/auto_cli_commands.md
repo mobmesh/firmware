@@ -1362,6 +1362,19 @@ confirm or force the rail off if state is ever in doubt (e.g. after a crash or w
 
 ---
 
+#### Inspect the ESP32 WiFi driver after WAN use
+**Usage:**
+- `get ota.wan.radio`
+
+**Note:** Returns `> wifi:off driver:no link:down pwr:off` when WiFi is off, its driver is
+deinitialized, the station is disconnected, and the external hotspot-power pin is off. `pwr`
+is the same value as `get ota.wan.pwr`. An unexpected driver result appears as `driver:error`.
+`ota wan leave` reports an error when driver shutdown cannot be confirmed; a reboot clears it.
+
+**Requires:** `WITH_HOTSPOT_OTA` build flag on shipped ESP32 targets
+
+---
+
 #### Pre-flight check the WiFi join and WAN connectivity before `start ota wan`
 **Usage:**
 - `ota wan join`

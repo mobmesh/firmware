@@ -438,8 +438,8 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
     if (HotspotOTA::isActive()) {
       strcpy(reply, "ERR: OTA active");
     } else {
-      HotspotOTA::wifiDisconnect();
-      strcpy(reply, "OK - disconnected");
+      strcpy(reply, HotspotOTA::wifiDisconnect() ? "OK - disconnected"
+                                               : "ERR: WiFi shutdown failed; reboot to clear");
     }
   } else if (const char* survey_arg = verbArgument(command, "ota wan survey")) {
     HotspotOTA::survey(survey_arg, reply);
@@ -534,6 +534,8 @@ static bool handleGet(char* command, char* reply) {
     sprintf(reply, "> %s", cfg.url[0] ? cfg.url : "(not set)");
   } else if (memcmp(config, "ota.wan.pwr", 11) == 0) {
     sprintf(reply, "> %s", HotspotOTA::getPower() ? "on" : "off");
+  } else if (memcmp(config, "ota.wan.radio", 13) == 0) {
+    HotspotOTA::radioStatus(reply);
   } else if (memcmp(config, "ota.wan.health", 14) == 0) {
     HotspotOTA::wanHealth(reply);
   } else if (memcmp(config, "ota.status", 10) == 0) {

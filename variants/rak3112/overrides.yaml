@@ -1,3 +1,5 @@
+ota_board_id: 5
+
 # Override-only board config for rak3112: only what this project adds on top of upstream.
 
 capabilities:

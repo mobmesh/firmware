@@ -1,21 +1,16 @@
 #!/usr/bin/env python3
-"""Write MobMesh OTA metadata into the reserved tail of an ESP32 app image.
+"""Write MobMesh OTA metadata at the end of the ESP32 app descriptor.
 
-The 80 bytes at offsets 208-288 are zero in every stock build. Writing there leaves a
-normal flashable image, but the segment checksum byte and the appended SHA-256 must both
-be recomputed or esptool image-info rejects the result.
+Layout version 1 occupies bytes 252-287, leaving lower reserved bytes to IDF.
+The checksum byte and appended SHA-256 are recomputed after stamping.
 
-Layout, version 0x01:
-    208   8  magic "MOBMESH\\0" -- identifies the block; the layout version, not the
-                magic, changes when the fields below move
-    216   1  layout version
-    217   1  flags
-    218   2  reserved
-    220  16  upstream version   e.g. "v1.17.1"
-    236  12  repo short sha     e.g. "ceb8915"
-    248  24  board/role         e.g. "heltec_v4/repeater"
-    272   4  mod bitfield, u32 LE -- which mods this image actually carries
-    276  12  reserved
+    252  12  upstream version (NUL-padded ASCII)
+    264   8  repo short SHA (NUL-padded ASCII)
+    272   4  mod bitfield, u32 little-endian
+    276   2  board ID, u16 little-endian
+    278   1  role ID
+    279   1  layout version (1)
+    280   8  magic "MOBMESH\\0"
 """
 
 import argparse
@@ -30,8 +25,8 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from project_config import ProjectModel, ProjectModelError
 
-RESERVED_OFFSET = 208
-RESERVED_LEN = 80
+RESERVED_OFFSET = 252
+RESERVED_LEN = 36
 MAGIC = b"MOBMESH\0"
 LAYOUT_VERSION = 0x01
 
@@ -42,17 +37,13 @@ HASH_APPENDED_OFFSET = 23
 CHECKSUM_SEED = 0xEF
 DIGEST_LEN = 32
 
-FIELDS = [
-    ("magic", 208, 8),
-    ("layout_version", 216, 1),
-    ("flags", 217, 1),
-    ("_pad", 218, 2),
-    ("upstream_version", 220, 16),
-    ("repo_sha", 236, 12),
-    ("board_role", 248, 24),
-    ("mods", 272, 4),
-    ("_reserved", 276, 12),
-]
+READ_FIELDS = (
+    ("upstream_version", -28, 12),
+    ("repo_sha", -16, 8),
+    ("mods", -8, 4),
+    ("board_id", -4, 2),
+    ("role_id", -2, 1),
+)
 
 
 class ImageError(Exception):
@@ -159,15 +150,19 @@ def resolve_mod_bits(data, claimed, registry):
     return bits
 
 
-def build_payload(upstream_version, repo_sha, board, role, mods=0, flags=0x00):
+def build_payload(upstream_version, repo_sha, board_id, role_id, mods=0):
+    if not isinstance(board_id, int) or isinstance(board_id, bool) or not 1 <= board_id <= 65535:
+        raise ImageError("board ID must be from 1 to 65535")
+    if not isinstance(role_id, int) or isinstance(role_id, bool) or not 1 <= role_id <= 255:
+        raise ImageError("role ID must be from 1 to 255")
+    if not 0 <= mods <= 0xffffffff:
+        raise ImageError("mods out of range")
     payload = bytearray(RESERVED_LEN)
-    payload[0:8] = MAGIC
-    payload[8] = LAYOUT_VERSION
-    payload[9] = flags
-    payload[12:28] = field(upstream_version, 16, "upstream version")
-    payload[28:40] = field(repo_sha, 12, "repo sha")
-    payload[40:64] = field(f"{board}/{role}", 24, "board/role")
-    payload[64:68] = struct.pack("<I", mods)
+    payload[0:12] = field(upstream_version, 12, "upstream version")
+    payload[12:20] = field(repo_sha, 8, "repo sha")
+    struct.pack_into("<IHB", payload, 20, mods, board_id, role_id)
+    payload[27] = LAYOUT_VERSION
+    payload[28:36] = MAGIC
     return bytes(payload)
 
 
@@ -197,20 +192,25 @@ def patch(data, payload):
 
 
 def read_metadata(data):
-    """Read back what patch() wrote. None when the area holds no recognised payload."""
-    region = bytes(data[RESERVED_OFFSET:RESERVED_OFFSET + RESERVED_LEN])
-    if region[0:8] != MAGIC:
+    """Find layout 1 by its trailing magic anywhere in the descriptor's reserved tail."""
+    if len(data) < 288:
         return None
-    out = {"layout_version": region[8], "flags": region[9]}
-    for name, offset, length in FIELDS:
-        if name.startswith("_") or name in ("magic", "layout_version", "flags"):
+    reserved = bytes(data[208:288])
+    for marker in range(len(reserved) - len(MAGIC) + 1):
+        if reserved[marker:marker + len(MAGIC)] != MAGIC:
             continue
-        raw = region[offset - RESERVED_OFFSET:offset - RESERVED_OFFSET + length]
-        if name == "mods":
-            out[name] = struct.unpack("<I", raw)[0]
+        if marker < 28 or reserved[marker - 1] != LAYOUT_VERSION:
             continue
-        out[name] = raw.split(b"\0", 1)[0].decode("ascii")
-    return out
+        out = {"layout_version": reserved[marker - 1]}
+        for name, offset, length in READ_FIELDS:
+            raw = reserved[marker + offset:marker + offset + length]
+            if name in ("mods", "board_id", "role_id"):
+                out[name] = int.from_bytes(raw, "little")
+                continue
+            out[name] = raw.split(b"\0", 1)[0].decode("ascii")
+        if out["board_id"] and out["role_id"]:
+            return out
+    return None
 
 
 def describe_mods(bits, registry):
@@ -225,8 +225,8 @@ def main():
     parser.add_argument("--out", type=Path, help="output path (default: patch in place)")
     parser.add_argument("--upstream-version")
     parser.add_argument("--repo-sha")
-    parser.add_argument("--board")
-    parser.add_argument("--role")
+    parser.add_argument("--board-id", type=int)
+    parser.add_argument("--role-id", type=int)
     parser.add_argument(
         "--mods",
         default="",
@@ -256,7 +256,7 @@ def main():
         print(f"  mods 0x{metadata['mods']:08x} -> {describe_mods(metadata['mods'], load_mod_registry())}")
         return 0
 
-    missing = [n for n in ("upstream_version", "repo_sha", "board", "role") if not getattr(args, n)]
+    missing = [n for n in ("upstream_version", "repo_sha", "board_id", "role_id") if not getattr(args, n)]
     if missing:
         parser.error("--" + ", --".join(n.replace("_", "-") for n in missing) + " required unless --check")
 
@@ -264,7 +264,7 @@ def main():
         registry = load_mod_registry()
         claimed = [name for name in args.mods.split(",") if name]
         mods = resolve_mod_bits(data, claimed, registry)
-        payload = build_payload(args.upstream_version, args.repo_sha, args.board, args.role, mods)
+        payload = build_payload(args.upstream_version, args.repo_sha, args.board_id, args.role_id, mods)
         out = patch(data, payload)
     except ImageError as error:
         print(f"::error::{args.image}: {error}", file=sys.stderr)

@@ -328,8 +328,8 @@ jobs:
           python3 scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" \
             --upstream-version "${{ steps.pick.outputs.version }}" \
             --repo-sha "$(echo "${{ github.sha }}" | cut -c1-7)" \
-            --board "${{ matrix.board_id }}" \
-            --role "${{ matrix.ota_role }}" \
+            --board-id "${{ matrix.ota_board_id }}" \
+            --role-id "${{ matrix.ota_role_id }}" \
             --mods "${{ join(matrix.mods, ',') }}" \
             --show
 

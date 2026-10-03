@@ -7,6 +7,7 @@
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
 #include <esp_sntp.h>
+#include <esp_wifi.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <time.h>
@@ -39,7 +40,7 @@
 // Keep referenced: --gc-sections drops an unreferenced build marker.
 static const char OTA_MOD_MARKER[] = "H0TSP0T";   // must never change
 
-// Metadata occupies 80 bytes at a fixed offset in esp_app_desc_t's reserved tail.
+// Layout 1 metadata is found by its trailing magic within the app descriptor's reserved tail.
 #define OTA_META_OFFSET        208
 #define OTA_META_LEN           80
 #define OTA_META_MIN_BYTES     (OTA_META_OFFSET + OTA_META_LEN)   // decided in the first packet
@@ -52,21 +53,28 @@ static const char OTA_META_MAGIC[] = "MOBMESH";   // must never change -- 7 char
 #define MOD_BIT_HOTSPOT_OTA   (1u << 1)
 
 struct OtaMetadata {
-  char upstream_version[17];
-  char repo_sha[13];
-  char board_role[25];
+  char upstream_version[13];
+  char repo_sha[9];
+  uint16_t board_id;
+  uint8_t role_id;
   uint32_t mods;
 };
 
-// Layout version 0x01 only: a newer layout may have moved the fields below.
+// The 28 bytes before the magic are the layout 1 record. A relocated record is readable.
 static bool parseMetadata(const uint8_t* block, OtaMetadata& out) {
-  if (memcmp(block, OTA_META_MAGIC, OTA_META_MAGIC_LEN) != 0) return false;
-  if (block[8] != 0x01) return false;
-  memcpy(out.upstream_version, block + 12, 16);  out.upstream_version[16] = 0;
-  memcpy(out.repo_sha, block + 28, 12);          out.repo_sha[12] = 0;
-  memcpy(out.board_role, block + 40, 24);        out.board_role[24] = 0;
-  memcpy(&out.mods, block + 64, sizeof(out.mods));   // u32 LE, same byte order both ends
-  return true;
+  for (size_t offset = 0; offset + OTA_META_MAGIC_LEN <= OTA_META_LEN; ++offset) {
+    if (memcmp(block + offset, OTA_META_MAGIC, OTA_META_MAGIC_LEN) != 0) continue;
+    if (offset < 28 || block[offset - 1] != 1) continue;
+    const uint8_t* record = block + offset - 28;
+    memcpy(out.upstream_version, record, 12); out.upstream_version[12] = 0;
+    memcpy(out.repo_sha, record + 12, 8); out.repo_sha[8] = 0;
+    out.mods = (uint32_t)record[20] | ((uint32_t)record[21] << 8)
+             | ((uint32_t)record[22] << 16) | ((uint32_t)record[23] << 24);
+    out.board_id = (uint16_t)record[24] | ((uint16_t)record[25] << 8);
+    out.role_id = record[26];
+    if (out.board_id && out.role_id) return true;
+  }
+  return false;
 }
 
 // The same block from the partition this node booted, to compare against an incoming image.
@@ -83,7 +91,7 @@ bool HotspotOTA::runningMetadata(char* version, char* sha, char* role) {
   if (!runningMetadata(meta)) return false;
   strcpy(version, meta.upstream_version);
   strcpy(sha, meta.repo_sha);
-  strcpy(role, meta.board_role);
+  snprintf(role, 25, "board %u / role %u", meta.board_id, meta.role_id);
   return true;
 }
 
@@ -597,8 +605,9 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, ch
         // A build of this project, but without the OTA mod -- flashing it strands this node.
         refusal = "ERR: image has no OTA support, would lose remote-update ability -- aborting";
       } else if (runningMetadata(running)) {
-        if (strcmp(running.board_role, incoming.board_role) != 0) {
-          sprintf(reply, "ERR: image is for %s, this node is %s", incoming.board_role, running.board_role);
+        if (running.board_id != incoming.board_id || running.role_id != incoming.role_id) {
+          sprintf(reply, "ERR: image is for board %u/role %u, this node is board %u/role %u",
+                  incoming.board_id, incoming.role_id, running.board_id, running.role_id);
           refusal = reply;
         } else if (!bypass_marker_check
                    && strcmp(running.upstream_version, incoming.upstream_version) == 0
@@ -675,6 +684,17 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, ch
   return true;
 }
 
+static bool stopWifiRadio() {
+  if (WiFi.getMode() & WIFI_MODE_STA) {
+    WiFi.disconnect(false);
+    delay(50);
+  }
+  bool stopped = WiFi.mode(WIFI_OFF);
+  wifi_mode_t idf_mode;
+  return stopped && WiFi.getMode() == WIFI_OFF &&
+         esp_wifi_get_mode(&idf_mode) == ESP_ERR_WIFI_NOT_INIT;
+}
+
 static bool wanStateMatches(const WanRuntimeState& initial) {
   if (WiFi.getMode() != initial.wifi_mode) return false;
   bool connected = WiFi.status() == WL_CONNECTED;
@@ -695,8 +715,11 @@ static bool restoreWanState(const WanRuntimeState& initial, const HotspotOtaConf
     }
     if (wifi_ok) WiFi.mode(initial.wifi_mode);
   } else {
-    WiFi.disconnect(true);
-    wifi_ok = WiFi.mode(initial.wifi_mode);
+    if (initial.wifi_mode == WIFI_OFF) wifi_ok = stopWifiRadio();
+    else {
+      WiFi.disconnect(false);
+      wifi_ok = WiFi.mode(initial.wifi_mode);
+    }
   }
 
   pinMode(PIN_HOTSPOT_PWR, OUTPUT);
@@ -782,8 +805,7 @@ static void serviceTaskMain(void*) {
   if (kind == ServiceKind::Ota) {
     ok = runService(cfg, bypass_marker_check, result);
     digitalWrite(PIN_HOTSPOT_PWR, LOW);
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
+    if (!stopWifiRadio() && !ok) strcpy(result, "ERR: WiFi shutdown failed; reboot to clear");
   } else if (kind == ServiceKind::WanVerify) {
     ok = runWanVerify(cfg, initial, result);
   } else {
@@ -1187,7 +1209,9 @@ bool HotspotOTA::wifiConnect(char reply[]) {
   digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // hotspot needs power before its AP exists to join
 
   if (!joinWifiStation(cfg.ssid, cfg.password, reply, OTA_DIAG_WIFI_JOIN_ATTEMPTS, false, true)) {
+    bool stopped = stopWifiRadio();
     digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    if (!stopped) strcpy(reply, "ERR: WiFi shutdown failed; reboot to clear");
     return false;
   }
 
@@ -1195,12 +1219,24 @@ bool HotspotOTA::wifiConnect(char reply[]) {
   return true;
 }
 
-void HotspotOTA::wifiDisconnect() {
-  if (HotspotOTA::isActive()) return;
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
+bool HotspotOTA::wifiDisconnect() {
+  if (HotspotOTA::isActive()) return false;
+  bool stopped = stopWifiRadio();
   digitalWrite(PIN_HOTSPOT_PWR, LOW);
   session_ended = true;   // poll() acts after this command's reply has gone out
+  return stopped;
+}
+
+void HotspotOTA::radioStatus(char reply[]) {
+  wifi_mode_t mode = WiFi.getMode();
+  wifi_mode_t idf_mode;
+  esp_err_t idf = esp_wifi_get_mode(&idf_mode);
+  const char* driver = idf == ESP_OK ? "yes" :
+                       idf == ESP_ERR_WIFI_NOT_INIT ? "no" : "error";
+  snprintf(reply, MAX_TEXT_LEN, "> wifi:%s driver:%s link:%s pwr:%s",
+           mode == WIFI_OFF ? "off" : "on", driver,
+           WiFi.status() == WL_CONNECTED ? "up" : "down",
+           HotspotOTA::getPower() ? "on" : "off");
 }
 
 bool HotspotOTA::checkWan(char reply[]) {

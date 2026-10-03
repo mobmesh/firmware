@@ -1,8 +1,13 @@
 # Mod bit registry
 
-Every firmware image carries a `u32` at file offset 272 naming which mods it was built
-with. One bit per mod, little-endian. `scripts/patch_ota_metadata.py` writes it;
-that script's module docstring describes the block it sits in.
+The writer places the **mod bitfield** (`u32`, little-endian) at file offset 272.
+The **metadata magic** `MOBMESH\0` begins at 280. Readers find that magic within
+the descriptor's reserved tail and read the bitfield nine bytes before it, so
+the record can move without changing the reader. One bit identifies each mod;
+`scripts/patch_ota_metadata.py` defines the complete record.
+
+The `marker` column below names strings compiled into each mod's code to prove
+the mod is present during stamping. Those strings are distinct from the metadata magic.
 
 ## The register
 
@@ -30,8 +35,8 @@ what lets a clear bit mean *absent* rather than *unknown*.
 reading a new image would misidentify what it is holding. A retired mod's row stays, marked
 retired, and the next mod takes the next free bit.
 
-**32 bits is a lifetime budget, not a concurrent one.** Widening to `u64` is possible later
-under a layout version bump; the 12 reserved bytes after the field are there for it.
+**32 bits is a lifetime budget, not a concurrent one.** Widening to `u64` requires
+a layout revision and a corresponding update to every reader.
 
 ## Adding a mod to the register
 

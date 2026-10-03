@@ -5,11 +5,20 @@ export function flashedModBits(plan) {
   for (const file of plan.files) {
     const bytes = file.data instanceof Uint8Array ? file.data : new Uint8Array(file.data);
     if (file.address < 0x10000 || bytes[0] !== 0xe9) continue;
-    if (bytes.length < 288 || !META_MAGIC.every((value, i) => bytes[208+i] === value)) {
+    if (bytes.length < 288) throw new Error('Enhanced firmware has no supported mod metadata; regional setup cannot be selected safely.');
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let marker = -1;
+    for (let offset = 208; offset <= 280; offset++) {
+      if (offset >= 236 && bytes[offset - 1] === 1 && META_MAGIC.every((value, i) => bytes[offset + i] === value) &&
+          view.getUint16(offset - 4, true) && bytes[offset - 2]) {
+        marker = offset;
+        break;
+      }
+    }
+    if (marker < 0) {
       throw new Error('Enhanced firmware has no supported mod metadata; regional setup cannot be selected safely.');
     }
-    if (bytes[216] !== 1) throw new Error('Unsupported enhanced firmware metadata version.');
-    return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(272, true);
+    return view.getUint32(marker - 8, true);
   }
   throw new Error('Enhanced flash plan has no application image.');
 }
