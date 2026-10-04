@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 470" role="img" aria-labelledby="title desc">
+  <title id="title">A tryset trial and its four possible endings</title>
+  <desc id="desc">Tryset remembers the original setting, applies a temporary value, and starts a countdown. Keep confirms the value while any trial is active. Revert, timeout, and reboot are grouped as conditions that restore the original value. Once the trial has reverted, there is nothing to keep.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker><style>.bg{fill:#18212b}.card{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.body{font:14px system-ui,sans-serif;fill:#b0c1cd}.small{font:700 13px system-ui,sans-serif;fill:#b0c1cd}.line{fill:none;stroke:#7e9eac;stroke-width:2.5;marker-end:url(#arrow)}</style></defs>
+  <rect class="bg" width="1000" height="470" rx="28"/>
+  <text class="head" x="40" y="48">Try a setting without getting stranded</text>
+  <text class="sub" x="40" y="75">The original value stays available until the trial is kept or ends.</text>
+  <rect class="card" x="40" y="118" width="245" height="105" rx="22"/>
+  <text class="label" x="58" y="159">Remember original</text><text class="body" x="58" y="188">Saved setting or radio config</text>
+  <path class="line" d="M285 170H324"/>
+  <rect class="card" x="324" y="118" width="281" height="105" rx="22"/>
+  <text class="label" x="342" y="159">Apply trial value</text><text class="body" x="342" y="188">One trial at a time</text>
+  <path class="line" d="M605 170H644"/>
+  <rect x="644" y="118" width="316" height="105" rx="22" fill="#263b46" stroke="#517c88" stroke-width="1.5"/>
+  <text class="label" x="662" y="159">Trial period begins</text><text class="body" x="662" y="188">The setting stays temporary</text>
+  <text class="small" x="40" y="263">HOW THE TRIAL ENDS</text>
+  <rect x="40" y="281" width="214" height="127" rx="22" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
+  <text class="label" x="58" y="316">Keep</text><text class="body" x="58" y="344">Confirm during trial</text><text class="body" x="58" y="368">Retain trial value</text>
+  <rect x="274" y="281" width="686" height="127" rx="22" fill="#1d2b36" stroke="#456172" stroke-width="1.5"/>
+  <text class="small" x="292" y="306">REVERT CONDITIONS — RESTORE ORIGINAL VALUE</text>
+  <rect x="290" y="318" width="207" height="76" rx="17" fill="#263b46" stroke="#517c88" stroke-width="1.5"/>
+  <text class="label" x="306" y="348">Revert</text><text class="body" x="306" y="375">On command</text>
+  <rect x="505" y="318" width="207" height="76" rx="17" fill="#263b46" stroke="#517c88" stroke-width="1.5"/>
+  <text class="label" x="521" y="348">Timeout</text><text class="body" x="521" y="375">When time expires</text>
+  <rect x="720" y="318" width="224" height="76" rx="17" fill="#263b46" stroke="#517c88" stroke-width="1.5"/>
+  <text class="label" x="736" y="348">Reboot</text><text class="body" x="736" y="375">During startup</text>
+  <text class="sub" x="40" y="446">Keep confirms only during the active trial, proving the node is reachable with the new settings.</text>
+</svg>

@@ -1,0 +1,793 @@
+/* Components the shared sheet does not have yet.
+   Nothing here may redefine a shared token. */
+
+:root {
+  /* A floor, not a ceiling: short steps pad out to it, long ones grow past rather
+     than scrolling. GCM's max-w-2xl is the panel alone; .wrap's 20px sides sit outside. */
+  --cell-w: 784px;
+  --cell-min-h: 600px;
+
+  /* GCM sets headings in Space Grotesk (`font-display`) and body in Inter. The
+     shared sheet only ever loaded Inter, so headings were the wrong face. */
+  --choice-gap: 1rem;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Spread -40 against blur 80 puts the visible reach at blur/2 - spread = 0px, so it
+     pools under the card instead of haloing around it. Colour is gulf-500, the darker teal. */
+  --glow-accent: 0 30px 80px -40px rgba(17, 182, 164, 0.4);
+  /* Teal at 45%: a full-strength opaque edge reads as harsh. */
+  --hover-edge: rgba(45, 209, 189, 0.45);
+}
+
+/* Loaded after shared/style.css, so these win for this page only. */
+.tile:hover,
+.board-tile:hover {
+  border-color: var(--hover-edge);
+  box-shadow: var(--glow-accent);
+}
+
+/* GCM: font-display, semibold — never Inter 700/800. */
+.page-header h1,
+.step-title,
+.choice-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+/* GCM's .btn is `text-sm font-semibold` with symmetric `px-6 py-3`; the shared
+   sheet's is 16px/700 with a bottom-heavy pad. Scoped here, not in shared. */
+.wrap button.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+}
+
+.wrap {
+  width: clamp(320px, 94%, 960px);
+  padding-top: 2.75rem;
+}
+
+/* .card supplies the surface; this sets the floor. The panel grows with its content. */
+.cell {
+  min-height: var(--cell-min-h);
+  padding: 3rem;
+  width: 100%;
+  max-width: var(--cell-w);
+  margin-inline: auto;
+}
+
+.step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Shrink-wraps its text: fixed trailing space here reads as gap *above* the body and
+   drops a centred step visibly low. Centring supplies the separation instead. */
+.step-head {
+  flex: none;
+}
+
+.step-head .step-desc {
+  margin-bottom: 0;
+}
+
+/* A list step is top-aligned, so it needs the gap the centred ones get for free. */
+.step-body:not(.is-centred) {
+  padding-top: 1.5rem;
+}
+
+.step-foot:empty {
+  padding-top: 0;
+}
+
+/* Against a min-height, `height: 100%` collapses to auto, leaving the body's `flex: 1`
+   nothing to expand into and dropping every centred step to the top of the card. */
+.step {
+  flex: 1;
+}
+
+/* Grows with its content; the page scrolls, not the panel. */
+.step-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0.25rem;
+  margin: 0 -0.25rem;
+}
+
+.step-foot {
+  flex: none;
+  padding-top: 1rem;
+}
+
+/* Out of flow: in the footer the link's height re-centres the body and lifts the
+   choice cards ~27px above where they sit on every other step. */
+.step-foot:has(.aside-link) {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding-top: 0;
+}
+
+/* Vertically centres a short step (connect, the binary choice) without letting a
+   long one lose its scroll. */
+.step-body.is-centred {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* The shared sheet leaves both the badge and the h1 inline-flex, so they share a
+   line whenever the title is short enough to fit. Force the badge onto its own. */
+.page-header .badge-pill {
+  display: flex;
+  width: fit-content;
+  margin-inline: auto;
+}
+
+/* Matches the shipped flasher's two-tone h1, where the accent half is the
+   location button. Static here until that selector has a home. */
+.title-lead {
+  color: var(--accent);
+}
+
+/* ---- Binary choice ---- */
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 560px) {
+  .choice-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.choice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--fg);
+  padding: 1.4rem 1.3rem 1.5rem;
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+/* 1px ring lit at the top-left and bottom-right corners only, masked to the border
+   rather than the fill, so the card reads as catching light from one direction. */
+.tile,
+.board-tile {
+  position: relative;
+}
+
+.choice::before,
+.tile::before,
+.board-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 22%,
+    rgba(255, 255, 255, 0) 78%, rgba(255, 255, 255, 0.21) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.choice:hover {
+  transform: translateY(-2px);
+  border-color: var(--hover-edge);
+  box-shadow: var(--glow-accent);
+}
+
+.choice:active { transform: translateY(0); }
+
+.choice-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 1rem;
+  background: var(--accent-soft);
+  border: 1px solid rgba(45, 209, 189, 0.28);
+  color: var(--accent);
+  flex: none;
+}
+
+/* Spacing follows GCM's mt-5 / mt-2 rather than one uniform gap. */
+.choice-text {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1.25rem;
+}
+
+.choice-title {
+  font-size: 1.125rem;
+}
+
+.choice-desc {
+  margin-top: 0.5rem;
+  color: var(--fg-muted);
+  font-size: 0.875rem;
+  line-height: 1.625;
+}
+
+/* Three or more options stack, and each card lays out horizontally: a 3-column grid
+   at this width leaves ~168px per card, too narrow for the descriptions to read. */
+.choice-grid.is-stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.choice-grid.is-stacked .choice {
+  flex-direction: row;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 1.1rem 1.3rem;
+}
+
+.choice-grid.is-stacked .choice-text {
+  margin-top: 0;
+}
+
+.choice-grid.is-stacked .choice-desc {
+  margin-top: 0.2rem;
+}
+
+/* The shared .tile-icon is sized for an <img>; a glyph has to be centred in it. */
+.tile-icon.is-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+/* Icon in its own column, label stacked over its note. As a flex row in the shared
+   sheet the note ran inline, so labels wrapped and no two descriptions lined up. */
+.tile-with-icon {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.9rem;
+  row-gap: 0.15rem;
+  padding: 1rem 1.1rem;
+}
+
+.tile-with-icon .tile-icon {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.tile-with-icon strong {
+  grid-column: 2;
+  margin-bottom: 0;
+}
+
+.tile-with-icon small {
+  grid-column: 2;
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+/* balanceTileRows() sets a max-width to keep rows even; without this the capped
+   list would sit left instead of centred. */
+.board-tiles {
+  margin-inline: auto;
+}
+
+/* `--tile-delay` is set per tile by ui.js: a diagonal wave needs the column count,
+   which is only known there. Row layouts stay still -- a list is not a grid. */
+.board-tiles > .board-tile,
+.choice-grid > .choice {
+  animation: tile-rise 0.38s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: var(--tile-delay, 0ms);
+}
+
+@keyframes tile-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* A logo wants no frame; the gradient plate is there to sit behind a board photo. */
+.board-tile-icon[data-noplate] {
+  background: none;
+  border: 0;
+}
+
+/* Holds the plate for filtered art. The bitmap fills it and carries the filter alone. */
+.board-tile-icon.is-framed {
+  display: block;
+  overflow: hidden;
+}
+
+.board-tile-icon.is-framed img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* `[data-nodim]` is art from our own override file, already drawn for this card. */
+.board-tiles[data-source="stock"] .board-tile-icon:not(.is-placeholder):not([data-nodim]) {
+  opacity: 0.5;
+}
+
+/* The shared sheet sizes .board-tile-icon for an <img>; as a placeholder it has to
+   centre a glyph instead. Same box, same gradient chip. */
+.board-tile-icon.is-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  opacity: 0.5;
+}
+
+/* ---- Location step ---- */
+
+/* GCM centres this screen's heading; every other step stays left-aligned. */
+.step-head.is-centred {
+  text-align: center;
+}
+
+.map-wrap {
+  position: relative;
+}
+
+/* The ratio holds the shape as the card narrows; the min-height keeps it usable on a
+   phone. A measured height either way: the map renders an empty canvas without one. */
+.map-frame {
+  aspect-ratio: 1.8;
+  min-height: 240px;
+}
+
+/* Overlay chips, borrowed from GCM: the map explains itself rather than relying on a
+   caption underneath it. */
+.map-hint,
+.map-empty {
+  position: absolute;
+  pointer-events: none;
+  z-index: 500;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Both hints wear the same pill. */
+.map-hint,
+.map-empty > span {
+  padding: 0.25rem 0.55rem;
+  border-radius: var(--radius-full);
+  background: rgba(6, 18, 31, 0.9);
+}
+
+/* Bottom-right corner. Leaflet's controls sit at 1000, so this has to clear them to cover
+   the attribution rather than sit behind it. */
+.map-hint {
+  right: 0;
+  bottom: 4px;
+  z-index: 1001;
+  color: var(--fg-muted);
+  font-size: 0.56rem;
+  letter-spacing: 0.16em;
+}
+
+.map-empty {
+  inset: 0;
+  transition: opacity 0.18s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+}
+
+/* Uncovers the map the moment the pointer is over it — by then the instruction has
+   been read and it is only in the way of the place being aimed at. */
+.map-wrap:hover .map-empty {
+  opacity: 0;
+}
+
+.map-empty[hidden] { display: none; }
+
+.location-form {
+  display: flex;
+  flex-direction: column;
+  /* GCM's space-y-5. */
+  gap: 1.25rem;
+}
+
+/* The shared sheet gives .field a 24px bottom margin, which flex `gap` does not collapse
+   -- every field was separated by 37.6px. The gap owns spacing in this form. */
+.location-form .field {
+  margin-bottom: 0;
+}
+
+.map-frame {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-1);
+}
+
+/* `display: grid` outranks the UA's [hidden] rule, so it needs saying explicitly. */
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.coord-row[hidden] {
+  display: none;
+}
+
+.coord-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.coord {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.coord .field {
+  margin-top: 0.35rem;
+  font-family: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+  font-size: 0.9rem;
+}
+
+/* `:has(.identity-line)` matches a hidden one too, and space-between left-aligns a
+   lone child, walking the button across the card on an Upgrade. */
+.step-foot:has(.identity-line:not([hidden])) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.step-foot:has(.identity-line:not([hidden])) .actions { margin-top: 0; }
+
+/* Sits directly under its field: the negative margin cancels .location-form's gap.
+   Same face and size as .identity-line -- at equal px, Inter reads larger than mono. */
+.field-note {
+  /* 4px in from the field's rounded edge, so it reads as belonging to it. */
+  margin: -1rem 0 0 4px;
+  color: var(--fg-muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.identity-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  /* Same treatment as .field-note: sentence case, no tracking, no extra weight. */
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--fg-muted);
+}
+
+/* mobmesh.org's .gcm-mark-badge scaled down: knocked out of a teal-to-amber chip, not
+   drawn in line colour. Their 40px badge carries a 20px glyph and a 12px radius. */
+.identity-mark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 55%, var(--accent-warm) 100%);
+  color: var(--bg-0);
+  box-shadow: 0 0 0.6rem rgba(45, 209, 189, 0.28);
+  opacity: 0.5;
+  flex: none;
+}
+
+.identity-mark svg {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2;
+}
+
+/* The upload escape hatch. Deliberately not a button: it sits beside two real choices
+   and must not compete with them. */
+.aside-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1.25rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+/* Underline the words only -- a glyph inside the underline reads as a broken rule. */
+.aside-link span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.aside-link svg { flex: none; }
+
+.aside-link:hover { color: var(--accent); }
+
+/* The curated list's escape hatch. A pill, not a link: it is an alternative route
+   rather than a footnote to the tiles above it. */
+.aside-pill {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0.25rem auto 0;
+  padding: 0.45rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.aside-pill:hover {
+  border-color: var(--hover-edge);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--fg);
+}
+
+/* The file picker. */
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 15rem;
+  padding: 2rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated-glass);
+  color: var(--fg);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.drop-zone:hover,
+.drop-zone.is-over {
+  border-color: var(--hover-edge);
+  background: var(--bg-elevated);
+}
+
+.drop-zone.is-busy { opacity: 0.6; pointer-events: none; }
+.drop-zone small { color: var(--fg-muted); }
+.drop-icon { color: var(--accent); }
+
+.field-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.82rem;
+}
+
+/* The shared sheet right-aligns .actions; the closing screen centres its one button. */
+.actions.is-centred { justify-content: center; }
+
+/* Byte counter, inside the name field. The input gets room on the right so typed text
+   never runs under it. */
+.name-wrap {
+  position: relative;
+}
+
+.name-wrap input.field {
+  padding-right: 3.4rem;
+}
+
+.name-count {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.5rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.62rem;
+  line-height: 1;
+  color: var(--fg-muted);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.name-count.is-full { color: var(--accent-warm); opacity: 0.9; }
+.name-count.is-over { color: var(--danger); opacity: 1; }
+
+/* Advisory: the firmware stores the name, the advert is what clips. */
+.field-note.is-warn { color: var(--danger); opacity: 0.7; }
+
+/* Reassurance rather than instruction — closer to a watermark than a label, so it sits
+   back until someone goes looking for it. */
+.field-note.is-quiet { opacity: 0.5; }
+
+/* Maximise, within the card. The fields stand down rather than the map covering them, so
+   nothing is hidden behind anything and the card keeps one scroll position. */
+.map-expand {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 900;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(3, 8, 15, 0.75);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.map-expand:hover { color: var(--accent); border-color: var(--hover-edge); }
+
+/* The ratio governs the collapsed map; expanded, the height is the point, so the ratio
+   has to be released or the box keeps deriving its own. */
+.step.is-map-expanded .map-frame {
+  aspect-ratio: auto;
+  height: min(70vh, 620px);
+}
+.step.is-map-expanded .field,
+.step.is-map-expanded .field-row,
+.step.is-map-expanded .field-note,
+.step.is-map-expanded .coord-row,
+.step.is-map-expanded .identity-line,
+.step.is-map-expanded .actions { display: none; }
+
+/* Expanded is the map and nothing else: the counter and heading both belong to the
+   name field, which is hidden here. */
+.step.is-map-expanded .name-count { display: none; }
+.step.is-map-expanded .step-head { display: none; }
+
+/* Expanded is a mode, and the only way out of it is this button — so it stops being
+   quiet chrome and says so. */
+.step.is-map-expanded .map-expand {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 14px rgba(45, 209, 189, 0.35);
+}
+
+.step.is-map-expanded .map-expand:hover {
+  color: var(--fg);
+  box-shadow: 0 0 18px rgba(45, 209, 189, 0.5);
+}
+
+/* MapLibre paints its own light chrome; pull it back to the sheet's palette. Label
+   contrast is set on the style's own layers in ui.js, not by filtering the canvas. */
+.map-frame .maplibregl-map { background: var(--bg-1); }
+.map-frame .maplibregl-canvas { outline: none; }
+
+/* Attribution has to be present for CARTO's and OSM's terms, not read: below
+   .map-hint's z-index so the instruction wins wherever they overlap. */
+.map-frame .maplibregl-ctrl-bottom-right,
+.map-frame .maplibregl-ctrl-bottom-left {
+  z-index: 1000;
+  margin: 0;
+  bottom: 0;
+}
+
+.map-frame .maplibregl-ctrl-attrib {
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 0.48rem;
+  line-height: 1.2;
+  /* Right padding clears .map-hint's own inset, so the credit never peeks past its end. */
+  padding: 0 10px 2px 4px;
+  opacity: 0.45;
+  margin: 0;
+}
+
+.map-frame .maplibregl-ctrl-attrib a { color: var(--fg-muted); text-decoration: none; }
+.map-frame .maplibregl-ctrl-attrib-button { display: none; }
+/* Compact mode collapses to a button; the text is wanted, so keep it expanded. */
+.map-frame .maplibregl-ctrl-attrib.maplibregl-compact-show { padding: 0 4px 1px; }
+
+.map-frame .maplibregl-ctrl-group {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+}
+.map-frame .maplibregl-ctrl-group button { background: transparent; }
+.map-frame .maplibregl-ctrl-group button:hover { background: var(--bg-1); }
+/* The control glyphs are inlined SVG on a light theme; invert rather than replace them. */
+.map-frame .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(0.9); }
+
+/* ---- Anchored back navigation ---- */
+
+.cell-nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 3rem;
+  margin-top: 0.25rem;
+}
+
+.back-link {
+  font: inherit;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  color: var(--accent);
+  opacity: 0.65;
+  cursor: pointer;
+  /* Tight to the label: generous padding fires the hover well before the pointer
+     reaches the text, and edge crossings in that dead space flash the fade. */
+  padding: 0.2rem 0.35rem;
+}
+
+.back-link:hover { opacity: 1; }
+
+.empty-note {
+  margin: 0;
+  color: var(--fg-muted);
+  text-align: center;
+}
+
+/* ---- Connect step ---- */
+
+.connect-art {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+  color: var(--accent);
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--accent);
+  border-radius: var(--radius-full);
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  vertical-align: -3px;
+  margin-right: 0.5rem;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+  .map-empty { transition: none; }
+  .choice { transition: none; }
+  .board-tiles > .board-tile,
+  .choice-grid > .choice { animation: none; }
+}

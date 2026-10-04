@@ -1,0 +1,115 @@
+diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
+index 7519ca4..f50a7aa 100644
+--- a/examples/simple_repeater/MyMesh.cpp
++++ b/examples/simple_repeater/MyMesh.cpp
+@@ -1,6 +1,7 @@
+ #include "MyMesh.h"
+ #include <helpers/ModHooks.h>
+ #include <algorithm>
++#include <helpers/MillisSafe.h>
+ 
+ // Reverse hooks that need MyMesh's own members: ModHooks.cpp sees neither _cli nor the tempradio
+ // timers, and MyMesh.h carries no patch, so state is snapshotted here instead of exposed.
+@@ -559,7 +560,7 @@ int MyMesh::handleRequest(ClientInfo *sender, uint32_t sender_timestamp, uint8_t
+ #if MAX_NEIGHBOURS
+         // add next neighbour to results
+         auto neighbour = sorted_neighbours[index + offset];
+-        uint32_t heard_seconds_ago = getRTCClock()->getCurrentTime() - neighbour->heard_timestamp;
++        uint32_t heard_seconds_ago = safeElapsedSecs(getRTCClock()->getCurrentTime(), neighbour->heard_timestamp);
+         memcpy(&results_buffer[results_offset], neighbour->id.pub_key, pubkey_prefix_length); results_offset += pubkey_prefix_length;
+         memcpy(&results_buffer[results_offset], &heard_seconds_ago, 4); results_offset += 4;
+         memcpy(&results_buffer[results_offset], &neighbour->snr, 1); results_offset += 1;
+@@ -1370,7 +1371,7 @@ void MyMesh::formatNeighborsReply(char *reply) {
+     mesh::Utils::toHex(hex, neighbour->id.pub_key, 4);
+ 
+     // add next neighbour
+-    uint32_t secs_ago = getRTCClock()->getCurrentTime() - neighbour->heard_timestamp;
++    uint32_t secs_ago = safeElapsedSecs(getRTCClock()->getCurrentTime(), neighbour->heard_timestamp);
+     sprintf(dp, "%s:%d:%d", hex, secs_ago, neighbour->snr);
+     while (*dp)
+       dp++; // find end of string
+diff --git a/examples/simple_repeater/UITask.cpp b/examples/simple_repeater/UITask.cpp
+index e722555..9b200d7 100644
+--- a/examples/simple_repeater/UITask.cpp
++++ b/examples/simple_repeater/UITask.cpp
+@@ -2,6 +2,7 @@
+ #include "target.h"
+ #include <Arduino.h>
+ #include <helpers/CommonCLI.h>
++#include <helpers/MillisSafe.h>
+ 
+ #ifndef USER_BTN_PRESSED
+ #define USER_BTN_PRESSED LOW
+@@ -55,7 +56,7 @@ void UITask::begin(NodePrefs* node_prefs, const char* build_date, const char* fi
+ 
+ void UITask::renderCurrScreen() {
+   char tmp[80];
+-  if (millis() < _started_at + BOOT_SCREEN_MILLIS) { // boot screen
++  if (!millis_passed(_started_at + BOOT_SCREEN_MILLIS)) { // boot screen
+     // meshcore logo
+     _display->setColor(UIColor::corp_blue);
+     int logoWidth = 128;
+@@ -127,14 +128,14 @@ void UITask::loop() {
+ #endif
+ 
+   if (_display->isOn()) {
+-    if (millis() >= _next_refresh) {
++    if (millis_passed(_next_refresh)) {
+       _display->startFrame();
+       renderCurrScreen();
+       _display->endFrame();
+ 
+       _next_refresh = millis() + 1000;   // refresh every second
+     }
+-    if (millis() > _auto_off) {
++    if (millis_passed(_auto_off)) {
+       _display->turnOff();
+     }
+   }
+diff --git a/examples/simple_room_server/UITask.cpp b/examples/simple_room_server/UITask.cpp
+index 8e4c2fc..4685a1a 100644
+--- a/examples/simple_room_server/UITask.cpp
++++ b/examples/simple_room_server/UITask.cpp
+@@ -1,6 +1,7 @@
+ #include "UITask.h"
+ #include <Arduino.h>
+ #include <helpers/CommonCLI.h>
++#include <helpers/MillisSafe.h>
+ 
+ #ifndef USER_BTN_PRESSED
+ #define USER_BTN_PRESSED LOW
+@@ -47,7 +48,7 @@ void UITask::begin(NodePrefs* node_prefs, const char* build_date, const char* fi
+ 
+ void UITask::renderCurrScreen() {
+   char tmp[80];
+-  if (millis() < BOOT_SCREEN_MILLIS) { // boot screen
++  if (!millis_passed(BOOT_SCREEN_MILLIS)) { // boot screen
+     // meshcore logo
+     _display->setColor(UIColor::corp_blue);
+     int logoWidth = 128;
+@@ -93,7 +94,7 @@ void UITask::renderCurrScreen() {
+ 
+ void UITask::loop() {
+ #ifdef PIN_USER_BTN
+-  if (millis() >= _next_read) {
++  if (millis_passed(_next_read)) {
+     int btnState = digitalRead(PIN_USER_BTN);
+     if (btnState != _prevBtnState) {
+       if (btnState == USER_BTN_PRESSED) {  // pressed?
+@@ -111,14 +112,14 @@ void UITask::loop() {
+ #endif
+ 
+   if (_display->isOn()) {
+-    if (millis() >= _next_refresh) {
++    if (millis_passed(_next_refresh)) {
+       _display->startFrame();
+       renderCurrScreen();
+       _display->endFrame();
+ 
+       _next_refresh = millis() + 1000;   // refresh every second
+     }
+-    if (millis() > _auto_off) {
++    if (millis_passed(_auto_off)) {
+       _display->turnOff();
+     }
+   }

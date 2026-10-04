@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 430" role="img" aria-labelledby="title desc">
+  <title id="title">A later round fills a missing chunk</title>
+  <desc id="desc">In round one, the announcement and chunks zero and two arrive but chunk one is lost. The subscriber retains the chunks. In the next round, chunk one arrives, completing the saved dataset. The subscriber verifies, saves, and activates it.</desc>
+  <defs><style>.bg{fill:#18212b}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub{font:15px system-ui,sans-serif;fill:#b0c1cd}.row{font:700 17px system-ui,sans-serif;fill:#e1ebf2}.frame{fill:#263b46;stroke:#517c88;stroke-width:1.5}.repeat{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.lost{fill:#362d2d;stroke:#b37667;stroke-width:1.5;stroke-dasharray:6 5}.done{fill:#203d38;stroke:#477f6d;stroke-width:1.5}.txt{font:700 15px system-ui,sans-serif;fill:#e1ebf2}.small{font:14px system-ui,sans-serif;fill:#b0c1cd}.warn{font:700 13px system-ui,sans-serif;fill:#e3a078}.green{font:700 13px system-ui,sans-serif;fill:#8fc8ad}</style></defs>
+  <rect class="bg" width="1000" height="430" rx="28"/>
+  <text class="head" x="40" y="48">A lost chunk can arrive later</text>
+  <text class="sub" x="40" y="75">Each round repeats the same captured update, so the subscriber can fill a gap.</text>
+  <text class="row" x="40" y="151">Round 1</text>
+  <rect class="frame" x="171" y="113" width="182" height="67" rx="18"/><text class="txt" x="191" y="152">Announcement</text>
+  <rect class="frame" x="370" y="113" width="137" height="67" rx="18"/><text class="txt" x="392" y="152">Chunk 0</text>
+  <rect class="lost" x="524" y="113" width="137" height="67" rx="18"/><text class="txt" x="546" y="143">Chunk 1</text><text class="warn" x="546" y="163">LOST</text>
+  <rect class="frame" x="678" y="113" width="137" height="67" rx="18"/><text class="txt" x="700" y="152">Chunk 2</text>
+  <text class="small" x="831" y="140">Keep 0 + 2</text><text class="small" x="831" y="161">while waiting</text>
+  <text class="row" x="40" y="253">Next round</text>
+  <rect class="repeat" x="171" y="215" width="182" height="67" rx="18"/><text class="txt" x="191" y="254">Announcement</text>
+  <rect class="repeat" x="370" y="215" width="137" height="67" rx="18"/><text class="txt" x="392" y="254">Chunk 0</text>
+  <rect class="done" x="524" y="215" width="137" height="67" rx="18"/><text class="txt" x="546" y="245">Chunk 1</text><text class="green" x="546" y="265">RECEIVED</text>
+  <rect class="repeat" x="678" y="215" width="137" height="67" rx="18"/><text class="txt" x="700" y="254">Chunk 2</text>
+  <path d="M40 323H960" fill="none" stroke="#3d5262" stroke-width="1.5"/>
+  <text class="row" x="40" y="366">Subscriber</text>
+  <rect class="done" x="171" y="332" width="236" height="61" rx="18"/><text class="txt" x="189" y="370">Complete: 0 + 1 + 2</text>
+  <text x="421" y="370" fill="#8fb0be" font="700 23px system-ui">→</text>
+  <rect class="done" x="461" y="332" width="215" height="61" rx="18"/><text class="txt" x="479" y="370">Verify and save</text>
+  <text x="690" y="370" fill="#8fb0be" font="700 23px system-ui">→</text>
+  <rect class="done" x="730" y="332" width="185" height="61" rx="18"/><text class="txt" x="748" y="370">Activate</text>
+</svg>

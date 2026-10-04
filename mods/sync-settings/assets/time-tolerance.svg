@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 390" role="img" aria-labelledby="title desc">
+  <title id="title">Time samples correct clocks outside the tolerance band</title>
+  <desc id="desc">A trusted publisher sends one fresh signed time sample. A receiver with a clock more than 20 minutes slow moves forward, one within 20 minutes either way stays unchanged, and one more than 20 minutes fast moves backward. The example tolerance is configurable.</desc>
+  <defs>
+    <style>.bg{fill:#18212b}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub,.body{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.small{font:14px system-ui,sans-serif;fill:#b0c1cd}.axis{stroke:#7e9eac;stroke-width:2}.tick{stroke:#b0c1cd;stroke-width:2}.slow{fill:#263b46;stroke:#517c88;stroke-width:1.5}.band{fill:#203d38;stroke:#477f6d;stroke-width:1.5}.fast{fill:#362f35;stroke:#906b76;stroke-width:1.5}</style>
+  </defs>
+  <rect class="bg" width="1000" height="390" rx="28"/>
+  <text class="head" x="40" y="48">Correct only when the clock is materially wrong</text>
+  <text class="sub" x="40" y="75">One fresh signed sample carries the publisher's time and its tolerance.</text>
+  <text class="small" x="40" y="120">Receiver's clock compared with publisher · 20-minute example</text>
+  <rect class="slow" x="40" y="144" width="285" height="122" rx="22"/>
+  <text class="label" x="60" y="181">More than 20m slow</text>
+  <text class="body" x="60" y="210">Set clock forward</text>
+  <text class="small" x="60" y="239">Example: 21m slow</text>
+  <rect class="band" x="341" y="144" width="318" height="122" rx="22"/>
+  <text class="label" x="361" y="181">Within tolerance</text>
+  <text class="body" x="361" y="210">Leave clock unchanged</text>
+  <text class="small" x="361" y="239">Example: 19m slow or fast</text>
+  <rect class="fast" x="675" y="144" width="285" height="122" rx="22"/>
+  <text class="label" x="695" y="181">More than 20m fast</text>
+  <text class="body" x="695" y="210">Set clock backward</text>
+  <text class="small" x="695" y="239">Example: 21m fast</text>
+  <line class="axis" x1="86" y1="314" x2="914" y2="314"/>
+  <line class="tick" x1="333" y1="303" x2="333" y2="325"/>
+  <line class="tick" x1="500" y1="303" x2="500" y2="325"/>
+  <line class="tick" x1="667" y1="303" x2="667" y2="325"/>
+  <text class="small" x="282" y="348">-20m</text><text class="small" x="482" y="348">0</text><text class="small" x="644" y="348">+20m</text>
+  <text class="small" x="40" y="375">Older or repeated samples are ignored. Corrections already made are not rolled back.</text>
+</svg>

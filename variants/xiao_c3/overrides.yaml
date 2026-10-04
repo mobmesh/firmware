@@ -1,0 +1,56 @@
+ota_board_id: 2
+
+# Override-only board config for xiao_c3: only what this project adds on top of upstream.
+# Every other board fact is read from upstream at generation time by scripts/generate-board-config.py.
+
+
+capabilities:
+  wifi_station: true
+  dual_ota: true
+  battery_measurement: unverified
+  external_power_control: unverified
+  fem_lna_control: false
+  deep_sleep_rail_shutdown: false
+
+# Injected into this board's variant platformio.ini envs; which mods get injected is decided
+# in build-targets.yaml, not here.
+build_values:
+  PIN_HOTSPOT_PWR: 47   # PLACEHOLDER from heltec_v4 -- not confirmed against this board's pinout
+  # Carried over from heltec_v4 as starting defaults, not yet tuned for this board.
+  OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS: 15000
+  OTA_WIFI_JOIN_RETRY_DELAY_MS: 5000
+  OTA_WIFI_JOIN_MAX_ATTEMPTS: 6
+  OTA_HTTP_TIMEOUT_MS: 20000
+  OTA_WPA2_SESSION_LIMIT: 450   # WPA2 sessions per boot before a reboot; sized from this board's heap
+  OTA_DIAG_WIFI_JOIN_ATTEMPTS: 1
+  OTA_WAN_CHECK_ATTEMPTS: 3
+  OTA_WAN_CHECK_RETRY_DELAY_MS: 10000
+  # Radio-failure sleep: doubles from the start value until it reaches the ceiling.
+  OTA_RADIO_FAIL_SLEEP_START_SECS: 60
+  OTA_RADIO_FAIL_SLEEP_MAX_SECS: 900
+
+# Stock 4MB scheme leaves too little OTA app-slot room for hotspot-ota. This shrinks
+# spiffs/coredump to give both slots 0x1D0000, summing to exactly 4MB.
+partitions_override: partitions_xiao_c3.csv
+
+# See variants/heltec_v4/overrides.yaml for what each qemu field means. `mem` is empty on
+# purpose: the esp32c3 machine sets its own 400KB and wedges if given more.
+qemu:
+  enabled: true
+  machine: esp32c3
+  binary: qemu-system-riscv32
+  mcu: esp32c3
+  mem: ""
+  globals:
+    bramble.gpio.strap-mode: 8
+    bramble.gpspi2.cs-gpio: 6
+    bramble.gpspi2.spi-base: "0x60024000"
+
+# Facts needed by the web flasher that aren't derivable from upstream.
+flasher:
+  label: "Xiao ESP32-C3"
+  connect_note: "Put the board into flash mode first (hold BOOT, tap RESET, then release BOOT), then connect over USB."
+  post_flash_note: "Press RESET once to put the board back into normal operation."
+  post_flash_commands:
+    repeater:
+      - "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/xiao_c3.bin"

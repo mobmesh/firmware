@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 390" role="img" aria-labelledby="title desc">
+  <title id="title">Scope of publish.abort</title>
+  <desc id="desc">A publish abort stops unsent data and sends two signed abort notices. A repeater still receiving discards its partial update and retains current settings. A repeater that already applied the campaign retains the applied settings; abort does not roll them back.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker><style>.bg{fill:#18212b}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.body{font:15px system-ui,sans-serif;fill:#b0c1cd}.small{font:14px system-ui,sans-serif;fill:#b0c1cd}.line{fill:none;stroke:#7e9eac;stroke-width:2.5;marker-end:url(#arrow)}</style></defs>
+  <rect class="bg" width="1000" height="390" rx="28"/>
+  <text class="head" x="40" y="48">Scope of publish.abort</text>
+  <text class="sub" x="40" y="75">Abort stops transmission and cancels partial reception; it does not roll back an applied update.</text>
+  <rect x="40" y="153" width="205" height="105" rx="22" fill="#362f35" stroke="#906b76" stroke-width="1.5"/>
+  <text class="label" x="58" y="194">publish.abort</text><text class="body" x="58" y="223">Operator command</text>
+  <path class="line" d="M245 205H291"/>
+  <rect x="291" y="153" width="223" height="105" rx="22" fill="#222f3c" stroke="#3d5262" stroke-width="1.5"/>
+  <text class="label" x="309" y="186">Publisher stops</text><text class="body" x="309" y="211">unsent data; sends two</text><text class="body" x="309" y="234">signed abort notices</text>
+  <path class="line" d="M514 182H574V151H625"/><path class="line" d="M514 229H574V271H625"/>
+  <rect x="625" y="104" width="335" height="100" rx="22" fill="#263b46" stroke="#517c88" stroke-width="1.5"/>
+  <text class="label" x="643" y="139">Still receiving</text><text class="body" x="643" y="165">Discard partial update;</text><text class="body" x="643" y="187">keep current settings</text>
+  <rect x="625" y="223" width="335" height="100" rx="22" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
+  <text class="label" x="643" y="258">Already applied</text><text class="body" x="643" y="284">Keep applied update;</text><text class="body" x="643" y="306">revert w/new campaign</text>
+  <text class="small" x="40" y="359">Abort notices can be lost, so an unconfirmed transmission leaves a warning.</text>
+</svg>

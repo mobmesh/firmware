@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 390" role="img" aria-labelledby="title desc">
+  <title id="title">Firmware probation and rollback</title>
+  <desc id="desc">After new firmware boots, a working radio leads to a 90-second trial and the image is marked good. If the radio fails, the node selects the previous firmware and reboots into it.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker>
+    <style>
+      .bg{fill:#18212b}.card{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.label-small{font:700 16px system-ui,sans-serif;fill:#e1ebf2}.body{font:14px system-ui,sans-serif;fill:#b0c1cd}.tag{font:700 13px system-ui,sans-serif}.line{fill:none;stroke:#7e9eac;stroke-width:2.5;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1000" height="390" rx="28"/>
+  <text class="head" x="42" y="48">Automatic rollback protection</text>
+  <text class="sub" x="42" y="75">The new image stays on probation until the radio proves it can start.</text>
+  <rect class="card" x="42" y="158" width="200" height="88" rx="22"/>
+  <text class="label" x="60" y="195">New image boots</text><text class="body" x="60" y="221">After either OTA path</text>
+  <path class="line" d="M242 202H306"/>
+  <rect x="306" y="142" width="188" height="120" rx="24" fill="#263c49" stroke="#4e788d" stroke-width="1.5"/>
+  <text class="label" x="331" y="191">LoRa radio</text><text class="label" x="331" y="217">working?</text>
+  <path class="line" d="M494 178H569V139H603"/>
+  <text class="tag" x="522" y="160" fill="#3c8c72">YES</text>
+  <rect x="603" y="95" width="160" height="88" rx="22" fill="#222f3c" stroke="#477f6d" stroke-width="1.5"/>
+  <text class="label-small" x="622" y="132">Run 90 seconds</text><text class="body" x="622" y="158">Trial window</text>
+  <path class="line" d="M763 139H801"/>
+  <rect x="801" y="95" width="159" height="88" rx="22" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
+  <text class="label" x="818" y="132">Marked good</text><text class="body" x="818" y="158">Keep new image</text>
+  <path class="line" d="M494 226H569V270H603"/>
+  <text class="tag" x="530" y="252" fill="#e3a078">NO</text>
+  <rect x="603" y="226" width="160" height="88" rx="22" fill="#222f3c" stroke="#86634f" stroke-width="1.5"/>
+  <text class="label" x="622" y="263">Roll back</text><text class="body" x="622" y="289">Select old image</text>
+  <path class="line" d="M763 270H801"/>
+  <rect x="801" y="226" width="159" height="88" rx="22" fill="#3d302a" stroke="#86634f" stroke-width="1.5"/>
+  <text class="label" x="818" y="263">Reboot</text><text class="body" x="818" y="289">Previous image</text>
+  <text class="sub" x="42" y="354">A radio failure returns the node to its previous firmware without a site visit.</text>
+</svg>

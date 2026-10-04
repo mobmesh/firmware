@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 330" role="img" aria-labelledby="title desc">
+  <title id="title">Policy settings travel as one snapshot</title>
+  <desc id="desc">A publisher captures its current native operating settings. One signed announcement and one signed data chunk carry the snapshot through the mesh. A trusted subscriber verifies and saves those values as its native settings. Radio settings and credentials are excluded.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker>
+    <style>.bg{fill:#18212b}.card{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.source{fill:#223c40;stroke:#4c8886;stroke-width:1.5}.dest{fill:#203d38;stroke:#477f6d;stroke-width:1.5}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub,.body{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.small{font:14px system-ui,sans-serif;fill:#b0c1cd}.pill{font:700 13px system-ui,sans-serif;fill:#afd5df}.line{fill:none;stroke:#7e9eac;stroke-width:2.5;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect class="bg" width="1000" height="330" rx="28"/>
+  <text class="head" x="40" y="48">One snapshot, two messages per round</text>
+  <text class="sub" x="40" y="75">A policy campaign carries the publisher's current native operating settings.</text>
+  <rect class="source" x="40" y="110" width="255" height="155" rx="22"/>
+  <text class="label" x="60" y="147">Publisher</text>
+  <text class="body" x="60" y="180">Capture current values</text>
+  <text class="body" x="60" y="205">flood.max · repeat.gate</text>
+  <text class="body" x="60" y="230">and other policy keys</text>
+  <path class="line" d="M295 188H338"/>
+  <rect class="card" x="338" y="110" width="290" height="155" rx="22"/>
+  <text class="label" x="358" y="147">Signed campaign round</text>
+  <rect x="358" y="168" width="123" height="31" rx="15" fill="#324657"/><text class="pill" x="373" y="189">Announcement</text>
+  <rect x="490" y="168" width="117" height="31" rx="15" fill="#31565a"/><text class="pill" x="507" y="189">Data chunk</text>
+  <text class="body" x="358" y="233">Relayed by the existing mesh</text>
+  <path class="line" d="M628 188H671"/>
+  <rect class="dest" x="671" y="110" width="289" height="155" rx="22"/>
+  <text class="label" x="691" y="147">Trusted subscriber</text>
+  <text class="body" x="691" y="180">Verify the complete snapshot</text>
+  <text class="body" x="691" y="205">Apply to native settings</text>
+  <text class="body" x="691" y="230">Save across reboot</text>
+  <text class="small" x="40" y="300">Radio settings and credentials never travel in a policy campaign.</text>
+</svg>

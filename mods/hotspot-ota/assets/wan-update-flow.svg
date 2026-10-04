@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 470" role="img" aria-labelledby="title desc">
+  <title id="title">Remote WAN firmware update</title>
+  <desc id="desc">An operator sends an update command over LoRa. The node powers a hotspot if needed, joins WiFi, checks internet access, downloads firmware, checks metadata and SHA-256, disconnects WiFi and powers the hotspot off, then commits and reboots into the new firmware on probation.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker>
+    <style>
+      .bg{fill:#18212b}.card{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.num{fill:#3b8792}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 17px system-ui,sans-serif;fill:#e1ebf2}.body{font:14px system-ui,sans-serif;fill:#b0c1cd}.small{font:600 13px system-ui,sans-serif;fill:#3b8792}.line{fill:none;stroke:#7e9eac;stroke-width:2.5;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1000" height="470" rx="28"/>
+  <text class="head" x="42" y="48">Remote firmware update</text>
+  <text class="sub" x="42" y="75">One command starts the update; the node handles connectivity, checks, and reboot.</text>
+  <path class="line" d="M219 176H258"/><path class="line" d="M476 176H515"/><path class="line" d="M733 176H772"/>
+  <path class="line" d="M866 230V350H734"/><path class="line" d="M515 350H476"/><path class="line" d="M258 350H219"/>
+  <g>
+    <rect class="card" x="40" y="122" width="179" height="108" rx="22"/>
+    <circle class="num" cx="65" cy="147" r="14"/><text x="65" y="152" text-anchor="middle" fill="white" font="700 13px system-ui">1</text>
+    <text class="label" x="52" y="181">Operator</text><text class="body" x="52" y="204">Start over LoRa</text>
+  </g>
+  <g>
+    <rect class="card" x="258" y="122" width="218" height="108" rx="22"/>
+    <circle class="num" cx="283" cy="147" r="14"/><text x="283" y="152" text-anchor="middle" fill="white" font="700 13px system-ui">2</text>
+    <text class="label" x="270" y="181">Hotspot if needed</text><text class="body" x="270" y="204">Power on and join WiFi</text>
+  </g>
+  <g>
+    <rect class="card" x="515" y="122" width="218" height="108" rx="22"/>
+    <circle class="num" cx="540" cy="147" r="14"/><text x="540" y="152" text-anchor="middle" fill="white" font="700 13px system-ui">3</text>
+    <text class="label" x="527" y="181">Check connection</text><text class="body" x="527" y="204">Internet and clock</text>
+  </g>
+  <g>
+    <rect class="card" x="772" y="122" width="188" height="108" rx="22"/>
+    <circle class="num" cx="797" cy="147" r="14"/><text x="797" y="152" text-anchor="middle" fill="white" font="700 13px system-ui">4</text>
+    <text class="label" x="784" y="181">Download</text><text class="body" x="784" y="204">Firmware binary</text>
+  </g>
+  <g>
+    <rect class="card" x="515" y="296" width="218" height="108" rx="22"/>
+    <circle class="num" cx="540" cy="321" r="14"/><text x="540" y="326" text-anchor="middle" fill="white" font="700 13px system-ui">5</text>
+    <text class="label" x="527" y="355">Check download</text><text class="body" x="527" y="378">Stamp, board, SHA-256</text>
+  </g>
+  <g>
+    <rect class="card" x="258" y="296" width="218" height="108" rx="22"/>
+    <circle class="num" cx="283" cy="321" r="14"/><text x="283" y="326" text-anchor="middle" fill="white" font="700 13px system-ui">6</text>
+    <text class="label" x="270" y="355">Disconnect WAN</text><text class="body" x="270" y="378">Hotspot power off</text>
+  </g>
+  <g>
+    <rect x="40" y="296" width="179" height="108" rx="22" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
+    <circle cx="65" cy="321" r="14" fill="#3c8c72"/><text x="65" y="326" text-anchor="middle" fill="white" font="700 13px system-ui">7</text>
+    <text class="label" x="52" y="355">Commit &amp; reboot</text><text class="body" x="52" y="378">New image on trial</text>
+  </g>
+  <text class="small" x="42" y="442">The previous firmware remains available during the trial.</text>
+</svg>

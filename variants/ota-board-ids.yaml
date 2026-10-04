@@ -1,0 +1,17 @@
+# Permanent OTA board identities. Add a row for each new board before its first release.
+# Keep retired boards here so their IDs cannot be assigned to different hardware.
+board_ids:
+  - id: 1
+    board: heltec_v4
+  - id: 2
+    board: xiao_c3
+  - id: 3
+    board: heltec_v3
+  - id: 4
+    board: xiao_s3_wio
+  - id: 5
+    board: rak3112
+  - id: 6
+    board: ebyte_eora_s3
+  - id: 7
+    board: station_g3_esp32

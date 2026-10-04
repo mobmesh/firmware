@@ -1,0 +1,21 @@
+# Mod-level facts. build_src_filter is derived from what is under files/, so the
+# two cannot drift apart; this mod ships headers only, so it contributes none.
+name: power-guard
+
+env_flags: [WITH_POWER_GUARD]
+
+requirements:
+  required: [battery_measurement]
+  optional: [fem_lna_control, deep_sleep_rail_shutdown]
+
+integration:
+  header: helpers/esp32/PowerGuardIntegration.h
+  hooks:
+    before_radio_init: powerGuardBeforeRadioInit
+    loop: powerGuardLoop
+    wants_power_saving: powerGuardWantsPowerSaving
+    load_allowed: powerGuardLoadAllowed
+    before_deep_sleep: powerGuardBeforeDeepSleep
+    cli:
+      handler: powerGuardHandleCli
+      priority: 200

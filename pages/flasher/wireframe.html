@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MobMesh flasher — flow wireframe</title>
+  <style>
+    :root {
+      --bg: #1b1e22;  --panel: #23272c;  --edge: #343a41;
+      --ink: #d6d2ca;  --dim: #8b929b;  --hot: #e0b080;  --bad: #e08a7a;  --ok: #8fbf9f;
+    }
+    html { color-scheme: dark; scrollbar-gutter: stable; }
+    body {
+      font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: var(--bg); color: var(--ink); margin: 0; padding: 1.5rem 1.75rem 3rem;
+    }
+    h1 { font-size: 1.1rem; font-weight: 600; margin: 0 0 .25rem; letter-spacing: .02em; }
+    h2 { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
+         color: var(--dim); margin: 0 0 .6rem; }
+    p  { color: var(--dim); margin: 0 0 1.25rem; max-width: 60ch; }
+    code { color: var(--hot); }
+    button {
+      font: inherit; display: block; width: 100%; margin: .3rem 0; padding: .45rem .7rem;
+      text-align: left; color: var(--ink); background: var(--panel);
+      border: 1px solid var(--edge); border-radius: 5px; cursor: pointer;
+    }
+    button:has(img) { display: flex; align-items: center; gap: .7rem; }
+    button img { width: 2.6rem; height: 2.6rem; object-fit: contain; flex: none; }
+    button:hover:not(:disabled) { border-color: var(--hot); color: var(--hot); }
+    button:disabled { opacity: .4; cursor: default; }
+    input[type=file] { color: var(--dim); margin: .4rem 0; }
+    .start { display: flex; gap: .6rem; max-width: 34rem; margin-bottom: 1.5rem; }
+    .cols { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
+    .col { flex: 1 1 21rem; min-width: 19rem; }
+    .box { background: var(--panel); border: 1px solid var(--edge); border-radius: 6px;
+           padding: .75rem .9rem; }
+    .title { color: var(--hot); font-weight: 600; margin-bottom: .6rem; }
+    .err  { color: var(--bad); }
+    .done { color: var(--ok); }
+    .now  { color: var(--hot); }
+    .past { color: var(--dim); }
+    #state, #log { white-space: pre-wrap; max-height: 22rem; overflow: auto; }
+    #log { margin-top: .6rem; }
+    #steps div { padding: .05rem 0; }
+    /* serial log — anchored so it is reachable at any point in the flow */
+    #serial-toggle, #release {
+      position: fixed; bottom: 1rem; width: auto; z-index: 20;
+      background: var(--panel); border-color: var(--hot); color: var(--hot);
+      box-shadow: 0 2px 10px rgba(0,0,0,.5);
+    }
+    #serial-toggle { right: 1rem; }
+    #release { right: 10.5rem; border-color: var(--bad); color: var(--bad); }
+    #serial-panel {
+      position: fixed; top: 0; right: 0; bottom: 0; width: min(46rem, 60vw); z-index: 19;
+      display: flex; flex-direction: column;
+      background: var(--panel); border-left: 1px solid var(--edge);
+      box-shadow: -6px 0 24px rgba(0,0,0,.45);
+    }
+    #serial-panel[hidden] { display: none; }
+    #serial-head {
+      display: flex; gap: .4rem; align-items: center;
+      padding: .6rem .8rem; border-bottom: 1px solid var(--edge);
+    }
+    #serial-head h2 { margin: 0 auto 0 0; }
+    #serial-head button { width: auto; margin: 0; padding: .2rem .5rem; font-size: .85em; }
+    #serial-log {
+      flex: 1; overflow: auto; padding: .6rem .8rem 3rem;
+      font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
+    }
+    #serial-log div { padding: .02rem 0; }
+    .s-status { color: var(--hot); }
+    .s-warn { color: #d8b46a; }
+    .s-error { color: var(--bad); }
+    .s-log, .s-info { color: var(--dim); }
+    ::-webkit-scrollbar { width: 9px; height: 9px; }
+    ::-webkit-scrollbar-thumb { background: var(--edge); border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Flow wireframe</h1>
+  <p>No design here on purpose — this exercises the step order in <code>src/flow.js</code>.
+     Dry run skips every hardware call; the chip buttons stand in for the PID Step 1 would read. Add <code>?relay=http://localhost:8787/fw/</code>
+     to use the local relay.</p>
+  <div class="start">
+    <button id="dry-esp32">Dry run — ESP32</button>
+    <button id="dry-nrf52">Dry run — nRF52</button>
+    <button id="live">Start — live device</button>
+  </div>
+  <div class="cols">
+    <div class="col"><h2>Steps</h2><div class="box" id="steps"></div></div>
+    <div class="col"><h2>Current</h2><div class="box" id="panel"></div></div>
+    <div class="col"><h2>State</h2><div class="box" id="state"></div></div>
+  </div>
+  <div style="margin-top:1.5rem"><h2>Log</h2><div class="box" id="log"></div></div>
+  <button id="release">Release port</button>
+  <button id="serial-toggle">Serial log</button>
+  <div id="serial-panel" hidden>
+    <div id="serial-head">
+      <h2>Serial log</h2>
+      <button id="serial-copy">Copy</button>
+      <button id="serial-clear">Clear</button>
+      <button id="serial-close">Close</button>
+    </div>
+    <div id="serial-log"></div>
+  </div>
+  <script type="module" src="src/wireframe.js"></script>
+</body>
+</html>

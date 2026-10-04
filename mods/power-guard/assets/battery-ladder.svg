@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 530" role="img" aria-labelledby="title desc">
+  <title id="title">Heltec V4 battery thresholds on falling and rising voltage</title>
+  <desc id="desc">As voltage falls, automatic power saving starts at 3300 millivolts and safe sleep begins below 2800. As it recovers, the radio may start at or above the 3150 millivolt resume floor, and automatic power saving stops at 3600. The measured boot floor is about 2400 millivolts. The resume floor is checked before radio startup on every boot.</desc>
+  <defs><marker id="down" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#b48470"/></marker><marker id="up" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#69a999"/></marker><style>.bg{fill:#18212b}.panel{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub{font:15px system-ui,sans-serif;fill:#b0c1cd}.lane{font:700 14px system-ui,sans-serif}.mv{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.label{font:700 16px system-ui,sans-serif;fill:#e1ebf2}.body{font:14px system-ui,sans-serif;fill:#b0c1cd}.note{font:14px system-ui,sans-serif;fill:#b0c1cd}</style></defs>
+  <rect class="bg" width="1000" height="530" rx="28"/>
+  <text class="head" x="40" y="48">The thresholds depend on direction</text>
+  <text class="sub" x="40" y="75">Heltec V4 example · gauge millivolts · board-specific, measured values</text>
+  <text class="lane" x="48" y="116" fill="#d3a088">FALLING BATTERY ↓</text>
+  <text class="lane" x="633" y="116" fill="#8fc8ad">RISING BATTERY ↑</text>
+  <rect class="panel" x="40" y="131" width="920" height="329" rx="22"/>
+  <path d="M76 157V416" fill="none" stroke="#b48470" stroke-width="3" marker-end="url(#down)"/>
+  <path d="M924 416V157" fill="none" stroke="#69a999" stroke-width="3" marker-end="url(#up)"/>
+  <path d="M464 170V420" stroke="#617789" stroke-width="3"/>
+  <path d="M440 170H488M440 226H488M440 282H488M440 338H488M440 394H488" stroke="#617789" stroke-width="2"/>
+  <text class="mv" x="502" y="176">3600 mV</text>
+  <text class="mv" x="502" y="232">3300 mV</text>
+  <text class="mv" x="502" y="288">3150 mV</text>
+  <text class="mv" x="502" y="344">2800 mV</text>
+  <text class="mv" x="502" y="400">2400 mV</text>
+  <rect x="633" y="143" width="250" height="55" rx="17" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
+  <text class="label" x="649" y="166">Power saving stops</text><text class="body" x="649" y="186">Auto-off on recovery</text>
+  <rect x="112" y="199" width="298" height="55" rx="17" fill="#3b322e" stroke="#966d59" stroke-width="1.5"/>
+  <text class="label" x="128" y="222">Power saving starts</text><text class="body" x="128" y="242">Auto-on as battery falls</text>
+  <rect x="633" y="255" width="250" height="55" rx="17" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
+  <text class="label" x="649" y="278">Resume floor</text><text class="body" x="649" y="298">Allow radio on boot</text>
+  <rect x="112" y="311" width="298" height="55" rx="17" fill="#3b322e" stroke="#966d59" stroke-width="1.5"/>
+  <text class="label" x="128" y="334">Leave service</text><text class="body" x="128" y="354">Safe sleep below this mark</text>
+  <rect x="112" y="382" width="298" height="55" rx="17" fill="#2d3039" stroke="#686579" stroke-width="1.5"/>
+  <text class="label" x="128" y="405">Measured boot floor</text><text class="body" x="128" y="425">Cannot boot below this</text>
+  <text class="note" x="40" y="491">The resume check also runs before radio startup on an ordinary boot.</text>
+  <text class="note" x="40" y="511">The safe-to-resume gap prevents a weak battery from repeatedly starting the radio.</text>
+</svg>

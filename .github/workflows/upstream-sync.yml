@@ -1,0 +1,159 @@
+# Daily pull of the mirrored upstream files. Never builds, never publishes.
+#
+# mc_config has no version tag and moves fast, so the job validates shape, never counts.
+# It names firmware by stream and pattern, so /releases must be mirrored with it.
+name: upstream-sync
+
+on:
+  schedule:
+    - cron: "20 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+env:
+  UPSTREAM_REPO: meshcore-dev/MeshCore
+  ISSUE_TITLE: "upstream-sync failing"
+
+jobs:
+  mc_config:
+    name: mirror MeshCore's stock device manifest
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM_URL: https://flasher.meshcore.io/config.json
+      DEST: pages/flasher/data/mc_config.json
+      RELEASES_URL: https://flasher.meshcore.io/releases
+      RELEASES_DEST: pages/flasher/data/mc_releases.json
+      MAX_SHRINK_PCT: 20
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+
+      - name: Fetch upstream manifest
+        run: |
+          curl -sSfL --max-time 60 --retry 3 --retry-delay 5 \
+            -o fetched.json "$UPSTREAM_URL"
+          curl -sSfL --max-time 60 --retry 3 --retry-delay 5 \
+            -o fetched-releases.json "$RELEASES_URL"
+
+      - name: Validate shape against the committed mirror
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          def fail(msg):
+              print(f"::error::{msg}")
+              sys.exit(1)
+
+          try:
+              new = json.load(open("fetched.json"))
+          except json.JSONDecodeError as e:
+              fail(f"upstream config.json does not parse: {e}")
+
+          for key in ("staticPath", "device"):
+              if key not in new:
+                  fail(f"upstream config.json lost top-level key '{key}'")
+          if not isinstance(new["device"], list):
+              fail("upstream 'device' is no longer a list -- the manifest shape changed")
+
+          count = len(new["device"])
+          if count == 0:
+              fail("upstream config.json lists no devices")
+          for i, dev in enumerate(new["device"]):
+              for key in ("name", "type", "firmware"):
+                  if key not in dev:
+                      fail(f"device[{i}] ({dev.get('name', '?')}) has no '{key}'")
+
+          try:
+              rel = json.load(open("fetched-releases.json"))
+          except json.JSONDecodeError as e:
+              fail(f"upstream /releases does not parse: {e}")
+          if not isinstance(rel, list) or not rel:
+              fail("upstream /releases is not a non-empty list -- the manifest shape changed")
+          for i, stream in enumerate(rel):
+              for key in ("type", "version", "files"):
+                  if key not in stream:
+                      fail(f"/releases[{i}] has no '{key}'")
+
+          streams = {s["type"] for s in rel}
+          wanted = {f["github"]["type"]
+                    for d in new["device"] for f in d.get("firmware", [])
+                    if isinstance(f.get("github"), dict) and "type" in f["github"]}
+          missing = wanted - streams
+          if missing:
+              fail(f"/releases is missing stream(s) config.json refers to: {sorted(missing)}")
+          print(f"/releases: {len(rel)} streams, {sum(len(s['files']) for s in rel)} files")
+
+          dest = os.environ["DEST"]
+          if os.path.exists(dest):
+              old = len(json.load(open(dest))["device"])
+              floor = old * (100 - int(os.environ["MAX_SHRINK_PCT"])) / 100
+              if count < floor:
+                  fail(f"device count fell {old} -> {count}, past the "
+                       f"{os.environ['MAX_SHRINK_PCT']}% floor of {floor:.0f}")
+              print(f"device count {old} -> {count}")
+          else:
+              print(f"first mirror, {count} devices")
+          PY
+
+      - name: Commit the mirror if changed
+        run: |
+          mkdir -p "$(dirname "$DEST")"
+          mv fetched.json "$DEST"
+          mv fetched-releases.json "$RELEASES_DEST"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4 5; do
+            git add "$DEST" "$RELEASES_DEST"
+            git diff --staged --quiet && { echo "no change upstream"; break; }
+            git commit -m "docs: mirror MeshCore stock manifests"
+            git push && break
+            if [ "$i" -eq 5 ]; then
+              echo "::error::failed to push the mirrored manifest after 5 attempts"
+              exit 1
+            fi
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+            curl -sSfL --max-time 60 -o "$DEST" "$UPSTREAM_URL"
+            curl -sSfL --max-time 60 -o "$RELEASES_DEST" "$RELEASES_URL"
+          done
+
+  report:
+    name: track failures in one issue
+    needs: [mc_config]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const failed = ${{ needs.mc_config.result == 'failure' }};
+            const title = process.env.ISSUE_TITLE;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const which = [
+              `mirror MeshCore's stock device manifest: ${{ needs.mc_config.result }}`,
+            ].map(l => `- ${l}`).join('\n');
+            const body = `A daily upstream sync failed, so a file this repo mirrors is no longer being refreshed.\n\n${which}\n\nSee [the run](${runUrl}) for the failing step. This closes itself once a later run succeeds.`;
+
+            const existing = (await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'upstream-sync',
+            })).data.find(i => i.title === title);
+
+            if (failed) {
+              if (existing) {
+                await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: existing.number, body });
+              } else {
+                await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo,
+                  title, body, labels: ['upstream-sync'] });
+              }
+            } else if (existing) {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Both syncs succeeded as of ${runUrl} -- closing.` });
+              await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing.number, state: 'closed' });
+            }

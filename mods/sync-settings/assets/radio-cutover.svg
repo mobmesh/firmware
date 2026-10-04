@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 420" role="img" aria-labelledby="title desc">
+  <title id="title">Radio migration needs confirmation on the new channel</title>
+  <desc id="desc">Signed plans are sent on old radio settings R1. Optional rehearsals visit R2 and return to R1. At the cutover time nodes temporarily use R2. A matching signed confirmation heard on R2 commits the new settings; without one a node returns to saved R1. A coding-rate-only change has a separate path.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker>
+    <style>.bg{fill:#18212b}.old{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.temporary{fill:#263b46;stroke:#517c88;stroke-width:1.5}.good{fill:#203d38;stroke:#477f6d;stroke-width:1.5}.fallback{fill:#362f35;stroke:#906b76;stroke-width:1.5}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub,.body{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.small{font:14px system-ui,sans-serif;fill:#b0c1cd}.line{fill:none;stroke:#7e9eac;stroke-width:2.5;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect class="bg" width="1000" height="420" rx="28"/>
+  <text class="head" x="40" y="48">Move together; save only after confirmation</text>
+  <text class="sub" x="40" y="75">A radio plan schedules the change, while a signed confirmation on R2 makes it permanent.</text>
+  <rect class="old" x="40" y="130" width="250" height="128" rx="22"/>
+  <text class="label" x="60" y="166">R1 · old settings</text>
+  <text class="body" x="60" y="195">Repeated signed plans</text>
+  <text class="body" x="60" y="221">Optional tests return here</text>
+  <path class="line" d="M290 194H352"/>
+  <text class="small" x="297" y="166">At T</text>
+  <rect class="temporary" x="352" y="130" width="275" height="128" rx="22"/>
+  <text class="label" x="372" y="166">R2 · temporary</text>
+  <text class="body" x="372" y="195">Listen during confirm window</text>
+  <text class="body" x="372" y="221">R1 remains saved for recovery</text>
+  <path class="line" d="M627 177H695V150H734"/>
+  <path class="line" d="M627 216H695V286H734"/>
+  <rect class="good" x="734" y="113" width="226" height="102" rx="22"/>
+  <text class="label" x="754" y="150">Confirm on R2</text>
+  <text class="body" x="754" y="177">Save R2 permanently</text>
+  <rect class="fallback" x="734" y="240" width="226" height="102" rx="22"/>
+  <text class="label" x="754" y="277">No confirmation</text>
+  <text class="body" x="754" y="304">Return to saved R1</text>
+  <text class="small" x="40" y="379">Receiving nodes use the publisher's signed clock; their own date and time need not be correct.</text>
+</svg>

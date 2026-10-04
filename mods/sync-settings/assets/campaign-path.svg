@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 370" role="img" aria-labelledby="title desc">
+  <title id="title">Campaign travels existing mesh</title>
+  <desc id="desc">A publisher captures and signs an update. Stock MeshCore repeaters relay the frames. A subscribed repeater checks the campaign, collects and verifies the frames, then saves and activates the update. It may relay onward when forwarding rules allow.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker>
+    <style>.bg{fill:#18212b}.card{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.body{font:15px system-ui,sans-serif;fill:#b0c1cd}.badge{font:700 12px system-ui,sans-serif;fill:#afd5df}.note{font:14px system-ui,sans-serif;fill:#b0c1cd}.line{fill:none;stroke:#7e9eac;stroke-width:2.5;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect class="bg" width="1000" height="370" rx="28"/>
+  <text class="head" x="40" y="48">Campaign travels existing mesh</text>
+  <text class="sub" x="40" y="75">Signed frames travel through the mesh; only the publisher and subscriber need sync-settings.</text>
+  <path class="line" d="M242 205H281"/><path class="line" d="M463 205H501"/><path class="line" d="M683 205H721"/>
+  <rect x="40" y="115" width="202" height="180" rx="22" fill="#223c40" stroke="#4c8886" stroke-width="1.5"/>
+  <text class="label" x="58" y="151">Publisher</text>
+  <text class="body" x="58" y="186">Capture dataset</text><text class="body" x="58" y="211">Sign frames</text><text class="body" x="58" y="236">Send each round</text>
+  <rect x="58" y="257" width="126" height="23" rx="11" fill="#31565a"/><text class="badge" x="70" y="273">sync-settings</text>
+  <rect class="card" x="281" y="115" width="182" height="180" rx="22"/>
+  <text class="label" x="299" y="151">Repeater A</text>
+  <text class="body" x="299" y="196">Relay frames</text><text class="body" x="299" y="221">when allowed</text>
+  <rect x="299" y="257" width="123" height="23" rx="11" fill="#324657"/><text class="badge" x="311" y="273">stock MeshCore</text>
+  <rect class="card" x="501" y="115" width="182" height="180" rx="22"/>
+  <text class="label" x="519" y="151">Repeater B</text>
+  <text class="body" x="519" y="196">Relay frames</text><text class="body" x="519" y="221">when allowed</text>
+  <rect x="519" y="257" width="123" height="23" rx="11" fill="#324657"/><text class="badge" x="531" y="273">stock MeshCore</text>
+  <rect x="721" y="115" width="239" height="180" rx="22" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
+  <text class="label" x="739" y="151">Subscriber</text>
+  <text class="body" x="739" y="185">Check type, channel, trust</text><text class="body" x="739" y="210">Collect and verify</text><text class="body" x="739" y="235">Save and activate</text>
+  <rect x="739" y="257" width="126" height="23" rx="11" fill="#315a4e"/><text class="badge" x="751" y="273">sync-settings</text>
+  <text class="note" x="40" y="335">The subscriber may also relay onward when its forwarding rules allow.</text>
+</svg>

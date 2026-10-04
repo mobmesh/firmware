@@ -1,0 +1,100 @@
+ota_board_id: 1
+
+# Override-only board config for heltec_v4: only what this project adds on top of upstream.
+# Every other board fact is read from upstream at generation time by scripts/generate-board-config.py.
+# The directory name is the mapping to upstream's own variants/<name>/, so there is no reference field.
+
+
+capabilities:
+  wifi_station: true
+  dual_ota: true
+  battery_measurement: true  # bench-measured across 3 boards
+  external_power_control: true
+  fem_lna_control: true
+  deep_sleep_rail_shutdown: true
+
+# Injected into this board's variant platformio.ini envs, upstream's own -D PIN_XXX=nn idiom.
+build_values:
+  PIN_HOTSPOT_PWR: 47   # confirmed clean on Heltec V4.3.1 (GPIO48 = fallback)
+
+  # Bench-measured across 3 boards; the schematic ratio (4.9) reads ~270 mV low
+  # and upstream's 5.42 reads ~90 mV high. A stored `set adc.multiplier` wins over this.
+  ADC_MULTIPLIER: 5.32
+
+  # Hotspot WiFi can take ~60s to appear after PIN_HOTSPOT_PWR (modem boot);
+  # 6 x 15s + 5 x 5s is ~115s, comfortably past that.
+  OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS: 15000
+  OTA_WIFI_JOIN_RETRY_DELAY_MS: 5000
+  OTA_WIFI_JOIN_MAX_ATTEMPTS: 6
+  OTA_HTTP_TIMEOUT_MS: 20000
+  OTA_WPA2_SESSION_LIMIT: 600   # WPA2 sessions per boot before a reboot; sized from this board's heap
+  OTA_DIAG_WIFI_JOIN_ATTEMPTS: 1   # `ota wan join` -- one attempt, so it can't block the CLI
+  # Advisory: cellular modems often show L2 link up before the data session negotiates.
+  OTA_WAN_CHECK_ATTEMPTS: 3
+  OTA_WAN_CHECK_RETRY_DELAY_MS: 10000
+  # Radio-failure sleep: doubles from the start value until it reaches the ceiling.
+  OTA_RADIO_FAIL_SLEEP_START_SECS: 60
+  OTA_RADIO_FAIL_SLEEP_MAX_SECS: 900
+
+# mods/power-guard. Gauge millivolts, highest to lowest -- the ordering is the contract;
+# see that mod's README for the ladder.
+#
+# `powersaving auto`. Gap must stay wide: sleeping sheds load and raises the reading.
+  POWER_GUARD_AUTO_OFF_MV: 3600   # release saving at or above
+  POWER_GUARD_AUTO_ON_MV: 3300    # engage saving at or below
+
+# Return to service. Below AUTO_ON_MV so saving gets a chance first; the safe rung's CLI
+# ceiling derives from this, so anything that leaves service can always come back.
+  POWER_GUARD_RESUME_MV: 3150
+
+# Leaving service -- `powersaving safe`. Goes before a brownout does, so a solar pack keeps
+# the reserve that lets it climb back.
+  POWER_GUARD_SAFE_MV: 2800       # 0 disables; ~2.97 V at the pins on this board
+  POWER_GUARD_SAFE_FLOOR_MV: 2500 # CLI floor; ~100 mV over this board's measured boot floor
+  POWER_GUARD_SAFE_SECS: 60       # first wait only; the boot check backs off after
+
+# Debounce window, 3 x 60 s -- what stops a transmit's sag reading as a flat pack.
+  POWER_GUARD_SAMPLE_INTERVAL_MS: 60000
+  POWER_GUARD_CONSECUTIVE_SAMPLES: 3
+
+# Retry backoff: doubles from the start value until it reaches the ceiling.
+  POWER_GUARD_BACKOFF_START_SECS: 60
+  POWER_GUARD_BACKOFF_MAX_SECS: 900
+
+  POWER_GUARD_POWEROFF_MIN_SECS: 60           # `poweroff <secs>` bounds; 0 is always refused
+  POWER_GUARD_POWEROFF_MAX_SECS: 86400
+
+# Set only when upstream's default scheme leaves too little OTA slot room. A filename here makes
+# inject-env write `board_build.partitions`; vendoring the CSV is the mod patch's own job.
+partitions_override: null
+
+# How the QEMU boot check boots this board; absent or disabled and the check skips it.
+# globals are board wiring passed as run-time properties. The long -global form is required:
+# `-global a.b=c` splits at the first dot and silently ignores the setting.
+#   strap-mode  selects SPI boot; the wrong value drops the ROM into download mode.
+#   cs-gpio     the pin the firmware drives as the radio's soft chip-select.
+#   spi-base    the SPI controller the radio hangs off (SPIClass defaults to HSPI = SPI3 here).
+qemu:
+  enabled: true
+  machine: esp32s3
+  binary: qemu-system-xtensa
+  mcu: esp32s3
+  mem: 8M           # this board has PSRAM and the app probes for it
+  globals:
+    bramble.gpio.strap-mode: 4
+    bramble.gpspi2.cs-gpio: 8
+    bramble.gpspi2.spi-base: "0x60025000"
+
+# Web flasher facts not derivable from upstream or from the built partitions.bin. The only other
+# hand-maintained source for pages/flasher/data/auto_boards.json.
+flasher:
+  label: "Heltec V4"
+  connect_note: "Put the board into flash mode first (hold PGM, tap RST, then release PGM), then connect over USB."
+  post_flash_note: "Press RST once to put the board back into normal operation."
+
+  # Sent after a flash, before the location settings, so a region can override a board
+  # default. Never `powersaving on`: light sleep has no serial wake, so later commands drop.
+  post_flash_commands:
+    repeater:
+      - "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/heltec_v4.bin"
+      - "set tx 20"

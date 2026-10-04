@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 418" role="img" aria-labelledby="title desc">
+  <title id="title">Power-guard sleep and recovery loop</title>
+  <desc id="desc">After several low battery readings below the safe mark, a repeater enters deep sleep. On each wake it checks battery voltage before starting the radio. If it is still below the higher resume mark, it sleeps again with increasing backoff. Once the resume mark is reached, it returns to service.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker><style>.bg{fill:#18212b}.card{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.body{font:14px system-ui,sans-serif;fill:#b0c1cd}.small{font:700 13px system-ui,sans-serif;fill:#b0c1cd}.line{fill:none;stroke:#7e9eac;stroke-width:2.5;marker-end:url(#arrow)}</style></defs>
+  <rect class="bg" width="1000" height="418" rx="28"/>
+  <text class="head" x="40" y="48">Sleep until the battery can support the radio</text>
+  <text class="sub" x="40" y="75">Several agreeing readings prevent a brief transmit dip from triggering sleep.</text>
+  <rect x="40" y="117" width="244" height="110" rx="22" fill="#362f35" stroke="#906b76" stroke-width="1.5"/>
+  <text class="label" x="58" y="155">Below safe mark</text><text class="body" x="58" y="184">Leave service</text><text class="body" x="58" y="206">after repeated readings</text>
+  <path class="line" d="M284 172H316"/>
+  <rect class="card" x="316" y="117" width="258" height="110" rx="22"/>
+  <text class="label" x="334" y="155">Enter deep sleep</text><text class="body" x="334" y="184">Drop FEM rail where</text><text class="body" x="334" y="206">the board supports it</text>
+  <path class="line" d="M574 172H606"/>
+  <rect x="606" y="117" width="354" height="110" rx="22" fill="#263b46" stroke="#517c88" stroke-width="1.5"/>
+  <text class="label" x="624" y="155">Wake and measure</text><text class="body" x="624" y="184">Check against resume mark</text><text class="body" x="624" y="206">before starting LoRa radio</text>
+  <path d="M783 227V263H267V280" fill="none" stroke="#7e9eac" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M783 227V280" fill="none" stroke="#7e9eac" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text class="small" x="307" y="257">BELOW RESUME</text><text class="small" x="801" y="257">AT OR ABOVE</text>
+  <rect x="40" y="280" width="454" height="95" rx="22" fill="#263b46" stroke="#517c88" stroke-width="1.5"/>
+  <text class="label" x="58" y="318">Sleep again</text><text class="body" x="58" y="345">Wait longer between checks; repeat until recovered</text>
+  <rect x="526" y="280" width="434" height="95" rx="22" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
+  <text class="label" x="544" y="318">Return to service</text><text class="body" x="544" y="345">Start the radio after the battery recovers</text>
+  <text class="sub" x="40" y="403">The resume mark is higher than the safe mark to avoid a boot-and-sleep loop.</text>
+</svg>

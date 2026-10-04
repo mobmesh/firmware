@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 400" role="img" aria-labelledby="title desc">
+  <title id="title">Region overlay works alongside native regions</title>
+  <desc id="desc">The native and synchronized overlay lists each have 32 slots. A matching overlay entry takes priority, but a matching deny in either list blocks a flood. Turning synchronization off removes the overlay from routing without overwriting the native list.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker>
+    <style>.bg{fill:#18212b}.native{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.overlay{fill:#223c40;stroke:#4c8886;stroke-width:1.5}.route{fill:#203d38;stroke:#477f6d;stroke-width:1.5}.deny{fill:#362f35;stroke:#906b76;stroke-width:1.5}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub,.body{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.small{font:14px system-ui,sans-serif;fill:#b0c1cd}.line{fill:none;stroke:#7e9eac;stroke-width:2.5;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect class="bg" width="1000" height="400" rx="28"/>
+  <text class="head" x="40" y="48">An overlay adds regions without replacing local ones</text>
+  <text class="sub" x="40" y="75">Two lists contribute to routing; the synchronized list can be replaced as one verified update.</text>
+  <rect class="native" x="40" y="113" width="285" height="121" rx="22"/>
+  <text class="label" x="60" y="149">Native list · 32 slots</text>
+  <text class="body" x="60" y="179">Managed by region commands</text>
+  <text class="body" x="60" y="204">Always stays in place</text>
+  <rect class="overlay" x="40" y="249" width="285" height="111" rx="22"/>
+  <text class="label" x="60" y="285">Overlay · 32 slots</text>
+  <text class="body" x="60" y="315">Managed by sync.region</text>
+  <text class="body" x="60" y="338">Accepted campaigns replace it</text>
+  <path class="line" d="M325 172H376V226H418"/>
+  <path class="line" d="M325 305H376V226H418"/>
+  <rect class="native" x="418" y="160" width="253" height="132" rx="22"/>
+  <text class="label" x="438" y="197">Region lookup</text>
+  <text class="body" x="438" y="230">Overlay match first</text>
+  <text class="body" x="438" y="256">Check both lists for deny</text>
+  <path class="line" d="M671 208H695V184H717"/>
+  <path class="line" d="M671 244H695V284H717"/>
+  <rect class="route" x="717" y="143" width="243" height="83" rx="22"/>
+  <text class="label" x="737" y="178">Route allowed</text>
+  <text class="body" x="737" y="202">A list allows; neither denies</text>
+  <rect class="deny" x="717" y="243" width="243" height="83" rx="22"/>
+  <text class="label" x="737" y="278">Flood denied</text>
+  <text class="body" x="737" y="302">If either list denies it</text>
+  <text class="small" x="418" y="351">sync.region off removes the overlay from use; the native list is untouched.</text>
+</svg>

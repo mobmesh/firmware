@@ -1,0 +1,36 @@
+{
+  "_comment": "Gulfport home-area settings.",
+  "_units": "advert.interval: minutes (60-240). flood.advert.interval: hours (3-168). agc.reset.interval: seconds, rounded down to a multiple of 4. Both intervals take 0 to disable.",
+  "_radio": "Sets freq/bw/sf/cr together, COMMA-separated -- spaces parse as one field and the command is rejected. Out-of-range is rejected, not clamped. Needs a reboot, which the flasher sends itself after the list.",
+  "commands": [
+    "set radio 910.525,62.5,7,5",
+    "set advert.interval 240",
+    "set flood.advert.interval 23",
+    "set path.hash.mode 1",
+    "set loop.detect minimal",
+    "set agc.reset.interval 4",
+    "set multi.acks 1",
+  {
+      "if_mod": "sync-settings",
+      "then": [
+        "sync.publisher add 35A11A9B65C37E7B134A1CAAF0C23E5F6C2A1DFCB2CB63AAB64D7EBF4D125499",
+        "sync.publisher add A1AB0184CFC95016C09C3623F68101C9184F42D7E831DB306498FCD6F4CDC596",
+        "sync.publisher add A1AB022CBEF6C4E6C2D724660FD14DC55AEC7BE77A192DD5CA0965E91488B620",
+        "set sync.channel public_ms",
+        "sync.region def us us-southeast|us us-gc",
+        "sync.region def us us-ms us-ms-gpt|us us-la us-la-msy|us us-al us-al-mob",
+        "sync.region save",
+        "sync.region on",
+        "sync.policy on",
+        "sync.time on",
+        "sync.radio on"
+      ],
+      "else": [
+        "region def us us-southeast|us us-gc",
+        "region def us us-ms us-ms-gpt|us us-la us-la-msy|us us-al us-al-mob"
+      ]
+    },
+    "region allowf *",
+    "region save"
+  ]
+}

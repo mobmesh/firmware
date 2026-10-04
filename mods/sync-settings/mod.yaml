@@ -1,0 +1,21 @@
+name: sync-settings
+bit: 2
+image_marker: "set sync.channel"
+
+env_flags: [WITH_SYNC_SETTINGS]
+
+# Both datasets are on by default; opt out with -DSYNC_SETTINGS_WITHOUT_REGION or _WITHOUT_POLICY, never both.
+
+integration:
+  header: helpers/sync_settings/SyncIntegration.h
+  hooks:
+    loop: syncLoop
+    route: syncRoute
+    allow_forward: syncAllowFlood
+    region_export: syncExportRegions
+    owner_info: syncOwnerInfoMarker
+    recv: syncRecv
+    tx: syncTx
+    cli:
+      handler: syncCli
+      priority: 50

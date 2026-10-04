@@ -1,0 +1,58 @@
+[
+{
+"name": "Mobile",
+"city_code": "us-al-mob",
+"state_code": "us-al",
+"aliases": ["Mobile AL", "Midtown", "West Mobile", "Theodore", "Tillmans Corner", "Prichard", "Saraland"],
+"lat": 30.6954,
+"lon": -88.0399
+},
+{
+"name": "Fairhope",
+"city_code": "us-al-fhp",
+"state_code": "us-al",
+"aliases": ["Eastern Shore", "Daphne", "Spanish Fort", "Point Clear", "Montrose", "Baldwin County"],
+"lat": 30.523,
+"lon": -87.9033
+},
+{
+"name": "Gulf Shores",
+"city_code": "us-al-guf",
+"state_code": "us-al",
+"aliases": ["Orange Beach", "Foley", "Bon Secour", "Fort Morgan", "Pleasure Island"],
+"lat": 30.246,
+"lon": -87.7008
+},
+{
+"name": "Pensacola",
+"city_code": "us-fl-pns",
+"state_code": "us-fl",
+"aliases": ["Pensacola FL", "Gulf Breeze", "Pensacola Beach", "Perdido Key", "Escambia County"],
+"lat": 30.4213,
+"lon": -87.2169
+},
+{
+"name": "Lafayette",
+"city_code": "us-la-lft",
+"state_code": "us-la",
+"aliases": ["Lafayette LA", "Broussard", "Youngsville", "Scott", "Carencro", "Acadiana"],
+"lat": 30.2241,
+"lon": -92.0198
+},
+{
+"name": "New Orleans",
+"city_code": "us-la-msy",
+"state_code": "us-la",
+"aliases": ["New Orleans LA", "NOLA", "Metairie", "Kenner", "Gretna", "Chalmette", "Marrero", "Orleans Parish", "Jefferson Parish", "Westbank", "MSY"],
+"lat": 29.9511,
+"lon": -90.0715
+},
+{
+"name": "Mobile",
+"city_code": "us-al-mob-mm",
+"state_code": "us-al",
+"aliases": ["meshmap'r", "meshmapr", "mm", "Mobile meshmap"],
+"lat": 30.6954,
+"lon": -88.0399
+}
+]

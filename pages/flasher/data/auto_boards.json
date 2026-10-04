@@ -1,0 +1,335 @@
+{
+  "heltec_v4": {
+    "label": "Heltec V4",
+    "connectNote": "Put the board into flash mode first (hold PGM, tap RST, then release PGM), then connect over USB.",
+    "postFlashNote": "Press RST once to put the board back into normal operation.",
+    "partitionsOverridden": false,
+    "qemu": {
+      "enabled": true,
+      "machine": "esp32s3",
+      "binary": "qemu-system-xtensa",
+      "mcu": "esp32s3",
+      "mem": "8M",
+      "globals": {
+        "bramble.gpio.strap-mode": 4,
+        "bramble.gpspi2.cs-gpio": 8,
+        "bramble.gpspi2.spi-base": "0x60025000"
+      }
+    },
+    "offsets": {
+      "bootloader": "0x0",
+      "partitions": "0x8000",
+      "otadata": "0xe000",
+      "app0": "0x10000",
+      "app1": "0x650000",
+      "appMaxSize": "0x640000"
+    },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/heltec_v4_bootloader.bin",
+    "partitionsFile": "bin/boot/heltec_v4_partitions.bin",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "heltec_v4_rep_mobmesh",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/repeater/heltec_v4.bin",
+        "postFlashCommands": [
+          "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/heltec_v4.bin",
+          "set tx 20"
+        ]
+      },
+      "room_server": {
+        "label": "Room",
+        "assetBasename": "heltec_v4_room_mobmesh",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/room_server/heltec_v4.bin"
+      }
+    }
+  },
+  "xiao_c3": {
+    "label": "Xiao ESP32-C3",
+    "connectNote": "Put the board into flash mode first (hold BOOT, tap RESET, then release BOOT), then connect over USB.",
+    "postFlashNote": "Press RESET once to put the board back into normal operation.",
+    "partitionsOverridden": true,
+    "qemu": {
+      "enabled": true,
+      "machine": "esp32c3",
+      "binary": "qemu-system-riscv32",
+      "mcu": "esp32c3",
+      "mem": "",
+      "globals": {
+        "bramble.gpio.strap-mode": 8,
+        "bramble.gpspi2.cs-gpio": 6,
+        "bramble.gpspi2.spi-base": "0x60024000"
+      }
+    },
+    "offsets": {
+      "bootloader": "0x0",
+      "partitions": "0x8000",
+      "otadata": "0xe000",
+      "app0": "0x10000",
+      "app1": "0x1e0000",
+      "appMaxSize": "0x1d0000"
+    },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/xiao_c3_bootloader.bin",
+    "partitionsFile": "bin/boot/xiao_c3_partitions.bin",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "xiao_c3_rep_mobmesh_beta",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/repeater/xiao_c3.bin",
+        "postFlashCommands": [
+          "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/xiao_c3.bin"
+        ]
+      },
+      "room_server": {
+        "label": "Room",
+        "assetBasename": "xiao_c3_room_mobmesh_beta",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/room_server/xiao_c3.bin"
+      }
+    }
+  },
+  "heltec_v3": {
+    "label": "Heltec V3",
+    "connectNote": "Put the board into flash mode first (hold PRG, tap RST, then release PRG), then connect over USB.",
+    "postFlashNote": "Press RST once to put the board back into normal operation.",
+    "partitionsOverridden": false,
+    "qemu": {
+      "enabled": true,
+      "machine": "esp32s3",
+      "binary": "qemu-system-xtensa",
+      "mcu": "esp32s3",
+      "mem": "",
+      "globals": {
+        "bramble.gpio.strap-mode": 4,
+        "bramble.gpspi2.cs-gpio": 8,
+        "bramble.gpspi2.spi-base": "0x60025000"
+      },
+      "console": "uart0"
+    },
+    "offsets": {
+      "bootloader": "0x0",
+      "partitions": "0x8000",
+      "otadata": "0xe000",
+      "app0": "0x10000",
+      "app1": "0x340000",
+      "appMaxSize": "0x330000"
+    },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/heltec_v3_bootloader.bin",
+    "partitionsFile": "bin/boot/heltec_v3_partitions.bin",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "heltec_v3_rep_mobmesh_beta",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/repeater/heltec_v3.bin",
+        "postFlashCommands": [
+          "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/heltec_v3.bin"
+        ]
+      },
+      "room_server": {
+        "label": "Room",
+        "assetBasename": "heltec_v3_room_mobmesh_beta",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/room_server/heltec_v3.bin"
+      }
+    }
+  },
+  "xiao_s3_wio": {
+    "label": "Xiao ESP32-S3 + Wio-SX1262",
+    "connectNote": "Put the board into flash mode first (hold BOOT, tap RESET, then release BOOT), then connect over USB.",
+    "postFlashNote": "Press RESET once to put the board back into normal operation.",
+    "partitionsOverridden": false,
+    "qemu": {
+      "enabled": true,
+      "machine": "esp32s3",
+      "binary": "qemu-system-xtensa",
+      "mcu": "esp32s3",
+      "mem": "8M",
+      "globals": {
+        "bramble.gpio.strap-mode": 4,
+        "bramble.gpspi2.cs-gpio": 41,
+        "bramble.gpspi2.spi-base": "0x60025000",
+        "bramble.sx1262.dio1-gpio": 39
+      }
+    },
+    "offsets": {
+      "bootloader": "0x0",
+      "partitions": "0x8000",
+      "otadata": "0xe000",
+      "app0": "0x10000",
+      "app1": "0x340000",
+      "appMaxSize": "0x330000"
+    },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/xiao_s3_wio_bootloader.bin",
+    "partitionsFile": "bin/boot/xiao_s3_wio_partitions.bin",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "xiao_s3_wio_rep_mobmesh_beta",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/repeater/xiao_s3_wio.bin",
+        "postFlashCommands": [
+          "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/xiao_s3_wio.bin"
+        ]
+      },
+      "room_server": {
+        "label": "Room",
+        "assetBasename": "xiao_s3_wio_room_mobmesh_beta",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/room_server/xiao_s3_wio.bin"
+      }
+    }
+  },
+  "rak3112": {
+    "label": "RAK3112",
+    "connectNote": "Put the board into flash mode first (hold BOOT, tap RESET, then release BOOT), then connect over USB.",
+    "postFlashNote": "Press RESET once to put the board back into normal operation.",
+    "partitionsOverridden": false,
+    "qemu": {
+      "enabled": true,
+      "machine": "esp32s3",
+      "binary": "qemu-system-xtensa",
+      "mcu": "esp32s3",
+      "mem": "8M",
+      "globals": {
+        "bramble.gpio.strap-mode": 4,
+        "bramble.gpspi2.cs-gpio": 7,
+        "bramble.gpspi2.spi-base": "0x60025000",
+        "bramble.sx1262.dio1-gpio": 47,
+        "bramble.gpio.idle-high": 2097153
+      }
+    },
+    "offsets": {
+      "bootloader": "0x0",
+      "partitions": "0x8000",
+      "otadata": "0xe000",
+      "app0": "0x10000",
+      "app1": "0x340000",
+      "appMaxSize": "0x330000"
+    },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/rak3112_bootloader.bin",
+    "partitionsFile": "bin/boot/rak3112_partitions.bin",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "rak3112_rep_mobmesh_beta",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/repeater/rak3112.bin",
+        "postFlashCommands": [
+          "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/rak3112.bin"
+        ]
+      },
+      "room_server": {
+        "label": "Room",
+        "assetBasename": "rak3112_room_mobmesh_beta",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/room_server/rak3112.bin"
+      }
+    }
+  },
+  "ebyte_eora_s3": {
+    "label": "Ebyte EoRa-S3",
+    "connectNote": "Put the board into flash mode first (hold BOOT, tap RST, then release BOOT), then connect over USB.",
+    "postFlashNote": "Press RST once to put the board back into normal operation.",
+    "partitionsOverridden": true,
+    "qemu": {
+      "enabled": true,
+      "machine": "esp32s3",
+      "binary": "qemu-system-xtensa",
+      "mcu": "esp32s3",
+      "mem": "8M",
+      "globals": {
+        "bramble.gpio.strap-mode": 4,
+        "bramble.gpspi2.cs-gpio": 7,
+        "bramble.gpspi2.spi-base": "0x60025000",
+        "bramble.sx1262.dio1-gpio": 33
+      }
+    },
+    "offsets": {
+      "bootloader": "0x0",
+      "partitions": "0x8000",
+      "otadata": "0xe000",
+      "app0": "0x10000",
+      "app1": "0x1e0000",
+      "appMaxSize": "0x1d0000"
+    },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/ebyte_eora_s3_bootloader.bin",
+    "partitionsFile": "bin/boot/ebyte_eora_s3_partitions.bin",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "ebyte_eora_s3_rep_mobmesh_beta",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/repeater/ebyte_eora_s3.bin",
+        "postFlashCommands": [
+          "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/ebyte_eora_s3.bin"
+        ]
+      },
+      "room_server": {
+        "label": "Room",
+        "assetBasename": "ebyte_eora_s3_room_mobmesh_beta",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/room_server/ebyte_eora_s3.bin"
+      }
+    }
+  },
+  "station_g3_esp32": {
+    "label": "Station G3",
+    "connectNote": "Put the board into flash mode first (hold BOOT, tap RESET, then release BOOT), then connect over USB.",
+    "postFlashNote": "Press RESET once to put the board back into normal operation.",
+    "partitionsOverridden": true,
+    "qemu": {
+      "enabled": true,
+      "machine": "esp32s3",
+      "binary": "qemu-system-xtensa",
+      "mcu": "esp32s3",
+      "mem": "8M",
+      "globals": {
+        "bramble.gpio.strap-mode": 4,
+        "bramble.gpspi2.cs-gpio": 11,
+        "bramble.gpspi2.spi-base": "0x60025000",
+        "bramble.gpio.idle-high": 274877906945,
+        "bramble.sx1262.dio1-gpio": 48
+      },
+      "console": "otg"
+    },
+    "offsets": {
+      "bootloader": "0x0",
+      "partitions": "0x8000",
+      "otadata": "0xe000",
+      "app0": "0x10000",
+      "app1": "0x650000",
+      "appMaxSize": "0x640000"
+    },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/station_g3_esp32_bootloader.bin",
+    "partitionsFile": "bin/boot/station_g3_esp32_partitions.bin",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "station_g3_esp32_rep_mobmesh_beta",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/repeater/station_g3_esp32.bin",
+        "postFlashCommands": [
+          "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/station_g3_esp32.bin"
+        ]
+      },
+      "room_server": {
+        "label": "Room",
+        "assetBasename": "station_g3_esp32_room_mobmesh_beta",
+        "version": "v1.17.1",
+        "firmwareFile": "bin/room_server/station_g3_esp32.bin"
+      }
+    }
+  },
+  "_generated": "Auto-generated by scripts/generate-board-config.py from build-targets.yaml, variants/<board>/overrides.yaml and built partition tables. Do not edit this file manually -- changes will be overwritten on the next build.",
+  "_version": "v1.17.1"
+}

@@ -1,0 +1,713 @@
+name: build-release
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # daily poll for new upstream tags across all variants
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: 'Upstream tag/branch to build against (blank = auto-detect latest tag per variant). Applies to whichever variant(s) this run builds.'
+        required: false
+        default: ''
+      variant:
+        description: 'Limit this run to a single variant id, e.g. repeater or room_server (blank = build all variants)'
+        required: false
+        default: ''
+      force_rebuild:
+        description: 'Rebuild and republish even if a release already exists for the resolved tag (manual runs only -- the scheduled poll always respects the existing-release check)'
+        required: false
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Build and run every check, but publish nothing: no release, no vendored-asset commit, no Pages deploy. The build bundle is uploaded as a workflow artifact instead. Use with force_rebuild to exercise a tag that has already shipped.'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  UPSTREAM_REPO: meshcore-dev/MeshCore
+  # xiao_c3 sits near 75% of its 1.9MB OTA slot; heltec_v4 near 20% of 6.5MB.
+  WARN_PCT: 85
+
+# A second invocation may queue, but it must not publish from an older checkout while
+# another invocation is updating the same release assets and flasher catalogue.
+concurrency:
+  group: build-release-${{ github.ref }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  compute-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+
+      - name: Resolve build-targets.yaml into the CI build matrix
+        id: resolve
+        run: |
+          pip install --quiet pyyaml==6.0.3
+          python3 scripts/generate-board-config.py resolve-targets --plan-out BuildPlan.json
+          echo "matrix=$(jq -c '{include: .targets}' BuildPlan.json)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: compute-matrix
+    permissions:
+      contents: read
+      issues: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.compute-matrix.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo (patches only)
+        uses: actions/checkout@v7
+
+      - id: filter
+        name: Check whether this variant is in scope for this run
+        run: |
+          if [ -n "${{ github.event.inputs.variant }}" ] && [ "${{ github.event.inputs.variant }}" != "${{ matrix.id }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify variants/<board>/overrides.yaml exists for this board
+        if: steps.filter.outputs.skip == 'false'
+        run: |
+          test -f "variants/${{ matrix.board_id }}/overrides.yaml" || {
+            echo "::error::variants/${{ matrix.board_id }}/overrides.yaml not found. Add one (see scripts/generate-board-config.py) before this board can build -- pages/flasher/data/auto_boards.json is regenerated from it every run, not hand-maintained."
+            exit 1
+          }
+
+      - id: pick
+        name: Resolve upstream ref for ${{ matrix.id }}
+        if: steps.filter.outputs.skip == 'false'
+        run: |
+          if [ -n "${{ github.event.inputs.upstream_ref }}" ]; then
+            REF="${{ github.event.inputs.upstream_ref }}"
+          else
+            REF=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases" \
+              | jq -r '[.[] | select(.tag_name | startswith("${{ matrix.upstream_tag_prefix }}-v"))][0].tag_name')
+          fi
+          if [ -z "$REF" ] || [ "$REF" = "null" ]; then
+            echo "::error::No upstream ${{ matrix.upstream_tag_prefix }}-v* release found."
+            exit 1
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "version=${REF#${{ matrix.upstream_tag_prefix }}-}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${REF}-mobmesh" >> "$GITHUB_OUTPUT"
+
+      - id: check
+        name: Check if this board's asset already exists in the shared release
+        if: steps.filter.outputs.skip == 'false'
+        run: |
+          if [ "${{ github.event.inputs.force_rebuild }}" = "true" ]; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Release existence alone does not mean THIS board's asset is in it.
+          ASSET_NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}.bin"
+          STATUS=$(curl -s -o /tmp/release.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.pick.outputs.release_tag }}")
+          if [ "$STATUS" = "200" ] && jq -e --arg name "$ASSET_NAME" '.assets[]? | select(.name == $name)' /tmp/release.json > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch upstream release notes
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          BODY=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases/tags/${{ steps.pick.outputs.ref }}" \
+            | jq -r '.body // ""')
+          {
+            echo "Built from [\`${{ steps.pick.outputs.ref }}\`](https://github.com/${{ env.UPSTREAM_REPO }}/releases/tag/${{ steps.pick.outputs.ref }}) of upstream MeshCore."
+            echo ""
+            echo "## Upstream release notes"
+            echo ""
+            if [ -n "$BODY" ]; then
+              echo "$BODY"
+            else
+              echo "_Upstream published no release notes for this tag._"
+            fi
+          } > release-notes.md
+
+      - name: Checkout upstream at resolved ref
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          git clone --depth 50 https://github.com/${{ env.UPSTREAM_REPO }}.git upstream-src
+          cd upstream-src
+          git checkout "${{ steps.pick.outputs.ref }}"
+
+      - name: Verify each patch's sidecar dependencies are satisfied, in order
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          python3 scripts/generate-board-config.py validate-mods \
+            --mods "${{ join(matrix.mods, ',') }}"
+
+      # Strict apply is the gate; the three-way retry only produces a rebase starting
+      # point. Mod-owned files arrive by copy, so patches carry only edits to upstream's own.
+      - name: Copy each mod's own source into the upstream clone
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          python3 scripts/generate-board-config.py copy-src \
+            --upstream upstream-src --mods "${{ join(matrix.mods, ',') }}"
+
+      - name: Compose selected mod integrations
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          python3 scripts/generate-board-config.py compose-mods \
+            --upstream upstream-src --mods "${{ join(matrix.mods, ',') }}"
+
+      - id: apply
+        name: Apply maintained patches in order (fail loudly on drift; emit a rescue diff, never auto-merge)
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          cd upstream-src
+          git config user.email "ci@localhost"
+          git config user.name "patch-apply"
+          RESCUE="$GITHUB_WORKSPACE/patch-rescue"
+          IFS=',' read -ra MODS <<< "${{ join(matrix.mods, ',') }}"
+          for mod in "${MODS[@]}"; do
+            for patch in "../mods/$mod/patches"/*.patch; do
+              [ -e "$patch" ] || continue
+              name="$mod/$(basename "$patch")"
+              if git apply --check "$patch" 2>/dev/null; then
+                git apply "$patch"
+                git add -A && git commit -qm "$name"
+                continue
+              fi
+
+              echo "::error::$patch no longer applies cleanly against ${{ steps.pick.outputs.ref }}. Manual rebase required."
+              mkdir -p "$RESCUE"
+              git apply --check "$patch" 2> "$RESCUE/00-apply-errors.txt" || true
+
+              if git apply -3 "$patch" 2>/dev/null; then
+                verdict="three-way merge resolved it with no conflicts"
+              elif git ls-files -u | grep -q .; then
+                verdict="three-way merge left CONFLICT MARKERS -- needs manual resolution"
+              else
+                verdict="three-way merge could not apply it at all"
+                git checkout -- . 2>/dev/null || true
+              fi
+              echo "$verdict" | tee "$RESCUE/00-verdict.txt"
+
+              # Emit the rescued patch as a one-commit diff, same format as mods/*/patches/*.patch
+              git add -A
+              git commit -qm "rescued: $name" || true
+              out="$RESCUE/$(echo "$name" | tr '/' '_')"
+              git diff HEAD~1 HEAD > "$out" 2>/dev/null || true
+
+              {
+                echo "rescue_attempted=true"
+                echo "rescue_verdict=$verdict"
+                echo "rescue_patch=$name"
+              } >> "$GITHUB_OUTPUT"
+              exit 1
+            done
+          done
+
+      - name: Upload rescue diff for the failing patch
+        if: failure() && steps.apply.outputs.rescue_attempted == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: patch-rescue-${{ matrix.board_id }}-${{ matrix.id }}-${{ steps.pick.outputs.ref }}
+          path: patch-rescue/
+          if-no-files-found: warn
+
+      - name: Inject this target's mod + board build flags into platformio.ini
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          pip install --quiet pyyaml==6.0.3
+          python3 scripts/generate-board-config.py inject-env \
+            --board ${{ matrix.board_id }} \
+            --env ${{ matrix.build_env }} \
+            --platformio-ini "upstream-src/variants/${{ matrix.upstream_variant }}/platformio.ini" \
+            --mods "${{ join(matrix.mods, ',') }}" \
+            --append-flags="${{ join(matrix.build_flags_append, ',') }}"
+          cd upstream-src
+          DIFF=$(git diff -- "variants/${{ matrix.upstream_variant }}/platformio.ini")
+          if [ -z "$DIFF" ]; then
+            echo "::error::inject-env ran but produced no change to variants/${{ matrix.upstream_variant }}/platformio.ini -- nothing was actually injected."
+            exit 1
+          fi
+          echo "$DIFF"
+
+      - name: Set up PlatformIO
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          pip install platformio==6.1.19
+
+      - name: Build
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          cd upstream-src
+          OTA_MOD_SHA="$(git -C .. rev-parse --short HEAD)"
+          OTA_MOD_DATE="$(date -u +"%-d %b %Y") - $OTA_MOD_SHA"
+          MOBMESH_BUILD_EPOCH="${SOURCE_DATE_EPOCH:-$(date -u +%s)}"
+          PLATFORMIO_BUILD_FLAGS="-D 'OTA_MOD_BUILD_DATE=\"$OTA_MOD_DATE\"' -D 'OTA_MOD_SHORT_SHA=\"$OTA_MOD_SHA\"' -D MOBMESH_BUILD_EPOCH=$MOBMESH_BUILD_EPOCH" \
+            pio run -e ${{ matrix.build_env }}
+
+      - id: rollback_check
+        name: Verify RollbackGuard's core hook still exists and is called (catches silent drift before it ships)
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
+          HITS=$([ -n "$FRAMEWORK_DIR" ] && grep -ro "verifyRollbackLater" "$FRAMEWORK_DIR" | wc -l || echo 0)
+          echo "verifyRollbackLater occurrences in installed core: $HITS"
+          # Expect >=2: the weak prototype and the call site in initArduino(). A count of 1
+          # means the override would link and never run, which link success would not catch.
+          if [ -z "$FRAMEWORK_DIR" ] || [ "$HITS" -lt 2 ]; then
+            echo "::error::verifyRollbackLater() found $HITS time(s) in the installed Arduino-ESP32 core ($FRAMEWORK_DIR), expected >=2 (declaration + call site)."
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+      - name: Notify on rollback-guard hook drift
+        if: failure() && steps.rollback_check.outputs.failed == 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[${{ matrix.board_id }}/${{ matrix.id }}] verifyRollbackLater() no longer found/called in the Arduino-ESP32 core`,
+              body: [
+                `The \`${{ matrix.board_id }}/${{ matrix.id }}\` build failed because the installed Arduino-ESP32 core no longer declares and calls \`verifyRollbackLater()\` (see \`src/helpers/esp32/RollbackGuard.cpp\`). This usually means a core version bump changed how OTA rollback confirmation works, and \`RollbackGuard\`'s override may have silently stopped taking effect.`,
+                ``,
+                `**To fix:**`,
+                `1. Check the installed core's \`cores/esp32/esp32-hal-misc.c\` (or wherever \`initArduino()\` now lives) for how it confirms/defers OTA rollback.`,
+                `2. Update \`verifyRollbackLater()\` in \`RollbackGuard.cpp\` to match the new mechanism, if an equivalent hook still exists.`,
+                `3. If the core dropped app-rollback confirmation control entirely, this feature needs a bigger rework -- see "Automatic rollback protection" in README.md.`,
+                ``,
+                `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              ].join('\n')
+            });
+
+      - name: Stage this build's own boot files for merged-image and QEMU checks
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          BOOT="upstream-src/.pio/build/${{ matrix.build_env }}/bootloader.bin"
+          PART="upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin"
+          # boot_app0.bin ships inside the Arduino-ESP32 framework package, identical for every
+          # board, so it comes from the installed package rather than .pio/build.
+          FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
+          APP0=$(find "$FRAMEWORK_DIR" -name 'boot_app0.bin' | head -1)
+          test -f "$BOOT"
+          test -f "$PART"
+          test -n "$APP0" && test -f "$APP0"
+          eval "$(python3 scripts/generate-board-config.py flasher-paths --board ${{ matrix.board_id }} --variant-id ${{ matrix.id }})"
+          mkdir -p pages/flasher/bin/boot
+          cp "$BOOT" "pages/flasher/$BOOTLOADER"
+          cp "$PART" "pages/flasher/$PARTITIONS"
+          cp "$APP0" "pages/flasher/$BOOT_APP0"
+
+      - name: Locate app-only .bin (not the merged/full-flash image)
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        id: artifact
+        run: |
+          cd upstream-src
+          BIN=".pio/build/${{ matrix.build_env }}/firmware.bin"
+          test -f "$BIN"
+          NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}.bin"
+          cp "$BIN" "../$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Write OTA metadata into the image's reserved app-descriptor field
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          python3 scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" \
+            --upstream-version "${{ steps.pick.outputs.version }}" \
+            --repo-sha "$(echo "${{ github.sha }}" | cut -c1-7)" \
+            --board-id "${{ matrix.ota_board_id }}" \
+            --role-id "${{ matrix.ota_role_id }}" \
+            --mods "${{ join(matrix.mods, ',') }}" \
+            --show
+
+      - name: Regenerate pages/flasher/data/auto_boards.json from overrides.yaml + upstream + this build's real partitions.bin
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          pip install --quiet pyyaml==6.0.3
+          python3 scripts/generate-board-config.py boards-json \
+            --board ${{ matrix.board_id }} \
+            --upstream-dir upstream-src \
+            --partitions-bin "upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin" \
+            --variant-id ${{ matrix.id }} \
+            --variant-label "${{ matrix.release_title }}" \
+            --asset-basename ${{ matrix.asset_basename }} \
+            --version "${{ steps.pick.outputs.version }}" \
+            --output pages/flasher/data/auto_boards.json
+
+      - name: Verify firmware.bin fits within its OTA app partition
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          MAX_HEX=$(jq -r '.["${{ matrix.board_id }}"].offsets.appMaxSize' pages/flasher/data/auto_boards.json)
+          MAX=$((MAX_HEX))
+          SIZE=$(stat -c%s "${{ steps.artifact.outputs.name }}")
+          PCT=$((SIZE * 100 / MAX))
+          echo "firmware.bin size: $SIZE bytes; app partition max: $MAX bytes (${PCT}%, $((MAX - SIZE)) free)"
+          if [ "$SIZE" -gt "$MAX" ]; then
+            echo "::error::firmware.bin ($SIZE bytes) exceeds the ${{ matrix.board_id }} app partition size ($MAX bytes, from pages/flasher/data/auto_boards.json). Flashing this into an OTA slot would overrun into the next partition."
+            exit 1
+          fi
+          if [ "$PCT" -ge "$WARN_PCT" ]; then
+            echo "::warning::${{ matrix.board_id }}/${{ matrix.id }} fills ${PCT}% of its app partition, $((MAX - SIZE)) bytes free. Past ${WARN_PCT}% a new feature can overrun the OTA slot and block a release."
+          fi
+
+      - name: Verify the image reports its own metadata back
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          python3 scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" --check
+
+      # Pinned rather than taking PlatformIO's bundled copy: esptool 4.x spells this
+      # merge_bin/--flash_size and 5.x merge-bin/--flash-size.
+      - name: Build the whole-flash -merged.bin
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        id: merged
+        run: |
+          pip install --quiet esptool==5.3.1
+          NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}-merged.bin"
+          python3 scripts/merge_flash_image.py \
+            --board-id ${{ matrix.board_id }} \
+            --variant ${{ matrix.id }} \
+            --boards-json pages/flasher/data/auto_boards.json \
+            --flasher-dir pages/flasher \
+            --firmware "${{ steps.artifact.outputs.name }}" \
+            --out "$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+
+      - name: Stage this app for merged-image and QEMU checks
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          eval "$(python3 scripts/generate-board-config.py flasher-paths --board ${{ matrix.board_id }} --variant-id ${{ matrix.id }})"
+          mkdir -p "$(dirname "pages/flasher/$FIRMWARE")"
+          cp "${{ steps.artifact.outputs.name }}" "pages/flasher/$FIRMWARE"
+
+      # Everything downstream sits behind this, so an image that cannot reach its command
+      # loop is never shipped.
+      - name: Fetch the emulator
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.qemu_boot_check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QEMU_REPO: HeyVern/espressif-qemu
+          QEMU_TAG: v9.2.2-4
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgcrypt20 libpixman-1-0 libsdl2-2.0-0 zstd
+          # Which emulator this board needs is a board fact, kept with the others in
+          # variants/<board>/overrides.yaml and carried into auto_boards.json.
+          mcu=$(jq -r '.["${{ matrix.board_id }}"].qemu.mcu // empty' pages/flasher/data/auto_boards.json)
+          if [ -z "$mcu" ]; then
+            echo "no emulation configured for ${{ matrix.board_id }} -- boot check will skip"
+            echo "QEMU_DIR=" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          asset="${mcu}-${QEMU_TAG}-linux-x86_64.tar.zst"
+          expected=$(gh api "repos/${QEMU_REPO}/releases/tags/${QEMU_TAG}" \
+            --jq ".assets[] | select(.name==\"${asset}\") | .digest" | sed 's/^sha256://')
+          gh release download "${QEMU_TAG}" --repo "${QEMU_REPO}" -p "$asset"
+          echo "${expected}  ${asset}" | sha256sum -c -
+          tar xaf "$asset"
+          echo "QEMU_DIR=${mcu}-${QEMU_TAG}-linux-x86_64" >> "$GITHUB_ENV"
+
+      - id: boot_check
+        name: Boot the built firmware and exercise its CLI
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.qemu_boot_check
+        run: |
+          if [ -z "$QEMU_DIR" ]; then
+            echo "no emulator for this board -- skipping"
+            exit 0
+          fi
+          mkdir -p qemu-workdir
+          python3 scripts/qemu_boot_check.py \
+            --board-id "${{ matrix.board_id }}" \
+            --variant "${{ matrix.id }}" \
+            --boards-json pages/flasher/data/auto_boards.json \
+            --flasher-dir pages/flasher \
+            --qemu-dir "$QEMU_DIR" \
+            --workdir qemu-workdir
+
+      - name: Upload boot output on failure
+        if: failure() && steps.boot_check.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: boot-check-${{ matrix.board_id }}-${{ matrix.id }}
+          path: qemu-workdir/uart0.log
+          retention-days: 14
+
+      - name: Package this successful build for the single publisher
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        run: |
+          mkdir -p release-input
+          eval "$(python3 scripts/generate-board-config.py flasher-paths --board ${{ matrix.board_id }} --variant-id ${{ matrix.id }})"
+          FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
+          APP0=$(find "$FRAMEWORK_DIR" -name 'boot_app0.bin' | head -1)
+          cp "${{ steps.artifact.outputs.name }}" release-input/app.bin
+          cp "${{ steps.merged.outputs.name }}" release-input/merged.bin
+          cp "upstream-src/.pio/build/${{ matrix.build_env }}/bootloader.bin" release-input/bootloader.bin
+          cp "upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin" release-input/partitions.bin
+          cp "$APP0" release-input/boot_app0.bin
+          cp release-notes.md release-input/release-notes.md
+          jq '."${{ matrix.board_id }}"' pages/flasher/data/auto_boards.json > release-input/board-entry.json
+          jq -n \
+            --arg board "${{ matrix.board_id }}" \
+            --arg role "${{ matrix.id }}" \
+            --arg version "${{ steps.pick.outputs.version }}" \
+            --arg release_tag "${{ steps.pick.outputs.release_tag }}" \
+            --arg release_title "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - mobmesh" \
+            --arg app_asset "${{ steps.artifact.outputs.name }}" \
+            --arg merged_asset "${{ steps.merged.outputs.name }}" \
+            --arg firmware_path "$FIRMWARE" \
+            --argjson make_latest '${{ matrix.make_latest }}' \
+            --argjson vendor_flasher_assets '${{ matrix.vendor_flasher_assets }}' \
+            '{board:$board, role:$role, version:$version, release_tag:$release_tag,
+              release_title:$release_title, app_asset:$app_asset,
+              merged_asset:$merged_asset, firmware_path:$firmware_path,
+              make_latest:$make_latest, vendor_flasher_assets:$vendor_flasher_assets}' \
+            > release-input/meta.json
+
+      - name: Upload this successful build
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-input-${{ matrix.board_id }}-${{ matrix.id }}
+          path: release-input/
+          retention-days: 7
+
+      - name: Notify on patch/build failure
+        if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && steps.rollback_check.outputs.failed != 'true'
+        uses: actions/github-script@v9
+        env:
+          BOARD_ID: ${{ matrix.board_id }}
+          VARIANT_ID: ${{ matrix.id }}
+          UPSTREAM_REF: ${{ steps.pick.outputs.ref }}
+          RESCUE_ATTEMPTED: ${{ steps.apply.outputs.rescue_attempted }}
+          RESCUE_PATCH: ${{ steps.apply.outputs.rescue_patch }}
+          RESCUE_VERDICT: ${{ steps.apply.outputs.rescue_verdict }}
+        with:
+          # Values arrive via env: the drift text carries backticks that would terminate
+          # a JS template literal early.
+          script: |
+            const { BOARD_ID, VARIANT_ID, UPSTREAM_REF,
+                    RESCUE_ATTEMPTED, RESCUE_PATCH, RESCUE_VERDICT } = process.env;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const detail = RESCUE_ATTEMPTED === 'true'
+              ? `**Patch drift**: \`${RESCUE_PATCH}\` no longer applies. A three-way merge was attempted as a starting point -- ${RESCUE_VERDICT}. The rescued diff is attached to the run as artifact \`patch-rescue-${BOARD_ID}-${VARIANT_ID}-${UPSTREAM_REF}\`. It is NOT validated and was NOT built; treat it as a head start on the rebase, not a fix.`
+              : 'The failure was not in the patch-apply step -- check the build log.';
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[${BOARD_ID}/${VARIANT_ID}] Patch or build failed against ${UPSTREAM_REF}`,
+              body: [
+                `build-release (${BOARD_ID}/${VARIANT_ID}) failed for upstream ref \`${UPSTREAM_REF}\`.`,
+                ``,
+                `Workflow run: ${runUrl}`,
+                ``,
+                detail,
+              ].join('\n')
+            });
+
+  publish:
+    needs: [compute-matrix, build]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Start from the current branch tip
+        run: git pull --ff-only origin "${{ github.ref_name }}"
+
+      - name: Download every successful build
+        uses: actions/download-artifact@v7
+        continue-on-error: true
+        with:
+          pattern: release-input-*
+          path: release-inputs
+
+      - name: Assemble release assets and the web-flasher update
+        run: |
+          mkdir -p release-inputs release-assets
+          python3 scripts/assemble-release.py \
+            --inputs release-inputs \
+            --flasher-dir pages/flasher \
+            --boards-json pages/flasher/data/auto_boards.json \
+            --output-dir release-assets \
+            --summary publish-summary.json
+          {
+            echo '## Release assembly'
+            echo
+            echo '### Web flasher updates'
+            jq -r '.web_published[]? | "- \(.board)/\(.role)"' publish-summary.json
+            echo
+            echo '### Withheld web-flasher boards'
+            jq -r '.web_skipped[]? | "- \(.board): \(.reason)"' publish-summary.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - id: vendor
+        name: Commit and push the assembled web-flasher update once
+        if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pages/flasher/bin pages/flasher/data/auto_boards.json
+          if git diff --staged --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "docs: publish assembled firmware and flasher catalogue"
+          for attempt in 1 2 3 4 5; do
+            if git push origin "HEAD:${{ github.ref_name }}"; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::failed to push the assembled flasher update after 5 attempts"
+              exit 1
+            fi
+            git pull --rebase origin "${{ github.ref_name }}"
+          done
+
+      - name: Create or update each shared release once
+        if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          jq -r '.releases[].release_tag' publish-summary.json | sort -u | while read -r tag; do
+            [ -n "$tag" ] || continue
+            title=$(jq -r --arg tag "$tag" '.releases[] | select(.release_tag==$tag) | .release_title' publish-summary.json | sort -u)
+            latest=$(jq -r --arg tag "$tag" '.releases[] | select(.release_tag==$tag) | .make_latest' publish-summary.json | sort -u)
+            notes=$(jq -r --arg tag "$tag" '.releases[] | select(.release_tag==$tag) | .notes_file' publish-summary.json | head -1)
+            if [ "$(printf '%s\n' "$title" | wc -l)" -ne 1 ] || [ "$(printf '%s\n' "$latest" | wc -l)" -ne 1 ]; then
+              echo "::error::inconsistent release metadata for $tag"
+              exit 1
+            fi
+            mapfile -t assets < <(jq -r --arg tag "$tag" '.releases[] | select(.release_tag==$tag) | .release_files[]' publish-summary.json)
+            if gh release view "$tag" > /dev/null 2>&1; then
+              edit_args=("$tag" --title "$title" --notes-file "$notes")
+              [ "$latest" = true ] && edit_args+=(--latest)
+              gh release edit "${edit_args[@]}"
+              gh release upload "$tag" --clobber "${assets[@]}"
+            else
+              gh release create "$tag" "${assets[@]}" \
+                --title "$title" --notes-file "$notes" --latest="$latest"
+            fi
+          done
+
+  # Requires Settings -> Pages -> Source set to "GitHub Actions", a one-time manual step.
+  # One issue per run, filed from a single job so parallel matrix jobs cannot open duplicates.
+  boot-check-report:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: boot-check-*
+          path: boot-checks
+        continue-on-error: true
+
+      - id: collect
+        run: |
+          {
+            echo 'report<<REPORT_EOF'
+            for d in boot-checks/boot-check-*; do
+              [ -d "$d" ] || continue
+              name="${d#boot-checks/boot-check-}"
+              echo "### $name"
+              echo '```'
+              # The tail is where a panic or the last thing the node managed to say lands.
+              tail -n 40 "$d/uart0.log" 2>/dev/null || echo '(no console output captured)'
+              echo '```'
+            done
+            echo REPORT_EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open, update, or close the tracking issue
+        uses: actions/github-script@v9
+        env:
+          REPORT: ${{ steps.collect.outputs.report }}
+        with:
+          script: |
+            const report = (process.env.REPORT || '').trim();
+            const title = 'QEMU boot check: firmware did not answer';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const repo = { owner: context.repo.owner, repo: context.repo.repo };
+
+            const existing = (await github.rest.issues.listForRepo({
+              ...repo, state: 'open', labels: 'qemu-boot-check',
+            })).data.find(i => i.title === title);
+
+            if (report) {
+              const body = [
+                `The build gate booted these images in the emulator and they did not answer. **Nothing was published for them** -- the gate runs before the vendored image is committed and before the release step.`,
+                ``,
+                `Each is the exact binary that was just built, talked to over the emulated USB console. It is booted twice before being called a failure, so this is not a one-off flake.`,
+                ``,
+                report,
+                ``,
+                `Last seen ${new Date().toISOString().slice(0,10)} in ${runUrl}.`,
+              ].join('\n');
+              if (existing) {
+                await github.rest.issues.update({ ...repo, issue_number: existing.number, body });
+              } else {
+                await github.rest.issues.create({ ...repo, title, body, labels: ['qemu-boot-check'] });
+              }
+            } else if (existing) {
+              await github.rest.issues.createComment({ ...repo, issue_number: existing.number,
+                body: `Every variant boots and answers again as of ${runUrl} -- closing.` });
+              await github.rest.issues.update({ ...repo, issue_number: existing.number, state: 'closed' });
+            }
+
+  publish-pages:
+    needs: publish
+    # Only from the default branch, and never on a dry run. Without the ref guard a run
+    # started on any branch deployed production Pages from that branch's tree.
+    if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+
+      - name: Pull the assembled flasher commit
+        run: git pull --ff-only origin "${{ github.ref_name }}"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
+      - name: Write build stamp for stale-page detection
+        run: |
+          echo "{\"sha\": \"$(git rev-parse HEAD)\"}" > pages/flasher/build-stamp.json
+
+      - name: Upload pages/ as the Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: pages
+
+      - id: deployment
+        name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v5

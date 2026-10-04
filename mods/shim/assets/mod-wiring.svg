@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 505" role="img" aria-labelledby="title desc">
+  <title id="title">How shim connects selected mods to MeshCore</title>
+  <desc id="desc">At build time, selected mods declare hooks in mod.yaml and the composer generates dispatch code. At runtime, MeshCore entry points call shim hooks, which dispatch to the selected mods. Timing-safety is an exception that patches upstream code directly.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker><style>.bg{fill:#18212b}.card{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.body{font:14px system-ui,sans-serif;fill:#b0c1cd}.small{font:700 12px system-ui,sans-serif;fill:#b0c1cd}.chip{font:700 13px system-ui,sans-serif;fill:#c7e8e5}.line{fill:none;stroke:#7e9eac;stroke-width:2.5;marker-end:url(#arrow)}</style></defs>
+  <rect class="bg" width="1000" height="505" rx="28"/>
+  <text class="head" x="40" y="48">One hook layer, independently selected mods</text>
+  <text class="sub" x="40" y="75">Build-time composition decides which mod code receives each upstream call.</text>
+  <text class="small" x="40" y="115">AT BUILD TIME</text>
+  <rect class="card" x="40" y="130" width="236" height="74" rx="19"/>
+  <text class="label" x="57" y="160">Selected mods</text><text class="body" x="57" y="184">Declare hooks in mod.yaml</text>
+  <path class="line" d="M276 167H317"/>
+  <rect class="card" x="317" y="130" width="275" height="74" rx="19"/>
+  <text class="label" x="334" y="160">Composer</text><text class="body" x="334" y="184">Checks the chosen combination</text>
+  <path class="line" d="M592 167H633"/>
+  <rect x="633" y="130" width="327" height="74" rx="19" fill="#263b46" stroke="#517c88" stroke-width="1.5"/>
+  <text class="label" x="650" y="160">Generated dispatch</text><text class="body" x="650" y="184">ModHooks.cpp + CommonCliMods.cpp</text>
+  <path d="M40 231H960" fill="none" stroke="#3d5262" stroke-width="1.5"/>
+  <text class="small" x="40" y="255">AT RUNTIME</text>
+  <rect class="card" x="40" y="271" width="236" height="157" rx="22"/>
+  <text class="label" x="57" y="306">MeshCore</text>
+  <text class="body" x="57" y="334">Startup, main loop,</text><text class="body" x="57" y="355">CLI and other call sites</text>
+  <text class="body" x="57" y="401">Upstream entry points</text>
+  <path class="line" d="M276 349H317"/>
+  <rect x="317" y="271" width="275" height="157" rx="22" fill="#263b46" stroke="#517c88" stroke-width="1.5"/>
+  <text class="label" x="334" y="306">shim</text>
+  <text class="body" x="334" y="334">Shared hook calls</text><text class="body" x="334" y="355">+ generated dispatch</text>
+  <text class="body" x="334" y="401">Routes to installed mods</text>
+  <path class="line" d="M592 349H633"/>
+  <rect x="633" y="271" width="327" height="157" rx="22" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
+  <text class="label" x="650" y="306">Selected mods</text>
+  <rect x="650" y="324" width="138" height="31" rx="14" fill="#315a4e"/><text class="chip" x="663" y="344">hotspot-ota</text>
+  <rect x="798" y="324" width="145" height="31" rx="14" fill="#315a4e"/><text class="chip" x="811" y="344">power-guard</text>
+  <rect x="650" y="365" width="138" height="31" rx="14" fill="#315a4e"/><text class="chip" x="663" y="385">try-settings</text>
+  <rect x="798" y="365" width="145" height="31" rx="14" fill="#315a4e"/><text class="chip" x="811" y="385">sync-settings</text>
+  <text class="body" x="40" y="472">Exception: timing-safety fixes upstream code directly; it does not use shim hooks.</text>
+</svg>

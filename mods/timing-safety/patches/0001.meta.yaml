@@ -1,0 +1,6 @@
+id: "0001"
+title: millis-safe-comparisons
+requires: []
+# Carried ahead of merge. Once one is MERGED the hunks are probably redundant: a patch
+# duplicating a landed fix keeps applying cleanly and raises no signal of its own.
+upstream_prs: [1972, 1349]

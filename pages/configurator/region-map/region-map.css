@@ -1,0 +1,407 @@
+/* region-map.css
+   Full-height map layout on top of the shared style.css tokens. */
+
+html,
+body.region-map-body {
+  height: 100%;
+  overflow: hidden;
+}
+
+.region-map-layout {
+  display: flex;
+  height: 100vh;
+  height: 100dvh;
+}
+
+
+/* -------------------------------------------------- shared form controls -- */
+/* Kept local so this page does not have to load the configurator stylesheet. */
+
+.search-wrap {
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  color: var(--fg-muted);
+  pointer-events: none;
+}
+
+.search-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.region-map-body input.search-input {
+  width: 100%;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem 0.5rem 2.3rem;
+}
+
+.region-map-body input.search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.region-map-body input::placeholder {
+  color: var(--fg-muted);
+  opacity: 0.6;
+}
+
+.region-map-body input[type="checkbox"] {
+  appearance: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 0.3rem;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.region-map-body input[type="checkbox"]:checked {
+  border-color: var(--accent);
+  background-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%2304120f' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+  background-size: 100%;
+  background-repeat: no-repeat;
+}
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  background: var(--accent-soft);
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.serial-btn-secondary {
+  background: transparent;
+  color: var(--fg-muted);
+  border-color: var(--line);
+}
+
+.serial-btn-secondary:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+/* ------------------------------------------------------------ side panel -- */
+
+.region-map-controls {
+  position: relative;
+  width: 320px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  background: var(--bg-elevated-glass);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  transition: margin-left 0.2s ease;
+}
+
+body.controls-hidden .region-map-controls {
+  margin-left: -320px;
+}
+
+.region-map-controls-inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.region-map-controls-top {
+  padding: 1.25rem 1.1rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.region-map-panel-title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.region-map-controls-scroll {
+  overflow-y: auto;
+  padding: 1rem 1.1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.region-map-overlays-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.region-map-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  padding: 0.2rem 0;
+  cursor: pointer;
+}
+
+.region-map-counter {
+  margin: 0.6rem 0 0;
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+}
+
+/* Sibling of the panel, not a child: a backdrop-filter ancestor would make
+   this fixed element position against the panel instead of the viewport. */
+.region-map-controls-toggle {
+  position: fixed;
+  left: calc(320px + 0.75rem);
+  bottom: 2.5rem;
+  z-index: 900;
+  background: var(--bg-elevated);
+  transition: left 0.2s ease;
+}
+
+body.controls-hidden .region-map-controls-toggle {
+  left: 0.75rem;
+}
+
+/* ------------------------------------------------------------- hierarchy -- */
+
+.hierarchy-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.hierarchy-node {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.hierarchy-node:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+}
+
+.hierarchy-node.is-covered {
+  color: var(--fg);
+}
+
+.hierarchy-node.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.hierarchy-code {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+  flex: none;
+}
+
+.hierarchy-label {
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hierarchy-node.is-selected .hierarchy-label {
+  color: var(--accent);
+}
+
+/* ------------------------------------------------------------------ map -- */
+
+.region-map-main {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.region-map-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-elevated-glass);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+
+.region-map-header-brand h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  letter-spacing: -0.02em;
+}
+
+.region-map-header-brand .badge-pill {
+  margin-bottom: 0.35rem;
+}
+
+.region-map-header-links {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.region-map-github {
+  position: static;
+}
+
+#region-map-container {
+  flex: 1;
+  min-height: 0;
+}
+
+.region-map-selection {
+  margin: 0;
+  padding: 0.5rem 1.25rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  background: var(--bg-1);
+}
+
+/* Leaflet ships light chrome; tone it down for the dark surface. */
+.leaflet-container {
+  background: var(--bg-1);
+}
+
+.leaflet-control-attribution,
+.leaflet-bar a {
+  background: var(--bg-elevated) !important;
+  color: var(--fg-muted) !important;
+  border-color: var(--line) !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--accent) !important;
+}
+
+.leaflet-tooltip {
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  color: var(--fg);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.8);
+}
+
+.leaflet-tooltip-top::before {
+  border-top-color: var(--line);
+}
+
+/* --------------------------------------------------------------- embed -- */
+
+body.is-embedded .region-map-header-bar,
+body.is-embedded .region-map-controls,
+body.is-embedded .region-map-controls-toggle,
+body.is-embedded .region-map-selection {
+  display: none;
+}
+
+/* embed=1&panel=1 keeps the scope tree and its code search alongside the map. */
+body.is-embedded.show-panel .region-map-controls {
+  display: flex;
+  width: 268px;
+}
+
+body.is-embedded.show-panel .region-map-controls-toggle {
+  display: inline-flex;
+  left: calc(268px + 0.75rem);
+  bottom: 0.75rem;
+}
+
+body.is-embedded.show-panel.controls-hidden .region-map-controls {
+  margin-left: -268px;
+}
+
+body.is-embedded.show-panel.controls-hidden .region-map-controls-toggle {
+  left: 0.75rem;
+}
+
+body.is-embedded.show-panel .region-map-controls-top {
+  padding: 0.9rem 0.85rem 0.7rem;
+}
+
+body.is-embedded.show-panel .region-map-panel-title {
+  font-size: 0.85rem;
+}
+
+body.is-embedded.show-panel .region-map-controls-scroll {
+  padding: 0.85rem 0.85rem 3rem;
+  gap: 1rem;
+}
+
+/* ----------------------------------------------------------- responsive -- */
+
+@media (max-width: 780px) {
+  .region-map-layout {
+    flex-direction: column;
+  }
+
+  .region-map-controls {
+    width: 100%;
+    max-height: 45vh;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+
+  body.controls-hidden .region-map-controls {
+    margin-left: 0;
+    display: none;
+  }
+
+  .region-map-controls-toggle {
+    left: 0.75rem;
+    bottom: 0.75rem;
+  }
+
+  body.controls-hidden .region-map-controls-toggle {
+    left: 0.75rem;
+  }
+}
