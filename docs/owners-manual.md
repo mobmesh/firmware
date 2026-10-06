@@ -139,8 +139,7 @@ After reboot, inspect both slots:
 get ota.slot
 ```
 
-The active image reports `pending` during probation and later `valid`. Do not start another
-update while the new image is still pending.
+The active image reports `pending` during probation and later `valid`.
 
 ### Example: diagnose the WAN path without updating
 

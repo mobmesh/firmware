@@ -5,6 +5,7 @@
   "commands": [
     "set radio 910.525,62.5,7,6",
     "set advert.interval 240",
+    "gps advert prefs",
     "set flood.advert.interval 23",
     "set path.hash.mode 1",
     "set loop.detect minimal",
