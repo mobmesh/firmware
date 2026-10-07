@@ -1,5 +1,7 @@
 # timing-safety
 
+[↩ Back to firmware readme](../../README.md)
+
 ## Small Clock and Timer Fixes for MeshCore
 
 This mod fixes two time-related problems in MeshCore:
@@ -17,3 +19,5 @@ Both fixes remain unmerged upstream (PRs 1972 and 1349). Their status is tracked
 The second upstream PR also removes the `time` command's guard against setting the clock
 backward. This mod keeps that guard. `hotspot-ota` can already correct the clock in either
 direction through NTP when it joins WiFi, without changing the rule for manual commands.
+
+[↩ Back to firmware readme](../../README.md)

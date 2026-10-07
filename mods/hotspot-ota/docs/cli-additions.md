@@ -1,5 +1,7 @@
 # hotspot-ota CLI reference
 
+[↩ Back to hotspot-ota readme](../README.md)
+
 Commands added or extended by `hotspot-ota`, available over serial and authenticated
 remote CLI on supported ESP32 repeater and room-server builds. Setup instructions
 are in the [mod README](../README.md).
@@ -399,3 +401,5 @@ ver
 ```text
 <upstream-version> (<upstream-build-date>) + ota (<OTA-build-date> - <commit>)
 ```
+
+[↩ Back to hotspot-ota readme](../README.md)

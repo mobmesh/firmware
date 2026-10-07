@@ -1,5 +1,7 @@
 # Mod bit registry
 
+[↩ Back to firmware readme](../README.md)
+
 The writer places the **mod bitfield** (`u32`, little-endian) at file offset 272.
 The **metadata magic** `MOBMESH\0` begins at 280. Readers find that magic within
 the descriptor's reserved tail and read the bitfield nine bytes before it, so
@@ -52,3 +54,5 @@ a layout revision and a corresponding update to every reader.
    ```
 3. Add the row above.
 4. `scripts/tests/test_patch_ota_metadata.py` checks the bits are unique and in range.
+
+[↩ Back to firmware readme](../README.md)

@@ -1,5 +1,7 @@
 # Owner's Manual and Quick Reference
 
+[↩ Back to firmware readme](../README.md)
+
 **For:** MeshCore operators who are new to MeshCore Enhanced+  
 **Document date:** 4 October 2026
 
@@ -917,3 +919,5 @@ These commands are available on the Heltec V4 repeater.
 | `sync.time publish <region\|*> <channel>` | Start a persistent signed time-sample schedule. |
 | `sync.time publish.abort` | Stop future samples locally; previously accepted corrections stand. |
 | `sync.time publish.status` | Show on/off, active schedule, next/final sample, and latest received result. |
+
+[↩ Back to firmware readme](../README.md)

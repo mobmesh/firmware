@@ -1,5 +1,7 @@
 # power-guard CLI reference
 
+[↩ Back to power-guard readme](../README.md)
+
 Commands added or extended by `power-guard` on supported ESP32 repeaters, available
 over serial and authenticated remote CLI. Battery behavior and board thresholds
 are described in the [mod README](../README.md).
@@ -141,3 +143,5 @@ stats-packets
 
 **Extension:** Allows the existing serial command over authenticated remote CLI.
 Read-only; response fields follow the upstream firmware version.
+
+[↩ Back to power-guard readme](../README.md)

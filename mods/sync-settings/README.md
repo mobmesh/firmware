@@ -1,5 +1,7 @@
 # sync-settings
 
+[↩ Back to firmware readme](../../README.md)
+
 Repeaters can subscribe to [trusted publishers](#trusted-publishers) that send periodic
 region lists and selected operating settings over the mesh. After an operator
 trusts a publisher and enables a campaign type, the repeater applies received updates.
@@ -188,3 +190,5 @@ subscriber examples, outcomes, hop tallies and time status.
   chunk's signature passes, is bounded on input and output, and the integrity check covers
   the decompressed table.
 - **Private keys:** remain behind the signing interface; not handed to the mod.
+
+[↩ Back to firmware readme](../../README.md)

@@ -1,5 +1,7 @@
 # shim
 
+[↩ Back to firmware readme](../../README.md)
+
 ## Mod Hooks for MeshCore Upstream
 
 Most mods need upstream MeshCore to call their code at the right moment: at startup,
@@ -55,3 +57,5 @@ A few ground rules:
 - **Vetoes combine:** where several mods may refuse something, such as powering a heavy
   load, every one must agree. With no such mod installed it is allowed, so no mod depends
   on another.
+
+[↩ Back to firmware readme](../../README.md)

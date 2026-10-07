@@ -1,5 +1,7 @@
 # try-settings CLI reference
 
+[↩ Back to try-settings readme](../README.md)
+
 Commands added by `try-settings`, available over serial and authenticated remote CLI.
 Trial behavior and examples are described in the [mod README](../README.md).
 
@@ -120,3 +122,5 @@ tryset revert
 Radio trials return to saved parameters through a one-minute native trial; the
 radio change normally takes effect within two seconds. The native timer remains
 active until that trial expires.
+
+[↩ Back to try-settings readme](../README.md)

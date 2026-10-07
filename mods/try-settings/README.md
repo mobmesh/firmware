@@ -1,5 +1,7 @@
 # try-settings
 
+[↩ Back to firmware readme](../../README.md)
+
 `tryset <secs> <key> <value>` applies a setting, then puts it back unless you confirm with
 `tryset keep`. It is for settings that can make a node unreachable, or whose value can only be
 judged at the site where the node is deployed.
@@ -73,3 +75,5 @@ trial is declined -- one binary serves every variant.
 
 `radio.rxgain` needs its own care: MeshCore saves the pref *before* testing whether the board
 supports it, so a failed apply is followed here by an explicit restore rather than left as-is.
+
+[↩ Back to firmware readme](../../README.md)

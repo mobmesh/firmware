@@ -1,5 +1,7 @@
 # sync-settings CLI reference
 
+[↩ Back to sync-settings readme](../README.md)
+
 Commands added or extended by `sync-settings`, available over serial and authenticated
 remote CLI. A campaign command exists only when that campaign type is included in
 the build. Setup and campaign behavior remain in the [mod README](../README.md) and
@@ -522,3 +524,5 @@ last:<result|->
 Activity includes `idle`, `waiting-clock`, `verifying`, `sending`, and `retry`.
 The received result can include an offset in seconds. Storage failure returns
 `fault storage`. Time campaigns have no separate `publish.report` command.
+
+[↩ Back to sync-settings readme](../README.md)

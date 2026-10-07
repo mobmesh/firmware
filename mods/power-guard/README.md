@@ -1,5 +1,7 @@
 # power-guard
 
+[↩ Back to firmware readme](../../README.md)
+
 Takes a repeater out of service before the battery browns it out, and brings it back
 when the pack recovers. Also drops the LoRa FEM rail in deep sleep, which upstream
 leaves powered: ~4 mA against ~14 uA, the difference between a solar pack climbing back
@@ -83,3 +85,5 @@ hears less than it advertises is a routing hazard.
 
 Requires the `battery_measurement` capability; `fem_lna_control` and
 `deep_sleep_rail_shutdown` are optional.
+
+[↩ Back to firmware readme](../../README.md)

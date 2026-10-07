@@ -1,5 +1,7 @@
 # hotspot-ota
 
+[↩ Back to firmware readme](../../README.md)
+
 ## Fully Remote Firmware Updates
 
 MeshCore already has a built-in `start ota` command. It starts a WiFi access point on the
@@ -187,3 +189,5 @@ clock from `us.pool.ntp.org` (falling back to `pool.ntp.org`). A
 refresh its own clock before it broadcasts. These boards lose the time on every reboot, and the
 [`timing-safety`](../timing-safety) mod explains why that matters. If the time server doesn't
 answer, the update carries on.
+
+[↩ Back to firmware readme](../../README.md)
