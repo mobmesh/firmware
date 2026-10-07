@@ -88,10 +88,19 @@ Turn on any combination of campaign types the installed build supports.
 
 - Trust is by complete 64-character hexadecimal public key.
 - One trusted list covers region, policy, radio and time campaigns.
-- `remove` revokes trust and cancels that publisher's inbound work, but keeps its replay
-  history.
-- `forget`, after `remove`, erases the record and its replay history. Previously seen
-  updates from that key would then be accepted again.
+
+| Command | Effect | When to use it |
+|---|---|---|
+| `sync.publisher remove <key>` | Revoke trust and cancel that publisher's inbound work. Keep its record and remembered campaign generations. | Stop accepting its campaigns while retaining protection against old updates if the key is added again. |
+| `sync.publisher forget <key>` | Delete the removed publisher's record and generation history, freeing its slot. Requires `remove` first. | Discard the record entirely or free space in the publisher table. |
+
+Removed keys still occupy slots in the 16-record publisher table. To trust a removed key
+again, use `sync.publisher add <key>`; its remembered generations remain in effect.
+If the key was also forgotten, adding it again starts without that history, so old
+campaigns may become eligible for acceptance again.
+
+Neither command undoes settings already applied by that publisher. `forget` can be
+refused while recovery or replay settlement is pending.
 
 ### Subscription Channels
 
@@ -127,6 +136,9 @@ Replace `<dataset>` with `region` or `policy`.
 - Initial schedule: every `12h` over `3d`, seven rounds, starting immediately.
 - Region and policy keep independent schedules; a change affects the next publication.
 - There is no restore or rollback command.
+- Region publications also accept `-empty` to authorize sending an already-empty overlay.
+  This clears subscribers' managed overlays. `publish.reset` serves a separate purpose:
+  generation-history recovery; it does not clear regions by itself.
 
 | Command | What it does |
 |---|---|

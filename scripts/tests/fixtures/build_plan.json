@@ -1,9 +1,6 @@
 {
   "core_mods": [
-    "shim",
-    "hotspot-ota",
-    "timing-safety",
-    "try-settings"
+    "shim"
   ],
   "targets": [
     {

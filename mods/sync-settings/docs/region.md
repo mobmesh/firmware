@@ -90,7 +90,15 @@ sync.region publish * release
 sync.region publish * release -empty
 ```
 
-This clears overlays only, never native lists. `-empty` also works with `publish.reset`.
+The publisher's overlay must already be empty. `-empty` confirms that publishing it is
+intentional; receiving repeaters clear their managed overlays and keep their native lists.
+
+`publish.reset` is for generation-history recovery, not clearing regions. If that recovery
+also needs to distribute an empty overlay, use:
+
+```text
+sync.region publish.reset * release -empty
+```
 
 ### Commands
 

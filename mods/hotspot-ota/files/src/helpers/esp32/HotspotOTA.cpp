@@ -148,6 +148,20 @@ static int service_total = -1;
 static bool service_bypass_marker = false;
 static bool service_cancel_requested = false;
 static bool service_sleep_inhibited = false;
+static bool survey_sleep_inhibited = false;
+static void updateSleepInhibit() {
+  portENTER_CRITICAL(&service_mux);
+  modBoardInhibitSleep(service_sleep_inhibited || survey_sleep_inhibited);
+  portEXIT_CRITICAL(&service_mux);
+}
+
+static void surveyInhibitSleep(bool inhibit) {
+  portENTER_CRITICAL(&service_mux);
+  survey_sleep_inhibited = inhibit;
+  portEXIT_CRITICAL(&service_mux);
+  updateSleepInhibit();
+}
+
 static uint32_t service_clock_epoch = 0;
 static ServiceKind service_kind = ServiceKind::None;
 static uint32_t service_run = 0;
@@ -875,7 +889,7 @@ bool HotspotOTA::start(const HotspotOtaConfig& cfg, char reply[]) {
     return false;
   }
 
-  modBoardInhibitSleep(true);
+  updateSleepInhibit();
   BaseType_t created = xTaskCreate(serviceTaskMain, "wan-ota", 8192, NULL, 1, NULL);
   if (created != pdPASS) {
     portENTER_CRITICAL(&service_mux);
@@ -884,7 +898,7 @@ bool HotspotOTA::start(const HotspotOtaConfig& cfg, char reply[]) {
     strcpy(service_result, "ERR: could not start OTA task");
     service_sleep_inhibited = false;
     portEXIT_CRITICAL(&service_mux);
-    modBoardInhibitSleep(false);
+    updateSleepInhibit();
     strcpy(reply, "ERR: could not start OTA task");
     return false;
   }
@@ -973,6 +987,7 @@ static int16_t survey_count = 0;
 
 static void surveyForget() {
   WiFi.scanDelete();
+  surveyInhibitSleep(false);
   survey_count = 0;
   survey_state = SurveyState::Idle;
 }
@@ -996,6 +1011,7 @@ static bool surveyStart(char reply[]) {
     strcpy(reply, "ERR: OTA/WAN operation active");
     return false;
   }
+  surveyInhibitSleep(true);
   WiFi.scanDelete();
   if (WiFi.getMode() != WIFI_STA) {
     WiFi.mode(WIFI_STA);
@@ -1004,6 +1020,7 @@ static bool surveyStart(char reply[]) {
   if (WiFi.scanNetworks(true) == WIFI_SCAN_FAILED) {
     WiFi.mode(WIFI_OFF);
     survey_state = SurveyState::Failed;
+    surveyInhibitSleep(false);
     strcpy(reply, "ERR: scan did not start");
     return false;
   }
@@ -1048,9 +1065,8 @@ static void surveyPage(uint8_t offset, char reply[]) {
     size_t length = surveyRow(index, row, sizeof(row));
     if (length == 0) continue;
     size_t reserve = index + 1 < survey_count ? 10 : 1;
-    size_t lead = used ? 1 : 0;
-    if (used + lead + length + reserve > MAX_TEXT_LEN) break;
-    if (lead) reply[used++] = '\n';
+    if (used + 1 + length + reserve > MAX_TEXT_LEN) break;
+    reply[used++] = '\n';
     memcpy(reply + used, row, length + 1);
     used += length;
   }
@@ -1077,6 +1093,7 @@ void HotspotOTA::surveyPoll() {
     survey_ready_ms = millis();
     survey_state = SurveyState::Ready;
     WiFi.mode(WIFI_OFF);
+    surveyInhibitSleep(false);
     return;
   }
   if (survey_state == SurveyState::Ready &&
@@ -1143,7 +1160,7 @@ void HotspotOTA::poll() {
   portEXIT_CRITICAL(&service_mux);
 
   if (clock_epoch != 0) modClockSet(clock_epoch);
-  if (release_sleep) modBoardInhibitSleep(false);
+  if (release_sleep) updateSleepInhibit();
   if (release_sleep && kind == ServiceKind::WanVerify) {
     portENTER_CRITICAL(&service_mux);
     wan_done_run = service_run;
@@ -1299,14 +1316,14 @@ bool HotspotOTA::verifyWan(char reply[]) {
   service_result[0] = 0;
   service_sleep_inhibited = true;
   portEXIT_CRITICAL(&service_mux);
-  modBoardInhibitSleep(true);
+  updateSleepInhibit();
   if (xTaskCreate(serviceTaskMain, "wan-verify", 8192, NULL, 1, NULL) != pdPASS) {
     portENTER_CRITICAL(&service_mux);
     service_state = OtaServiceState::Failed;
     service_kind = ServiceKind::None;
     service_sleep_inhibited = false;
     portEXIT_CRITICAL(&service_mux);
-    modBoardInhibitSleep(false);
+    updateSleepInhibit();
     strcpy(reply, "ERR: could not start WAN verification");
     return false;
   }

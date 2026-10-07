@@ -283,14 +283,16 @@ ota wan survey refresh
 | Response | Meaning |
 | --- | --- |
 | `OK - scanning` | Scan is running; another call reads its result |
-| Network list, optionally ending in `next N` | Saved scan results; a lock marks protected networks |
+| Network list, optionally ending in `next N` | Saved scan results; each page starts with a newline, and a lock marks protected networks |
 | `No networks found` | Scan completed without results |
 | `ERR: ...` | Invalid parameter, scan failure, or operation conflict |
 
 **Lifetime:** One scan retained for two minutes. An expired result starts a new scan.
 
 **Restrictions:** Refused while WiFi is in use or an OTA/WAN operation is active.
-Never joins or powers the hotspot; WiFi is switched off when scanning finishes.
+Never joins or powers the hotspot. Sleep is inhibited during the scan and released
+when it finishes or fails; cached results do not keep the node awake. WiFi is switched
+off when scanning finishes.
 
 ## ota wan verify
 

@@ -1,13 +1,12 @@
 # What gets built and released. Board hardware facts live in variants/<board>/overrides.yaml,
 # and resolve-targets computes asset_basename as <board>_<role_abbrev>_mobmesh.
 #
-# Every target lists every mod it wants; nothing applies by default except core_mods.
+# Shim supplies the shared integration hooks; each target explicitly selects its features.
 # vendor_flasher_assets: exactly one target per BOARD, since bootloader.bin, partitions.bin
 # and boot_app0.bin are partition-table specific and never shared between boards.
 
-# Applied to every target, in this order, before any target-specific mods below.
-# A mod that stops shipping everywhere belongs in a target's own `mods:` list instead.
-core_mods: [shim, hotspot-ota, timing-safety, try-settings]
+# Applied before each target's ordered mod list.
+core_mods: [shim]
 
 roles:
   repeater:
@@ -29,7 +28,7 @@ targets:
     build_env: heltec_v4_repeater
     vendor_flasher_assets: true
     # heltec_v4 only: its battery divider is the one that has been bench-measured.
-    mods: [power-guard, sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, power-guard, sync-settings]
     # Headless: drops the OLED and the button's long-press power-off.
     # Joined form -- PlatformIO splits "-U FOO" into a bare -U.
     build_flags_append: ["-UDISPLAY_CLASS"]
@@ -38,7 +37,7 @@ targets:
     role: room_server
     build_env: heltec_v4_room_server
     vendor_flasher_assets: false
-    mods: [sync-settings]      # extras beyond core_mods
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
     # qemu_boot_check: false   # opt this role out of the emulator gate
 
   - board: xiao_c3
@@ -46,14 +45,14 @@ targets:
     build_env: Xiao_C3_repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
 
   - board: xiao_c3
     role: room_server
     build_env: Xiao_C3_room_server
     vendor_flasher_assets: false
     beta: true
-    mods: [sync-settings]      # extras beyond core_mods
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
 
   # Beta boards: `beta: true` appends _beta to every release asset name until each is proven in the field.
 
@@ -62,7 +61,7 @@ targets:
     build_env: Heltec_v3_repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
     # Headless, as heltec_v4.
     build_flags_append: ["-UDISPLAY_CLASS"]
 
@@ -71,60 +70,60 @@ targets:
     build_env: Heltec_v3_room_server
     vendor_flasher_assets: false
     beta: true
-    mods: [sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
 
   - board: xiao_s3_wio
     role: repeater
     build_env: Xiao_S3_WIO_repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
 
   - board: xiao_s3_wio
     role: room_server
     build_env: Xiao_S3_WIO_room_server
     vendor_flasher_assets: false
     beta: true
-    mods: [sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
 
   - board: rak3112
     role: repeater
     build_env: RAK_3112_repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
 
   - board: rak3112
     role: room_server
     build_env: RAK_3112_room_server
     vendor_flasher_assets: false
     beta: true
-    mods: [sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
 
   - board: ebyte_eora_s3
     role: repeater
     build_env: Ebyte_EoRa-S3_Repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
 
   - board: ebyte_eora_s3
     role: room_server
     build_env: Ebyte_EoRa-S3_room_server
     vendor_flasher_assets: false
     beta: true
-    mods: [sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
 
   - board: station_g3_esp32
     role: repeater
     build_env: Station_G3_ESP32_repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
 
   - board: station_g3_esp32
     role: room_server
     build_env: Station_G3_ESP32_room_server
     vendor_flasher_assets: false
     beta: true
-    mods: [sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
