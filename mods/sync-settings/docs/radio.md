@@ -1,5 +1,7 @@
 # Radio campaigns
 
+[↩ Back to sync-settings readme](../README.md)
+
 Part of [sync-settings](../README.md). Trusted publishers, channels, campaign mechanics and
 monitoring are covered there.
 
@@ -132,4 +134,6 @@ Requires a channel and at least one trusted publisher.
 
 Unlike region and policy campaigns, a radio campaign's status and reports show identical
 information on both the publisher's and the receiver's side. See
-[Campaign Feedback and Reports](../README.md#campaign-feedback-and-reports).
+[Status and reports](status-and-reports.md#radio-status-and-reports).
+
+[↩ Back to sync-settings readme](../README.md)

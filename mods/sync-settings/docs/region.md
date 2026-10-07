@@ -1,5 +1,7 @@
 # Region campaigns
 
+[↩ Back to sync-settings readme](../README.md)
+
 Part of [sync-settings](../README.md). Trusted publishers, channels, campaign mechanics and
 monitoring are covered there.
 
@@ -138,3 +140,7 @@ sync.region on
 
 Publishing schedule, `publish.reset`, abort and the shared command table:
 [Region and policy publishing](../README.md#region-and-policy-publishing).
+
+For status examples, report outcomes and hop tallies, see [Status and reports](status-and-reports.md).
+
+[↩ Back to sync-settings readme](../README.md)

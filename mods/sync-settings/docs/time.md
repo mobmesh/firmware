@@ -1,5 +1,7 @@
 # Time campaigns
 
+[↩ Back to sync-settings readme](../README.md)
+
 Part of [sync-settings](../README.md). Trusted publishers, channels, campaign mechanics and
 monitoring are covered there.
 
@@ -134,15 +136,6 @@ authority to correct this repeater's clock while `sync.time on` is set.
 |---|---|
 | `sync.time publish.status` | Show on/off, whether a schedule is active with its next and final sample times, and the last received sample. |
 
-Status words while a schedule is active:
+For status words and received-sample results, see [Status and reports](status-and-reports.md#time-status).
 
-| Word | Meaning |
-|---|---|
-| `waiting-clock` | After a restart the clock is not yet believable (before this firmware was built, or before the schedule began); nothing is sent until it is set. |
-| `verifying` | The hotspot preflight is refreshing the publisher's clock. |
-| `sending` | A sample has been handed to the radio. |
-| `retry` | The last attempt did not complete; it retries after a minute. |
-
-The last received sample appears as `last corrected <N>s` or `last within <N>s`, where `N` is
-this repeater's clock minus the publisher's, or as `last replay` or `last storage`. Time has
-no `publish.report`.
+[↩ Back to sync-settings readme](../README.md)
