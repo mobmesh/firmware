@@ -72,7 +72,7 @@ All of these work over serial or remotely over the mesh. Full details are in
 <tr><td><code>get ota.wan.radio</code></td><td>Show ESP32 WiFi, driver, and link state alongside the <code>ota.wan.pwr</code> value.</td></tr>
 <tr><td><code>get ota.status</code></td><td>Current step, download progress, or the final result.</td></tr>
 <tr><td><code>get ota.slot</code></td><td>Version and state of both slots.</td></tr>
-<tr><td><code>ota wan survey</code></td><td>List nearby WiFi networks and whether each is open. Scans once; paging shows the same result.</td></tr>
+<tr><td><code>ota wan survey</code></td><td>List nearby WiFi networks and whether each is open, keeping the strongest result per name and security state. Scans once; paging shows the same result.</td></tr>
 <tr><td><code>ota wan survey &lt;offset&gt;</code></td><td>Show results from <code>&lt;offset&gt;</code> onward, as <code>next N</code> suggests.</td></tr>
 <tr><td><code>ota wan survey refresh</code></td><td>Throw the old result away and scan again.</td></tr>
 <tr><td><code>ota wan join</code> / <code>ota wan leave</code></td><td>Join WiFi without downloading, or disconnect and cut hotspot power.</td></tr>

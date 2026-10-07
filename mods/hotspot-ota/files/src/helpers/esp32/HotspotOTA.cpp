@@ -1052,19 +1052,38 @@ static size_t surveyRow(int index, char* out, size_t capacity) {
   return (size_t)written;
 }
 
+static int surveyNext(int offset) {
+  for (int index = offset; index < survey_count; ++index) {
+    String ssid = WiFi.SSID(index);
+    bool open = WiFi.encryptionType(index) == WIFI_AUTH_OPEN;
+    bool duplicate = false;
+    for (int other = 0; other < survey_count; ++other) {
+      if (other == index || WiFi.SSID(other) != ssid ||
+          (WiFi.encryptionType(other) == WIFI_AUTH_OPEN) != open) continue;
+      if (WiFi.RSSI(other) > WiFi.RSSI(index) ||
+          (WiFi.RSSI(other) == WiFi.RSSI(index) && other < index)) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (!duplicate) return index;
+  }
+  return survey_count;
+}
+
 static void surveyPage(uint8_t offset, char reply[]) {
-  if (offset >= (uint8_t)survey_count) {
+  if (surveyNext(offset) >= survey_count) {
     strcpy(reply, "ERR: page range");
     return;
   }
   size_t used = 0;
   reply[0] = 0;
-  int index = offset;
-  for (; index < survey_count; ++index) {
+  int index = surveyNext(offset);
+  for (; index < survey_count; index = surveyNext(index + 1)) {
     char row[MAX_TEXT_LEN];
     size_t length = surveyRow(index, row, sizeof(row));
     if (length == 0) continue;
-    size_t reserve = index + 1 < survey_count ? 10 : 1;
+    size_t reserve = surveyNext(index + 1) < survey_count ? 10 : 1;
     if (used + 1 + length + reserve > MAX_TEXT_LEN) break;
     reply[used++] = '\n';
     memcpy(reply + used, row, length + 1);

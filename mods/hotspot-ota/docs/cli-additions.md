@@ -287,6 +287,8 @@ ota wan survey refresh
 | `No networks found` | Scan completed without results |
 | `ERR: ...` | Invalid parameter, scan failure, or operation conflict |
 
+**Results:** Matching SSID names are combined within each open/secured category; the strongest signal is shown. Ties retain the first scan record. Row numbers retain scan indexes and can have gaps; use `next N` for paging.
+
 **Lifetime:** One scan retained for two minutes. An expired result starts a new scan.
 
 **Restrictions:** Refused while WiFi is in use or an OTA/WAN operation is active.
