@@ -9,7 +9,7 @@ source is not stored here.
 
 ## Start here
 
-- [Flash a device](https://tools.mobmesh.org/flasher) from a Web Serial browser.
+- [Flash a device](https://tools.mobmesh.org/flasher) from your browser using a USB data cable (not a charge-only cable).
 - Use the [owner's manual](docs/owners-manual.md) for setup examples, workflows and CLI commands.
 
 ## Mods
