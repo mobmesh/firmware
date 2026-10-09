@@ -1,0 +1,1 @@
+export function retained(records,maxBytes=2*1024*1024){let n=0,start=records.length;while(start>0){const bytes=new TextEncoder().encode(records[start-1].safeText).length;if(n+bytes>maxBytes)break;n+=bytes;start--;}return {records:records.slice(start),truncated:start>0};}

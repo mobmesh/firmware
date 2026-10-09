@@ -1,0 +1,3884 @@
+[
+  {
+    "id": "upstream.set.dutycycle.d19493f8",
+    "syntax": "set dutycycle <percent:1–100>",
+    "path": [
+      "set",
+      "dutycycle"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "dutycycle"
+      },
+      {
+        "kind": "text",
+        "name": "percent:1–100",
+        "optional": false,
+        "choices": [],
+        "help": "percent:1–100: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L450",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set transmit duty cycle."
+  },
+  {
+    "id": "upstream.set.af.d57c20db",
+    "syntax": "set af <factor>",
+    "path": [
+      "set",
+      "af"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "af"
+      },
+      {
+        "kind": "text",
+        "name": "factor",
+        "optional": false,
+        "choices": [],
+        "help": "factor: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L462",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set airtime factor."
+  },
+  {
+    "id": "upstream.set.int.thresh.d8b4de05",
+    "syntax": "set int.thresh <integer>",
+    "path": [
+      "set",
+      "int.thresh"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "int.thresh"
+      },
+      {
+        "kind": "text",
+        "name": "integer",
+        "optional": false,
+        "choices": [],
+        "help": "integer: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L466",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set interference threshold."
+  },
+  {
+    "id": "upstream.set.cad.c08d26a4",
+    "syntax": "set cad <on|off>",
+    "path": [
+      "set",
+      "cad"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "cad"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L470",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set channel activity detection."
+  },
+  {
+    "id": "upstream.set.agc.reset.interval.8393b965",
+    "syntax": "set agc.reset.interval <seconds; rounded down to multiples of 4>",
+    "path": [
+      "set",
+      "agc.reset.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "agc.reset.interval"
+      },
+      {
+        "kind": "number",
+        "name": "seconds; rounded down to multiples of 4",
+        "optional": false,
+        "choices": [],
+        "help": "seconds; rounded down to multiples of 4: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L474",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set agc reset interval."
+  },
+  {
+    "id": "upstream.set.multi.acks.3c67eee4",
+    "syntax": "set multi.acks <0|1>",
+    "path": [
+      "set",
+      "multi.acks"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "multi.acks"
+      },
+      {
+        "kind": "enum",
+        "name": "0|1",
+        "optional": false,
+        "choices": [
+          "0",
+          "1"
+        ],
+        "help": "0|1: exact firmware choices"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L478",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set multiple acknowledgements."
+  },
+  {
+    "id": "upstream.set.allow.read.only.96a7cd00",
+    "syntax": "set allow.read.only <on|off>",
+    "path": [
+      "set",
+      "allow.read.only"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "allow.read.only"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; room-server semantic relevance",
+    "details": "Shared handler; room-server semantic relevance",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L482",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set read-only access."
+  },
+  {
+    "id": "upstream.set.flood.advert.interval.e16db729",
+    "syntax": "set flood.advert.interval <0|3–168 hours>",
+    "path": [
+      "set",
+      "flood.advert.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "flood.advert.interval"
+      },
+      {
+        "kind": "text",
+        "name": "0|3–168 hours",
+        "optional": false,
+        "choices": [],
+        "help": "0|3–168 hours: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L486",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set flood advertisement interval."
+  },
+  {
+    "id": "upstream.set.advert.interval.92883006",
+    "syntax": "set advert.interval <0|60–240 minutes; rounded to even>",
+    "path": [
+      "set",
+      "advert.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "advert.interval"
+      },
+      {
+        "kind": "text",
+        "name": "0|60–240 minutes; rounded to even",
+        "optional": false,
+        "choices": [],
+        "help": "0|60–240 minutes; rounded to even: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L496",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set advertisement interval."
+  },
+  {
+    "id": "upstream.set.guest.password.aea1b11d",
+    "syntax": "set guest.password <password>",
+    "path": [
+      "set",
+      "guest.password"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "guest.password"
+      },
+      {
+        "kind": "secret",
+        "name": "password",
+        "optional": false,
+        "choices": [],
+        "help": "password: secret; never saved or suggested"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L506",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": true,
+    "brief": "Set guest password."
+  },
+  {
+    "id": "upstream.set.prv.key.ea0c7f48",
+    "syntax": "set prv.key <private-key hex>",
+    "path": [
+      "set",
+      "prv.key"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "prv.key"
+      },
+      {
+        "kind": "secret",
+        "name": "private-key hex",
+        "optional": false,
+        "choices": [],
+        "help": "private-key hex: secret; never saved or suggested"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L510",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": true,
+    "brief": "Set private key."
+  },
+  {
+    "id": "upstream.set.name.771bc7f7",
+    "syntax": "set name <name text>",
+    "path": [
+      "set",
+      "name"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "name"
+      },
+      {
+        "kind": "tail",
+        "name": "name text",
+        "optional": false,
+        "choices": [],
+        "help": "Unquoted remainder of line, including spaces; firmware byte limit applies"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L523",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set device name."
+  },
+  {
+    "id": "upstream.set.repeat.d99a1539",
+    "syntax": "set repeat <on|off>",
+    "path": [
+      "set",
+      "repeat"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "repeat"
+      },
+      {
+        "kind": "enum",
+        "name": "state",
+        "choices": [
+          "on",
+          "off"
+        ],
+        "optional": false,
+        "help": "Repeater forwarding: on/off"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L531",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set packet repeating."
+  },
+  {
+    "id": "upstream.set.radio.rxgain.44f8bd54",
+    "syntax": "set radio.rxgain <on|off>",
+    "path": [
+      "set",
+      "radio.rxgain"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "radio.rxgain"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L535",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set radio rxgain."
+  },
+  {
+    "id": "upstream.set.radio.fem.rxgain.45c31e59",
+    "syntax": "set radio.fem.rxgain <on|off>",
+    "path": [
+      "set",
+      "radio.fem.rxgain"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "radio.fem.rxgain"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Board FEM capability required",
+    "details": "Board FEM capability required",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L544",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set radio fem rxgain."
+  },
+  {
+    "id": "upstream.set.radio.fem.txgain.7e80b465",
+    "syntax": "set radio.fem.txgain <on|off>",
+    "path": [
+      "set",
+      "radio.fem.txgain"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "radio.fem.txgain"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Board FEM capability required",
+    "details": "Board FEM capability required",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L566",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set radio fem txgain."
+  },
+  {
+    "id": "upstream.set.radio.32f84e55",
+    "syntax": "set radio <freq>,<bw>,<sf>,<cr>",
+    "path": [
+      "set",
+      "radio"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "radio"
+      },
+      {
+        "kind": "number",
+        "name": "freq",
+        "optional": false,
+        "choices": [],
+        "help": "freq: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "bw",
+        "optional": false,
+        "choices": [],
+        "help": "bw: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "sf",
+        "optional": false,
+        "choices": [],
+        "help": "sf: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "cr",
+        "optional": false,
+        "choices": [],
+        "help": "cr: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L588",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set radio frequency, bandwidth, spreading factor, and coding rate."
+  },
+  {
+    "id": "upstream.set.lat.c0bafa5a",
+    "syntax": "set lat <degrees>",
+    "path": [
+      "set",
+      "lat"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "lat"
+      },
+      {
+        "kind": "text",
+        "name": "degrees",
+        "optional": false,
+        "choices": [],
+        "help": "degrees: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L606",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set latitude."
+  },
+  {
+    "id": "upstream.set.lon.2528139a",
+    "syntax": "set lon <degrees>",
+    "path": [
+      "set",
+      "lon"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "lon"
+      },
+      {
+        "kind": "text",
+        "name": "degrees",
+        "optional": false,
+        "choices": [],
+        "help": "degrees: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L610",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set longitude."
+  },
+  {
+    "id": "upstream.set.rxdelay.1a7d043e",
+    "syntax": "set rxdelay <0–20>",
+    "path": [
+      "set",
+      "rxdelay"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "rxdelay"
+      },
+      {
+        "kind": "text",
+        "name": "0–20",
+        "optional": false,
+        "choices": [],
+        "help": "0–20: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L614",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set receive delay."
+  },
+  {
+    "id": "upstream.set.txdelay.a62701e9",
+    "syntax": "set txdelay <0–2>",
+    "path": [
+      "set",
+      "txdelay"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "txdelay"
+      },
+      {
+        "kind": "text",
+        "name": "0–2",
+        "optional": false,
+        "choices": [],
+        "help": "0–2: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L623",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set transmit delay."
+  },
+  {
+    "id": "upstream.set.flood.max.unscoped.6578cce8",
+    "syntax": "set flood.max.unscoped <0–64>",
+    "path": [
+      "set",
+      "flood.max.unscoped"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "flood.max.unscoped"
+      },
+      {
+        "kind": "text",
+        "name": "0–64",
+        "optional": false,
+        "choices": [],
+        "help": "0–64: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L632",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set flood max unscoped."
+  },
+  {
+    "id": "upstream.set.flood.max.advert.fe9763c9",
+    "syntax": "set flood.max.advert <0–64>",
+    "path": [
+      "set",
+      "flood.max.advert"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "flood.max.advert"
+      },
+      {
+        "kind": "text",
+        "name": "0–64",
+        "optional": false,
+        "choices": [],
+        "help": "0–64: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L641",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set flood max advert."
+  },
+  {
+    "id": "upstream.set.flood.max.67d84a44",
+    "syntax": "set flood.max <0–64>",
+    "path": [
+      "set",
+      "flood.max"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "flood.max"
+      },
+      {
+        "kind": "text",
+        "name": "0–64",
+        "optional": false,
+        "choices": [],
+        "help": "0–64: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L650",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set flood max."
+  },
+  {
+    "id": "upstream.set.direct.txdelay.9a89b026",
+    "syntax": "set direct.txdelay <0–2>",
+    "path": [
+      "set",
+      "direct.txdelay"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "direct.txdelay"
+      },
+      {
+        "kind": "text",
+        "name": "0–2",
+        "optional": false,
+        "choices": [],
+        "help": "0–2: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L659",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set direct transmission delay."
+  },
+  {
+    "id": "upstream.set.owner.info.a2d76a1a",
+    "syntax": "set owner.info <text; | represents newline>",
+    "path": [
+      "set",
+      "owner.info"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "owner.info"
+      },
+      {
+        "kind": "tail",
+        "name": "text; | represents newline",
+        "optional": false,
+        "choices": [],
+        "help": "Unquoted remainder of line, including spaces; firmware byte limit applies"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L668",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set owner information."
+  },
+  {
+    "id": "upstream.set.path.hash.mode.ccecf83e",
+    "syntax": "set path.hash.mode <0|1|2>",
+    "path": [
+      "set",
+      "path.hash.mode"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "path.hash.mode"
+      },
+      {
+        "kind": "enum",
+        "name": "0|1|2",
+        "optional": false,
+        "choices": [
+          "0",
+          "1",
+          "2"
+        ],
+        "help": "0|1|2: exact firmware choices"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L678",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set path hash mode."
+  },
+  {
+    "id": "upstream.set.loop.detect.0b37621f",
+    "syntax": "set loop.detect <off|minimal|moderate|strict>",
+    "path": [
+      "set",
+      "loop.detect"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "loop.detect"
+      },
+      {
+        "kind": "enum",
+        "name": "off|minimal|moderate|strict",
+        "optional": false,
+        "choices": [
+          "off",
+          "minimal",
+          "moderate",
+          "strict"
+        ],
+        "help": "off|minimal|moderate|strict: exact firmware choices"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L688",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set loop detection."
+  },
+  {
+    "id": "upstream.set.tx.8fc84ce7",
+    "syntax": "set tx <dBm; board dependent>",
+    "path": [
+      "set",
+      "tx"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "tx"
+      },
+      {
+        "kind": "text",
+        "name": "dBm; board dependent",
+        "optional": false,
+        "choices": [],
+        "help": "dBm; board dependent: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L708",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set transmit power."
+  },
+  {
+    "id": "upstream.set.freq.580106cb",
+    "syntax": "set freq <MHz>",
+    "path": [
+      "set",
+      "freq"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "freq"
+      },
+      {
+        "kind": "text",
+        "name": "MHz",
+        "optional": false,
+        "choices": [],
+        "help": "MHz: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Direct serial only",
+    "details": "Direct serial only",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L713",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set radio frequency."
+  },
+  {
+    "id": "upstream.set.bridge.enabled.a3aac4cb",
+    "syntax": "set bridge.enabled <on|off>",
+    "path": [
+      "set",
+      "bridge.enabled"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.enabled"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Relevant bridge compile guard",
+    "details": "Relevant bridge compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L718",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set bridge enabled."
+  },
+  {
+    "id": "upstream.set.bridge.delay.ef1c769c",
+    "syntax": "set bridge.delay <0–10000 ms>",
+    "path": [
+      "set",
+      "bridge.delay"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.delay"
+      },
+      {
+        "kind": "text",
+        "name": "0–10000 ms",
+        "optional": false,
+        "choices": [],
+        "help": "0–10000 ms: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Relevant bridge compile guard",
+    "details": "Relevant bridge compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L723",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set bridge delay."
+  },
+  {
+    "id": "upstream.set.bridge.source.7b92769e",
+    "syntax": "set bridge.source <rx|tx; source parser differs from docs>",
+    "path": [
+      "set",
+      "bridge.source"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.source"
+      },
+      {
+        "kind": "enum",
+        "name": "rx|tx; source parser differs from docs",
+        "optional": false,
+        "choices": [
+          "rx",
+          "tx"
+        ],
+        "help": "rx|tx; source parser differs from docs: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Relevant bridge compile guard",
+    "details": "Relevant bridge compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L732",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set bridge source."
+  },
+  {
+    "id": "upstream.set.bridge.baud.71b9f8e9",
+    "syntax": "set bridge.baud <9600–BRIDGE_MAX_BAUD>",
+    "path": [
+      "set",
+      "bridge.baud"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.baud"
+      },
+      {
+        "kind": "text",
+        "name": "9600–BRIDGE_MAX_BAUD",
+        "optional": false,
+        "choices": [],
+        "help": "9600–BRIDGE_MAX_BAUD: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Relevant bridge compile guard",
+    "details": "Relevant bridge compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L738",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set bridge baud."
+  },
+  {
+    "id": "upstream.set.bridge.channel.f6a9e00f",
+    "syntax": "set bridge.channel <1–14>",
+    "path": [
+      "set",
+      "bridge.channel"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.channel"
+      },
+      {
+        "kind": "text",
+        "name": "1–14",
+        "optional": false,
+        "choices": [],
+        "help": "1–14: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Relevant bridge compile guard",
+    "details": "Relevant bridge compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L750",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set bridge channel."
+  },
+  {
+    "id": "upstream.set.bridge.secret.5773e511",
+    "syntax": "set bridge.secret <secret>",
+    "path": [
+      "set",
+      "bridge.secret"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.secret"
+      },
+      {
+        "kind": "secret",
+        "name": "secret",
+        "optional": false,
+        "choices": [],
+        "help": "secret: secret; never saved or suggested"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Relevant bridge compile guard",
+    "details": "Relevant bridge compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L760",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": true,
+    "brief": "Set bridge secret."
+  },
+  {
+    "id": "upstream.set.adc.multiplier.d1ec2862",
+    "syntax": "set adc.multiplier <number; board dependent>",
+    "path": [
+      "set",
+      "adc.multiplier"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "adc.multiplier"
+      },
+      {
+        "kind": "text",
+        "name": "number; board dependent",
+        "optional": false,
+        "choices": [],
+        "help": "number; board dependent: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L766",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set adc multiplier."
+  },
+  {
+    "id": "upstream.set.extra.sf.3117ea8e",
+    "syntax": "set extra.sf <sf>[,<sf>[,<sf>]]",
+    "path": [
+      "set",
+      "extra.sf"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "extra.sf"
+      },
+      {
+        "kind": "number",
+        "name": "sf",
+        "optional": false,
+        "choices": [],
+        "help": "Spreading factor"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "sf",
+        "optional": true,
+        "choices": [],
+        "help": "Spreading factor"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "sf",
+        "optional": true,
+        "choices": [],
+        "help": "Spreading factor"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "USE_LR2021 guard",
+    "details": "USE_LR2021 guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L780",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set extra spreading factor."
+  },
+  {
+    "id": "upstream.get.dutycycle.f05804fe",
+    "syntax": "get dutycycle",
+    "path": [
+      "get",
+      "dutycycle"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "dutycycle"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L809",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show transmit duty cycle."
+  },
+  {
+    "id": "upstream.get.af.69fe94dc",
+    "syntax": "get af",
+    "path": [
+      "get",
+      "af"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "af"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L814",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show airtime factor."
+  },
+  {
+    "id": "upstream.get.int.thresh.e4f659d6",
+    "syntax": "get int.thresh",
+    "path": [
+      "get",
+      "int.thresh"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "int.thresh"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L816",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show interference threshold."
+  },
+  {
+    "id": "upstream.get.cad.8ae2371b",
+    "syntax": "get cad",
+    "path": [
+      "get",
+      "cad"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "cad"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L818",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show channel activity detection."
+  },
+  {
+    "id": "upstream.get.agc.reset.interval.0378846a",
+    "syntax": "get agc.reset.interval",
+    "path": [
+      "get",
+      "agc.reset.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "agc.reset.interval"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L820",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show agc reset interval."
+  },
+  {
+    "id": "upstream.get.multi.acks.0ebf2d8c",
+    "syntax": "get multi.acks",
+    "path": [
+      "get",
+      "multi.acks"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "multi.acks"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L822",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show multiple acknowledgements."
+  },
+  {
+    "id": "upstream.get.allow.read.only.e5fc1d09",
+    "syntax": "get allow.read.only",
+    "path": [
+      "get",
+      "allow.read.only"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "allow.read.only"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; room-server semantic relevance",
+    "details": "Shared handler; room-server semantic relevance",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L824",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show read-only access."
+  },
+  {
+    "id": "upstream.get.flood.advert.interval.375428a9",
+    "syntax": "get flood.advert.interval",
+    "path": [
+      "get",
+      "flood.advert.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "flood.advert.interval"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L826",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show flood advertisement interval."
+  },
+  {
+    "id": "upstream.get.advert.interval.864f8265",
+    "syntax": "get advert.interval",
+    "path": [
+      "get",
+      "advert.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "advert.interval"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L828",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show advertisement interval."
+  },
+  {
+    "id": "upstream.get.guest.password.58cdeb17",
+    "syntax": "get guest.password",
+    "path": [
+      "get",
+      "guest.password"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "guest.password"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L830",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": true,
+    "brief": "Show guest password."
+  },
+  {
+    "id": "upstream.get.prv.key.c5405e87",
+    "syntax": "get prv.key",
+    "path": [
+      "get",
+      "prv.key"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "prv.key"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Direct serial only",
+    "details": "Direct serial only",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L832",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": true,
+    "brief": "Show private key."
+  },
+  {
+    "id": "upstream.get.name.2ca10420",
+    "syntax": "get name",
+    "path": [
+      "get",
+      "name"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "name"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L837",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show device name."
+  },
+  {
+    "id": "upstream.get.repeat.43a12e8a",
+    "syntax": "get repeat",
+    "path": [
+      "get",
+      "repeat"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "repeat"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L839",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show packet repeating."
+  },
+  {
+    "id": "upstream.get.lat.ef41b659",
+    "syntax": "get lat",
+    "path": [
+      "get",
+      "lat"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "lat"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L841",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show latitude."
+  },
+  {
+    "id": "upstream.get.lon.21db24f5",
+    "syntax": "get lon",
+    "path": [
+      "get",
+      "lon"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "lon"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L843",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show longitude."
+  },
+  {
+    "id": "upstream.get.radio.rxgain.3a12c796",
+    "syntax": "get radio.rxgain",
+    "path": [
+      "get",
+      "radio.rxgain"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "radio.rxgain"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L845",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show radio rxgain."
+  },
+  {
+    "id": "upstream.get.radio.fem.rxgain.39178a03",
+    "syntax": "get radio.fem.rxgain",
+    "path": [
+      "get",
+      "radio.fem.rxgain"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "radio.fem.rxgain"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Board FEM capability required",
+    "details": "Board FEM capability required",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L847",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show radio fem rxgain."
+  },
+  {
+    "id": "upstream.get.radio.fem.txgain.772f7fe7",
+    "syntax": "get radio.fem.txgain",
+    "path": [
+      "get",
+      "radio.fem.txgain"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "radio.fem.txgain"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Board FEM capability required",
+    "details": "Board FEM capability required",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L853",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show radio fem txgain."
+  },
+  {
+    "id": "upstream.get.radio.be5f57b8",
+    "syntax": "get radio",
+    "path": [
+      "get",
+      "radio"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "radio"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L859",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show radio frequency, bandwidth, spreading factor, and coding rate."
+  },
+  {
+    "id": "upstream.get.rxdelay.d5fde96d",
+    "syntax": "get rxdelay",
+    "path": [
+      "get",
+      "rxdelay"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "rxdelay"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L864",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show receive delay."
+  },
+  {
+    "id": "upstream.get.txdelay.476530f4",
+    "syntax": "get txdelay",
+    "path": [
+      "get",
+      "txdelay"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "txdelay"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L866",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show transmit delay."
+  },
+  {
+    "id": "upstream.get.flood.max.advert.df46bb5c",
+    "syntax": "get flood.max.advert",
+    "path": [
+      "get",
+      "flood.max.advert"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "flood.max.advert"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L868",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show flood max advert."
+  },
+  {
+    "id": "upstream.get.flood.max.unscoped.91ae600c",
+    "syntax": "get flood.max.unscoped",
+    "path": [
+      "get",
+      "flood.max.unscoped"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "flood.max.unscoped"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L870",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show flood max unscoped."
+  },
+  {
+    "id": "upstream.get.flood.max.b447bc3f",
+    "syntax": "get flood.max",
+    "path": [
+      "get",
+      "flood.max"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "flood.max"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L872",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show flood max."
+  },
+  {
+    "id": "upstream.get.direct.txdelay.b388c908",
+    "syntax": "get direct.txdelay",
+    "path": [
+      "get",
+      "direct.txdelay"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "direct.txdelay"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L874",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show direct transmission delay."
+  },
+  {
+    "id": "upstream.get.owner.info.8b0acd90",
+    "syntax": "get owner.info",
+    "path": [
+      "get",
+      "owner.info"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "owner.info"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L876",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show owner information."
+  },
+  {
+    "id": "upstream.get.path.hash.mode.06a438ee",
+    "syntax": "get path.hash.mode",
+    "path": [
+      "get",
+      "path.hash.mode"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "path.hash.mode"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L886",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show path hash mode."
+  },
+  {
+    "id": "upstream.get.loop.detect.eec8138b",
+    "syntax": "get loop.detect",
+    "path": [
+      "get",
+      "loop.detect"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "loop.detect"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L888",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show loop detection."
+  },
+  {
+    "id": "upstream.get.tx.0e279d0d",
+    "syntax": "get tx",
+    "path": [
+      "get",
+      "tx"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "tx"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L898",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show transmit power."
+  },
+  {
+    "id": "upstream.get.freq.12752a70",
+    "syntax": "get freq",
+    "path": [
+      "get",
+      "freq"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "freq"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L900",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show radio frequency."
+  },
+  {
+    "id": "upstream.get.public.key.dfce3e61",
+    "syntax": "get public.key",
+    "path": [
+      "get",
+      "public.key"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "public.key"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L902",
+    "grammarVerified": true,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show the public key subscribers must authorize.",
+    "helpSyntax": "get public.key"
+  },
+  {
+    "id": "upstream.get.role.22f79d8e",
+    "syntax": "get role",
+    "path": [
+      "get",
+      "role"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "role"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L905",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show role."
+  },
+  {
+    "id": "upstream.get.bridge.type.cd8c93a4",
+    "syntax": "get bridge.type",
+    "path": [
+      "get",
+      "bridge.type"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.type"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L907",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show bridge type."
+  },
+  {
+    "id": "upstream.get.bridge.enabled.f23af2ea",
+    "syntax": "get bridge.enabled",
+    "path": [
+      "get",
+      "bridge.enabled"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.enabled"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Relevant bridge compile guard",
+    "details": "Relevant bridge compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L918",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show bridge enabled."
+  },
+  {
+    "id": "upstream.get.bridge.delay.4bee1be6",
+    "syntax": "get bridge.delay",
+    "path": [
+      "get",
+      "bridge.delay"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.delay"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Relevant bridge compile guard",
+    "details": "Relevant bridge compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L920",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show bridge delay."
+  },
+  {
+    "id": "upstream.get.bridge.source.04deb043",
+    "syntax": "get bridge.source",
+    "path": [
+      "get",
+      "bridge.source"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.source"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Relevant bridge compile guard",
+    "details": "Relevant bridge compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L922",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show bridge source."
+  },
+  {
+    "id": "upstream.get.bridge.baud.8bf24963",
+    "syntax": "get bridge.baud",
+    "path": [
+      "get",
+      "bridge.baud"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.baud"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Relevant bridge compile guard",
+    "details": "Relevant bridge compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L926",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show bridge baud."
+  },
+  {
+    "id": "upstream.get.bridge.channel.81256dfa",
+    "syntax": "get bridge.channel",
+    "path": [
+      "get",
+      "bridge.channel"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.channel"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Relevant bridge compile guard",
+    "details": "Relevant bridge compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L930",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show bridge channel."
+  },
+  {
+    "id": "upstream.get.bridge.secret.ca3b8765",
+    "syntax": "get bridge.secret",
+    "path": [
+      "get",
+      "bridge.secret"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "bridge.secret"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Relevant bridge compile guard",
+    "details": "Relevant bridge compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L932",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": true,
+    "brief": "Show bridge secret."
+  },
+  {
+    "id": "upstream.get.bootloader.ver.770f23a4",
+    "syntax": "get bootloader.ver",
+    "path": [
+      "get",
+      "bootloader.ver"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "bootloader.ver"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "nRF52-specific implementation; ESP32 returns unsupported",
+    "details": "nRF52-specific implementation; ESP32 returns unsupported",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L935",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show bootloader ver."
+  },
+  {
+    "id": "upstream.get.adc.multiplier.314bfad6",
+    "syntax": "get adc.multiplier",
+    "path": [
+      "get",
+      "adc.multiplier"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "adc.multiplier"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L946",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show adc multiplier."
+  },
+  {
+    "id": "upstream.get.pwrmgt.support.a5e1ecd1",
+    "syntax": "get pwrmgt.support",
+    "path": [
+      "get",
+      "pwrmgt.support"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "pwrmgt.support"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L954",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show pwrmgt support."
+  },
+  {
+    "id": "upstream.get.pwrmgt.source.d38522dc",
+    "syntax": "get pwrmgt.source",
+    "path": [
+      "get",
+      "pwrmgt.source"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "pwrmgt.source"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "NRF52_POWER_MANAGEMENT required",
+    "details": "NRF52_POWER_MANAGEMENT required",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L960",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show pwrmgt source."
+  },
+  {
+    "id": "upstream.get.pwrmgt.bootreason.1573498f",
+    "syntax": "get pwrmgt.bootreason",
+    "path": [
+      "get",
+      "pwrmgt.bootreason"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "pwrmgt.bootreason"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L966",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show pwrmgt bootreason."
+  },
+  {
+    "id": "upstream.get.pwrmgt.bootmv.c2ca2f26",
+    "syntax": "get pwrmgt.bootmv",
+    "path": [
+      "get",
+      "pwrmgt.bootmv"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "pwrmgt.bootmv"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "NRF52_POWER_MANAGEMENT required",
+    "details": "NRF52_POWER_MANAGEMENT required",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L970",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show pwrmgt bootmv."
+  },
+  {
+    "id": "upstream.get.extra.sf.0163f26c",
+    "syntax": "get extra.sf",
+    "path": [
+      "get",
+      "extra.sf"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "extra.sf"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Shared handler; runtime support may vary",
+    "details": "Shared handler; runtime support may vary",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L976",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show extra spreading factor."
+  },
+  {
+    "id": "upstream.reboot.92bf8ea8",
+    "syntax": "reboot",
+    "path": [
+      "reboot"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "reboot"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "No normal reply; OTA interlock can refuse",
+    "details": "No normal reply; OTA interlock can refuse",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L185",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Restart the device."
+  },
+  {
+    "id": "upstream.clkreboot.51e9a9b0",
+    "syntax": "clkreboot",
+    "path": [
+      "clkreboot"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "clkreboot"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "No normal reply; clock reset and reboot",
+    "details": "No normal reply; clock reset and reboot",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L187",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Schedule a restart using the device clock."
+  },
+  {
+    "id": "upstream.advert.a64463d7",
+    "syntax": "advert",
+    "path": [
+      "advert"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "advert"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Reply",
+    "details": "Reply",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L195",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Send an advertisement."
+  },
+  {
+    "id": "upstream.advert.zerohop.0f793eac",
+    "syntax": "advert.zerohop",
+    "path": [
+      "advert.zerohop"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "advert.zerohop"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Reply",
+    "details": "Reply",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L191",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Send a zero-hop advertisement."
+  },
+  {
+    "id": "upstream.clock.sync.58623788",
+    "syntax": "clock sync",
+    "path": [
+      "clock",
+      "sync"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "clock"
+      },
+      {
+        "kind": "literal",
+        "value": "sync"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Uses sender timestamp; direct serial supplies zero",
+    "details": "Uses sender timestamp; direct serial supplies zero",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L199",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage clock sync."
+  },
+  {
+    "id": "upstream.clock.d8198efa",
+    "syntax": "clock",
+    "path": [
+      "clock"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "clock"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Reply",
+    "details": "Reply",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L213",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show or set the device clock."
+  },
+  {
+    "id": "upstream.time.9d5142e0",
+    "syntax": "time <epoch_seconds>",
+    "path": [
+      "time"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "time"
+      },
+      {
+        "kind": "number",
+        "name": "epoch_seconds",
+        "optional": false,
+        "choices": [],
+        "help": "epoch_seconds: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Clock must move forward",
+    "details": "Clock must move forward",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L217",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show device time."
+  },
+  {
+    "id": "upstream.neighbors.27520c70",
+    "syntax": "neighbors",
+    "path": [
+      "neighbors"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "neighbors"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Repeater callbacks",
+    "details": "Repeater callbacks",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L228",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show the neighbor table."
+  },
+  {
+    "id": "upstream.neighbor.remove.c51b9705",
+    "syntax": "neighbor.remove <pubkey-prefix>",
+    "path": [
+      "neighbor.remove"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "neighbor.remove"
+      },
+      {
+        "kind": "text",
+        "name": "pubkey-prefix",
+        "optional": false,
+        "choices": [],
+        "help": "pubkey-prefix: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Empty-prefix behavior requires exact space preservation",
+    "details": "Empty-prefix behavior requires exact space preservation",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L230",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Remove a neighbor entry."
+  },
+  {
+    "id": "upstream.tempradio.0f3b48ac",
+    "syntax": "tempradio <freq>,<bw>,<sf>,<cr>,<timeout_mins>",
+    "path": [
+      "tempradio"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "tempradio"
+      },
+      {
+        "kind": "number",
+        "name": "freq",
+        "optional": false,
+        "choices": [],
+        "help": "freq: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "bw",
+        "optional": false,
+        "choices": [],
+        "help": "bw: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "sf",
+        "optional": false,
+        "choices": [],
+        "help": "sf: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "cr",
+        "optional": false,
+        "choices": [],
+        "help": "cr: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "timeout_mins",
+        "optional": false,
+        "choices": [],
+        "help": "timeout_mins: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Comma fields; temporary radio",
+    "details": "Comma fields; temporary radio",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L241",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage tempradio."
+  },
+  {
+    "id": "upstream.password.faed89bd",
+    "syntax": "password <new-password>",
+    "path": [
+      "password"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "password"
+      },
+      {
+        "kind": "secret",
+        "name": "new-password",
+        "optional": false,
+        "choices": [],
+        "help": "new-password: secret; never saved or suggested"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Sensitive tail; firmware echoes password",
+    "details": "Sensitive tail; firmware echoes password",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L256",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": true,
+    "brief": "Set the admin password."
+  },
+  {
+    "id": "upstream.clear.stats.7520fbb3",
+    "syntax": "clear stats",
+    "path": [
+      "clear",
+      "stats"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "clear"
+      },
+      {
+        "kind": "literal",
+        "value": "stats"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Reply",
+    "details": "Reply",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L262",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Clear statistics counters."
+  },
+  {
+    "id": "upstream.erase.5cf46cd8",
+    "syntax": "erase",
+    "path": [
+      "erase"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "erase"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Direct serial only; OTA interlock can refuse",
+    "details": "Direct serial only; OTA interlock can refuse",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L269",
+    "grammarVerified": false,
+    "remote": false,
+    "sensitive": false,
+    "brief": "Erase firmware-managed data."
+  },
+  {
+    "id": "upstream.board.859169b3",
+    "syntax": "board",
+    "path": [
+      "board"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "board"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Reply",
+    "details": "Reply",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L274",
+    "grammarVerified": true,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show board model."
+  },
+  {
+    "id": "upstream.sensor.get.80712386",
+    "syntax": "sensor get <key>",
+    "path": [
+      "sensor",
+      "get"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sensor"
+      },
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "text",
+        "name": "key",
+        "optional": false,
+        "choices": [],
+        "help": "key: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Dynamic sensor settings",
+    "details": "Dynamic sensor settings",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L276",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Read a sensor setting."
+  },
+  {
+    "id": "upstream.sensor.set.99e1ca9f",
+    "syntax": "sensor set <key> <value>",
+    "path": [
+      "sensor",
+      "set"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sensor"
+      },
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "text",
+        "name": "key",
+        "optional": false,
+        "choices": [],
+        "help": "key: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "number",
+        "name": "value",
+        "optional": false,
+        "choices": [],
+        "help": "value: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Dynamic sensor setting values",
+    "details": "Dynamic sensor setting values",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L284",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Change a sensor setting."
+  },
+  {
+    "id": "upstream.sensor.list.914ceb18",
+    "syntax": "sensor list [start]",
+    "path": [
+      "sensor",
+      "list"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sensor"
+      },
+      {
+        "kind": "literal",
+        "value": "list"
+      },
+      {
+        "kind": "text",
+        "name": "start",
+        "optional": true,
+        "choices": [],
+        "help": "start: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Paged variable list",
+    "details": "Paged variable list",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L295",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "List available sensors."
+  },
+  {
+    "id": "upstream.gps.7c001edd",
+    "syntax": "gps [on|off]",
+    "path": [
+      "gps"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "gps"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": true,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "ENV_INCLUDE_GPS == 1",
+    "details": "ENV_INCLUDE_GPS == 1",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L382",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage gps."
+  },
+  {
+    "id": "upstream.gps.sync.b9096f4b",
+    "syntax": "gps sync",
+    "path": [
+      "gps",
+      "sync"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "gps"
+      },
+      {
+        "kind": "literal",
+        "value": "sync"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "GPS compile guard",
+    "details": "GPS compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L339",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage gps sync."
+  },
+  {
+    "id": "upstream.gps.setloc.a8bf836b",
+    "syntax": "gps setloc",
+    "path": [
+      "gps",
+      "setloc"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "gps"
+      },
+      {
+        "kind": "literal",
+        "value": "setloc"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "GPS compile guard",
+    "details": "GPS compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L347",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage gps setloc."
+  },
+  {
+    "id": "upstream.gps.advert.b9521719",
+    "syntax": "gps advert [none|share|prefs]",
+    "path": [
+      "gps",
+      "advert"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "gps"
+      },
+      {
+        "kind": "literal",
+        "value": "advert"
+      },
+      {
+        "kind": "text",
+        "name": "none|share|prefs",
+        "optional": true,
+        "choices": [],
+        "help": "none|share|prefs: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "GPS compile guard",
+    "details": "GPS compile guard",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L352",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage gps advert."
+  },
+  {
+    "id": "upstream.powersaving.6a4f933c",
+    "syntax": "powersaving [on|off]",
+    "path": [
+      "powersaving"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "powersaving"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": true,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Platform/bridge behavior varies",
+    "details": "Platform/bridge behavior varies",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L419",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage powersaving."
+  },
+  {
+    "id": "upstream.log.start.1cbfec4a",
+    "syntax": "log start",
+    "path": [
+      "log",
+      "start"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "log"
+      },
+      {
+        "kind": "literal",
+        "value": "start"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Reply",
+    "details": "Reply",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L425",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Start device logging."
+  },
+  {
+    "id": "upstream.log.stop.190fda8e",
+    "syntax": "log stop",
+    "path": [
+      "log",
+      "stop"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "log"
+      },
+      {
+        "kind": "literal",
+        "value": "stop"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Reply",
+    "details": "Reply",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L428",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Stop device logging."
+  },
+  {
+    "id": "upstream.log.erase.63d411df",
+    "syntax": "log erase",
+    "path": [
+      "log",
+      "erase"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "log"
+      },
+      {
+        "kind": "literal",
+        "value": "erase"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Reply",
+    "details": "Reply",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L431",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Erase device logs."
+  },
+  {
+    "id": "upstream.log.836ff184",
+    "syntax": "log",
+    "path": [
+      "log"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "log"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Direct serial stream ending in EOF reply",
+    "details": "Direct serial stream ending in EOF reply",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L434",
+    "grammarVerified": false,
+    "remote": false,
+    "sensitive": false,
+    "brief": "Show device logs."
+  },
+  {
+    "id": "upstream.region.c697d298",
+    "syntax": "region",
+    "path": [
+      "region"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "region"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Export native region tree",
+    "details": "Export native region tree",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L320",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Managed with sync.region commands",
+    "helpSyntax": "region"
+  },
+  {
+    "id": "upstream.region.def.6fdfbb56",
+    "syntax": "region def <token> [<token> ...]",
+    "path": [
+      "region",
+      "def"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "region"
+      },
+      {
+        "kind": "literal",
+        "value": "def"
+      },
+      {
+        "kind": "tail",
+        "name": "token ...",
+        "optional": false,
+        "choices": [],
+        "help": "One or more region-definition tokens, space separated"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Hierarchy tokens including |parent or ,parent",
+    "details": "Hierarchy tokens including |parent or ,parent",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L1046",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage region def."
+  },
+  {
+    "id": "upstream.region.load.e04dead2",
+    "syntax": "region load",
+    "path": [
+      "region",
+      "load"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "region"
+      },
+      {
+        "kind": "literal",
+        "value": "load"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Interactive; rows + blank terminator; serial mode",
+    "details": "Interactive; rows + blank terminator; serial mode",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L1063",
+    "grammarVerified": false,
+    "remote": false,
+    "sensitive": false,
+    "brief": "Manage region load."
+  },
+  {
+    "id": "upstream.region.save.c2ec5d0d",
+    "syntax": "region save",
+    "path": [
+      "region",
+      "save"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "region"
+      },
+      {
+        "kind": "literal",
+        "value": "save"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Persist regions",
+    "details": "Persist regions",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L1065",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage region save."
+  },
+  {
+    "id": "upstream.region.allowf.d43963be",
+    "syntax": "region allowf <name|*>",
+    "path": [
+      "region",
+      "allowf"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "region"
+      },
+      {
+        "kind": "literal",
+        "value": "allowf"
+      },
+      {
+        "kind": "text",
+        "name": "name|*",
+        "optional": false,
+        "choices": [],
+        "help": "name|*: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Native region reference",
+    "details": "Native region reference",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L1070",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage region allowf."
+  },
+  {
+    "id": "upstream.region.denyf.b63b57ca",
+    "syntax": "region denyf <name|*>",
+    "path": [
+      "region",
+      "denyf"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "region"
+      },
+      {
+        "kind": "literal",
+        "value": "denyf"
+      },
+      {
+        "kind": "text",
+        "name": "name|*",
+        "optional": false,
+        "choices": [],
+        "help": "name|*: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Native region reference",
+    "details": "Native region reference",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L1078",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage region denyf."
+  },
+  {
+    "id": "upstream.region.get.f5e8d94f",
+    "syntax": "region get <name|*>",
+    "path": [
+      "region",
+      "get"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "region"
+      },
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "text",
+        "name": "name|*",
+        "optional": false,
+        "choices": [],
+        "help": "name|*: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Native region reference",
+    "details": "Native region reference",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L1086",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage region get."
+  },
+  {
+    "id": "upstream.region.home.b470117e",
+    "syntax": "region home [name]",
+    "path": [
+      "region",
+      "home"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "region"
+      },
+      {
+        "kind": "literal",
+        "value": "home"
+      },
+      {
+        "kind": "text",
+        "name": "name",
+        "optional": true,
+        "choices": [],
+        "help": "name: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Native home reference",
+    "details": "Native home reference",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L1098",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage region home."
+  },
+  {
+    "id": "upstream.region.default.45e0cfb2",
+    "syntax": "region default [name|<null>]",
+    "path": [
+      "region",
+      "default"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "region"
+      },
+      {
+        "kind": "literal",
+        "value": "default"
+      },
+      {
+        "kind": "text",
+        "name": "name",
+        "optional": true,
+        "choices": [
+          "<null>"
+        ],
+        "help": "Region name, or <null> to clear the default scope"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Native default scope; auto-create possible",
+    "details": "Native default scope; auto-create possible",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L1109",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage region default."
+  },
+  {
+    "id": "upstream.region.put.a698d4da",
+    "syntax": "region put <name> [parent]",
+    "path": [
+      "region",
+      "put"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "region"
+      },
+      {
+        "kind": "literal",
+        "value": "put"
+      },
+      {
+        "kind": "text",
+        "name": "name",
+        "optional": false,
+        "choices": [],
+        "help": "name: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "parent",
+        "optional": true,
+        "choices": [],
+        "help": "parent: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Native region edit",
+    "details": "Native region edit",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L1133",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage region put."
+  },
+  {
+    "id": "upstream.region.remove.e05a0ba3",
+    "syntax": "region remove <name>",
+    "path": [
+      "region",
+      "remove"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "region"
+      },
+      {
+        "kind": "literal",
+        "value": "remove"
+      },
+      {
+        "kind": "text",
+        "name": "name",
+        "optional": false,
+        "choices": [],
+        "help": "name: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Native region edit",
+    "details": "Native region edit",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L1146",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage region remove."
+  },
+  {
+    "id": "upstream.region.list.c983e9e0",
+    "syntax": "region list <allowed|denied>",
+    "path": [
+      "region",
+      "list"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "region"
+      },
+      {
+        "kind": "literal",
+        "value": "list"
+      },
+      {
+        "kind": "enum",
+        "name": "allowed|denied",
+        "optional": false,
+        "choices": [
+          "allowed",
+          "denied"
+        ],
+        "help": "allowed|denied: exact firmware choices"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Filter native regions",
+    "details": "Filter native regions",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/CommonCLI.cpp#L1157",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage region list."
+  },
+  {
+    "id": "upstream.setperm.68e716ca",
+    "syntax": "setperm <pubkey-prefix> <permissions>",
+    "path": [
+      "setperm"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "setperm"
+      },
+      {
+        "kind": "text",
+        "name": "pubkey-prefix",
+        "optional": false,
+        "choices": [],
+        "help": "pubkey-prefix: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "permissions",
+        "optional": false,
+        "choices": [],
+        "help": "permissions: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Permissions 0/1/2/3; documented omission needs separator test",
+    "details": "Permissions 0/1/2/3; documented omission needs separator test",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/examples/simple_repeater/MyMesh.cpp#L1239-L1263",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set access permissions for a public key."
+  },
+  {
+    "id": "upstream.get.acl.e2b283a4",
+    "syntax": "get acl",
+    "path": [
+      "get",
+      "acl"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "acl"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Direct serial; streamed output, empty returned reply",
+    "details": "Direct serial; streamed output, empty returned reply",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/examples/simple_repeater/MyMesh.cpp#L1264-L1273",
+    "grammarVerified": false,
+    "remote": false,
+    "sensitive": false,
+    "brief": "Show the access control list."
+  },
+  {
+    "id": "upstream.discover.neighbors.b1aa07fa",
+    "syntax": "discover.neighbors",
+    "path": [
+      "discover.neighbors"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "discover.neighbors"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "Repeater; no options",
+    "details": "Repeater; no options",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/examples/simple_repeater/MyMesh.cpp#L1274-L1281",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Discover neighboring nodes."
+  },
+  {
+    "id": "upstream.eth.status.699bf8fc",
+    "syntax": "eth.status",
+    "path": [
+      "eth.status"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "eth.status"
+      }
+    ],
+    "origin": "upstream",
+    "mod": null,
+    "summary": "ETHERNET_ENABLED; special serial branch, no LoRa CLI route at this revision",
+    "details": "ETHERNET_ENABLED; special serial branch, no LoRa CLI route at this revision",
+    "source": "https://github.com/meshcore-dev/MeshCore/blob/d92964352441e53b93e8667b802e04f6e072b39e/src/helpers/nrf52/EthernetCLI.h#L87-L101",
+    "grammarVerified": false,
+    "remote": false,
+    "sensitive": false,
+    "brief": "Show Ethernet status."
+  }
+]

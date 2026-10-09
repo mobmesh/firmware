@@ -1,0 +1,28 @@
+{
+  "status": "draft-parameter-verification-in-progress",
+  "releaseCoveragePassed": false,
+  "requirementsRevision": "console-requirements-2026-10-08-08",
+  "upstreamCommit": "d92964352441e53b93e8667b802e04f6e072b39e",
+  "mobmeshCommit": "985976a04e2a3ca1aab958b982c2d242d0ac5b3a",
+  "sourceRows": 234,
+  "effectiveSignatures": 227,
+  "cliAdditionFiles": [
+    {
+      "path": "mods/hotspot-ota/docs/cli-additions.md",
+      "sha256": "a755fa2bdaa6e9189cb17bee2b949584e7278996c542564c1cb4b3dd8ba9ffe0"
+    },
+    {
+      "path": "mods/power-guard/docs/cli-additions.md",
+      "sha256": "1e77ad6082b51e30e9f2c0e08d5c8dbae8f0e940e23fcb38cc3ca2377df8591b"
+    },
+    {
+      "path": "mods/sync-settings/docs/cli-additions.md",
+      "sha256": "4747ed645aba1bd2b819cbb1cfae0b47a65a22f98b7c843936dd8c10220ec332"
+    },
+    {
+      "path": "mods/try-settings/docs/cli-additions.md",
+      "sha256": "bf284d4714d4624256f60deb0c299586125d083e29efa0f3f2137c07b8def9c7"
+    }
+  ],
+  "classification": "Every extracted seed signature is retained; duplicate exact signatures overlay with MobMesh precedence; stock poweroff/shutdown replaced. A full handler audit is still required."
+}

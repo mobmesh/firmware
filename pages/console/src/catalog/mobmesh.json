@@ -1,0 +1,3524 @@
+[
+  {
+    "id": "mobmesh.start.ota.09f4b9ed",
+    "syntax": "start ota",
+    "path": [
+      "start",
+      "ota"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "start"
+      },
+      {
+        "kind": "literal",
+        "value": "ota"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "start ota",
+    "details": "## start ota\n\n```text\nstart ota\n```\n\n**Effect:** Opens the local access point and its unauthenticated firmware-upload page.\nA successful upload reboots into the new image.\n\n**Limits:** Session ends after 20 minutes unless writing. An upload stalled for\n10 minutes is aborted and the session closes. Failed uploads leave the page available\nfor retry until the session deadline. Teardown restores the prior WiFi mode.\n\n**Restrictions:** Refused while the station is connected, another OTA operation is\nactive, or the firmware is on probation or its rollback state is unavailable.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L335",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Start the native local upload AP through the hardened handler.",
+    "helpSyntax": "start ota"
+  },
+  {
+    "id": "mobmesh.ver.cf542ada",
+    "syntax": "ver",
+    "path": [
+      "ver"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "ver"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "Command/status section",
+    "details": "## ver\n\n```text\nver\n```\n\n**Response format:**\n\n```text\n<upstream-version> (<upstream-build-date>) + ota (<OTA-build-date> - <commit>)\n```\n\n[↩ Back to hotspot-ota readme](../README.md)",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L396",
+    "grammarVerified": true,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show running firmware version information.",
+    "helpSyntax": "ver"
+  },
+  {
+    "id": "mobmesh.stats-core.7b46f93e",
+    "syntax": "stats-core",
+    "path": [
+      "stats-core"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "stats-core"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "power-guard",
+    "summary": "stats-core",
+    "details": "## stats-core\n\n```text\nstats-core\n```\n\n**Response:** Native MeshCore system statistics: battery, uptime, errors, and queue state.\n\n**Extension:** Allows the existing serial command over authenticated remote CLI.\nRead-only; response fields follow the upstream firmware version.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/power-guard/docs/cli-additions.md#L117",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show native core and battery statistics; also allowed over authenticated remote CLI.",
+    "helpSyntax": "stats-core"
+  },
+  {
+    "id": "mobmesh.stats-radio.a5f5d7bb",
+    "syntax": "stats-radio",
+    "path": [
+      "stats-radio"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "stats-radio"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "power-guard",
+    "summary": "stats-radio",
+    "details": "## stats-radio\n\n```text\nstats-radio\n```\n\n**Response:** Native MeshCore radio statistics: noise floor, RSSI/SNR, and airtime.\n\n**Extension:** Allows the existing serial command over authenticated remote CLI.\nRead-only; response fields follow the upstream firmware version.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/power-guard/docs/cli-additions.md#L128",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show native radio statistics; also allowed remotely.",
+    "helpSyntax": "stats-radio"
+  },
+  {
+    "id": "mobmesh.stats-packets.5cc3b1ec",
+    "syntax": "stats-packets",
+    "path": [
+      "stats-packets"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "stats-packets"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "power-guard",
+    "summary": "stats-packets",
+    "details": "## stats-packets\n\n```text\nstats-packets\n```\n\n**Response:** Native MeshCore packet counters.\n\n**Extension:** Allows the existing serial command over authenticated remote CLI.\nRead-only; response fields follow the upstream firmware version.\n\n[↩ Back to power-guard readme](../README.md)",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/power-guard/docs/cli-additions.md#L139",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show native packet counters; also allowed remotely.",
+    "helpSyntax": "stats-packets"
+  },
+  {
+    "id": "mobmesh.set.ota.wan.wifi.47b006f0",
+    "syntax": "set ota.wan.wifi <ssid>,<password>",
+    "path": [
+      "set",
+      "ota.wan.wifi"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "ota.wan.wifi"
+      },
+      {
+        "kind": "secret",
+        "name": "ssid",
+        "optional": false,
+        "choices": [],
+        "help": "ssid: secret; never saved or suggested"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "secret",
+        "name": "password",
+        "optional": false,
+        "choices": [],
+        "help": "password: secret; never saved or suggested"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "set ota.wan.wifi",
+    "details": "## set ota.wan.wifi\n\n```text\nset ota.wan.wifi <ssid>,<password>\n```\n\n| Item | Definition |\n| --- | --- |\n| `ssid` | Network name; stored limit of 31 bytes |\n| `password` | Network password; stored limit of 63 bytes |\n| Response | `OK` or `ERR: ...` |\n| Storage | Persistent across firmware updates |\n| Restrictions | Refused during an active OTA/WAN operation |\n\nLonger credentials are truncated. Saving credentials clears proven WAN health.\nThere is no credential-reading command.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L42",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": true,
+    "brief": "Save WAN Wi-Fi credentials; changing them clears proven WAN health.",
+    "helpSyntax": "set ota.wan.wifi <ssid>,<password>"
+  },
+  {
+    "id": "mobmesh.get.ota.fw.url.f96cbfad",
+    "syntax": "get ota.fw.url",
+    "path": [
+      "get",
+      "ota.fw.url"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "ota.fw.url"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "get / set ota.fw.url",
+    "details": "## get / set ota.fw.url\n\n```text\nget ota.fw.url\nset ota.fw.url <url>\n```\n\n| Item | Definition |\n| --- | --- |\n| `url` | HTTP(S) application `.bin` URL; up to 146 characters |\n| Get response | `> <url>` or `> (not set)` |\n| Set response | `OK` or `ERR: URL too long (max 146 chars)` |\n| Storage | Persistent across firmware updates |\n\nA longer URL is refused without truncation. Use an application image, not a merged\nimage containing boot files.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L59",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show the saved default firmware URL.",
+    "helpSyntax": "get ota.fw.url"
+  },
+  {
+    "id": "mobmesh.set.ota.fw.url.1b4622c7",
+    "syntax": "set ota.fw.url <url>",
+    "path": [
+      "set",
+      "ota.fw.url"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "ota.fw.url"
+      },
+      {
+        "kind": "text",
+        "name": "url",
+        "optional": false,
+        "choices": [],
+        "help": "url: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "get / set ota.fw.url",
+    "details": "## get / set ota.fw.url\n\n```text\nget ota.fw.url\nset ota.fw.url <url>\n```\n\n| Item | Definition |\n| --- | --- |\n| `url` | HTTP(S) application `.bin` URL; up to 146 characters |\n| Get response | `> <url>` or `> (not set)` |\n| Set response | `OK` or `ERR: URL too long (max 146 chars)` |\n| Storage | Persistent across firmware updates |\n\nA longer URL is refused without truncation. Use an application image, not a merged\nimage containing boot files.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L60",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Save the URL used by start ota wan update.",
+    "helpSyntax": "set ota.fw.url <url>"
+  },
+  {
+    "id": "mobmesh.set.ota.fw.marker.d297db00",
+    "syntax": "set ota.fw.marker <on|off>",
+    "path": [
+      "set",
+      "ota.fw.marker"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "ota.fw.marker"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "set ota.fw.marker",
+    "details": "## set ota.fw.marker\n\n```text\nset ota.fw.marker <on|off>\n```\n\n| Value | Effect |\n| --- | --- |\n| `on` | Require the project stamp and OTA support; skip an already-running build. Default. |\n| `off` | Permit an unstamped image, an image without OTA support, or a same-build reflash |\n\n**Response:** `OK` or `ERR: expected on|off`.\n\n**Lifetime:** RAM-only. Consumed when the next update is queued. A refusal before\nqueuing leaves it available; reboot restores `on`.\n\n**Checks retained:** SHA-256 verification always applies. Board and role matching\nstill applies when both images have readable metadata.\n\n> [!IMPORTANT]\n> Firmware without remote OTA removes remote-update ability. Restoring it requires\n> an on-site flash.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L76",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "One-attempt, RAM-only identity-check override; SHA-256 remains mandatory.",
+    "helpSyntax": "set ota.fw.marker <on|off>"
+  },
+  {
+    "id": "mobmesh.get.ota.wan.pwr.2e0eb9c6",
+    "syntax": "get ota.wan.pwr",
+    "path": [
+      "get",
+      "ota.wan.pwr"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "ota.wan.pwr"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "get / set ota.wan.pwr",
+    "details": "## get / set ota.wan.pwr\n\n```text\nget ota.wan.pwr\nset ota.wan.pwr <on|off>\n```\n\n| Item | Definition |\n| --- | --- |\n| `on` / `off` | Assert or release the board-configured hotspot-power control pin |\n| Get response | `> on` or `> off` |\n| Set response | `OK` or `ERR: ...` |\n| Restrictions | Set is refused during an active OTA/WAN operation |\n\nReports the control-pin state, not measured supply voltage. Does not join WiFi or\nstart an update. Manual `on` bypasses the automatic power-guard battery check.\nExternal rail control is validated on Heltec V4; check board configuration before\nusing another board's pin.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L99",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show hotspot power state; external rail control is currently validated only on Heltec V4.",
+    "helpSyntax": "get ota.wan.pwr"
+  },
+  {
+    "id": "mobmesh.set.ota.wan.pwr.101268a4",
+    "syntax": "set ota.wan.pwr <on|off>",
+    "path": [
+      "set",
+      "ota.wan.pwr"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "ota.wan.pwr"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "get / set ota.wan.pwr",
+    "details": "## get / set ota.wan.pwr\n\n```text\nget ota.wan.pwr\nset ota.wan.pwr <on|off>\n```\n\n| Item | Definition |\n| --- | --- |\n| `on` / `off` | Assert or release the board-configured hotspot-power control pin |\n| Get response | `> on` or `> off` |\n| Set response | `OK` or `ERR: ...` |\n| Restrictions | Set is refused during an active OTA/WAN operation |\n\nReports the control-pin state, not measured supply voltage. Does not join WiFi or\nstart an update. Manual `on` bypasses the automatic power-guard battery check.\nExternal rail control is validated on Heltec V4; check board configuration before\nusing another board's pin.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L100",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Drive hotspot power directly; refused during active OTA service.",
+    "helpSyntax": "set ota.wan.pwr <on|off>"
+  },
+  {
+    "id": "mobmesh.get.ota.status.c9e575f1",
+    "syntax": "get ota.status",
+    "path": [
+      "get",
+      "ota.status"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "ota.status"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "get ota.status",
+    "details": "## get ota.status\n\n```text\nget ota.status\n```\n\n| Response format | Meaning |\n| --- | --- |\n| `> <state>` | Current operation state |\n| `> downloading <bytes>/<total>` | Download progress with known content length |\n| `> downloading <bytes> bytes` | Download progress without known content length |\n| `> <state>: <result>` | Final result or error |\n\nFailure and cancellation results remain until another operation starts.\n`wan-complete` means WAN verification finished; read `get ota.wan.health` for its outcome.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L118",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show background OTA or WAN-verification progress and result.",
+    "helpSyntax": "get ota.status"
+  },
+  {
+    "id": "mobmesh.get.ota.ap.ef73c3f7",
+    "syntax": "get ota.ap",
+    "path": [
+      "get",
+      "ota.ap"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "ota.ap"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "get ota.ap",
+    "details": "## get ota.ap\n\n```text\nget ota.ap\n```\n\n| Response | Meaning |\n| --- | --- |\n| `> down` | Local upload AP is stopped |\n| `> up, <seconds>s left` | AP is running with the indicated session time remaining |\n| `> up, <seconds>s left, uploading` | An upload is writing |\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L134",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show local upload AP state and remaining lifetime.",
+    "helpSyntax": "get ota.ap"
+  },
+  {
+    "id": "mobmesh.get.ota.wan.health.cb6e8b81",
+    "syntax": "get ota.wan.health",
+    "path": [
+      "get",
+      "ota.wan.health"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "ota.wan.health"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "get ota.wan.health",
+    "details": "## get ota.wan.health\n\n```text\nget ota.wan.health\n```\n\n**Response:** `> checking` during verification; otherwise\n`> latest=<result> proven=<yes|no>`.\n\n| Result | Meaning |\n| --- | --- |\n| `UNKNOWN` | No result for the saved credentials |\n| `WAN_0\\|NTP_0` | WAN verification failed |\n| `WAN_1\\|NTP_0` | WAN passed; NTP failed |\n| `WAN_1\\|NTP_1` | WAN and NTP passed |\n| `RESTORE_FAULT` | Cleanup could not restore the starting state |\n\n`proven=yes` persists across transient failures. Saving WiFi credentials clears it.\nA proven setup is required by features such as sync.time campaigns that request\nWAN/NTP refresh. A restore fault does not create a persistent lock.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L146",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show latest WAN_n|NTP_n, restore state, and durable proven flag.",
+    "helpSyntax": "get ota.wan.health"
+  },
+  {
+    "id": "mobmesh.get.ota.wan.radio.205b7534",
+    "syntax": "get ota.wan.radio",
+    "path": [
+      "get",
+      "ota.wan.radio"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "ota.wan.radio"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "get ota.wan.radio",
+    "details": "## get ota.wan.radio\n\n```text\nget ota.wan.radio\n```\n\n**Response format:** `> wifi:<state> driver:<state> link:<state> pwr:<state>`.\n\n| Field | Values | Meaning |\n| --- | --- | --- |\n| `wifi` | `off`, `on` | WiFi mode |\n| `driver` | `no`, `yes`, `error` | Driver initialization state; `error` indicates an unexpected query result |\n| `link` | `down`, `up` | Station connection state |\n| `pwr` | `off`, `on` | Same control-pin state as `get ota.wan.pwr` |\n\nDriver initialization alone does not indicate a network connection.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L167",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show ESP32 Wi-Fi, driver, link, and hotspot-power states.",
+    "helpSyntax": "get ota.wan.radio"
+  },
+  {
+    "id": "mobmesh.ota.cancel.502d621a",
+    "syntax": "ota cancel",
+    "path": [
+      "ota",
+      "cancel"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "ota"
+      },
+      {
+        "kind": "literal",
+        "value": "cancel"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "ota cancel",
+    "details": "## ota cancel\n\n```text\nota cancel\n```\n\n**Response:** `OK - cancel requested` or `ERR: OTA is not cancellable`.\n\n**Restrictions:** Accepted while queued, joining, checking WAN, opening the URL,\nor downloading. Refused during verification, commit, or WAN verification.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L226",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Cancel before verification or commit begins.",
+    "helpSyntax": "ota cancel"
+  },
+  {
+    "id": "mobmesh.ota.wan.join.d9411e8d",
+    "syntax": "ota wan join",
+    "path": [
+      "ota",
+      "wan",
+      "join"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "ota"
+      },
+      {
+        "kind": "literal",
+        "value": "wan"
+      },
+      {
+        "kind": "literal",
+        "value": "join"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "ota wan join",
+    "details": "## ota wan join\n\n```text\nota wan join\n```\n\n**Response:** `OK - joined` or `ERR: ...`.\n\n**Effect:** Powers the hotspot and joins the saved WiFi network using one join attempt.\nDoes not check WAN access or download firmware. A failed join shuts WiFi and power down.\n\n**Restrictions:** Requires saved credentials. Refused during an OTA/WAN operation,\nwhile the local upload AP is up, or when power-guard reports a low battery.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L237",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Join configured Wi-Fi without downloading.",
+    "helpSyntax": "ota wan join"
+  },
+  {
+    "id": "mobmesh.ota.wan.leave.0fabb883",
+    "syntax": "ota wan leave",
+    "path": [
+      "ota",
+      "wan",
+      "leave"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "ota"
+      },
+      {
+        "kind": "literal",
+        "value": "wan"
+      },
+      {
+        "kind": "literal",
+        "value": "leave"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "ota wan leave",
+    "details": "## ota wan leave\n\n```text\nota wan leave\n```\n\n**Response:** `OK - disconnected`, `ERR: OTA active`, or\n`ERR: WiFi shutdown failed; reboot to clear`.\n\n**Effect:** Disconnects the station, stops the WiFi driver, and turns off hotspot power.\nOn boards with a WPA2-session limit, reaching the limit causes a reboot after\nWiFi is off and the reply has been sent.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L251",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Disconnect Wi-Fi and drop hotspot power.",
+    "helpSyntax": "ota wan leave"
+  },
+  {
+    "id": "mobmesh.ota.wan.check.8ee8c9e3",
+    "syntax": "ota wan check",
+    "path": [
+      "ota",
+      "wan",
+      "check"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "ota"
+      },
+      {
+        "kind": "literal",
+        "value": "wan"
+      },
+      {
+        "kind": "literal",
+        "value": "check"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "ota wan check",
+    "details": "## ota wan check\n\n```text\nota wan check\n```\n\n**Response:** `WAN OK` or `WAN ERR`; `ERR: OTA active` during an OTA/WAN operation.\n\n**Prerequisite:** Manually joined WiFi. Checks internet reachability without joining\nor changing hotspot power.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L264",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Check WAN reachability while joined.",
+    "helpSyntax": "ota wan check"
+  },
+  {
+    "id": "mobmesh.ota.wan.survey.f899022e",
+    "syntax": "ota wan survey",
+    "path": [
+      "ota",
+      "wan",
+      "survey"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "ota"
+      },
+      {
+        "kind": "literal",
+        "value": "wan"
+      },
+      {
+        "kind": "literal",
+        "value": "survey"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "ota wan survey",
+    "details": "## ota wan survey\n\n```text\nota wan survey\nota wan survey <offset>\nota wan survey refresh\n```\n\n| Parameter | Meaning |\n| --- | --- |\n| `offset` | Result index, 0–255; use the suggested `next N` |\n| `refresh` | Discard saved results and start a new scan |\n\n| Response | Meaning |\n| --- | --- |\n| `OK - scanning` | Scan is running; another call reads its result |\n| Network list, optionally ending in `next N` | Saved scan results; each page starts with a newline, and a lock marks protected networks |\n| `No networks found` | Scan completed without results |\n| `ERR: ...` | Invalid parameter, scan failure, or operation conflict |\n\n**Results:** Matching SSID names are combined within each open/secured category; the strongest signal is shown. Ties retain the first scan record. Row numbers retain scan indexes and can have gaps; use `next N` for paging.\n\n**Lifetime:** One scan retained for two minutes. An expired result starts a new scan.\n\n**Restrictions:** Refused while WiFi is in use or an OTA/WAN operation is active.\nNever joins or powers the hotspot. Sleep is inhibited during the scan and released\nwhen it finishes or fails; cached results do not keep the node awake. WiFi is switched\noff when scanning finishes.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L275",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Scan nearby Wi-Fi networks once; show names and whether each is open.",
+    "helpSyntax": "ota wan survey"
+  },
+  {
+    "id": "mobmesh.ota.wan.survey.5b7033fb",
+    "syntax": "ota wan survey <offset>",
+    "path": [
+      "ota",
+      "wan",
+      "survey"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "ota"
+      },
+      {
+        "kind": "literal",
+        "value": "wan"
+      },
+      {
+        "kind": "literal",
+        "value": "survey"
+      },
+      {
+        "kind": "text",
+        "name": "offset",
+        "optional": false,
+        "choices": [],
+        "help": "offset: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "ota wan survey",
+    "details": "## ota wan survey\n\n```text\nota wan survey\nota wan survey <offset>\nota wan survey refresh\n```\n\n| Parameter | Meaning |\n| --- | --- |\n| `offset` | Result index, 0–255; use the suggested `next N` |\n| `refresh` | Discard saved results and start a new scan |\n\n| Response | Meaning |\n| --- | --- |\n| `OK - scanning` | Scan is running; another call reads its result |\n| Network list, optionally ending in `next N` | Saved scan results; each page starts with a newline, and a lock marks protected networks |\n| `No networks found` | Scan completed without results |\n| `ERR: ...` | Invalid parameter, scan failure, or operation conflict |\n\n**Results:** Matching SSID names are combined within each open/secured category; the strongest signal is shown. Ties retain the first scan record. Row numbers retain scan indexes and can have gaps; use `next N` for paging.\n\n**Lifetime:** One scan retained for two minutes. An expired result starts a new scan.\n\n**Restrictions:** Refused while WiFi is in use or an OTA/WAN operation is active.\nNever joins or powers the hotspot. Sleep is inhibited during the scan and released\nwhen it finishes or fails; cached results do not keep the node awake. WiFi is switched\noff when scanning finishes.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L276",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show the saved results starting at the suggested next offset.",
+    "helpSyntax": "ota wan survey <offset>"
+  },
+  {
+    "id": "mobmesh.ota.wan.survey.refresh.8ef7d44e",
+    "syntax": "ota wan survey refresh",
+    "path": [
+      "ota",
+      "wan",
+      "survey",
+      "refresh"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "ota"
+      },
+      {
+        "kind": "literal",
+        "value": "wan"
+      },
+      {
+        "kind": "literal",
+        "value": "survey"
+      },
+      {
+        "kind": "literal",
+        "value": "refresh"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "ota wan survey",
+    "details": "## ota wan survey\n\n```text\nota wan survey\nota wan survey <offset>\nota wan survey refresh\n```\n\n| Parameter | Meaning |\n| --- | --- |\n| `offset` | Result index, 0–255; use the suggested `next N` |\n| `refresh` | Discard saved results and start a new scan |\n\n| Response | Meaning |\n| --- | --- |\n| `OK - scanning` | Scan is running; another call reads its result |\n| Network list, optionally ending in `next N` | Saved scan results; each page starts with a newline, and a lock marks protected networks |\n| `No networks found` | Scan completed without results |\n| `ERR: ...` | Invalid parameter, scan failure, or operation conflict |\n\n**Results:** Matching SSID names are combined within each open/secured category; the strongest signal is shown. Ties retain the first scan record. Row numbers retain scan indexes and can have gaps; use `next N` for paging.\n\n**Lifetime:** One scan retained for two minutes. An expired result starts a new scan.\n\n**Restrictions:** Refused while WiFi is in use or an OTA/WAN operation is active.\nNever joins or powers the hotspot. Sleep is inhibited during the scan and released\nwhen it finishes or fails; cached results do not keep the node awake. WiFi is switched\noff when scanning finishes.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L277",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Discard saved results and start a fresh scan.",
+    "helpSyntax": "ota wan survey refresh"
+  },
+  {
+    "id": "mobmesh.ota.wan.verify.273872cc",
+    "syntax": "ota wan verify",
+    "path": [
+      "ota",
+      "wan",
+      "verify"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "ota"
+      },
+      {
+        "kind": "literal",
+        "value": "wan"
+      },
+      {
+        "kind": "literal",
+        "value": "verify"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "ota wan verify",
+    "details": "## ota wan verify\n\n```text\nota wan verify\n```\n\n**Response:** `OK - WAN verification queued` or `ERR: ...`.\n\n**Effect:** Powers and joins as needed, checks WAN twice, and attempts NTP twice.\nRestores WiFi and hotspot power to their starting state. A reboot cancels verification.\n\n**Result:** `get ota.status` reports `wan-complete`; `get ota.wan.health` reports\nsuccess, failure, and the persistent proven flag.\n\n**Restrictions:** Requires saved credentials. Refused while another operation or\nlocal upload AP is active, or when power-guard reports a low battery.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L304",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Queue WAN and NTP checks, then restore initial Wi-Fi/GPIO state.",
+    "helpSyntax": "ota wan verify"
+  },
+  {
+    "id": "mobmesh.ota.slot.boot.f049e2c4",
+    "syntax": "ota slot boot <A|B>",
+    "path": [
+      "ota",
+      "slot",
+      "boot"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "ota"
+      },
+      {
+        "kind": "literal",
+        "value": "slot"
+      },
+      {
+        "kind": "literal",
+        "value": "boot"
+      },
+      {
+        "kind": "enum",
+        "name": "A|B",
+        "optional": false,
+        "choices": [
+          "A",
+          "B"
+        ],
+        "help": "A|B: exact firmware choices"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "ota slot boot",
+    "details": "## ota slot boot\n\n```text\nota slot boot <A|B>\n```\n\n**Response:** `OK - rebooting` or `ERR: ...`.\n\n**Effect:** Selects the requested slot and reboots immediately. Rearms approximately\n90 seconds of rollback probation, including for a previously valid image.\n\n**Restrictions:** Refused if the slot is already active, absent, or has no valid image,\nor if an OTA/WAN operation or upload is writing. Requires rollback-guard support.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L321",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Reboot immediately into a verified image in the selected slot.",
+    "helpSyntax": "ota slot boot <A|B>"
+  },
+  {
+    "id": "mobmesh.start.ota.wan.65d7a016",
+    "syntax": "start ota wan <url>",
+    "path": [
+      "start",
+      "ota",
+      "wan"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "start"
+      },
+      {
+        "kind": "literal",
+        "value": "ota"
+      },
+      {
+        "kind": "literal",
+        "value": "wan"
+      },
+      {
+        "kind": "text",
+        "name": "url",
+        "optional": false,
+        "choices": [],
+        "help": "url: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "start ota wan",
+    "details": "## start ota wan\n\n```text\nstart ota wan <url>\nstart ota wan update\n```\n\n| Parameter | Meaning |\n| --- | --- |\n| `url` | HTTP(S) application `.bin` URL; up to 146 characters |\n| `update` | Use the URL saved with `set ota.fw.url` |\n\n**Response:** `OK - OTA queued` or `ERR: ...`.\n\n**Effect:** Joins WiFi if needed, downloads and verifies the image, installs it in the\ninactive slot, and reboots on success. Failure leaves the current firmware running.\nProgress is available through `get ota.status`.\n\n| Image check | Behavior |\n| --- | --- |\n| Project stamp | Scans file bytes 208–287 for `MOBMESH` plus its NUL and the preceding compact record |\n| OTA support | Requires the hotspot-ota mod bit |\n| Board and role | Compares numeric IDs when both stamps are readable |\n| Same build | Matching upstream version and repository SHA stops the update |\n| Integrity | Always verifies the appended SHA-256 |\n\n`set ota.fw.marker off` changes the stamp checks as documented above. The stamp and\nSHA-256 do not authenticate the publisher.\n\n**Restrictions:** Requires saved WiFi credentials and a URL. Refused while the local\nupload AP or another operation is active, during probation or unavailable rollback\nstate, or when power-guard reports a low battery.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L351",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Queue a WAN firmware update from the supplied URL.",
+    "helpSyntax": "start ota wan <url>"
+  },
+  {
+    "id": "mobmesh.start.ota.wan.update.dd205ebb",
+    "syntax": "start ota wan update",
+    "path": [
+      "start",
+      "ota",
+      "wan",
+      "update"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "start"
+      },
+      {
+        "kind": "literal",
+        "value": "ota"
+      },
+      {
+        "kind": "literal",
+        "value": "wan"
+      },
+      {
+        "kind": "literal",
+        "value": "update"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "start ota wan",
+    "details": "## start ota wan\n\n```text\nstart ota wan <url>\nstart ota wan update\n```\n\n| Parameter | Meaning |\n| --- | --- |\n| `url` | HTTP(S) application `.bin` URL; up to 146 characters |\n| `update` | Use the URL saved with `set ota.fw.url` |\n\n**Response:** `OK - OTA queued` or `ERR: ...`.\n\n**Effect:** Joins WiFi if needed, downloads and verifies the image, installs it in the\ninactive slot, and reboots on success. Failure leaves the current firmware running.\nProgress is available through `get ota.status`.\n\n| Image check | Behavior |\n| --- | --- |\n| Project stamp | Scans file bytes 208–287 for `MOBMESH` plus its NUL and the preceding compact record |\n| OTA support | Requires the hotspot-ota mod bit |\n| Board and role | Compares numeric IDs when both stamps are readable |\n| Same build | Matching upstream version and repository SHA stops the update |\n| Integrity | Always verifies the appended SHA-256 |\n\n`set ota.fw.marker off` changes the stamp checks as documented above. The stamp and\nSHA-256 do not authenticate the publisher.\n\n**Restrictions:** Requires saved WiFi credentials and a URL. Refused while the local\nupload AP or another operation is active, during probation or unavailable rollback\nstate, or when power-guard reports a low battery.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L352",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Queue an update using the saved URL.",
+    "helpSyntax": "start ota wan update"
+  },
+  {
+    "id": "mobmesh.stop.ota.c28f13ac",
+    "syntax": "stop ota",
+    "path": [
+      "stop",
+      "ota"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "stop"
+      },
+      {
+        "kind": "literal",
+        "value": "ota"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "stop ota",
+    "details": "## stop ota\n\n```text\nstop ota\n```\n\n**Response:** `OK - OTA AP stopped` or `ERR: ...`.\n\n**Effect:** Closes the local upload AP and server, restoring the prior WiFi mode.\n\n**Restrictions:** Refused if no AP is running or an upload is writing.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L384",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "End local upload AP mode; refused during an active write.",
+    "helpSyntax": "stop ota"
+  },
+  {
+    "id": "mobmesh.get.ota.slot.a3912501",
+    "syntax": "get ota.slot",
+    "path": [
+      "get",
+      "ota.slot"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "ota.slot"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "hotspot-ota",
+    "summary": "Command/status section",
+    "details": "## get ota.slot\n\n```text\nget ota.slot\n```\n\n**Response format:**\n\n```text\n> Slots: A=<version> (active, <state>) | B=<version> (recorded-<state>, <image>)\n```\n\nThe active and inactive descriptions swap when B is running.\nA is `ota_0`; B is `ota_1`. Versions include the build SHA, recorded after each\nslot boots; a slot without a recorded version shows `v?`.\n\n| Active state | Meaning |\n| --- | --- |\n| `pending` | On rollback probation; confirms after approximately 90 seconds with a working radio |\n| `valid` | Confirmed |\n| `n/a` | Rollback state unavailable |\n\n| Inactive recorded state | Meaning |\n| --- | --- |\n| `recorded-valid` | Previously accepted |\n| `new` | Selected but not yet booted |\n| `invalid` | Rejected by rollback |\n| `aborted` | Update did not finish |\n| `n/a` | No applicable rollback record |\n\n| Image result | Meaning |\n| --- | --- |\n| `image-ok` | Complete image passed integrity verification |\n| `image-invalid` | Image failed verification |\n| `image-absent` | Partition does not exist |\n| `image-unchecked` | Flash writer is active; verification was skipped |\n\nRecorded validity does not prove the image is intact. Only the inactive image is\nverified; reading and hashing it takes longer than other status queries.\nA reset during probation causes rollback; radio initialization failure triggers\nimmediate rollback. Requires rollback-guard support.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/hotspot-ota/docs/cli-additions.md#L184",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Inspect active/inactive slots, probation, recorded state, and inactive image validity.",
+    "helpSyntax": "get ota.slot"
+  },
+  {
+    "id": "mobmesh.powersaving.safe.mv.ed49cb14",
+    "syntax": "powersaving safe.mv <mv>",
+    "path": [
+      "powersaving",
+      "safe.mv"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "powersaving"
+      },
+      {
+        "kind": "literal",
+        "value": "safe.mv"
+      },
+      {
+        "kind": "number",
+        "name": "mv",
+        "optional": false,
+        "choices": [],
+        "help": "mv: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "power-guard",
+    "summary": "powersaving safe.mv",
+    "details": "## powersaving safe.mv\n\n```text\npowersaving safe.mv <mv>\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `mv` | Integer gauge millivolts within the board's accepted range, or `0` to disable the safe-sleep rung |\n\n| Response | Meaning |\n| --- | --- |\n| `OK - safe.mv <mv>mV` | Threshold saved; safe sleep is enabled |\n| `OK - safe.mv <mv>mV (safe is off)` | Threshold saved; safe sleep remains off |\n| `OK - safe.mv 0 (rung disabled)` | Threshold disabled |\n| `ERR: <floor>-<maximum> or 0` | Value is outside the board's allowed range or is malformed |\n\n**Storage:** Persistent across reboots and firmware updates.\n\n**Restrictions:** A nonzero threshold must be at least the board's safe floor and\nbelow its resume threshold. Setting a threshold does not enable safe sleep.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/power-guard/docs/cli-additions.md#L28",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set safe threshold in gauge millivolts; 0 disables it.",
+    "helpSyntax": "powersaving safe.mv <mv>"
+  },
+  {
+    "id": "mobmesh.powersaving.safe.23c68161",
+    "syntax": "powersaving safe",
+    "path": [
+      "powersaving",
+      "safe"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "powersaving"
+      },
+      {
+        "kind": "literal",
+        "value": "safe"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "power-guard",
+    "summary": "powersaving safe",
+    "details": "## powersaving safe\n\n```text\npowersaving safe\npowersaving safe <on|off>\n```\n\n| Parameter | Effect |\n| --- | --- |\n| Omitted | Read state, threshold, and last measured battery value |\n| `on` | Enable safe sleep at the saved threshold |\n| `off` | Disable safe sleep while retaining the threshold |\n\n| Response | Meaning |\n| --- | --- |\n| `safe <on\\|off>, <threshold>mV, batt <reading>mV` | Current safe-sleep state |\n| `OK - safe on, <threshold>mV` | Enabled |\n| `OK - safe off (<threshold>mV kept)` | Disabled |\n| `ERR: no threshold -- set powersaving safe.mv first` | Cannot enable with a zero threshold |\n\n**Storage:** Enable state and threshold are persistent.\n\n**Scope:** Controls leaving service on low voltage. Does not change the separate\nboot-time resume check or automatic power-saving thresholds.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/power-guard/docs/cli-additions.md#L50",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show brownout failsafe state, threshold, and reading.",
+    "helpSyntax": "powersaving safe"
+  },
+  {
+    "id": "mobmesh.powersaving.safe.8729125f",
+    "syntax": "powersaving safe <on|off>",
+    "path": [
+      "powersaving",
+      "safe"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "powersaving"
+      },
+      {
+        "kind": "literal",
+        "value": "safe"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "power-guard",
+    "summary": "powersaving safe",
+    "details": "## powersaving safe\n\n```text\npowersaving safe\npowersaving safe <on|off>\n```\n\n| Parameter | Effect |\n| --- | --- |\n| Omitted | Read state, threshold, and last measured battery value |\n| `on` | Enable safe sleep at the saved threshold |\n| `off` | Disable safe sleep while retaining the threshold |\n\n| Response | Meaning |\n| --- | --- |\n| `safe <on\\|off>, <threshold>mV, batt <reading>mV` | Current safe-sleep state |\n| `OK - safe on, <threshold>mV` | Enabled |\n| `OK - safe off (<threshold>mV kept)` | Disabled |\n| `ERR: no threshold -- set powersaving safe.mv first` | Cannot enable with a zero threshold |\n\n**Storage:** Enable state and threshold are persistent.\n\n**Scope:** Controls leaving service on low voltage. Does not change the separate\nboot-time resume check or automatic power-saving thresholds.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/power-guard/docs/cli-additions.md#L51",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Enable or disable the failsafe without changing its threshold.",
+    "helpSyntax": "powersaving safe <on|off>"
+  },
+  {
+    "id": "mobmesh.powersaving.auto.ff7eada1",
+    "syntax": "powersaving auto",
+    "path": [
+      "powersaving",
+      "auto"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "powersaving"
+      },
+      {
+        "kind": "literal",
+        "value": "auto"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "power-guard",
+    "summary": "powersaving auto",
+    "details": "## powersaving auto\n\n```text\npowersaving auto\npowersaving auto <on|off>\n```\n\n| Parameter | Effect |\n| --- | --- |\n| Omitted | Read enable state, active state, and transition count |\n| `on` | Allow the board's voltage ladder to control automatic power saving |\n| `off` | Disable automatic control and release any active automatic saving |\n\n**Response:** `auto <on|off>, active <yes|no>, transitions <count>` when reading;\n`OK - auto <on|off>` when setting; `ERR: usage: powersaving auto [on|off]` for invalid input.\n\n**Storage:** Runtime-only. Reboot restores the board's configured default.\n\n**Scope:** `on` enables automatic control; `active yes` means voltage has engaged it.\nSafe sleep is controlled separately. Voltage thresholds come from board configuration.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/power-guard/docs/cli-additions.md#L75",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show automatic power-saving state and transitions.",
+    "helpSyntax": "powersaving auto"
+  },
+  {
+    "id": "mobmesh.powersaving.auto.8452396b",
+    "syntax": "powersaving auto <on|off>",
+    "path": [
+      "powersaving",
+      "auto"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "powersaving"
+      },
+      {
+        "kind": "literal",
+        "value": "auto"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "power-guard",
+    "summary": "powersaving auto",
+    "details": "## powersaving auto\n\n```text\npowersaving auto\npowersaving auto <on|off>\n```\n\n| Parameter | Effect |\n| --- | --- |\n| Omitted | Read enable state, active state, and transition count |\n| `on` | Allow the board's voltage ladder to control automatic power saving |\n| `off` | Disable automatic control and release any active automatic saving |\n\n**Response:** `auto <on|off>, active <yes|no>, transitions <count>` when reading;\n`OK - auto <on|off>` when setting; `ERR: usage: powersaving auto [on|off]` for invalid input.\n\n**Storage:** Runtime-only. Reboot restores the board's configured default.\n\n**Scope:** `on` enables automatic control; `active yes` means voltage has engaged it.\nSafe sleep is controlled separately. Voltage thresholds come from board configuration.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/power-guard/docs/cli-additions.md#L76",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Enable or disable automatic power saving.",
+    "helpSyntax": "powersaving auto <on|off>"
+  },
+  {
+    "id": "mobmesh.poweroff.9b0ee17b",
+    "syntax": "poweroff <seconds>",
+    "path": [
+      "poweroff"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "poweroff"
+      },
+      {
+        "kind": "number",
+        "name": "seconds",
+        "optional": false,
+        "choices": [],
+        "help": "seconds: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "power-guard",
+    "summary": "poweroff / shutdown",
+    "details": "## poweroff / shutdown\n\n```text\npoweroff <seconds>\nshutdown <seconds>\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `seconds` | Sleep duration, 60–86400 seconds with the standard build limits |\n\n**Response:** `OK - deep sleep <seconds>s (<hours>h<minutes>m), then wakes`, or\n`ERR: usage: poweroff <secs> (<minimum>-<maximum>)`.\n\n**Effect:** Enters deep sleep, then wakes. Serial invocation sleeps immediately after\nprinting the reply. Remote invocation waits five seconds so the reply can be transmitted.\n\n**Restrictions:** A duration is required. When hotspot-ota is installed, active OTA\nwork or rollback probation can refuse sleep. On wake, the board's resume-voltage check\nmay return the node to sleep until the battery recovers.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/power-guard/docs/cli-additions.md#L96",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Deep sleep for 60–86400 seconds, then wake.",
+    "helpSyntax": "poweroff <seconds>"
+  },
+  {
+    "id": "mobmesh.shutdown.bd933ce0",
+    "syntax": "shutdown <seconds>",
+    "path": [
+      "shutdown"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "shutdown"
+      },
+      {
+        "kind": "number",
+        "name": "seconds",
+        "optional": false,
+        "choices": [],
+        "help": "seconds: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "power-guard",
+    "summary": "poweroff / shutdown",
+    "details": "## poweroff / shutdown\n\n```text\npoweroff <seconds>\nshutdown <seconds>\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `seconds` | Sleep duration, 60–86400 seconds with the standard build limits |\n\n**Response:** `OK - deep sleep <seconds>s (<hours>h<minutes>m), then wakes`, or\n`ERR: usage: poweroff <secs> (<minimum>-<maximum>)`.\n\n**Effect:** Enters deep sleep, then wakes. Serial invocation sleeps immediately after\nprinting the reply. Remote invocation waits five seconds so the reply can be transmitted.\n\n**Restrictions:** A duration is required. When hotspot-ota is installed, active OTA\nwork or rollback probation can refuse sleep. On wake, the board's resume-voltage check\nmay return the node to sleep until the battery recovers.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/power-guard/docs/cli-additions.md#L97",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Deep sleep for 60–86400 seconds, then wake.",
+    "helpSyntax": "shutdown <seconds>"
+  },
+  {
+    "id": "mobmesh.get.sync.channel.1ca1d839",
+    "syntax": "get sync.channel",
+    "path": [
+      "get",
+      "sync.channel"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.channel"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set sync.channel",
+    "details": "## get / set sync.channel\n\n```text\nget sync.channel\nset sync.channel <channel>\n```\n\n| Item | Definition |\n| --- | --- |\n| `channel` | 1–16 letters, digits, `-`, or `_`; normalized to lowercase |\n| Get response | `> <channel>` or `> unset` |\n| Set response | `OK` or `Err - ...` |\n| Storage | Persistent |\n\n**Restrictions:** All included campaign subscriptions must be off. The channel is a\nstream selector, not an authentication credential.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L48",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show the subscriber's receive channel.",
+    "helpSyntax": "get sync.channel"
+  },
+  {
+    "id": "mobmesh.set.sync.channel.ca002542",
+    "syntax": "set sync.channel <channel>",
+    "path": [
+      "set",
+      "sync.channel"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.channel"
+      },
+      {
+        "kind": "text",
+        "name": "channel",
+        "optional": false,
+        "choices": [],
+        "help": "channel: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set sync.channel",
+    "details": "## get / set sync.channel\n\n```text\nget sync.channel\nset sync.channel <channel>\n```\n\n| Item | Definition |\n| --- | --- |\n| `channel` | 1–16 letters, digits, `-`, or `_`; normalized to lowercase |\n| Get response | `> <channel>` or `> unset` |\n| Set response | `OK` or `Err - ...` |\n| Storage | Persistent |\n\n**Restrictions:** All included campaign subscriptions must be off. The channel is a\nstream selector, not an authentication credential.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L49",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Save 1–16 letters, digits, -, or _; all sync types must be off.",
+    "helpSyntax": "set sync.channel <channel>"
+  },
+  {
+    "id": "mobmesh.get.repeat.gate.8c4156aa",
+    "syntax": "get repeat.gate",
+    "path": [
+      "get",
+      "repeat.gate"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "repeat.gate"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set repeat.gate",
+    "details": "## get / set repeat.gate\n\n```text\nget repeat.gate\nset repeat.gate <on|off>\n```\n\n**Response:** `> on` or `> off` when reading; `OK - repeat.gate is now ON`,\n`OK - repeat.gate is now OFF`, or `Err - ...` when setting.\n\n**Effect:** On room servers, `on` requires region eligibility for forwarding.\nRepeaters already apply region filtering and store the value for policy compatibility.\nThe default is off; the setting is persistent.\n\n**Extension:** Native `set repeat on` also enables `repeat.gate` on a room server.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L65",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show whether room-server repeats use region eligibility.",
+    "helpSyntax": "get repeat.gate"
+  },
+  {
+    "id": "mobmesh.set.repeat.gate.bc2fd531",
+    "syntax": "set repeat.gate <on|off>",
+    "path": [
+      "set",
+      "repeat.gate"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "repeat.gate"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set repeat.gate",
+    "details": "## get / set repeat.gate\n\n```text\nget repeat.gate\nset repeat.gate <on|off>\n```\n\n**Response:** `> on` or `> off` when reading; `OK - repeat.gate is now ON`,\n`OK - repeat.gate is now OFF`, or `Err - ...` when setting.\n\n**Effect:** On room servers, `on` requires region eligibility for forwarding.\nRepeaters already apply region filtering and store the value for policy compatibility.\nThe default is off; the setting is persistent.\n\n**Extension:** Native `set repeat on` also enables `repeat.gate` on a room server.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L66",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Gate room-server forwarding by regions; off preserves upstream behavior.",
+    "helpSyntax": "set repeat.gate <on|off>"
+  },
+  {
+    "id": "mobmesh.get.sync.region.publish.interval.64322ca1",
+    "syntax": "get sync.region.publish.interval",
+    "path": [
+      "get",
+      "sync.region.publish.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.region.publish.interval"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set publication timing",
+    "details": "## get / set publication timing\n\n```text\nget sync.<dataset>.publish.interval\nset sync.<dataset>.publish.interval <N>h\nget sync.<dataset>.publish.duration\nset sync.<dataset>.publish.duration <N>d\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `dataset` | `region` or `policy` |\n| `N` for interval | 3–24 hours; suffix `h` is required |\n| `N` for duration | 1–4 days; suffix `d` is required |\n\n**Response:** `> <N>h` or `> <N>d` when reading; `OK` or `Err - ...` when setting.\n\n**Storage:** Persistent. Changes configure the next publication; they do not rewrite\nan active campaign's timing.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L81",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show sync region publish interval."
+  },
+  {
+    "id": "mobmesh.get.sync.policy.publish.interval.ad58a439",
+    "syntax": "get sync.policy.publish.interval",
+    "path": [
+      "get",
+      "sync.policy.publish.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.policy.publish.interval"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set publication timing",
+    "details": "## get / set publication timing\n\n```text\nget sync.<dataset>.publish.interval\nset sync.<dataset>.publish.interval <N>h\nget sync.<dataset>.publish.duration\nset sync.<dataset>.publish.duration <N>d\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `dataset` | `region` or `policy` |\n| `N` for interval | 3–24 hours; suffix `h` is required |\n| `N` for duration | 1–4 days; suffix `d` is required |\n\n**Response:** `> <N>h` or `> <N>d` when reading; `OK` or `Err - ...` when setting.\n\n**Storage:** Persistent. Changes configure the next publication; they do not rewrite\nan active campaign's timing.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L81",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show sync policy publish interval."
+  },
+  {
+    "id": "mobmesh.set.sync.region.publish.interval.31fa749f",
+    "syntax": "set sync.region.publish.interval <N>h",
+    "path": [
+      "set",
+      "sync.region.publish.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.region.publish.interval"
+      },
+      {
+        "kind": "text",
+        "name": "hours",
+        "optional": false,
+        "choices": [],
+        "help": "Hours with h suffix, 3h-24h"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set publication timing",
+    "details": "## get / set publication timing\n\n```text\nget sync.<dataset>.publish.interval\nset sync.<dataset>.publish.interval <N>h\nget sync.<dataset>.publish.duration\nset sync.<dataset>.publish.duration <N>d\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `dataset` | `region` or `policy` |\n| `N` for interval | 3–24 hours; suffix `h` is required |\n| `N` for duration | 1–4 days; suffix `d` is required |\n\n**Response:** `> <N>h` or `> <N>d` when reading; `OK` or `Err - ...` when setting.\n\n**Storage:** Persistent. Changes configure the next publication; they do not rewrite\nan active campaign's timing.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L82",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set sync region publish interval."
+  },
+  {
+    "id": "mobmesh.set.sync.policy.publish.interval.702a0289",
+    "syntax": "set sync.policy.publish.interval <N>h",
+    "path": [
+      "set",
+      "sync.policy.publish.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.policy.publish.interval"
+      },
+      {
+        "kind": "text",
+        "name": "hours",
+        "optional": false,
+        "choices": [],
+        "help": "Hours with h suffix, 3h-24h"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set publication timing",
+    "details": "## get / set publication timing\n\n```text\nget sync.<dataset>.publish.interval\nset sync.<dataset>.publish.interval <N>h\nget sync.<dataset>.publish.duration\nset sync.<dataset>.publish.duration <N>d\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `dataset` | `region` or `policy` |\n| `N` for interval | 3–24 hours; suffix `h` is required |\n| `N` for duration | 1–4 days; suffix `d` is required |\n\n**Response:** `> <N>h` or `> <N>d` when reading; `OK` or `Err - ...` when setting.\n\n**Storage:** Persistent. Changes configure the next publication; they do not rewrite\nan active campaign's timing.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L82",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set sync policy publish interval."
+  },
+  {
+    "id": "mobmesh.get.sync.region.publish.duration.6829052f",
+    "syntax": "get sync.region.publish.duration",
+    "path": [
+      "get",
+      "sync.region.publish.duration"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.region.publish.duration"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set publication timing",
+    "details": "## get / set publication timing\n\n```text\nget sync.<dataset>.publish.interval\nset sync.<dataset>.publish.interval <N>h\nget sync.<dataset>.publish.duration\nset sync.<dataset>.publish.duration <N>d\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `dataset` | `region` or `policy` |\n| `N` for interval | 3–24 hours; suffix `h` is required |\n| `N` for duration | 1–4 days; suffix `d` is required |\n\n**Response:** `> <N>h` or `> <N>d` when reading; `OK` or `Err - ...` when setting.\n\n**Storage:** Persistent. Changes configure the next publication; they do not rewrite\nan active campaign's timing.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L83",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show sync region publish duration."
+  },
+  {
+    "id": "mobmesh.get.sync.policy.publish.duration.be7b0b94",
+    "syntax": "get sync.policy.publish.duration",
+    "path": [
+      "get",
+      "sync.policy.publish.duration"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.policy.publish.duration"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set publication timing",
+    "details": "## get / set publication timing\n\n```text\nget sync.<dataset>.publish.interval\nset sync.<dataset>.publish.interval <N>h\nget sync.<dataset>.publish.duration\nset sync.<dataset>.publish.duration <N>d\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `dataset` | `region` or `policy` |\n| `N` for interval | 3–24 hours; suffix `h` is required |\n| `N` for duration | 1–4 days; suffix `d` is required |\n\n**Response:** `> <N>h` or `> <N>d` when reading; `OK` or `Err - ...` when setting.\n\n**Storage:** Persistent. Changes configure the next publication; they do not rewrite\nan active campaign's timing.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L83",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show sync policy publish duration."
+  },
+  {
+    "id": "mobmesh.set.sync.region.publish.duration.ee332825",
+    "syntax": "set sync.region.publish.duration <N>d",
+    "path": [
+      "set",
+      "sync.region.publish.duration"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.region.publish.duration"
+      },
+      {
+        "kind": "text",
+        "name": "days",
+        "optional": false,
+        "choices": [],
+        "help": "Days with d suffix, 1d-4d"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set publication timing",
+    "details": "## get / set publication timing\n\n```text\nget sync.<dataset>.publish.interval\nset sync.<dataset>.publish.interval <N>h\nget sync.<dataset>.publish.duration\nset sync.<dataset>.publish.duration <N>d\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `dataset` | `region` or `policy` |\n| `N` for interval | 3–24 hours; suffix `h` is required |\n| `N` for duration | 1–4 days; suffix `d` is required |\n\n**Response:** `> <N>h` or `> <N>d` when reading; `OK` or `Err - ...` when setting.\n\n**Storage:** Persistent. Changes configure the next publication; they do not rewrite\nan active campaign's timing.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L84",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set sync region publish duration."
+  },
+  {
+    "id": "mobmesh.set.sync.policy.publish.duration.d24df2bd",
+    "syntax": "set sync.policy.publish.duration <N>d",
+    "path": [
+      "set",
+      "sync.policy.publish.duration"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.policy.publish.duration"
+      },
+      {
+        "kind": "text",
+        "name": "days",
+        "optional": false,
+        "choices": [],
+        "help": "Days with d suffix, 1d-4d"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set publication timing",
+    "details": "## get / set publication timing\n\n```text\nget sync.<dataset>.publish.interval\nset sync.<dataset>.publish.interval <N>h\nget sync.<dataset>.publish.duration\nset sync.<dataset>.publish.duration <N>d\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `dataset` | `region` or `policy` |\n| `N` for interval | 3–24 hours; suffix `h` is required |\n| `N` for duration | 1–4 days; suffix `d` is required |\n\n**Response:** `> <N>h` or `> <N>d` when reading; `OK` or `Err - ...` when setting.\n\n**Storage:** Persistent. Changes configure the next publication; they do not rewrite\nan active campaign's timing.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L84",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set sync policy publish duration."
+  },
+  {
+    "id": "mobmesh.get.sync.radio.schedule.e24383ad",
+    "syntax": "get sync.radio.schedule",
+    "path": [
+      "get",
+      "sync.radio.schedule"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.radio.schedule"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set sync.radio.schedule",
+    "details": "## get / set sync.radio.schedule\n\n```text\nget sync.radio.schedule\nset sync.radio.schedule <campaign>,<test-interval>,<test-window>,<duration>,<confirm-interval>,<confirm-window>\n```\n\nAll six values are integer minutes with an `m` suffix.\n\n| Field | Production limits | Default |\n| --- | --- | --- |\n| `campaign` | Greater than 5 minutes and less than duration | `10m` |\n| `test-interval` | `0m` with `test-window=0m`, or greater than 30 minutes | `0m` |\n| `test-window` | `0m` with tests disabled; otherwise positive, less than 25 minutes and test interval | `0m` |\n| `duration` | Positive, at most 1440 minutes; enough time for a complete test if enabled | `360m` |\n| `confirm-interval` | Positive and less than confirmation window | `5m` |\n| `confirm-window` | 15–35791 minutes | `45m` |\n\n**Response:** `> <campaign>m,<test-interval>m,<test-window>m,<duration>m,<confirm-interval>m,<confirm-window>m`\nwhen reading; `OK` or `Err - ...` when setting.\n\n**Restrictions:** A test interval plus test window plus one minute must fit before\ncutover. Refused while campaign work locks radio changes. Saving a schedule clears\nthe RAM-only publish arm. Settings are persistent.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L101",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show six radio campaign timing values.",
+    "helpSyntax": "get sync.radio.schedule"
+  },
+  {
+    "id": "mobmesh.set.sync.radio.schedule.024d9681",
+    "syntax": "set sync.radio.schedule <campaign>,<test-interval>,<test-window>,<duration>,<confirm-interval>,<confirm-window>",
+    "path": [
+      "set",
+      "sync.radio.schedule"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.radio.schedule"
+      },
+      {
+        "kind": "text",
+        "name": "campaign",
+        "optional": false,
+        "choices": [],
+        "help": "campaign: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "text",
+        "name": "test-interval",
+        "optional": false,
+        "choices": [],
+        "help": "test-interval: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "text",
+        "name": "test-window",
+        "optional": false,
+        "choices": [],
+        "help": "test-window: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "text",
+        "name": "duration",
+        "optional": false,
+        "choices": [],
+        "help": "duration: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "text",
+        "name": "confirm-interval",
+        "optional": false,
+        "choices": [],
+        "help": "confirm-interval: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "text",
+        "name": "confirm-window",
+        "optional": false,
+        "choices": [],
+        "help": "confirm-window: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set sync.radio.schedule",
+    "details": "## get / set sync.radio.schedule\n\n```text\nget sync.radio.schedule\nset sync.radio.schedule <campaign>,<test-interval>,<test-window>,<duration>,<confirm-interval>,<confirm-window>\n```\n\nAll six values are integer minutes with an `m` suffix.\n\n| Field | Production limits | Default |\n| --- | --- | --- |\n| `campaign` | Greater than 5 minutes and less than duration | `10m` |\n| `test-interval` | `0m` with `test-window=0m`, or greater than 30 minutes | `0m` |\n| `test-window` | `0m` with tests disabled; otherwise positive, less than 25 minutes and test interval | `0m` |\n| `duration` | Positive, at most 1440 minutes; enough time for a complete test if enabled | `360m` |\n| `confirm-interval` | Positive and less than confirmation window | `5m` |\n| `confirm-window` | 15–35791 minutes | `45m` |\n\n**Response:** `> <campaign>m,<test-interval>m,<test-window>m,<duration>m,<confirm-interval>m,<confirm-window>m`\nwhen reading; `OK` or `Err - ...` when setting.\n\n**Restrictions:** A test interval plus test window plus one minute must fit before\ncutover. Refused while campaign work locks radio changes. Saving a schedule clears\nthe RAM-only publish arm. Settings are persistent.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L102",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Save the six minute-valued fields.",
+    "helpSyntax": "set sync.radio.schedule <campaign>,<test-interval>,<test-window>,<duration>,<confirm-interval>,<confirm-window>"
+  },
+  {
+    "id": "mobmesh.get.sync.time.tolerance.cb0b444c",
+    "syntax": "get sync.time.tolerance",
+    "path": [
+      "get",
+      "sync.time.tolerance"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.time.tolerance"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set sync.time settings",
+    "details": "## get / set sync.time settings\n\n```text\nget sync.time.tolerance\nset sync.time.tolerance <N>m\nget sync.time.publish.interval\nset sync.time.publish.interval <N>h|<N>d\nget sync.time.publish.duration\nset sync.time.publish.duration <N>d\nget sync.time.ntp.interval\nset sync.time.ntp.interval <N>h|<N>d|0\n```\n\n| Setting | Accepted values | Meaning |\n| --- | --- | --- |\n| `tolerance` | 1–1440 minutes, suffix `m` | Maximum tolerated receiver-clock offset in outgoing samples |\n| `publish.interval` | 1 hour–30 days, suffix `h` or `d` | Time between samples |\n| `publish.duration` | 1–365 days, suffix `d` | Schedule duration |\n| `ntp.interval` | 1 hour–365 days, suffix `h` or `d`, or `0` | Hotspot clock refresh cadence; `0` refreshes every sample |\n\n**Response:** `> <value>` with its unit when reading; unset tolerance returns\n`> unset`, and every-sample NTP returns `> 0`. Set returns `OK` or `Err - ...`.\n\n**Restrictions:** Publication interval must not exceed duration. Tolerance must be\nset before publishing. Settings are persistent; NTP interval changes take effect\non the next sample.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L126",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show the action tolerance placed in samples.",
+    "helpSyntax": "get sync.time.tolerance"
+  },
+  {
+    "id": "mobmesh.set.sync.time.tolerance.1e7a7a77",
+    "syntax": "set sync.time.tolerance <N>m",
+    "path": [
+      "set",
+      "sync.time.tolerance"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.time.tolerance"
+      },
+      {
+        "kind": "text",
+        "name": "minutes",
+        "optional": false,
+        "choices": [],
+        "help": "Minutes with m suffix, 1m-1440m"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set sync.time settings",
+    "details": "## get / set sync.time settings\n\n```text\nget sync.time.tolerance\nset sync.time.tolerance <N>m\nget sync.time.publish.interval\nset sync.time.publish.interval <N>h|<N>d\nget sync.time.publish.duration\nset sync.time.publish.duration <N>d\nget sync.time.ntp.interval\nset sync.time.ntp.interval <N>h|<N>d|0\n```\n\n| Setting | Accepted values | Meaning |\n| --- | --- | --- |\n| `tolerance` | 1–1440 minutes, suffix `m` | Maximum tolerated receiver-clock offset in outgoing samples |\n| `publish.interval` | 1 hour–30 days, suffix `h` or `d` | Time between samples |\n| `publish.duration` | 1–365 days, suffix `d` | Schedule duration |\n| `ntp.interval` | 1 hour–365 days, suffix `h` or `d`, or `0` | Hotspot clock refresh cadence; `0` refreshes every sample |\n\n**Response:** `> <value>` with its unit when reading; unset tolerance returns\n`> unset`, and every-sample NTP returns `> 0`. Set returns `OK` or `Err - ...`.\n\n**Restrictions:** Publication interval must not exceed duration. Tolerance must be\nset before publishing. Settings are persistent; NTP interval changes take effect\non the next sample.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L127",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Save the required tolerance, 1–1440 minutes.",
+    "helpSyntax": "set sync.time.tolerance <N>m"
+  },
+  {
+    "id": "mobmesh.get.sync.time.publish.interval.823a18ae",
+    "syntax": "get sync.time.publish.interval",
+    "path": [
+      "get",
+      "sync.time.publish.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.time.publish.interval"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set sync.time settings",
+    "details": "## get / set sync.time settings\n\n```text\nget sync.time.tolerance\nset sync.time.tolerance <N>m\nget sync.time.publish.interval\nset sync.time.publish.interval <N>h|<N>d\nget sync.time.publish.duration\nset sync.time.publish.duration <N>d\nget sync.time.ntp.interval\nset sync.time.ntp.interval <N>h|<N>d|0\n```\n\n| Setting | Accepted values | Meaning |\n| --- | --- | --- |\n| `tolerance` | 1–1440 minutes, suffix `m` | Maximum tolerated receiver-clock offset in outgoing samples |\n| `publish.interval` | 1 hour–30 days, suffix `h` or `d` | Time between samples |\n| `publish.duration` | 1–365 days, suffix `d` | Schedule duration |\n| `ntp.interval` | 1 hour–365 days, suffix `h` or `d`, or `0` | Hotspot clock refresh cadence; `0` refreshes every sample |\n\n**Response:** `> <value>` with its unit when reading; unset tolerance returns\n`> unset`, and every-sample NTP returns `> 0`. Set returns `OK` or `Err - ...`.\n\n**Restrictions:** Publication interval must not exceed duration. Tolerance must be\nset before publishing. Settings are persistent; NTP interval changes take effect\non the next sample.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L128",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show the sample interval.",
+    "helpSyntax": "get sync.time.publish.interval"
+  },
+  {
+    "id": "mobmesh.set.sync.time.publish.interval.3e56d649",
+    "syntax": "set sync.time.publish.interval <N>h|<N>d",
+    "path": [
+      "set",
+      "sync.time.publish.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.time.publish.interval"
+      },
+      {
+        "kind": "text",
+        "name": "interval",
+        "optional": false,
+        "choices": [],
+        "help": "1h-30d with h or d suffix"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set sync.time settings",
+    "details": "## get / set sync.time settings\n\n```text\nget sync.time.tolerance\nset sync.time.tolerance <N>m\nget sync.time.publish.interval\nset sync.time.publish.interval <N>h|<N>d\nget sync.time.publish.duration\nset sync.time.publish.duration <N>d\nget sync.time.ntp.interval\nset sync.time.ntp.interval <N>h|<N>d|0\n```\n\n| Setting | Accepted values | Meaning |\n| --- | --- | --- |\n| `tolerance` | 1–1440 minutes, suffix `m` | Maximum tolerated receiver-clock offset in outgoing samples |\n| `publish.interval` | 1 hour–30 days, suffix `h` or `d` | Time between samples |\n| `publish.duration` | 1–365 days, suffix `d` | Schedule duration |\n| `ntp.interval` | 1 hour–365 days, suffix `h` or `d`, or `0` | Hotspot clock refresh cadence; `0` refreshes every sample |\n\n**Response:** `> <value>` with its unit when reading; unset tolerance returns\n`> unset`, and every-sample NTP returns `> 0`. Set returns `OK` or `Err - ...`.\n\n**Restrictions:** Publication interval must not exceed duration. Tolerance must be\nset before publishing. Settings are persistent; NTP interval changes take effect\non the next sample.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L129",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Save 1 hour–30 days; it must not exceed duration.",
+    "helpSyntax": "set sync.time.publish.interval <N>h|<N>d"
+  },
+  {
+    "id": "mobmesh.get.sync.time.publish.duration.31dd3195",
+    "syntax": "get sync.time.publish.duration",
+    "path": [
+      "get",
+      "sync.time.publish.duration"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.time.publish.duration"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set sync.time settings",
+    "details": "## get / set sync.time settings\n\n```text\nget sync.time.tolerance\nset sync.time.tolerance <N>m\nget sync.time.publish.interval\nset sync.time.publish.interval <N>h|<N>d\nget sync.time.publish.duration\nset sync.time.publish.duration <N>d\nget sync.time.ntp.interval\nset sync.time.ntp.interval <N>h|<N>d|0\n```\n\n| Setting | Accepted values | Meaning |\n| --- | --- | --- |\n| `tolerance` | 1–1440 minutes, suffix `m` | Maximum tolerated receiver-clock offset in outgoing samples |\n| `publish.interval` | 1 hour–30 days, suffix `h` or `d` | Time between samples |\n| `publish.duration` | 1–365 days, suffix `d` | Schedule duration |\n| `ntp.interval` | 1 hour–365 days, suffix `h` or `d`, or `0` | Hotspot clock refresh cadence; `0` refreshes every sample |\n\n**Response:** `> <value>` with its unit when reading; unset tolerance returns\n`> unset`, and every-sample NTP returns `> 0`. Set returns `OK` or `Err - ...`.\n\n**Restrictions:** Publication interval must not exceed duration. Tolerance must be\nset before publishing. Settings are persistent; NTP interval changes take effect\non the next sample.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L130",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show schedule duration.",
+    "helpSyntax": "get sync.time.publish.duration"
+  },
+  {
+    "id": "mobmesh.set.sync.time.publish.duration.27226a6c",
+    "syntax": "set sync.time.publish.duration <N>d",
+    "path": [
+      "set",
+      "sync.time.publish.duration"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.time.publish.duration"
+      },
+      {
+        "kind": "text",
+        "name": "days",
+        "optional": false,
+        "choices": [],
+        "help": "Days with d suffix, 1d-365d"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set sync.time settings",
+    "details": "## get / set sync.time settings\n\n```text\nget sync.time.tolerance\nset sync.time.tolerance <N>m\nget sync.time.publish.interval\nset sync.time.publish.interval <N>h|<N>d\nget sync.time.publish.duration\nset sync.time.publish.duration <N>d\nget sync.time.ntp.interval\nset sync.time.ntp.interval <N>h|<N>d|0\n```\n\n| Setting | Accepted values | Meaning |\n| --- | --- | --- |\n| `tolerance` | 1–1440 minutes, suffix `m` | Maximum tolerated receiver-clock offset in outgoing samples |\n| `publish.interval` | 1 hour–30 days, suffix `h` or `d` | Time between samples |\n| `publish.duration` | 1–365 days, suffix `d` | Schedule duration |\n| `ntp.interval` | 1 hour–365 days, suffix `h` or `d`, or `0` | Hotspot clock refresh cadence; `0` refreshes every sample |\n\n**Response:** `> <value>` with its unit when reading; unset tolerance returns\n`> unset`, and every-sample NTP returns `> 0`. Set returns `OK` or `Err - ...`.\n\n**Restrictions:** Publication interval must not exceed duration. Tolerance must be\nset before publishing. Settings are persistent; NTP interval changes take effect\non the next sample.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L131",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Save 1–365 days.",
+    "helpSyntax": "set sync.time.publish.duration <N>d"
+  },
+  {
+    "id": "mobmesh.get.sync.time.ntp.interval.1462f94e",
+    "syntax": "get sync.time.ntp.interval",
+    "path": [
+      "get",
+      "sync.time.ntp.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.time.ntp.interval"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set sync.time settings",
+    "details": "## get / set sync.time settings\n\n```text\nget sync.time.tolerance\nset sync.time.tolerance <N>m\nget sync.time.publish.interval\nset sync.time.publish.interval <N>h|<N>d\nget sync.time.publish.duration\nset sync.time.publish.duration <N>d\nget sync.time.ntp.interval\nset sync.time.ntp.interval <N>h|<N>d|0\n```\n\n| Setting | Accepted values | Meaning |\n| --- | --- | --- |\n| `tolerance` | 1–1440 minutes, suffix `m` | Maximum tolerated receiver-clock offset in outgoing samples |\n| `publish.interval` | 1 hour–30 days, suffix `h` or `d` | Time between samples |\n| `publish.duration` | 1–365 days, suffix `d` | Schedule duration |\n| `ntp.interval` | 1 hour–365 days, suffix `h` or `d`, or `0` | Hotspot clock refresh cadence; `0` refreshes every sample |\n\n**Response:** `> <value>` with its unit when reading; unset tolerance returns\n`> unset`, and every-sample NTP returns `> 0`. Set returns `OK` or `Err - ...`.\n\n**Restrictions:** Publication interval must not exceed duration. Tolerance must be\nset before publishing. Settings are persistent; NTP interval changes take effect\non the next sample.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L132",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show the publisher's NTP refresh cadence.",
+    "helpSyntax": "get sync.time.ntp.interval"
+  },
+  {
+    "id": "mobmesh.set.sync.time.ntp.interval.d40e78d5",
+    "syntax": "set sync.time.ntp.interval <N>h|<N>d|0",
+    "path": [
+      "set",
+      "sync.time.ntp.interval"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "sync.time.ntp.interval"
+      },
+      {
+        "kind": "text",
+        "name": "interval",
+        "optional": false,
+        "choices": [],
+        "help": "1h-365d with h or d suffix; 0 refreshes every sample"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "get / set sync.time settings",
+    "details": "## get / set sync.time settings\n\n```text\nget sync.time.tolerance\nset sync.time.tolerance <N>m\nget sync.time.publish.interval\nset sync.time.publish.interval <N>h|<N>d\nget sync.time.publish.duration\nset sync.time.publish.duration <N>d\nget sync.time.ntp.interval\nset sync.time.ntp.interval <N>h|<N>d|0\n```\n\n| Setting | Accepted values | Meaning |\n| --- | --- | --- |\n| `tolerance` | 1–1440 minutes, suffix `m` | Maximum tolerated receiver-clock offset in outgoing samples |\n| `publish.interval` | 1 hour–30 days, suffix `h` or `d` | Time between samples |\n| `publish.duration` | 1–365 days, suffix `d` | Schedule duration |\n| `ntp.interval` | 1 hour–365 days, suffix `h` or `d`, or `0` | Hotspot clock refresh cadence; `0` refreshes every sample |\n\n**Response:** `> <value>` with its unit when reading; unset tolerance returns\n`> unset`, and every-sample NTP returns `> 0`. Set returns `OK` or `Err - ...`.\n\n**Restrictions:** Publication interval must not exceed duration. Tolerance must be\nset before publishing. Settings are persistent; NTP interval changes take effect\non the next sample.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L133",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Save 1 hour–365 days, or 0 for every sample.",
+    "helpSyntax": "set sync.time.ntp.interval <N>h|<N>d|0"
+  },
+  {
+    "id": "mobmesh.sync.publisher.list.dbe31264",
+    "syntax": "sync.publisher list [offset]",
+    "path": [
+      "sync.publisher",
+      "list"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.publisher"
+      },
+      {
+        "kind": "literal",
+        "value": "list"
+      },
+      {
+        "kind": "text",
+        "name": "offset",
+        "optional": true,
+        "choices": [],
+        "help": "offset: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.publisher list",
+    "details": "## sync.publisher list\n\n```text\nsync.publisher list [offset]\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `offset` | Zero-based record offset; omitted means zero |\n\n**Response:** Up to two full authorized public keys per reply, separated by spaces,\nor `empty` / `Err - ...`. Increase the offset by the number of keys returned to page.\nRemoved records are retained internally but are not listed.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L153",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "List complete trusted/retained keys; zero-based offset, up to two per reply.",
+    "helpSyntax": "sync.publisher list [offset]"
+  },
+  {
+    "id": "mobmesh.sync.publisher.add.72171ad5",
+    "syntax": "sync.publisher add <full-public-key>",
+    "path": [
+      "sync.publisher",
+      "add"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.publisher"
+      },
+      {
+        "kind": "literal",
+        "value": "add"
+      },
+      {
+        "kind": "text",
+        "name": "full-public-key",
+        "optional": false,
+        "choices": [],
+        "help": "full-public-key: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.publisher add / remove / forget",
+    "details": "## sync.publisher add / remove / forget\n\n```text\nsync.publisher add <full-public-key>\nsync.publisher remove <full-public-key>\nsync.publisher forget <full-public-key>\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `full-public-key` | Exactly 64 hexadecimal characters; prefixes are not accepted |\n\n| Action | Effect |\n| --- | --- |\n| `add` | Authorize a publisher for all included campaign types |\n| `remove` | Revoke authority and cancel inbound work; retain replay history |\n| `forget` | After removal, erase its record and replay history |\n\n**Response:** `OK` or `Err - ...`.\n\n**Storage:** Persistent, with capacity for 16 records including retained removed keys.\n\n**Restrictions:** Forget requires prior removal and can be refused while recovery or\nreplay settlement is pending. It removes protection against previously seen generations.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L167",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Authorize a 64-character hexadecimal public key for all enabled campaign types.",
+    "helpSyntax": "sync.publisher add <full-public-key>"
+  },
+  {
+    "id": "mobmesh.sync.publisher.remove.69a878bb",
+    "syntax": "sync.publisher remove <full-public-key>",
+    "path": [
+      "sync.publisher",
+      "remove"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.publisher"
+      },
+      {
+        "kind": "literal",
+        "value": "remove"
+      },
+      {
+        "kind": "text",
+        "name": "full-public-key",
+        "optional": false,
+        "choices": [],
+        "help": "full-public-key: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.publisher add / remove / forget",
+    "details": "## sync.publisher add / remove / forget\n\n```text\nsync.publisher add <full-public-key>\nsync.publisher remove <full-public-key>\nsync.publisher forget <full-public-key>\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `full-public-key` | Exactly 64 hexadecimal characters; prefixes are not accepted |\n\n| Action | Effect |\n| --- | --- |\n| `add` | Authorize a publisher for all included campaign types |\n| `remove` | Revoke authority and cancel inbound work; retain replay history |\n| `forget` | After removal, erase its record and replay history |\n\n**Response:** `OK` or `Err - ...`.\n\n**Storage:** Persistent, with capacity for 16 records including retained removed keys.\n\n**Restrictions:** Forget requires prior removal and can be refused while recovery or\nreplay settlement is pending. It removes protection against previously seen generations.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L168",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Revoke trust and cancel its inbound work; retain replay history.",
+    "helpSyntax": "sync.publisher remove <full-public-key>"
+  },
+  {
+    "id": "mobmesh.sync.publisher.forget.8fa77640",
+    "syntax": "sync.publisher forget <full-public-key>",
+    "path": [
+      "sync.publisher",
+      "forget"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.publisher"
+      },
+      {
+        "kind": "literal",
+        "value": "forget"
+      },
+      {
+        "kind": "text",
+        "name": "full-public-key",
+        "optional": false,
+        "choices": [],
+        "help": "full-public-key: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.publisher add / remove / forget",
+    "details": "## sync.publisher add / remove / forget\n\n```text\nsync.publisher add <full-public-key>\nsync.publisher remove <full-public-key>\nsync.publisher forget <full-public-key>\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `full-public-key` | Exactly 64 hexadecimal characters; prefixes are not accepted |\n\n| Action | Effect |\n| --- | --- |\n| `add` | Authorize a publisher for all included campaign types |\n| `remove` | Revoke authority and cancel inbound work; retain replay history |\n| `forget` | After removal, erase its record and replay history |\n\n**Response:** `OK` or `Err - ...`.\n\n**Storage:** Persistent, with capacity for 16 records including retained removed keys.\n\n**Restrictions:** Forget requires prior removal and can be refused while recovery or\nreplay settlement is pending. It removes protection against previously seen generations.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L169",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "After removal, erase the record and replay history.",
+    "helpSyntax": "sync.publisher forget <full-public-key>"
+  },
+  {
+    "id": "mobmesh.sync.region.ee961f3e",
+    "syntax": "sync.region [offset]",
+    "path": [
+      "sync.region"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "text",
+        "name": "offset",
+        "optional": true,
+        "choices": [],
+        "help": "offset: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region",
+    "details": "## sync.region\n\n```text\nsync.region [offset]\n```\n\n**Parameter:** Zero-based offset; omitted means zero.\n\n**Response:** Indented region tree with `F` for flood-enabled entries and a\n`next <offset>` line when more entries remain; `empty` or `Err - ...` otherwise.\n\n**Scope:** Reads the RAM overlay, separate from the native MeshCore region list.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L192",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show the RAM overlay as an indented tree; use the final next offset for another page.",
+    "helpSyntax": "sync.region [offset]"
+  },
+  {
+    "id": "mobmesh.sync.region.put.2e225c5c",
+    "syntax": "sync.region put <name> [<parent>]",
+    "path": [
+      "sync.region",
+      "put"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "put"
+      },
+      {
+        "kind": "text",
+        "name": "name",
+        "optional": false,
+        "choices": [],
+        "help": "name: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "parent",
+        "optional": true,
+        "choices": [],
+        "help": "parent: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region put",
+    "details": "## sync.region put\n\n```text\nsync.region put <name> [<parent>]\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `name` | Region name, at most 30 bytes; must satisfy native region-name rules |\n| `parent` | Existing parent name; omission selects top level |\n\n**Response:** `OK` or `Err - ...`.\n\n**Effect:** Adds or updates a flood-enabled entry in RAM. Requires `sync.region save`\nfor persistence. Invalid hierarchy or exhausted capacity is refused.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L205",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Add or update a flood-enabled entry; parent must already exist.",
+    "helpSyntax": "sync.region put <name> [<parent>]"
+  },
+  {
+    "id": "mobmesh.sync.region.def.e61cd217",
+    "syntax": "sync.region def <token> [<token> ...]",
+    "path": [
+      "sync.region",
+      "def"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "def"
+      },
+      {
+        "kind": "tail",
+        "name": "token ...",
+        "optional": false,
+        "choices": [],
+        "help": "One or more region-definition tokens, space separated"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region def",
+    "details": "## sync.region def\n\n```text\nsync.region def <token> [<token> ...]\n```\n\n**Parameter:** MeshCore-style region hierarchy tokens. Each token descends one level; a\n`|parent` or `,parent` suffix selects the next parent. For example,\n`us us-al|us us-fl` defines `us` with children `us-al` and `us-fl`.\n\n**Response:** `OK` or `Err - ...`.\n\n**Effect:** Defines the working overlay in RAM. Requires `sync.region save` for persistence.\nInvalid names or hierarchy and exhausted capacity are refused.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L221",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Load compact MeshCore-style hierarchy notation into RAM.",
+    "helpSyntax": "sync.region def <token> [<token> ...]"
+  },
+  {
+    "id": "mobmesh.sync.region.allowf.27eae470",
+    "syntax": "sync.region allowf <name>",
+    "path": [
+      "sync.region",
+      "allowf"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "allowf"
+      },
+      {
+        "kind": "text",
+        "name": "name",
+        "optional": false,
+        "choices": [],
+        "help": "name: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region allowf / denyf / remove",
+    "details": "## sync.region allowf / denyf / remove\n\n```text\nsync.region allowf <name>\nsync.region denyf <name>\nsync.region remove <name>\n```\n\n| Action | Effect |\n| --- | --- |\n| `allowf` | Enable flooding for an existing entry |\n| `denyf` | Disable flooding for an existing entry |\n| `remove` | Remove an entry; children must be removed first |\n\n**Response:** `OK`, `OK - accepted; save required` for deferred remote destructive\nedits, or `Err - ...`.\n\n**Storage:** RAM only until saved. Destructive remote edits take effect after the\nreply is queued. Further edits can be refused while an earlier edit is pending.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L236",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Flood-enable an existing overlay entry.",
+    "helpSyntax": "sync.region allowf <name>"
+  },
+  {
+    "id": "mobmesh.sync.region.denyf.f450b654",
+    "syntax": "sync.region denyf <name>",
+    "path": [
+      "sync.region",
+      "denyf"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "denyf"
+      },
+      {
+        "kind": "text",
+        "name": "name",
+        "optional": false,
+        "choices": [],
+        "help": "name: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region allowf / denyf / remove",
+    "details": "## sync.region allowf / denyf / remove\n\n```text\nsync.region allowf <name>\nsync.region denyf <name>\nsync.region remove <name>\n```\n\n| Action | Effect |\n| --- | --- |\n| `allowf` | Enable flooding for an existing entry |\n| `denyf` | Disable flooding for an existing entry |\n| `remove` | Remove an entry; children must be removed first |\n\n**Response:** `OK`, `OK - accepted; save required` for deferred remote destructive\nedits, or `Err - ...`.\n\n**Storage:** RAM only until saved. Destructive remote edits take effect after the\nreply is queued. Further edits can be refused while an earlier edit is pending.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L237",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Flood-deny an existing overlay entry.",
+    "helpSyntax": "sync.region denyf <name>"
+  },
+  {
+    "id": "mobmesh.sync.region.remove.fbd55ef2",
+    "syntax": "sync.region remove <name>",
+    "path": [
+      "sync.region",
+      "remove"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "remove"
+      },
+      {
+        "kind": "text",
+        "name": "name",
+        "optional": false,
+        "choices": [],
+        "help": "name: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region allowf / denyf / remove",
+    "details": "## sync.region allowf / denyf / remove\n\n```text\nsync.region allowf <name>\nsync.region denyf <name>\nsync.region remove <name>\n```\n\n| Action | Effect |\n| --- | --- |\n| `allowf` | Enable flooding for an existing entry |\n| `denyf` | Disable flooding for an existing entry |\n| `remove` | Remove an entry; children must be removed first |\n\n**Response:** `OK`, `OK - accepted; save required` for deferred remote destructive\nedits, or `Err - ...`.\n\n**Storage:** RAM only until saved. Destructive remote edits take effect after the\nreply is queued. Further edits can be refused while an earlier edit is pending.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L238",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Remove an entry; children must be removed first.",
+    "helpSyntax": "sync.region remove <name>"
+  },
+  {
+    "id": "mobmesh.sync.region.save.4996dd08",
+    "syntax": "sync.region save",
+    "path": [
+      "sync.region",
+      "save"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "save"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region save / clear / reload",
+    "details": "## sync.region save / clear / reload\n\n```text\nsync.region save\nsync.region clear\nsync.region reload\n```\n\n| Action | Effect | Successful response |\n| --- | --- | --- |\n| `save` | Persist RAM edits | `OK` or `OK - campaigns may overwrite` |\n| `clear` | Empty RAM overlay; save separately to persist | `OK - save required`, or `OK - accepted; save required` remotely |\n| `reload` | Discard RAM edits and load saved overlay | `OK` or `OK - accepted`; may include a degraded-storage indication |\n\n**Errors:** `Err - ...`, including pending edits, receipt settlement, and storage failures.\nIncoming campaigns can replace a saved overlay when region sync is on.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L256",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Persist RAM edits; incoming campaigns may later replace them.",
+    "helpSyntax": "sync.region save"
+  },
+  {
+    "id": "mobmesh.sync.region.clear.c8efea0f",
+    "syntax": "sync.region clear",
+    "path": [
+      "sync.region",
+      "clear"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "clear"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region save / clear / reload",
+    "details": "## sync.region save / clear / reload\n\n```text\nsync.region save\nsync.region clear\nsync.region reload\n```\n\n| Action | Effect | Successful response |\n| --- | --- | --- |\n| `save` | Persist RAM edits | `OK` or `OK - campaigns may overwrite` |\n| `clear` | Empty RAM overlay; save separately to persist | `OK - save required`, or `OK - accepted; save required` remotely |\n| `reload` | Discard RAM edits and load saved overlay | `OK` or `OK - accepted`; may include a degraded-storage indication |\n\n**Errors:** `Err - ...`, including pending edits, receipt settlement, and storage failures.\nIncoming campaigns can replace a saved overlay when region sync is on.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L257",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Empty RAM only; follow with save to persist.",
+    "helpSyntax": "sync.region clear"
+  },
+  {
+    "id": "mobmesh.sync.region.reload.534fc6ab",
+    "syntax": "sync.region reload",
+    "path": [
+      "sync.region",
+      "reload"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "reload"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region save / clear / reload",
+    "details": "## sync.region save / clear / reload\n\n```text\nsync.region save\nsync.region clear\nsync.region reload\n```\n\n| Action | Effect | Successful response |\n| --- | --- | --- |\n| `save` | Persist RAM edits | `OK` or `OK - campaigns may overwrite` |\n| `clear` | Empty RAM overlay; save separately to persist | `OK - save required`, or `OK - accepted; save required` remotely |\n| `reload` | Discard RAM edits and load saved overlay | `OK` or `OK - accepted`; may include a degraded-storage indication |\n\n**Errors:** `Err - ...`, including pending edits, receipt settlement, and storage failures.\nIncoming campaigns can replace a saved overlay when region sync is on.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L258",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Discard RAM edits and reload the saved overlay.",
+    "helpSyntax": "sync.region reload"
+  },
+  {
+    "id": "mobmesh.sync.region.253d57c6",
+    "syntax": "sync.region <on|off>",
+    "path": [
+      "sync.region"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync subscriptions",
+    "details": "## sync subscriptions\n\n```text\nsync.region <on|off>\nsync.policy <on|off>\nsync.radio <on|off>\nsync.time <on|off>\n```\n\n**Response:** `OK` or `Err - ...`. Region/policy off can return\n`OK - off until reboot; storage failed` when the runtime change could not be persisted.\n\n| Type | Prerequisite for `on` | Effect of `off` |\n| --- | --- | --- |\n| Region | Saved channel | Stop reception and overlay routing; retain saved overlay |\n| Policy | Saved channel | Stop reception; retain applied policy |\n| Radio | Saved channel and trusted publisher | Stop reception and cancel pending received migration before commit |\n| Time | Saved channel | Stop accepting samples; retain clock and local publish schedule |\n\n**Storage:** Enable states are persistent when saved successfully.\n\n**Restrictions:** Radio off refuses during a local publication or durable commit;\nuse `sync.radio publish.abort` for a local migration. Trust is still required for\naccepting signed campaigns even where `on` does not require a populated trust list.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L288",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Enable or disable campaign acceptance and overlay participation.",
+    "helpSyntax": "sync.region <on|off>"
+  },
+  {
+    "id": "mobmesh.sync.policy.1e577a0f",
+    "syntax": "sync.policy <on|off>",
+    "path": [
+      "sync.policy"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.policy"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync subscriptions",
+    "details": "## sync subscriptions\n\n```text\nsync.region <on|off>\nsync.policy <on|off>\nsync.radio <on|off>\nsync.time <on|off>\n```\n\n**Response:** `OK` or `Err - ...`. Region/policy off can return\n`OK - off until reboot; storage failed` when the runtime change could not be persisted.\n\n| Type | Prerequisite for `on` | Effect of `off` |\n| --- | --- | --- |\n| Region | Saved channel | Stop reception and overlay routing; retain saved overlay |\n| Policy | Saved channel | Stop reception; retain applied policy |\n| Radio | Saved channel and trusted publisher | Stop reception and cancel pending received migration before commit |\n| Time | Saved channel | Stop accepting samples; retain clock and local publish schedule |\n\n**Storage:** Enable states are persistent when saved successfully.\n\n**Restrictions:** Radio off refuses during a local publication or durable commit;\nuse `sync.radio publish.abort` for a local migration. Trust is still required for\naccepting signed campaigns even where `on` does not require a populated trust list.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L289",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Enable or disable future policy acceptance; applied settings remain.",
+    "helpSyntax": "sync.policy <on|off>"
+  },
+  {
+    "id": "mobmesh.sync.radio.e390f5bf",
+    "syntax": "sync.radio <on|off>",
+    "path": [
+      "sync.radio"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.radio"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync subscriptions",
+    "details": "## sync subscriptions\n\n```text\nsync.region <on|off>\nsync.policy <on|off>\nsync.radio <on|off>\nsync.time <on|off>\n```\n\n**Response:** `OK` or `Err - ...`. Region/policy off can return\n`OK - off until reboot; storage failed` when the runtime change could not be persisted.\n\n| Type | Prerequisite for `on` | Effect of `off` |\n| --- | --- | --- |\n| Region | Saved channel | Stop reception and overlay routing; retain saved overlay |\n| Policy | Saved channel | Stop reception; retain applied policy |\n| Radio | Saved channel and trusted publisher | Stop reception and cancel pending received migration before commit |\n| Time | Saved channel | Stop accepting samples; retain clock and local publish schedule |\n\n**Storage:** Enable states are persistent when saved successfully.\n\n**Restrictions:** Radio off refuses during a local publication or durable commit;\nuse `sync.radio publish.abort` for a local migration. Trust is still required for\naccepting signed campaigns even where `on` does not require a populated trust list.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L290",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Enable or disable radio plans; enable requires a channel and trusted publisher.",
+    "helpSyntax": "sync.radio <on|off>"
+  },
+  {
+    "id": "mobmesh.sync.time.a58a2a17",
+    "syntax": "sync.time <on|off>",
+    "path": [
+      "sync.time"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.time"
+      },
+      {
+        "kind": "enum",
+        "name": "on|off",
+        "optional": false,
+        "choices": [
+          "on",
+          "off"
+        ],
+        "help": "on|off: exact firmware choices"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync subscriptions",
+    "details": "## sync subscriptions\n\n```text\nsync.region <on|off>\nsync.policy <on|off>\nsync.radio <on|off>\nsync.time <on|off>\n```\n\n**Response:** `OK` or `Err - ...`. Region/policy off can return\n`OK - off until reboot; storage failed` when the runtime change could not be persisted.\n\n| Type | Prerequisite for `on` | Effect of `off` |\n| --- | --- | --- |\n| Region | Saved channel | Stop reception and overlay routing; retain saved overlay |\n| Policy | Saved channel | Stop reception; retain applied policy |\n| Radio | Saved channel and trusted publisher | Stop reception and cancel pending received migration before commit |\n| Time | Saved channel | Stop accepting samples; retain clock and local publish schedule |\n\n**Storage:** Enable states are persistent when saved successfully.\n\n**Restrictions:** Radio off refuses during a local publication or durable commit;\nuse `sync.radio publish.abort` for a local migration. Trust is still required for\naccepting signed campaigns even where `on` does not require a populated trust list.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L291",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Enable or disable trusted time samples.",
+    "helpSyntax": "sync.time <on|off>"
+  },
+  {
+    "id": "mobmesh.sync.region.publish.ffdf1592",
+    "syntax": "sync.region publish <region|*> <channel> [-empty] [-raw]",
+    "path": [
+      "sync.region",
+      "publish"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "publish"
+      },
+      {
+        "kind": "text",
+        "name": "region|*",
+        "optional": false,
+        "choices": [],
+        "help": "region|*: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "channel",
+        "optional": false,
+        "choices": [],
+        "help": "channel: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "-empty",
+        "optional": true,
+        "choices": [
+          "-empty"
+        ],
+        "help": "-empty: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "-raw",
+        "optional": true,
+        "choices": [
+          "-raw"
+        ],
+        "help": "-raw: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region / sync.policy publish",
+    "details": "## sync.region / sync.policy publish\n\n```text\nsync.region publish <region|*> <channel> [-empty] [-raw]\nsync.policy publish <region|*> <channel> [-raw]\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `region` | Defined, flood-enabled scope |\n| `*` | Unscoped publication |\n| `channel` | Target receive channel, 1–16 letters, digits, `-`, or `_` |\n| `-empty` | Region only: explicitly allow an empty overlay |\n| `-raw` | Force uncompressed data for this campaign |\n\n**Response:** `OK - ...` describing the captured format, size, and frames, or `Err - ...`.\n\n**Effect:** Signs and broadcasts a snapshot in repeated rounds. Later local edits do\nnot change it. Region captures the working overlay; policy captures selected native settings.\n\n**Restrictions:** Requires valid routing, identity, storage, and clock. Campaign\nlocks or pending recovery can refuse publication. Publishing does not require the\nlocal receive subscription to be on.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L313",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Publish the captured overlay; -empty confirms a clear and -raw disables compression.",
+    "helpSyntax": "sync.region publish <region|*> <channel> [-empty] [-raw]"
+  },
+  {
+    "id": "mobmesh.sync.policy.publish.82b89c07",
+    "syntax": "sync.policy publish <region|*> <channel> [-raw]",
+    "path": [
+      "sync.policy",
+      "publish"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.policy"
+      },
+      {
+        "kind": "literal",
+        "value": "publish"
+      },
+      {
+        "kind": "text",
+        "name": "region|*",
+        "optional": false,
+        "choices": [],
+        "help": "region|*: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "channel",
+        "optional": false,
+        "choices": [],
+        "help": "channel: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "-raw",
+        "optional": true,
+        "choices": [
+          "-raw"
+        ],
+        "help": "-raw: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region / sync.policy publish",
+    "details": "## sync.region / sync.policy publish\n\n```text\nsync.region publish <region|*> <channel> [-empty] [-raw]\nsync.policy publish <region|*> <channel> [-raw]\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `region` | Defined, flood-enabled scope |\n| `*` | Unscoped publication |\n| `channel` | Target receive channel, 1–16 letters, digits, `-`, or `_` |\n| `-empty` | Region only: explicitly allow an empty overlay |\n| `-raw` | Force uncompressed data for this campaign |\n\n**Response:** `OK - ...` describing the captured format, size, and frames, or `Err - ...`.\n\n**Effect:** Signs and broadcasts a snapshot in repeated rounds. Later local edits do\nnot change it. Region captures the working overlay; policy captures selected native settings.\n\n**Restrictions:** Requires valid routing, identity, storage, and clock. Campaign\nlocks or pending recovery can refuse publication. Publishing does not require the\nlocal receive subscription to be on.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L314",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Publish the current selected native policy values.",
+    "helpSyntax": "sync.policy publish <region|*> <channel> [-raw]"
+  },
+  {
+    "id": "mobmesh.sync.region.publish.reset.cfabf499",
+    "syntax": "sync.region publish.reset <region|*> <channel> [-empty] [-raw]",
+    "path": [
+      "sync.region",
+      "publish.reset"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.reset"
+      },
+      {
+        "kind": "text",
+        "name": "region|*",
+        "optional": false,
+        "choices": [],
+        "help": "region|*: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "channel",
+        "optional": false,
+        "choices": [],
+        "help": "channel: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "-empty",
+        "optional": true,
+        "choices": [
+          "-empty"
+        ],
+        "help": "-empty: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "-raw",
+        "optional": true,
+        "choices": [
+          "-raw"
+        ],
+        "help": "-raw: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region / sync.policy publish.reset",
+    "details": "## sync.region / sync.policy publish.reset\n\n```text\nsync.region publish.reset <region|*> <channel> [-empty] [-raw]\nsync.policy publish.reset <region|*> <channel> [-raw]\n```\n\n**Parameters / response:** Same as the corresponding `publish` command.\n\n**Effect:** Publishes generation-history recovery when a normal campaign is blocked\nby incorrectly advanced history. This is an exceptional recovery operation.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L337",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Publish exceptional generation-history recovery.",
+    "helpSyntax": "sync.region publish.reset <region|*> <channel> [-empty] [-raw]"
+  },
+  {
+    "id": "mobmesh.sync.policy.publish.reset.a11e674f",
+    "syntax": "sync.policy publish.reset <region|*> <channel> [-raw]",
+    "path": [
+      "sync.policy",
+      "publish.reset"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.policy"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.reset"
+      },
+      {
+        "kind": "text",
+        "name": "region|*",
+        "optional": false,
+        "choices": [],
+        "help": "region|*: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "channel",
+        "optional": false,
+        "choices": [],
+        "help": "channel: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "-raw",
+        "optional": true,
+        "choices": [
+          "-raw"
+        ],
+        "help": "-raw: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region / sync.policy publish.reset",
+    "details": "## sync.region / sync.policy publish.reset\n\n```text\nsync.region publish.reset <region|*> <channel> [-empty] [-raw]\nsync.policy publish.reset <region|*> <channel> [-raw]\n```\n\n**Parameters / response:** Same as the corresponding `publish` command.\n\n**Effect:** Publishes generation-history recovery when a normal campaign is blocked\nby incorrectly advanced history. This is an exceptional recovery operation.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L338",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Publish exceptional generation-history recovery.",
+    "helpSyntax": "sync.policy publish.reset <region|*> <channel> [-raw]"
+  },
+  {
+    "id": "mobmesh.sync.region.publish.abort.5cecdfbb",
+    "syntax": "sync.region publish.abort",
+    "path": [
+      "sync.region",
+      "publish.abort"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.abort"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region / sync.policy publish.abort",
+    "details": "## sync.region / sync.policy publish.abort\n\n```text\nsync.region publish.abort\nsync.policy publish.abort\n```\n\n**Response:** `OK - aborting` for outbound work, `OK` for inbound cancellation,\nor `Err - ...` such as `Err - no campaign`.\n\n**Effect:** Stops local outbound work first; otherwise cancels incomplete reception.\nAn already-applied dataset remains in place. Replacing it requires a new campaign.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L349",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage sync region publish abort."
+  },
+  {
+    "id": "mobmesh.sync.policy.publish.abort.82c014b1",
+    "syntax": "sync.policy publish.abort",
+    "path": [
+      "sync.policy",
+      "publish.abort"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.policy"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.abort"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region / sync.policy publish.abort",
+    "details": "## sync.region / sync.policy publish.abort\n\n```text\nsync.region publish.abort\nsync.policy publish.abort\n```\n\n**Response:** `OK - aborting` for outbound work, `OK` for inbound cancellation,\nor `Err - ...` such as `Err - no campaign`.\n\n**Effect:** Stops local outbound work first; otherwise cancels incomplete reception.\nAn already-applied dataset remains in place. Replacing it requires a new campaign.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L350",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage sync policy publish abort."
+  },
+  {
+    "id": "mobmesh.sync.region.publish.report.79fd2839",
+    "syntax": "sync.region publish.report [page]",
+    "path": [
+      "sync.region",
+      "publish.report"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.report"
+      },
+      {
+        "kind": "number",
+        "name": "page",
+        "optional": true,
+        "choices": [],
+        "help": "page: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region / sync.policy publish.report",
+    "details": "## sync.region / sync.policy publish.report\n\n```text\nsync.region publish.report [page]\nsync.policy publish.report [page]\n```\n\n**Parameter:** One-based page; omission selects the first report.\n\n**Response format:** `page:<page>/<count> gen:<generation> result:<outcome>`;\nabort warnings use `kind:abort` with deadline fields. Hop tallies may be appended.\nNo reports returns `empty`; invalid pages or storage return `Err - ...`.\n\n**Scope:** Local outcomes and warnings, not acknowledgements from every receiver.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L397",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage sync region publish report."
+  },
+  {
+    "id": "mobmesh.sync.policy.publish.report.8c3a4ae9",
+    "syntax": "sync.policy publish.report [page]",
+    "path": [
+      "sync.policy",
+      "publish.report"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.policy"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.report"
+      },
+      {
+        "kind": "number",
+        "name": "page",
+        "optional": true,
+        "choices": [],
+        "help": "page: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.region / sync.policy publish.report",
+    "details": "## sync.region / sync.policy publish.report\n\n```text\nsync.region publish.report [page]\nsync.policy publish.report [page]\n```\n\n**Parameter:** One-based page; omission selects the first report.\n\n**Response format:** `page:<page>/<count> gen:<generation> result:<outcome>`;\nabort warnings use `kind:abort` with deadline fields. Hop tallies may be appended.\nNo reports returns `empty`; invalid pages or storage return `Err - ...`.\n\n**Scope:** Local outcomes and warnings, not acknowledgements from every receiver.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L398",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage sync policy publish report."
+  },
+  {
+    "id": "mobmesh.sync.radio.publish.arm.abfb0994",
+    "syntax": "sync.radio publish.arm <region|*> <channel> <freq>,<bw>,<sf>,<cr> [@UTC]",
+    "path": [
+      "sync.radio",
+      "publish.arm"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.radio"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.arm"
+      },
+      {
+        "kind": "text",
+        "name": "region|*",
+        "optional": false,
+        "choices": [],
+        "help": "region|*: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "channel",
+        "optional": false,
+        "choices": [],
+        "help": "channel: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "number",
+        "name": "freq",
+        "optional": false,
+        "choices": [],
+        "help": "freq: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "bw",
+        "optional": false,
+        "choices": [],
+        "help": "bw: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "sf",
+        "optional": false,
+        "choices": [],
+        "help": "sf: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "cr",
+        "optional": false,
+        "choices": [],
+        "help": "cr: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "@UTC",
+        "optional": true,
+        "choices": [],
+        "help": "@UTC: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.radio publish.arm / publish.go",
+    "details": "## sync.radio publish.arm / publish.go\n\n```text\nsync.radio publish.arm <region|*> <channel> <freq>,<bw>,<sf>,<cr> [@UTC]\nsync.radio publish.go <region|*> <channel> <freq>,<bw>,<sf>,<cr> [@UTC]\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `region` / `*` | Defined flood-enabled scope, or unscoped |\n| `channel` | Target subscription channel |\n| `freq`, `bw` | Frequency in MHz and bandwidth in kHz |\n| `sf`, `cr` | Native spreading factor and coding rate; CR `0` preserves each node's coding rate |\n| `@UTC` | Optional cutover time, `@YYYY-MM-DDTHH:MMZ`; otherwise launch time plus schedule duration |\n\n| Action | Successful response | Effect |\n| --- | --- | --- |\n| `publish.arm` | `OK - armed <scope> <radio\\|cr keep> in <minutes>m`, or `... T <epoch>` | Validate and retain a RAM-only arm |\n| `publish.go` | `OK - migration <id> T <epoch>` | Launch the exact armed plan |\n\n**Restrictions:** Arm expires after six hours or reboot. Go must match the armed\nroute, channel, radio values, timing mode, and schedule. Valid clock, identity, and\nnative radio state are required. Active campaign work can lock migration.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L412",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Validate and preview; the RAM-only arm expires after six hours.",
+    "helpSyntax": "sync.radio publish.arm <region|*> <channel> <freq>,<bw>,<sf>,<cr> [@UTC]"
+  },
+  {
+    "id": "mobmesh.sync.radio.publish.go.118639cf",
+    "syntax": "sync.radio publish.go <region|*> <channel> <freq>,<bw>,<sf>,<cr> [@UTC]",
+    "path": [
+      "sync.radio",
+      "publish.go"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.radio"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.go"
+      },
+      {
+        "kind": "text",
+        "name": "region|*",
+        "optional": false,
+        "choices": [],
+        "help": "region|*: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "channel",
+        "optional": false,
+        "choices": [],
+        "help": "channel: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "number",
+        "name": "freq",
+        "optional": false,
+        "choices": [],
+        "help": "freq: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "bw",
+        "optional": false,
+        "choices": [],
+        "help": "bw: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "sf",
+        "optional": false,
+        "choices": [],
+        "help": "sf: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "cr",
+        "optional": false,
+        "choices": [],
+        "help": "cr: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "@UTC",
+        "optional": true,
+        "choices": [],
+        "help": "@UTC: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.radio publish.arm / publish.go",
+    "details": "## sync.radio publish.arm / publish.go\n\n```text\nsync.radio publish.arm <region|*> <channel> <freq>,<bw>,<sf>,<cr> [@UTC]\nsync.radio publish.go <region|*> <channel> <freq>,<bw>,<sf>,<cr> [@UTC]\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `region` / `*` | Defined flood-enabled scope, or unscoped |\n| `channel` | Target subscription channel |\n| `freq`, `bw` | Frequency in MHz and bandwidth in kHz |\n| `sf`, `cr` | Native spreading factor and coding rate; CR `0` preserves each node's coding rate |\n| `@UTC` | Optional cutover time, `@YYYY-MM-DDTHH:MMZ`; otherwise launch time plus schedule duration |\n\n| Action | Successful response | Effect |\n| --- | --- | --- |\n| `publish.arm` | `OK - armed <scope> <radio\\|cr keep> in <minutes>m`, or `... T <epoch>` | Validate and retain a RAM-only arm |\n| `publish.go` | `OK - migration <id> T <epoch>` | Launch the exact armed plan |\n\n**Restrictions:** Arm expires after six hours or reboot. Go must match the armed\nroute, channel, radio values, timing mode, and schedule. Valid clock, identity, and\nnative radio state are required. Active campaign work can lock migration.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L413",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Launch only when it exactly matches the arm.",
+    "helpSyntax": "sync.radio publish.go <region|*> <channel> <freq>,<bw>,<sf>,<cr> [@UTC]"
+  },
+  {
+    "id": "mobmesh.sync.radio.publish.abort.97b7c687",
+    "syntax": "sync.radio publish.abort",
+    "path": [
+      "sync.radio",
+      "publish.abort"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.radio"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.abort"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.radio publish.abort",
+    "details": "## sync.radio publish.abort\n\n```text\nsync.radio publish.abort\n```\n\n**Response:** `OK` or `Err - ...`, including no campaign or a commit that is too late to cancel.\n\n**Effect:** Cancels local publication or received migration before durable commit,\nreturning to the original radio configuration. Does not undo a committed migration.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L436",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Cancel a pending publish or received migration before durable commit.",
+    "helpSyntax": "sync.radio publish.abort"
+  },
+  {
+    "id": "mobmesh.sync.radio.publish.report.2788253e",
+    "syntax": "sync.radio publish.report [page]",
+    "path": [
+      "sync.radio",
+      "publish.report"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.radio"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.report"
+      },
+      {
+        "kind": "number",
+        "name": "page",
+        "optional": true,
+        "choices": [],
+        "help": "page: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.radio publish.report",
+    "details": "## sync.radio publish.report\n\n```text\nsync.radio publish.report [page]\n```\n\n**Parameter:** Page 1; omitted means the first page.\n\n**Response:** `1/1 migration <id> <result>`, `empty`, or `Err - ...`.\n\n| Result | Meaning |\n| --- | --- |\n| `committed` | New radio configuration accepted |\n| `identical` | Target configuration was already in effect |\n| `cr-only` | Coding-rate-only result |\n| `fallback` | Returned to original configuration |\n| `aborted` | Migration cancelled |\n| `fault` | Migration failed |\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L465",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show committed, identical, cr-only, fallback, aborted, or fault.",
+    "helpSyntax": "sync.radio publish.report [page]"
+  },
+  {
+    "id": "mobmesh.sync.time.publish.c8c05235",
+    "syntax": "sync.time publish <region|*> <channel>",
+    "path": [
+      "sync.time",
+      "publish"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.time"
+      },
+      {
+        "kind": "literal",
+        "value": "publish"
+      },
+      {
+        "kind": "text",
+        "name": "region|*",
+        "optional": false,
+        "choices": [],
+        "help": "region|*: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "text",
+        "name": "channel",
+        "optional": false,
+        "choices": [],
+        "help": "channel: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.time publish",
+    "details": "## sync.time publish\n\n```text\nsync.time publish <region|*> <channel>\n```\n\n**Parameters:** Defined flood-enabled region or `*`, and target receive channel.\n\n**Response:** `OK - every <interval> until <epoch>` or `Err - ...`.\n\n**Effect:** Starts a persistent publication schedule using saved tolerance, interval,\nand duration. Each publication sends one signed time sample.\n\n**Restrictions:** Requires set tolerance, sane clock, valid schedule, identity, and\nroute. An active schedule must be aborted before replacing it. WAN/NTP refresh\nrequires hotspot-ota and a proven WiFi setup; see [time campaigns](time.md).\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L484",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Start a persistent signed time-sample schedule.",
+    "helpSyntax": "sync.time publish <region|*> <channel>"
+  },
+  {
+    "id": "mobmesh.sync.time.publish.abort.af1a36b0",
+    "syntax": "sync.time publish.abort",
+    "path": [
+      "sync.time",
+      "publish.abort"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.time"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.abort"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "sync.time publish.abort",
+    "details": "## sync.time publish.abort\n\n```text\nsync.time publish.abort\n```\n\n**Response:** `OK`, `Err - no schedule`, or `Err - storage`.\n\n**Effect:** Stops this node's future samples. Already accepted receiver-clock\ncorrections remain in place. Does not change the receive subscription.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L501",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Stop future samples locally; previously accepted corrections stand.",
+    "helpSyntax": "sync.time publish.abort"
+  },
+  {
+    "id": "mobmesh.sync.policy.421cfae5",
+    "syntax": "sync.policy",
+    "path": [
+      "sync.policy"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.policy"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "Command/status section",
+    "details": "## sync.policy\n\n```text\nsync.policy\n```\n\n**Response format:**\n\n```text\nflood:<all>/<unscoped>/<advert> adv:<local>m/<flood>h path:<mode> loop:<value> ack:<value> gate:<value> af:<factor> tx:<factor> agc:<seconds>s\n```\n\n**Effect:** Read-only view of selected native policy values and `repeat.gate`.\nStorage or unavailable native-policy errors return `Err - ...`.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L273",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Enable or disable future policy acceptance; applied settings remain.",
+    "helpSyntax": "sync.policy <on|off>"
+  },
+  {
+    "id": "mobmesh.sync.region.publish.status.ef4a236a",
+    "syntax": "sync.region publish.status",
+    "path": [
+      "sync.region",
+      "publish.status"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.status"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "Command/status section",
+    "details": "## sync.region / sync.policy publish.status\n\n```text\nsync.region publish.status\nsync.policy publish.status\n```\n\n**Response format:** Four lines, or `fault storage`.\n\n```text\nsync:<on|off> step:<activity>\ngen:<generation|-> tout:<minutes|-> lock:<minutes|->\nregn:<scope|-> chnl:<channel|->\nrpts:<count> ERR:<count>\n```\n\nRegion status also includes `layr:<state>`. Activity includes `publishing`, `aborting`,\n`receiving`, `staged`, `quiet`, `idle`, and policy-only `recovering`.\nPublication includes `rnd:<done>/<total>`; reception includes `chnk:<received>/<total>`.\n`rpts` counts reports; `ERR` counts current errors.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L362",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage sync region publish status."
+  },
+  {
+    "id": "mobmesh.sync.policy.publish.status.718dc7df",
+    "syntax": "sync.policy publish.status",
+    "path": [
+      "sync.policy",
+      "publish.status"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.policy"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.status"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "Command/status section",
+    "details": "## sync.region / sync.policy publish.status\n\n```text\nsync.region publish.status\nsync.policy publish.status\n```\n\n**Response format:** Four lines, or `fault storage`.\n\n```text\nsync:<on|off> step:<activity>\ngen:<generation|-> tout:<minutes|-> lock:<minutes|->\nregn:<scope|-> chnl:<channel|->\nrpts:<count> ERR:<count>\n```\n\nRegion status also includes `layr:<state>`. Activity includes `publishing`, `aborting`,\n`receiving`, `staged`, `quiet`, `idle`, and policy-only `recovering`.\nPublication includes `rnd:<done>/<total>`; reception includes `chnk:<received>/<total>`.\n`rpts` counts reports; `ERR` counts current errors.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L363",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage sync policy publish status."
+  },
+  {
+    "id": "mobmesh.sync.region.publish.status.err.d3ee55d3",
+    "syntax": "sync.region publish.status.err [page]",
+    "path": [
+      "sync.region",
+      "publish.status.err"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.region"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.status.err"
+      },
+      {
+        "kind": "number",
+        "name": "page",
+        "optional": true,
+        "choices": [],
+        "help": "page: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "Command/status section",
+    "details": "## sync.region / sync.policy publish.status.err\n\n```text\nsync.region publish.status.err [page]\nsync.policy publish.status.err [page]\n```\n\n**Parameter:** One-based page; omission selects the first error.\n\n**Response:** `<page>/<count> [<token>] <detail>`, `empty`, `fault storage`,\n`Err - page`, or `Err - page range`.\n\n**Scope:** Current faults, separate from completed-campaign reports.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L383",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage sync region publish status err."
+  },
+  {
+    "id": "mobmesh.sync.policy.publish.status.err.5572df0b",
+    "syntax": "sync.policy publish.status.err [page]",
+    "path": [
+      "sync.policy",
+      "publish.status.err"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.policy"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.status.err"
+      },
+      {
+        "kind": "number",
+        "name": "page",
+        "optional": true,
+        "choices": [],
+        "help": "page: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "Command/status section",
+    "details": "## sync.region / sync.policy publish.status.err\n\n```text\nsync.region publish.status.err [page]\nsync.policy publish.status.err [page]\n```\n\n**Parameter:** One-based page; omission selects the first error.\n\n**Response:** `<page>/<count> [<token>] <detail>`, `empty`, `fault storage`,\n`Err - page`, or `Err - page range`.\n\n**Scope:** Current faults, separate from completed-campaign reports.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L384",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Manage sync policy publish status err."
+  },
+  {
+    "id": "mobmesh.sync.radio.publish.status.b379ca72",
+    "syntax": "sync.radio publish.status",
+    "path": [
+      "sync.radio",
+      "publish.status"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.radio"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.status"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "Command/status section",
+    "details": "## sync.radio publish.status\n\n```text\nsync.radio publish.status\n```\n\n**Response format:**\n\n```text\nsync:<on|off> step:<phase and radio side>\ncut:<epoch|->\nchnl:<channel|->\n```\n\nPhases distinguish publisher/receiver, R1/R2, testing, cutover, confirmation, commit,\nand fallback. A validated but unlaunched plan shows `publisher armed`.\nUnavailable storage returns `fault storage`.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L447",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show phase, radio side, channel, and cutover.",
+    "helpSyntax": "sync.radio publish.status"
+  },
+  {
+    "id": "mobmesh.sync.time.publish.status.67fe9390",
+    "syntax": "sync.time publish.status",
+    "path": [
+      "sync.time",
+      "publish.status"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "sync.time"
+      },
+      {
+        "kind": "literal",
+        "value": "publish.status"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "sync-settings",
+    "summary": "Command/status section",
+    "details": "## sync.time publish.status\n\n```text\nsync.time publish.status\n```\n\n**Response format:**\n\n```text\nsync:<on|off> step:<activity>\nnext:<epoch|-> ends:<epoch|->\nchnl:<channel|->\nlast:<result|->\n```\n\nActivity includes `idle`, `waiting-clock`, `verifying`, `sending`, and `retry`.\nThe received result can include an offset in seconds. Storage failure returns\n`fault storage`. Time campaigns have no separate `publish.report` command.\n\n[↩ Back to sync-settings readme](../README.md)",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/sync-settings/docs/cli-additions.md#L512",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show on/off, active schedule, next/final sample, and latest received result.",
+    "helpSyntax": "sync.time publish.status"
+  },
+  {
+    "id": "mobmesh.tryset.805354d8",
+    "syntax": "tryset",
+    "path": [
+      "tryset"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "tryset"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "try-settings",
+    "summary": "tryset",
+    "details": "## tryset\n\n```text\ntryset\nget tryset\n```\n\n| Response | Meaning |\n| --- | --- |\n| `(none)` | No live trial |\n| `<key> <value> <seconds>s` | Setting under trial and time remaining |\n| `radio <freq>,<bw>,<sf>,<cr> (tempradio)` | Live native radio trial; remaining time is not included |\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/try-settings/docs/cli-additions.md#L24",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show the running trial and time remaining.",
+    "helpSyntax": "tryset"
+  },
+  {
+    "id": "mobmesh.get.tryset.9916bf1e",
+    "syntax": "get tryset",
+    "path": [
+      "get",
+      "tryset"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "tryset"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "try-settings",
+    "summary": "tryset",
+    "details": "## tryset\n\n```text\ntryset\nget tryset\n```\n\n| Response | Meaning |\n| --- | --- |\n| `(none)` | No live trial |\n| `<key> <value> <seconds>s` | Setting under trial and time remaining |\n| `radio <freq>,<bw>,<sf>,<cr> (tempradio)` | Live native radio trial; remaining time is not included |\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/try-settings/docs/cli-additions.md#L25",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show tryset."
+  },
+  {
+    "id": "mobmesh.tryset.3ed852b4",
+    "syntax": "tryset <seconds> <key> <value>",
+    "path": [
+      "tryset"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "tryset"
+      },
+      {
+        "kind": "number",
+        "name": "seconds",
+        "optional": false,
+        "choices": [],
+        "help": "seconds: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "enum",
+        "name": "key",
+        "optional": false,
+        "choices": [
+          "repeat",
+          "tx",
+          "rxdelay",
+          "txdelay",
+          "flood.max",
+          "direct.txdelay",
+          "freq",
+          "bw",
+          "sf",
+          "cr"
+        ],
+        "help": "key: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "number",
+        "name": "value",
+        "optional": false,
+        "choices": [],
+        "help": "value: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "try-settings",
+    "summary": "tryset setting",
+    "details": "## tryset setting\n\n```text\ntryset <seconds> <key> <value>\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `seconds` | Integer duration, 60–86400 seconds |\n| `key` | One of the keys below |\n| `value` | Same syntax and limits as the native `set <key>` command |\n\n| Valid key | Setting |\n| --- | --- |\n| `tx` | LoRa transmit power |\n| `radio.rxgain` | Radio chip receive gain |\n| `radio.fem.rxgain` | External FEM receive gain, where supported |\n| `radio.fem.txgain` | External FEM transmit gain, where supported |\n| `int.thresh` | Interference threshold |\n| `cad` | Channel Activity Detection |\n| `agc.reset.interval` | Receiver AGC reset interval |\n| `flood.max` | Maximum flood hops |\n| `flood.max.unscoped` | Maximum unscoped flood hops |\n| `flood.max.advert` | Maximum advert flood hops |\n| `repeat` | Message forwarding |\n| `dutycycle` | Transmit duty-cycle limit |\n\n**Response:** `OK - tryset <seconds>s (reverts unless kept)` or `Error: ...`.\nNative setting-validation errors may also be returned.\n\n**Effect:** Records the original value before applying the trial value. Expiry or\nreboot restores it. A failed restore retains the recovery record and retries.\nClock corrections do not change the trial duration.\n\n**Restrictions:** One trial at a time, including radio trials. Unsupported keys or\nboard capabilities are refused. A rollback record must be saved before the setting changes.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/try-settings/docs/cli-additions.md#L37",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Trial an allowlisted setting for 60–86400 seconds.",
+    "helpSyntax": "tryset <seconds> <key> <value>"
+  },
+  {
+    "id": "mobmesh.tryset.e4ea0377",
+    "syntax": "tryset <seconds> radio <freq>,<bw>,<sf>,<cr>",
+    "path": [
+      "tryset"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "tryset"
+      },
+      {
+        "kind": "number",
+        "name": "seconds",
+        "optional": false,
+        "choices": [],
+        "help": "seconds: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "literal",
+        "value": "radio"
+      },
+      {
+        "kind": "number",
+        "name": "freq",
+        "optional": false,
+        "choices": [],
+        "help": "freq: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "bw",
+        "optional": false,
+        "choices": [],
+        "help": "bw: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "sf",
+        "optional": false,
+        "choices": [],
+        "help": "sf: operator-supplied value; see source help for constraints"
+      },
+      {
+        "kind": "separator",
+        "value": ","
+      },
+      {
+        "kind": "number",
+        "name": "cr",
+        "optional": false,
+        "choices": [],
+        "help": "cr: operator-supplied value; see source help for constraints"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "try-settings",
+    "summary": "tryset radio",
+    "details": "## tryset radio\n\n```text\ntryset <seconds> radio <freq>,<bw>,<sf>,<cr>\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `seconds` | 60–86400 seconds; must be a multiple of 60 |\n| `freq` | Frequency in MHz |\n| `bw` | Bandwidth in kHz |\n| `sf` | Spreading factor |\n| `cr` | Coding rate |\n\n**Response:** Native `tempradio` response or `Error: ...`.\n\n**Effect:** Uses MeshCore's temporary-radio mechanism. Parameters are validated by\nupstream; they are not saved until kept. Expiry or reboot restores saved parameters.\n\n**Restrictions:** Cannot overlap another trial. A fractional-minute duration is refused\nwith `Error: radio trials take whole minutes -- use <lower> or <upper>`.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/try-settings/docs/cli-additions.md#L74",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Trial radio parameters through native tempradio.",
+    "helpSyntax": "tryset <seconds> radio <freq>,<bw>,<sf>,<cr>"
+  },
+  {
+    "id": "mobmesh.tryset.keep.b71cbabf",
+    "syntax": "tryset keep",
+    "path": [
+      "tryset",
+      "keep"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "tryset"
+      },
+      {
+        "kind": "literal",
+        "value": "keep"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "try-settings",
+    "summary": "tryset keep",
+    "details": "## tryset keep\n\n```text\ntryset keep\n```\n\n| Response | Meaning |\n| --- | --- |\n| `OK - <key> kept` | Setting trial retained; recovery record cleared |\n| Native `set radio` response | Live radio parameters saved |\n| `Error: no live trial to keep` | No active trial to confirm |\n\n**Restrictions:** Confirmation must arrive during the active trial period for every key.\nAfter expiry or revert, a new trial is required before keeping a value.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/try-settings/docs/cli-additions.md#L96",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Persist the active trial; refused after it expires.",
+    "helpSyntax": "tryset keep"
+  },
+  {
+    "id": "mobmesh.tryset.revert.9edf1e8c",
+    "syntax": "tryset revert",
+    "path": [
+      "tryset",
+      "revert"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "tryset"
+      },
+      {
+        "kind": "literal",
+        "value": "revert"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "try-settings",
+    "summary": "tryset revert",
+    "details": "## tryset revert\n\n```text\ntryset revert\n```\n\n| Response | Meaning |\n| --- | --- |\n| `OK - <key> reverted` | Original setting restored |\n| `OK - radio reverting to saved params` | Native radio return requested |\n| `Error: <key> could not be restored -- trial kept, retrying` | Recovery remains pending |\n| `Error: no live trial` | Nothing to revert |\n\n**Effect:** Setting trials restore immediately when the native setter succeeds.\nRadio trials return to saved parameters through a one-minute native trial; the\nradio change normally takes effect within two seconds. The native timer remains\nactive until that trial expires.\n\n[↩ Back to try-settings readme](../README.md)",
+    "source": "https://github.com/mobmesh/firmware/blob/985976a04e2a3ca1aab958b982c2d242d0ac5b3a/mods/try-settings/docs/cli-additions.md#L111",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Restore the previous value immediately.",
+    "helpSyntax": "tryset revert"
+  }
+]
