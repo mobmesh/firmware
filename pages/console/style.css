@@ -1344,3 +1344,44 @@ summary:focus-visible, a:focus-visible {
 @media (prefers-reduced-motion:reduce) {
   .welcome-title.typing { width:auto; animation:none }
 }
+
+/* Same site navigation as tools.mobmesh.org, set inside the console's own top bar */
+.site-nav {
+  display:flex;
+  align-items:center;
+  gap:1.4rem;
+  margin:0 auto;
+  padding:0 28px;
+  font-size:.82rem
+}
+.site-nav a {
+  color:var(--muted);
+  text-decoration:none;
+  white-space:nowrap;
+  transition:color .15s ease
+}
+.site-nav a:hover {
+  color:var(--ink)
+}
+.site-nav a[aria-current="page"] {
+  color:var(--accent);
+  text-shadow:0 0 .85rem rgba(45,209,189,.55)
+}
+.site-nav [aria-disabled="true"] {
+  color:var(--muted);
+  opacity:.45;
+  white-space:nowrap;
+  cursor:default
+}
+/* Phones keep the bar for the console's own controls */
+@media (max-width:1140px) {
+  .site-nav {
+    display:none
+  }
+}
+
+.leave-actions {
+  display:flex;
+  flex-wrap:wrap;
+  gap:9px
+}

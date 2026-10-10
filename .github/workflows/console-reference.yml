@@ -1,0 +1,61 @@
+# Keeps the console's F1 command reference honest; it never builds firmware or touches releases.
+#
+# Opens one issue when upstream's repeater CLI or the owner's manual has moved past the console's
+# copies, and closes it once both are current. The fix is curated by hand (AI-assisted) and rides
+# along with the next push.
+name: console-reference
+on:
+  schedule:
+    - cron: "40 6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+env:
+  UPSTREAM_REPO: meshcore-dev/MeshCore
+  ISSUE_TITLE: "Console reference out of date"
+  ISSUE_LABEL: console
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Fetch the latest upstream repeater release
+        run: |
+          TAG=$(git ls-remote --tags --refs "https://github.com/$UPSTREAM_REPO" 'repeater-v*' | sed 's#.*refs/tags/##' | sort -V | tail -1)
+          echo "Latest upstream repeater tag: $TAG"
+          git clone --depth 1 --branch "$TAG" --filter=blob:none --sparse "https://github.com/$UPSTREAM_REPO" upstream
+          git -C upstream sparse-checkout set src/helpers examples/simple_repeater
+
+      - name: Compare with the console reference
+        id: check
+        run: |
+          if python3 scripts/console/console_reference_check.py check upstream report.md; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open, update or close the issue
+        uses: actions/github-script@v9
+        env:
+          DRIFT: ${{ steps.check.outputs.drift }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const title = process.env.ISSUE_TITLE, label = process.env.ISSUE_LABEL;
+            const open = await github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: label });
+            const existing = open.data.find(i => i.title === title);
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            // The label may not exist yet in a fresh repo; creating it twice is harmless.
+            await github.rest.issues.createLabel({ owner, repo, name: label, color: '2dd1bd', description: 'Console F1 reference drift' }).catch(() => {});
+            if (process.env.DRIFT === 'true') {
+              const body = `${fs.readFileSync('report.md', 'utf8')}\nChecked ${new Date().toISOString().slice(0,10)} by [console-reference](${runUrl}).`;
+              if (existing) await github.rest.issues.update({ owner, repo, issue_number: existing.number, body });
+              else await github.rest.issues.create({ owner, repo, title, body, labels: [label] });
+            } else if (existing) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: existing.number, body: `Console reference is current again ([run](${runUrl})).` });
+              await github.rest.issues.update({ owner, repo, issue_number: existing.number, state: 'closed' });
+            }

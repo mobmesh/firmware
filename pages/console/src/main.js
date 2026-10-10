@@ -100,8 +100,13 @@ async function loadManual(){
  if(text===null)throw Error('Owner\'s manual unavailable');
  const start=text.indexOf(MANUAL_HEADING);if(start<0)throw Error('Command reference section not found in the manual');
  const rest=text.slice(start+MANUAL_HEADING.length),next=rest.search(/\n## /);
- const body=$('manual-enhanced');body.innerHTML=marked.parse(text.slice(start,next<0?undefined:start+MANUAL_HEADING.length+next));
+ const body=$('manual-enhanced');// The section heading and its rule are dropped so the tab opens straight on content, like Native and Companion.
+ body.innerHTML=marked.parse(text.slice(start+MANUAL_HEADING.length,next<0?undefined:start+MANUAL_HEADING.length+next));
  // The reference stays self-contained: links become plain text, minus their underline and outbound arrow.
+ // Back-links to the README make no sense inside the console.
+ for(const para of [...body.querySelectorAll('p')])if(/^\s*↩/.test(para.textContent))para.remove();
+ // Subsections that only say a mod has no commands add nothing to a command reference.
+ for(const heading of [...body.querySelectorAll('h3')]){const next=heading.nextElementSibling;if(next?.tagName==='P'&&/has no operator commands/.test(next.textContent)&&(!next.nextElementSibling||/^H[23]$/.test(next.nextElementSibling.tagName))){next.remove();heading.remove();}}
  for(const link of body.querySelectorAll('a')){for(const u of link.querySelectorAll('u'))u.replaceWith(...u.childNodes);link.replaceWith(...link.childNodes);}
  for(const node of [...body.querySelectorAll('*')].flatMap(e=>[...e.childNodes]).filter(n=>n.nodeType===3&&n.textContent.includes('↗')))node.textContent=node.textContent.replaceAll('↗','');
  $('manual-native').replaceChildren(...nativeReference());
@@ -262,7 +267,10 @@ async function open(reuse=null,quiet=false){if(busy||transport)return;busy=true;
   }catch(e){settle('Connection failed: '+e.message);await factory?.close();transport=null;targetKey=null;auth=false;}
   finally{busy=false;update();if(focusAfter)$(focusAfter).focus();}}
 async function readContacts(){const c=transport.protocol,next=[];await c.rpc(4,()=>c.sendCommandGetContacts(),15000,x=>{if(next.length>=2048)throw Error('Contact limit exceeded');next.push(x);});contacts=next;renderContacts();}
-function renderContacts(){const previous=targetKey;$('target').replaceChildren();for(const contact of contacts.filter(x=>x.type===2).sort((a,b)=>a.advName.localeCompare(b.advName))){const opt=document.createElement('option');opt.value=fullKey(contact.publicKey);opt.textContent=contact.advName+' · '+opt.value.slice(0,12);$('target').append(opt);}if(previous&&contacts.some(x=>x.type===2&&fullKey(x.publicKey)===previous))$('target').value=previous;}
+// The last repeater chosen is a per-viewer preference; the list opens on it when nothing else is selected.
+function lastRepeater(){try{return localStorage.getItem('console-last-repeater');}catch{return null;}}
+function rememberRepeater(key){try{if(key)localStorage.setItem('console-last-repeater',key);}catch{}}
+function renderContacts(){const previous=targetKey||lastRepeater();$('target').replaceChildren();for(const contact of contacts.filter(x=>x.type===2).sort((a,b)=>a.advName.localeCompare(b.advName))){const opt=document.createElement('option');opt.value=fullKey(contact.publicKey);opt.textContent=contact.advName+' · '+opt.value.slice(0,12);$('target').append(opt);}if(previous&&contacts.some(x=>x.type===2&&fullKey(x.publicKey)===previous))$('target').value=previous;}
 async function refreshContacts(){if(busy||!transport?.protocol)return;busy=true;update();try{const previous=targetKey;await readContacts();targetKey=$('target').value||null;if(targetKey!==previous){auth=false;blocked=false;$('password').value='';if(targetKey)await offerSessions();else{await release();session=null;records=[];history=new History();display();}}add('status','Contact list refreshed from companion: '+contacts.filter(c=>c.type===2).length+' stored repeaters. This reads saved contacts; it does not add discovered adverts.');}finally{busy=false;update();}}
 async function connectKey(){if(busy||!transport?.protocol)return;const value=$('manual-key').value;busy=true;update();try{await readContacts();const result=await temporaryTargets.ensure(value,contacts,transport.gatewayKey,transport.protocol);await readContacts();if(!contacts.some(c=>fullKey(c.publicKey)===result.key&&c.type===2))throw Error('Target entry was not returned by companion');const changed=targetKey!==result.key;targetKey=result.key;$('target').value=targetKey;if(changed){auth=false;blocked=false;tabState=null;await offerSessions();}else await restorePassword();add('status',result.temporary?'Public-key target selected. An internal temporary entry supports this connection.':'Public-key target selected using its existing contact.');$('manual-key').value='';}finally{busy=false;update();} $('password').focus();}
 async function cleanupTemporary(){if(!temporaryTargets.created.size)return;if(!transport?.connected||transport.protocol?.closed){add('status','Temporary companion entries may remain; device disconnected before cleanup.');return;}try{await readContacts();await temporaryTargets.cleanup(transport.protocol,contacts,note=>add('status',note));}catch(e){add('status','Temporary entries may remain; cleanup unavailable: '+e.message);}}
@@ -279,7 +287,7 @@ async function login(providedPassword=null){
   add('transport','Diagnostic engine login · target '+key.slice(0,12)+' · stored route '+path+' · '+(path===255?'flood':path===0?'direct zero-hop':'direct stored path'));
   const remembered=password,remember=$('remember-password').checked!==false;const result=await authenticateRepeater(c,key,password,note=>{notes.push(note);$('assistance').textContent=note;});password='';if(remember){const saved=await credentials.save(key,remembered);$('credential-status').textContent=saved?'Password saved for this repeater.':'Password could not be saved · '+credentials.error;}else await credentials.forget(key);
   for(const note of notes)add('transport',note);
-  auth=true;blocked=false;if(lastLink)lastLink.targetKey=key;if(result.login?.gatewaySent?.viaFlood)routeStale=true;if(!session)await chooseSession();$('assistance').textContent='';
+  auth=true;blocked=false;if(lastLink)lastLink.targetKey=key;rememberRepeater(key);if(result.login?.gatewaySent?.viaFlood)routeStale=true;if(!session)await chooseSession();$('assistance').textContent='';
   // The companion's next-step line is rewritten once login completes.
   if(stepLine&&records.includes(stepLine)){stepLine.safeText='Connected · repeater admin access verified.';stepLine=null;display();}else add('status','Connected · repeater admin access verified.');status.update({lastTargetResponseAt:Date.now()});closeConnection();
  }catch(e){for(const note of notes)add('transport',note);add('status','Login stopped: '+e.message);$('assistance').textContent='Login stopped: '+e.message;auth=false;if(transport?.protocol&&transport.connected){blocked=false;session=null;writable=false;keptHistory=history;}else{blocked=true;await factory?.close();transport=null;$('remote').hidden=true;}}
@@ -378,7 +386,7 @@ function floatingPanel(panelId,headId,gripId){
 floatingPanel('diagnostics','diagnostics-head','diagnostics-resize');floatingPanel('manual','manual-head','manual-resize');
 $('password').oninput=()=>{passwordRevision++;};$('password').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();login().catch(error=>add('status',error.message));}};
 $('forget-password').onclick=errorAction(async()=>{if(!targetKey)return;passwordRevision++;const forgotten=await credentials.forget(targetKey);$('password').value='';$('credential-status').textContent=forgotten?'Saved password removed.':'Password could not be removed · '+credentials.error;});
-$('login').onclick=errorAction(login);$('refresh-contacts').onclick=errorAction(refreshContacts);$('connect-key').onclick=errorAction(connectKey);$('target').onchange=errorAction(async()=>{auth=false;blocked=false;targetKey=$('target').value;tabState=null;$('password').value='';await offerSessions();});
+$('login').onclick=errorAction(login);$('refresh-contacts').onclick=errorAction(refreshContacts);$('connect-key').onclick=errorAction(connectKey);$('target').onchange=errorAction(async()=>{auth=false;blocked=false;targetKey=$('target').value;rememberRepeater(targetKey);tabState=null;$('password').value='';await offerSessions();});
 // Radio TX/RX are the companion's own packet totals (command 56, subtype 2), not the remote repeater's.
 async function readRadioTotals(quiet=false){const probe=new RemoteProbe(transport.protocol);const bytes=await probe.wait([24],()=>transport.protocol.sendToRadioFrame(Uint8Array.of(56,2)),5000,f=>f[1]===2);const counts=packetCounters(bytes);$('radio-tx').textContent=String(counts.tx);$('radio-rx').textContent=String(counts.rx);if(!quiet)add('transport','Companion radio totals · TX '+counts.tx+' · RX '+counts.rx+' · direct TX '+counts.txDirect+' · flood TX '+counts.txFlood+' (all traffic; compare before/after).');return counts;}
 // While a companion is connected the totals refresh every 10 s; a tick is skipped while a command is in flight.
@@ -401,5 +409,16 @@ $('command').onkeydown=e=>{if(e.isComposing)return;const input=$('command'),text
   if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key))tabState=null;
 };
 window.addEventListener('pagehide',()=>{factory?.close();});
+// Leaving the page closes the link. Browser-level exits (back, close, reload) get the browser's own warning;
+// links inside the console get a choice: open the page in a new tab, leave and disconnect, or stay.
+window.addEventListener('beforeunload',e=>{if(transport?.connected&&!leaving){e.preventDefault();e.returnValue='';}});
+let leaving=false,leaveTarget=null;
+document.addEventListener?.('click',e=>{
+ const link=e.target.closest?.('a[href]');if(!link||!transport?.connected||link.target==='_blank'||e.ctrlKey||e.metaKey||e.shiftKey||e.button!==0)return;
+ e.preventDefault();leaveTarget=link.href;$('leave-dialog').showModal?.();$('leave-new-tab').focus();
+});
+$('leave-new-tab').onclick=()=>{window.open(leaveTarget,'_blank','noopener');$('leave-dialog').close();};
+$('leave-anyway').onclick=async()=>{$('leave-dialog').close();leaving=true;await close();location.href=leaveTarget;};
+$('leave-cancel').onclick=()=>$('leave-dialog').close();
 try{catalog=await loadCatalog();$('catalog-status').textContent=`${catalog.entries.length} effective signatures from upstream and all four CLI-additions docs. Full parameter verification gate: pending.`;update();$('command').focus();}catch(e){$('status').textContent='Console initialization failed: '+e.message;}
 if(document.modelContext?.registerTool){const lifecycle=new AbortController();try{Promise.resolve(document.modelContext.registerTool({name:'read_meshcore_console_status',description:'Read connection status without querying hardware.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:true},execute(input){if(!input||Object.keys(input).length)throw Error('Expected empty object');return {...status.getSnapshot(),catalogEntries:catalog?.entries.length,regionMode:region};}},{signal:lifecycle.signal})).catch(()=>{});}catch{}window.addEventListener('pagehide',()=>lifecycle.abort(),{once:true});}

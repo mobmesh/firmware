@@ -777,7 +777,6 @@ project.
 | Command / syntax | Purpose and important limits |
 |---|---|
 | `ver` | Show running firmware version information. |
-| `get public.key` | Show the public key subscribers must authorize. Never distribute the private key. |
 | `start ota` | Start the native local upload AP through the hardened handler. |
 | `poweroff <seconds>` / `shutdown <seconds>` | Deep sleep for 60–86400 seconds, then wake. |
 | `stats-core` | Show native core and battery statistics; also allowed over authenticated remote CLI. |
