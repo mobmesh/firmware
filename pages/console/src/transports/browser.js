@@ -16,8 +16,8 @@ class DiagnosticConnection extends Connection {
   frame(bytes){
     observeActivity({direction:'RX',bytes:bytes.length});events.frame?.('RX',bytes);
     if(bytes[0]===0){this.onFrameReceived(bytes);return;}
-    if(bytes[0]===24&&bytes.length>=26)this.emit('wire',Uint8Array.from(bytes));
-    const rawMin={1:1,6:10,7:13,8:7,10:1,16:16,17:10,129:33,131:1,133:8,134:8};
+    if(bytes[0]===24&&bytes.length>=2)this.emit('wire',Uint8Array.from(bytes));
+    const rawMin={1:1,6:10,7:13,8:7,9:5,10:1,11:2,14:65,15:1,16:16,17:10,23:9,129:33,131:1,133:8,134:8};
     if(bytes[0]in rawMin&&bytes.length>=rawMin[bytes[0]])this.emit('wire',Uint8Array.from(bytes));
     // Only diagnostic response codes are decoded: unsolicited messages are not exported.
     const min={1:1,2:5,3:148,4:5,5:58,12:3,13:20};

@@ -47,7 +47,7 @@ export class RemoteProbe {
       const onFrame=f=>{try{
         if(f[0]===1){finish(error(f));return;}
         if(f[0]===6){ack=sent(f);clearTimeout(timer);
-          if(!deadline)deadline=setTimeout(()=>finish(Error('Repeater login timed out after '+attempt+' attempt'+(attempt>1?'s':''))),replyWaitMs(ack.estimatedTimeoutMs));
+          if(!deadline)deadline=setTimeout(()=>finish(Error('No reply after '+attempt+' attempt'+(attempt>1?'s':'')+'; a repeater stays silent on a wrong password, or it may be out of range')),replyWaitMs(ack.estimatedTimeoutMs));
           clearTimeout(resend);if(attempt<LOGIN_ATTEMPTS)resend=setTimeout(()=>{if(result)return;this.notify('Login reply not heard; resending');send();},loginWaitMs(ack.estimatedTimeoutMs));
           this.notify('Login SENT received · attempt '+attempt+'/'+LOGIN_ATTEMPTS+' · '+(ack.viaFlood?'flood':'direct')+' · estimate '+ack.estimatedTimeoutMs+' ms · resend after '+loginWaitMs(ack.estimatedTimeoutMs)+' ms. SENT confirms acceptance, not radio TX.');}
         if([0x85,0x86].includes(f[0])){

@@ -59,7 +59,7 @@ button:focus-visible,input:focus-visible,select:focus-visible {
   height:100dvh;
   display:grid;
   grid-template-rows:72px 47px minmax(0,1fr) 42px;
-  background:radial-gradient(ellipse at 80% 0%,#15213266,transparent 45%),var(--bg)
+  background:var(--bg)
 }
 .app-bar {
   display:flex;
@@ -617,8 +617,8 @@ to {
   background:#657084
 }
 .state-led[data-active=true] {
-  background:var(--accent);
-  box-shadow:0 0 7px #2dd1bd44
+  background:#4ade80;
+  box-shadow:0 0 7px #4ade8044
 }
 .traffic-pair {
   display:flex;
@@ -784,6 +784,9 @@ to {
   transition:color .12s
 }
 .connection-pill {
+  padding:4px 13px;
+  line-height:1.25;
+  white-space:nowrap;
   transition:color .15s,border-color .15s,background .15s
 }
 .diagnostics-head strong {
@@ -931,7 +934,7 @@ to {
 }
 
 .app-shell  {
- background:radial-gradient(circle at 90% 8%,rgba(232,99,122,.08),transparent 25%),linear-gradient(180deg,var(--bg-0),var(--bg-1) 45%,var(--bg-0));
+ background:linear-gradient(180deg,var(--bg-0),var(--bg-1) 45%,var(--bg-0));
 
 }
 
@@ -1273,4 +1276,71 @@ summary:focus-visible, a:focus-visible {
 /* Names the link the byte counters measure, the way "Radio" names the companion's packet totals */
 #link-kind {
   margin-right:-8px
+}
+
+/* Inline password entry: masked while typed in the command line */
+#command.secret-entry {
+  -webkit-text-security:disc;
+  text-security:disc
+}
+
+/* Retro's contrast filter crushes the faint mesh lines, so the canvas is lifted under that theme */
+:root[data-theme="retro"] #mesh-canvas {
+  opacity:1;
+  filter:blur(.5px) brightness(2.2)
+}
+
+/* On narrow screens the pill shrinks and trims its label rather than widening the bar */
+.bar-actions {
+  min-width:0
+}
+.connection-pill {
+  min-width:0;
+  flex-shrink:1
+}
+#connection-label {
+  overflow:hidden;
+  text-overflow:ellipsis
+}
+@media (max-width:700px) {
+  #link-kind {
+    margin-right:0
+  }
+}
+
+
+/* Connected pill uses a status green rather than the teal accent */
+.connection-pill[data-connected=true] {
+  color:#4ade80;
+  border-color:rgba(74,222,128,.35);
+  background:rgba(74,222,128,.10)
+}
+.connection-pill[data-connected=true] .connection-dot {
+  background:#4ade80;
+  box-shadow:0 0 9px #4ade8044
+}
+
+/* Welcome title types itself out once on load, with the cursor blinking while it types */
+.welcome-title {
+  display:inline-block;
+  vertical-align:bottom;
+  white-space:nowrap;
+  overflow:hidden
+}
+.welcome-title.typing {
+  width:0;
+  animation:type-title 1.1s steps(15,end) .25s forwards
+}
+.welcome-title.typing+.welcome-cursor {
+  animation:cursor-blink .5s step-end infinite
+}
+/* Each step is one glyph advance: the heading's tight letter-spacing makes that less than 1ch */
+@keyframes type-title {
+  to { width:calc(15 * (1ch - .065em)) }
+}
+@keyframes cursor-blink {
+  50% { opacity:0 }
+}
+@media (prefers-reduced-motion:reduce) {
+  .welcome-title.typing { width:auto; animation:none }
 }
