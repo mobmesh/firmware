@@ -26,6 +26,7 @@
       </a>
       <nav class="site-nav" aria-label="Main">
         <a href="https://tools.mobmesh.org/flasher/">Setup</a>
+        <a href="https://tools.mobmesh.org/console/">Console</a>
         <a href="https://analyzer.gulfcoastmesh.org/?theme=dark#/live?lat=30.6954&amp;lon=-88.0399&amp;zoom=9&amp;layer=dark" target="_blank" rel="noopener noreferrer">Maps</a>
         <a href="https://github.com/mobmesh" target="_blank" rel="noopener noreferrer">Docs</a>
         <a href="https://tools.mobmesh.org" aria-current="page">Tools</a>
@@ -270,6 +271,15 @@
         el.hidden = false;
       })
       .catch(() => {});
+  </script>
+  <script>
+    // F2 opens the console, matching the console's own F2 connection key.
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "F2" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        location.href = "console/";
+      }
+    });
   </script>
 </body>
 </html>
