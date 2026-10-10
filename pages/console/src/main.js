@@ -1,5 +1,6 @@
-import {localCommand,localComplete,THEMES} from './core/local-commands.js';
+import {localCommand,localComplete,THEMES,companionCommand,companionComplete,COMPANION_COMMANDS} from './core/local-commands.js';
 import {startMeshBackground} from './core/mesh-bg.js';
+import {routeText} from './core/route.js';
 import {deferredObserver} from './core/observer.js';
 import {CredentialVault} from './storage/credentials.js';
 import {initializeCompanion,authenticateRepeater} from './transports/diagnostic-engine.js';
@@ -9,11 +10,29 @@ import {loadCatalog} from './core/catalog.js';import {complete} from './core/com
 const PERSISTENT=false;const recordText=(text,secret=false)=>PERSISTENT?safeRecord(text,secret):text;import {ConnectionStatus} from './core/connection-status.js';import {retained} from './core/output.js';import {transportFactory} from './transports/browser.js';import {directCommand,displayReply} from './transports/direct.js';import {RemoteProbe,RemoteReplyTimeout,packetCounters,keyBytes} from './transports/remote.js';import Constants from './vendor/meshcore/constants.js';import {fullKey,frameSummary,directReply} from './protocol.js';
 const $=id=>document.getElementById(id),status=new ConnectionStatus(),writerId=crypto.randomUUID(),credentials=new CredentialVault();
 let passwordRevision=0,linkTx=0,linkRx=0;const activityTimers={};
-function activity(event){if(event.direction==='TX')linkTx+=event.bytes;else linkRx+=event.bytes;const direction=event.direction.toLowerCase();$(direction+'-count').textContent=(event.direction==='TX'?linkTx:linkRx).toLocaleString()+' B';$(direction+'-activity').dataset.active='true';clearTimeout(activityTimers[direction]);activityTimers[direction]=setTimeout(()=>{$(direction+'-activity').dataset.active='false';},180);}
+// Plain bytes until 10,000, then KB (and MB past 10,000 KB) so the status bar stays short.
+function byteCount(n){if(n<10000)return n.toLocaleString()+' B';const kb=n/1000;if(kb<10000)return (kb<100?kb.toFixed(1):Math.round(kb).toLocaleString())+' KB';const mb=kb/1000;return (mb<100?mb.toFixed(1):Math.round(mb).toLocaleString())+' MB';}
+function activity(event){if(event.direction==='TX')linkTx+=event.bytes;else linkRx+=event.bytes;const direction=event.direction.toLowerCase();$(direction+'-count').textContent=byteCount(event.direction==='TX'?linkTx:linkRx);$(direction+'-activity').dataset.active='true';clearTimeout(activityTimers[direction]);activityTimers[direction]=setTimeout(()=>{$(direction+'-activity').dataset.active='false';},180);}
 let catalog,transport=null,factory=null,mode='direct',contacts=[],targetKey=null,session=null,records=[],history=new History(),writable=false,auth=false,busy=false,blocked=false,region=false,sequence=0,epoch=0,abort=null,tabState=null,escapeTab=false;
 let temporaryTargets=new TemporaryTargets(),directName=null,stepLine=null;
+// The last chosen port or Bluetooth device and repeater, so reconnect can skip the chooser and keep the transcript.
+let lastLink=null,keptHistory=null;
+// The status bar shows the route to the selected repeater; it follows path-updated notices, flood sends and contact re-reads.
+let routeNote=null,routeStale=false;
+function routeLabel(){
+ if(!transport?.connected)return 'No device selected';
+ if(mode==='direct')return 'Route: direct USB';
+ if(routeNote)return routeNote;
+ const contact=contacts.find(c=>fullKey(c.publicKey)===targetKey);
+ return contact?routeText(contact.outPathLen,contact.outPath,contacts):'No repeater selected';
+}
+function watchRoute(protocol){protocol.on('wire',frame=>{
+ if(frame[0]===129&&fullKey(frame.slice(1,33))===targetKey){routeStale=true;add('transport','Companion learned a new route to '+targetKey.slice(0,12));refreshRoute();}
+ else if(frame[0]===6&&frame[1]===1&&targetKey){routeNote='Route: flooding · relearning';update();routeStale=true;}
+});}
+async function refreshRoute(){if(!routeStale||busy||!transport?.protocol)return;routeStale=false;try{await readContacts();routeNote=null;const contact=contacts.find(c=>fullKey(c.publicKey)===targetKey);if(contact)add('transport',routeText(contact.outPathLen,contact.outPath,contacts));}catch(e){routeStale=true;}update();}
 const route=()=>({transport:mode,gatewayKey:transport?.gatewayKey||null});
-function update(){status.update({deviceConnected:!!transport?.connected,linkState:transport?.connected?'open':busy&&!transport?'connecting':'disconnected',targetKey,targetState:blocked?'unavailable':targetKey?(auth?'ready':'selected'):'none',canSubmit:!!transport?.connected&&!!session&&writable&&auth&&!busy&&!blocked,persistence:PERSISTENT?'enabled':'disabled'});$('mode').disabled=!!transport||busy;for(const id of ['mode-usb','mode-bluetooth'])$(id).disabled=!!transport||busy||!catalog;$('target').disabled=busy;$('refresh-contacts').disabled=busy||!transport?.protocol;$('connect-key').disabled=busy||!transport?.protocol;$('manual-key').disabled=busy||!transport?.protocol;$('login').disabled=busy||!targetKey;$('password').disabled=busy;$('remember-password').disabled=busy;$('forget-password').disabled=busy||!targetKey;$('packet-stats').disabled=busy||!transport?.protocol;$('send').disabled=busy;$('cancel').disabled=!busy;$('identity').textContent=targetKey?targetKey:transport?.gatewayKey?'Gateway '+transport.gatewayKey:'No device selected';const selected=contacts.find(c=>fullKey(c.publicKey)===targetKey);$('prompt-host').textContent=auth?(selected?.advName||directName||'repeater'):'mobmesh';$('connection-panel').dataset.connected=String(!!transport?.connected);$('connection-label').textContent=transport?.connected?(selected?.advName||directName||'Device connected'):'Connect to console';$('connection-feedback').textContent=busy?'Working…':auth?'Authenticated · ready':transport?'Select a repeater and log in':'Ready to connect';$('device-led').dataset.active=String(!!transport?.connected);$('admin-led').dataset.active=String(auth&&!blocked);$('device-state').textContent=transport?.connected?(mode==='ble'?'BLUETOOTH':'USB LINK'):'OFFLINE';$('admin-state').textContent=blocked&&auth?'CONSOLE PAUSED':auth?'ADMIN VERIFIED':targetKey?'LOGIN REQUIRED':'NO CONSOLE';$('radio-refresh').disabled=busy||!transport?.protocol;$('reauthenticate').hidden=!blocked||!transport?.connected||mode==='direct';$('reauthenticate').disabled=busy;$('command').placeholder=blocked?'Reauthenticate to continue…':'Type a command…';resizePrompt();}
+function update(){status.update({deviceConnected:!!transport?.connected,linkState:transport?.connected?'open':busy&&!transport?'connecting':'disconnected',targetKey,targetState:blocked?'unavailable':targetKey?(auth?'ready':'selected'):'none',canSubmit:!!transport?.connected&&!!session&&writable&&auth&&!busy&&!blocked,persistence:PERSISTENT?'enabled':'disabled'});$('mode').disabled=!!transport||busy;for(const id of ['mode-usb','mode-bluetooth'])$(id).disabled=!!transport||busy||!catalog;$('target').disabled=busy;$('refresh-contacts').disabled=busy||!transport?.protocol;$('connect-key').disabled=busy||!transport?.protocol;$('manual-key').disabled=busy||!transport?.protocol;$('login').disabled=busy||!targetKey;$('password').disabled=busy;$('remember-password').disabled=busy;$('forget-password').disabled=busy||!targetKey;$('packet-stats').disabled=busy||!transport?.protocol;$('send').disabled=busy;$('cancel').disabled=!busy;$('identity').textContent=routeLabel();$('identity').title=targetKey||'';const selected=contacts.find(c=>fullKey(c.publicKey)===targetKey);$('prompt-host').textContent=auth?(selected?.advName||directName||'repeater'):'mobmesh';$('connection-panel').dataset.connected=String(!!transport?.connected);$('connection-label').textContent=transport?.connected?(selected?.advName||directName||'Device connected'):'Connect to console';$('connection-feedback').textContent=busy?'Working…':auth?'Authenticated · ready':transport?'Select a repeater and log in':'Ready to connect';$('device-led').dataset.active=String(!!transport?.connected);$('admin-led').dataset.active=String(auth&&!blocked);$('link-kind').textContent=transport?.connected?(mode==='ble'?'Bluetooth':'USB'):'Link';$('device-state').textContent=transport?.connected?(mode==='ble'?'BLUETOOTH':'USB LINK'):'OFFLINE';$('admin-state').textContent=blocked&&auth?'CONSOLE PAUSED':auth?'ADMIN VERIFIED':targetKey?'LOGIN REQUIRED':'NO CONSOLE';$('radio-refresh').disabled=busy||!transport?.protocol;$('reauthenticate').hidden=!blocked||!transport?.connected||mode==='direct';$('reauthenticate').disabled=busy;$('command').placeholder=blocked?'Reauthenticate to continue…':'Type a command…';resizePrompt();}
 status.subscribe(s=>{$('status').textContent=s.deviceConnected?(busy?'Working…':blocked?'Console paused':auth?'Ready':'Connected · select a repeater'):'Disconnected';$('status').dataset.connected=String(s.deviceConnected);$('storage').textContent='Session data: memory only';});
 function resizePrompt(){const input=$('command');if(input?.style){input.style.height='auto';input.style.height=Math.max(29,input.scrollHeight)+'px';}}
 function showConnection(){const dialog=$('connection-dialog');if(!dialog.open){dialog.showModal?.();if(!$('mode-usb').disabled)$('mode-usb').focus();}}
@@ -36,13 +55,13 @@ function highlightTranscript(visible){
   if(record.kind==='command')for(const match of text.matchAll(/\b\d+(?:\.\d+)?\b/g))mark('cli-number',offset+match.index,offset+match.index+match[0].length);
   offset+=text.length+1;
  }
- for(const name of ['cli-help-prose','cli-command','cli-argument','cli-number','cli-help','cli-error','cli-key','cli-success'])CSS.highlights.set(name,new Highlight(...(groups.get(name)||[])));
+ for(const name of ['cli-prompt-host','cli-prompt-symbol','cli-help-prose','cli-command','cli-argument','cli-number','cli-help','cli-error','cli-key','cli-success'])CSS.highlights.set(name,new Highlight(...(groups.get(name)||[])));
 }
 async function restorePassword(){const key=targetKey,revision=++passwordRevision;$('password').value='';$('credential-status').textContent='Saved on this browser only.';if(!key||mode==='direct')return;const password=await credentials.read(key);if(targetKey!==key||passwordRevision!==revision)return;if(password){$('password').value=password;$('credential-status').textContent='Saved password recalled for this repeater.';}else if(credentials.error)$('credential-status').textContent='Password storage unavailable in this browser.';}
 function add(kind,text,secret=false){const r={eventId:crypto.randomUUID(),sessionId:session?.sessionId||'provisional',writerId,sequence:sequence++,timestamp:Date.now(),kind,safeText:recordText(text,secret),promptHost:kind==='command'?$('prompt-host').textContent:null,targetKey,route:route(),redacted:secret};records.push(r);const keep=retained(records);records=keep.records;if(keep.truncated)$('assistance').textContent='Oldest output records truncated at 2 MiB.';display();return r;}
 function live(text){$('live').textContent=($('live').textContent+text).slice(-65536);}
 async function release(){writable=false;}
-async function chooseSession(){session={sessionId:crypto.randomUUID(),targetKey};writable=true;history=new History();update();$('command').focus();}
+async function chooseSession(){session={sessionId:crypto.randomUUID(),targetKey};writable=true;history=keptHistory||new History();keptHistory=null;update();$('command').focus();}
 async function offerSessions(){session=null;writable=false;history=new History();if(mode==='direct')await chooseSession();else{await restorePassword();update();}}
 // Direct serial has no contact list, so the prompt name comes from the repeater itself.
 // Theme is a per-viewer preference; storage may be unavailable, so the default always works.
@@ -83,23 +102,65 @@ function nativeReference(){
 }
 function toggleManual(){const panel=$('manual');panel.hidden=!panel.hidden;if(!panel.hidden)placeManual();if(panel.hidden||manualLoaded)return;manualLoaded=true;loadManual().catch(e=>{manualLoaded=false;$('manual-enhanced').textContent=e.message;});}
 for(const tab of document.querySelectorAll?.('.manual-tabs [role=tab]')||[])tab.addEventListener('click',()=>{for(const other of document.querySelectorAll('.manual-tabs [role=tab]')){const on=other===tab;other.setAttribute('aria-selected',String(on));$(other.dataset.pane).hidden=!on;}$('manual-body').scrollTop=0;});
+// connect's optional repeater: a full key (any repeater, temporary entry if needed) or a contact name; then the saved password logs in.
+async function openTarget(spec){
+ const key=/^[a-f0-9]{64}$/i.test(spec)?spec.toLowerCase():null;
+ if(mode==='direct'){if(key&&key!==targetKey)add('status','Connected repeater is '+targetKey.slice(0,12)+', not '+key.slice(0,12)+'.');return;}
+ if(key){$('manual-key').value=key;await connectKey();}
+ else{
+  const matches=contacts.filter(c=>c.type===2&&c.advName.toLowerCase()===spec.toLowerCase());
+  if(matches.length!==1){add('status',matches.length?'Several repeaters are named "'+spec+'"; use its public key.':'No repeater contact named "'+spec+'".');showConnection();$('target').focus();return;}
+  $('target').value=fullKey(matches[0].publicKey);auth=false;blocked=false;targetKey=$('target').value;$('password').value='';await offerSessions();
+ }
+ // With a saved password there is no dialog: the companion status line tracks the login instead.
+ const saved=await credentials.read(targetKey);
+ if(saved){const name=contacts.find(c=>fullKey(c.publicKey)===targetKey)?.advName||targetKey.slice(0,12);if(stepLine&&records.includes(stepLine)){stepLine.safeText=recordText('Logging in to '+name+' . . .');display();}await login(saved);}
+ else{showConnection();$('password').focus();}
+}
+// Companion commands answer from the attached companion only; nothing goes over the radio.
+const CONTACT_TYPES={1:'chat',2:'repeater',3:'room',4:'sensor'};
+async function companionRun(name,arg){
+ const c=transport.protocol;
+ if(name==='info'){
+  const self=transport.selfInfo||{},info=transport.deviceInfo||{};
+  const battery=await c.rpc(12,()=>c.sendCommandGetBatteryVoltage()).then(b=>(b.batteryMilliVolts/1000).toFixed(2)+' V').catch(()=>'unavailable');
+  return [['name',self.name],['model',info.manufacturerModel],['firmware',[info.firmwareVersion,info.firmware_build_date].filter(Boolean).join(' · ')],['battery',battery],
+   ['radio',self.radioFreq?`${self.radioFreq/1000} MHz · BW ${self.radioBw/1000} kHz · SF${self.radioSf} · CR${self.radioCr}`:''],['tx power',self.txPower!==undefined?self.txPower+' dBm':''],
+   ['public key',transport.gatewayKey],['contacts',String(contacts.length)]].filter(([,v])=>v).map(([k,v])=>k.padEnd(12)+v).join('\n');
+ }
+ if(name==='contacts'){
+  await readContacts();const filter=arg.toLowerCase();
+  const rows=contacts.filter(x=>!filter||x.advName.toLowerCase().includes(filter)).sort((a,b)=>a.advName.localeCompare(b.advName));
+  if(!rows.length)return 'No contacts'+(filter?' matching "'+arg+'"':'')+'.';
+  const width=Math.min(28,Math.max(...rows.map(x=>x.advName.length)))+2;
+  return rows.map(x=>x.advName.slice(0,26).padEnd(width)+(CONTACT_TYPES[x.type]||'type '+x.type).padEnd(10)+routeText(x.outPathLen,x.outPath,contacts).replace(/^Route: /,'')).join('\n')+'\n'+rows.length+' contact'+(rows.length===1?'':'s');
+ }
+ const n=await readRadioTotals(true);
+ return [['received',n.rx],['sent',n.tx],['sent flood',n.txFlood],['sent direct',n.txDirect],['recv flood',n.rxFlood],['recv direct',n.rxDirect]].map(([k,v])=>k.padEnd(12)+v).join('\n');
+}
 async function readDirectName(){try{const reply=directReply('get name',(await directCommand(transport,'get name')).text);return reply?.value.replace(/^>\s*/,'').trim()||null;}catch{return null;}}
-async function open(){if(busy||transport)return;busy=true;directName=null;writable=false;session=null;targetKey=null;records=[];history=new History();auth=false;region=false;$('live').textContent='';mode=$('mode').value;linkTx=0;linkRx=0;$('tx-count').textContent='0 B';$('rx-count').textContent='0 B';$('radio-tx').textContent='—';$('radio-rx').textContent='—';temporaryTargets=new TemporaryTargets();const localEpoch=++epoch;status.update({epoch,linkState:'connecting',deviceConnected:false,lastTargetResponseAt:null});update();factory=transportFactory({text:live,frame:(direction,bytes)=>live(frameSummary(direction,bytes)),log:()=>{},activity,disconnected:()=>{if(localEpoch!==epoch)return;blocked=busy;auth=false;update();add('status','Physical device disconnected. Pending execution may be uncertain.'+(temporaryTargets.created.size?' Temporary companion entries may remain because cleanup could not run.':''));}});
+async function open(reuse=null,quiet=false){if(busy||transport)return;busy=true;directName=null;writable=false;session=null;targetKey=null;if(reuse){keptHistory=history;add('boundary','── reconnecting ──');}else{records=[];history=new History();}auth=false;region=false;$('live').textContent='';mode=reuse?.mode||$('mode').value;linkTx=0;linkRx=0;$('tx-count').textContent='0 B';$('rx-count').textContent='0 B';$('radio-tx').textContent='—';$('radio-rx').textContent='—';temporaryTargets=new TemporaryTargets();const localEpoch=++epoch;status.update({epoch,linkState:'connecting',deviceConnected:false,lastTargetResponseAt:null});update();factory=transportFactory({text:live,frame:(direction,bytes)=>live(frameSummary(direction,bytes)),log:()=>{},activity,disconnected:()=>{if(localEpoch!==epoch)return;blocked=busy;auth=false;update();add('status','Physical device disconnected. Pending execution may be uncertain.'+(temporaryTargets.created.size?' Temporary companion entries may remain because cleanup could not run.':''));}});
   // The Connecting line is rewritten with the outcome rather than followed by it.
-  let connecting=null;const settle=text=>{if(connecting&&records.includes(connecting)){connecting.safeText=recordText(text);display();}else add('status',text);};
+  let connecting=null,focusAfter=null;const settle=text=>{if(connecting&&records.includes(connecting)){connecting.safeText=recordText(text);display();}else add('status',text);};
   try{
-    if(mode==='ble'){if(!navigator.bluetooth)throw Error('Web Bluetooth unavailable');const device=await navigator.bluetooth.requestDevice({filters:[{services:[Constants.Ble.ServiceUuid.toLowerCase()]}]});connecting=add('status','Connecting . . .');transport=await factory.ble(device);}else{if(!navigator.serial)throw Error('Web Serial unavailable');const port=await navigator.serial.requestPort();connecting=add('status','Connecting . . .');transport=await factory.serial(port,mode);mode=transport.mode;}
+    if(mode==='ble'){if(!navigator.bluetooth)throw Error('Web Bluetooth unavailable');const device=reuse?.device||await navigator.bluetooth.requestDevice({filters:[{services:[Constants.Ble.ServiceUuid.toLowerCase()]}]});lastLink={mode:'ble',device,targetKey:reuse?.targetKey||null};connecting=add('status',reuse?'Reconnecting . . .':'Connecting . . .');transport=await factory.ble(device);}else{if(!navigator.serial)throw Error('Web Serial unavailable');const port=reuse?.port||await navigator.serial.requestPort();lastLink={mode:'auto',port,targetKey:reuse?.targetKey||null};connecting=add('status',reuse?'Reconnecting . . .':'Connecting . . .');transport=await factory.serial(port,'auto');mode=transport.mode;}
     blocked=false;region=false;
-    if(mode==='direct'){const key=await directCommand(transport,'get public.key');const m=key.text.match(/(?:^|\s)([a-f0-9]{64})(?=$|\s)/i);if(!m)throw Error('Full target public key was not returned');targetKey=m[1].toLowerCase();directName=await readDirectName();auth=true;await offerSessions();settle('Connected to repeater console.');closeConnection();}
-    else{const initialized=await initializeCompanion(transport.protocol,transport.deviceInfo);transport.gatewayKey=initialized.gatewayKey;contacts=initialized.contacts;renderContacts();targetKey=$('target').value||null;auth=false;$('remote').hidden=false;showConnection();settle('Connected to companion. Select a repeater and log in.');stepLine=connecting;if(targetKey)await offerSessions();else add('status','No repeater contacts available in this companion.');}
+    if(mode==='direct'){const key=await directCommand(transport,'get public.key');const m=key.text.match(/(?:^|\s)([a-f0-9]{64})(?=$|\s)/i);if(!m)throw Error('Full target public key was not returned');targetKey=m[1].toLowerCase();lastLink.targetKey=targetKey;directName=await readDirectName();auth=true;await offerSessions();settle(reuse?'Reconnected to repeater console.':'Connected to repeater console.');closeConnection();}
+    else{const initialized=await initializeCompanion(transport.protocol,transport.deviceInfo);transport.gatewayKey=initialized.gatewayKey;transport.selfInfo=initialized.selfInfo;contacts=initialized.contacts;renderContacts();routeNote=null;routeStale=false;watchRoute(transport.protocol);await readRadioTotals().catch(e=>add('transport','Companion radio totals unavailable: '+e.message));startRadioPoll();if(reuse?.targetKey&&contacts.some(c=>c.type===2&&fullKey(c.publicKey)===reuse.targetKey))$('target').value=reuse.targetKey;targetKey=$('target').value||null;auth=false;$('remote').hidden=false;
+      // Reconnect logs back in to the same repeater with its saved password; without one the dialog asks.
+      const saved=reuse&&targetKey===reuse.targetKey?await credentials.read(targetKey):null;
+      if(saved){settle('Reconnected to companion. Logging back in . . .');stepLine=connecting;await offerSessions();busy=false;await login(saved);}
+      else{if(!quiet)showConnection();settle(reuse?'Reconnected to companion. Log in to continue.':'Connected to companion. Select a repeater and log in.');stepLine=connecting;if(targetKey)await offerSessions();else add('status','No repeater contacts available in this companion.');
+      // The clicked transport button is now disabled, so focus would otherwise land nowhere; applied once controls re-enable.
+      if(!quiet)focusAfter=targetKey?'password':'target';}}
   }catch(e){settle('Connection failed: '+e.message);await factory?.close();transport=null;targetKey=null;auth=false;}
-  finally{busy=false;update();}}
+  finally{busy=false;update();if(focusAfter)$(focusAfter).focus();}}
 async function readContacts(){const c=transport.protocol,next=[];await c.rpc(4,()=>c.sendCommandGetContacts(),15000,x=>{if(next.length>=2048)throw Error('Contact limit exceeded');next.push(x);});contacts=next;renderContacts();}
 function renderContacts(){const previous=targetKey;$('target').replaceChildren();for(const contact of contacts.filter(x=>x.type===2).sort((a,b)=>a.advName.localeCompare(b.advName))){const opt=document.createElement('option');opt.value=fullKey(contact.publicKey);opt.textContent=contact.advName+' · '+opt.value.slice(0,12);$('target').append(opt);}if(previous&&contacts.some(x=>x.type===2&&fullKey(x.publicKey)===previous))$('target').value=previous;}
 async function refreshContacts(){if(busy||!transport?.protocol)return;busy=true;update();try{const previous=targetKey;await readContacts();targetKey=$('target').value||null;if(targetKey!==previous){auth=false;blocked=false;$('password').value='';if(targetKey)await offerSessions();else{await release();session=null;records=[];history=new History();display();}}add('status','Contact list refreshed from companion: '+contacts.filter(c=>c.type===2).length+' stored repeaters. This reads saved contacts; it does not add discovered adverts.');}finally{busy=false;update();}}
 async function connectKey(){if(busy||!transport?.protocol)return;const value=$('manual-key').value;busy=true;update();try{await readContacts();const result=await temporaryTargets.ensure(value,contacts,transport.gatewayKey,transport.protocol);await readContacts();if(!contacts.some(c=>fullKey(c.publicKey)===result.key&&c.type===2))throw Error('Target entry was not returned by companion');const changed=targetKey!==result.key;targetKey=result.key;$('target').value=targetKey;if(changed){auth=false;blocked=false;tabState=null;await offerSessions();}else await restorePassword();add('status',result.temporary?'Public-key target selected. An internal temporary entry supports this connection.':'Public-key target selected using its existing contact.');$('manual-key').value='';}finally{busy=false;update();} $('password').focus();}
 async function cleanupTemporary(){if(!temporaryTargets.created.size)return;if(!transport?.connected||transport.protocol?.closed){add('status','Temporary companion entries may remain; device disconnected before cleanup.');return;}try{await readContacts();await temporaryTargets.cleanup(transport.protocol,contacts,note=>add('status',note));}catch(e){add('status','Temporary entries may remain; cleanup unavailable: '+e.message);}}
-async function close(){epoch++;abort?.abort();for(const cancel of [...transport?.protocol?.pending||[]])cancel();await cleanupTemporary();await factory?.close();transport=null;auth=false;blocked=false;region=false;busy=false;$('remote').hidden=true;history.reset();add('boundary','Disconnected.');await release();update();}
+async function close(){stopRadioPoll();epoch++;abort?.abort();for(const cancel of [...transport?.protocol?.pending||[]])cancel();await cleanupTemporary();await factory?.close();transport=null;auth=false;blocked=false;region=false;busy=false;$('remote').hidden=true;history.reset();add('boundary','Disconnected.');await release();update();}
 async function login(providedPassword=null){
  if(busy||!transport?.protocol||!targetKey)return;
  let password=typeof providedPassword==='string'?providedPassword:$('password').value;$('password').value='';
@@ -112,26 +173,38 @@ async function login(providedPassword=null){
   add('transport','Diagnostic engine login · target '+key.slice(0,12)+' · stored route '+path+' · '+(path===255?'flood':path===0?'direct zero-hop':'direct stored path'));
   const remembered=password,remember=$('remember-password').checked!==false;const result=await authenticateRepeater(c,key,password,note=>{notes.push(note);$('assistance').textContent=note;});password='';if(remember){const saved=await credentials.save(key,remembered);$('credential-status').textContent=saved?'Password saved for this repeater.':'Password could not be saved · '+credentials.error;}else await credentials.forget(key);
   for(const note of notes)add('transport',note);
-  auth=true;blocked=false;if(!session)await chooseSession();$('assistance').textContent='';
+  auth=true;blocked=false;if(lastLink)lastLink.targetKey=key;if(result.login?.gatewaySent?.viaFlood)routeStale=true;if(!session)await chooseSession();$('assistance').textContent='';
   // The companion's next-step line is rewritten once login completes.
   if(stepLine&&records.includes(stepLine)){stepLine.safeText='Connected · repeater admin access verified.';stepLine=null;display();}else add('status','Connected · repeater admin access verified.');status.update({lastTargetResponseAt:Date.now()});closeConnection();
  }catch(e){for(const note of notes)add('transport',note);add('status','Login stopped: '+e.message);$('assistance').textContent='Login stopped: '+e.message;auth=false;blocked=true;await factory?.close();transport=null;$('remote').hidden=true;}
- finally{password='';busy=false;update();}
+ finally{password='';busy=false;update();refreshRoute();}
 }
 function clearChoices(){$('completion-choices').textContent='';$('completion-choices').hidden=true;}
 function clearTerminal(){records=[];display();$('command').focus();}
-async function submit(){clearChoices();tabState=null;const raw=$('command').value;const help=helpRequest(raw,catalog);if(help!==null){add('command',raw,help.trim()&&!localCommand(help)?sensitive(raw,catalog):false);if(help.trim())add('local-help',helpText(help,catalog,mode));else add('help-overview',helpOverview());$('command').value='';tabState=null;return;}if(!raw.trim()&&!region)return;
+async function submit(){clearChoices();tabState=null;const raw=$('command').value;const help=companionCommand(raw)?null:helpRequest(raw,catalog);if(help!==null){add('command',raw,help.trim()&&!localCommand(help)?sensitive(raw,catalog):false);if(help.trim())add('local-help',helpText(help,catalog,mode));else add('help-overview',helpOverview());$('command').value='';tabState=null;return;}// A blank Enter echoes an empty prompt line, as a shell does; nothing is sent.
+  if(!raw.trim()&&!region){add('command','');$('command').value='';resizePrompt();return;}
   const local=localCommand(raw);
   if(local){
-    if(!local.valid){add('status','Usage: '+(local.name==='connect'?'connect [usb|bluetooth]':local.name));return;}
+    if(!local.valid){add('status','Usage: '+(local.name==='connect'?'connect [usb|bluetooth] ["contact name"|public_key]':local.name));return;}
     $('command').value='';resizePrompt();history.add(local.name);
     if(local.name==='background'){if(local.background){backgroundOn=local.background==='on';setBackground(backgroundOn);try{localStorage.setItem('console-background',local.background);}catch{}}add('status','Background: '+(backgroundOn?'on':'off'));return;}
     if(local.name==='theme'){if(local.theme){applyTheme(local.theme);try{localStorage.setItem('console-theme',local.theme);}catch{}}add('status','Theme: '+currentTheme()+' · available: '+THEMES.join(', '));return;}
     if(local.name==='clear')clearTerminal();
     else if(local.name==='exit')await close();
-    else if(local.transport){if(transport||busy){add('status','Already connected. Type exit first.');return;}selectTransport(local.transport);await open();}
+    else if(local.name==='reconnect'){if(transport||busy){add('status','Already connected.');return;}if(!lastLink){add('status','Nothing to reconnect. Use connect first.');return;}await open(lastLink);}
+    else if(local.transport){if(transport||busy){add('status','Already connected. Type exit first.');return;}selectTransport(local.transport);await open(null,!!local.target);if(local.target&&transport?.connected)await openTarget(local.target);}
     else showConnection();
     return;
+  }
+  const comp=companionCommand(raw);
+  if(comp){
+   if(!transport?.protocol){add('status','Companion commands need a companion connection.');return;}
+   add('command',raw);history.add(raw);$('command').value='';resizePrompt();
+   if(!comp.name||comp.name==='?'||comp.arg==='?'){add('local-help',Object.entries(COMPANION_COMMANDS).map(([n,d])=>'/'+n+'\n'+d).join('\n\n'));return;}
+   if(!Object.hasOwn(COMPANION_COMMANDS,comp.name)){add('status','Unknown companion command: '+comp.name+'. Try / ? for the list.');return;}
+   if(busy){$('assistance').textContent='One command is pending; no command has been queued.';return;}
+   busy=true;update();try{add('reply',await companionRun(comp.name,comp.arg));}catch(e){add('status','Companion command failed: '+e.message);}finally{busy=false;update();$('command').focus();}
+   return;
   }
   if(raw.startsWith(':')&&!raw.startsWith(':raw ')){add('status','Unknown local command. Use :raw followed by an exact firmware command.');return;}
   if(busy){$('assistance').textContent='One command is pending; no command has been queued.';return;}
@@ -145,9 +218,15 @@ async function submit(){clearChoices();tabState=null;const raw=$('command').valu
     let reply;
     if(mode==='direct'){const policy=region||text==='region load'?'interactive':text==='log'?'eof':text==='get acl'?'stream':/^(?:reboot|clkreboot|poweroff|shutdown)(?: |$)/.test(text)?'no-reply':'marked';reply=await directCommand(transport,text,{kind:policy,signal:abort.signal});if(text==='region load'&&!/ERR|Unknown|refus/i.test(reply.text))region=true;else if(region&&text==='')region=false;if(policy==='no-reply'&&!/ERR|refus/i.test(reply.text)){auth=false;blocked=true;}}
     else{const probe=new RemoteProbe(transport.protocol,deferredObserver(note=>{add('transport',note);$('assistance').textContent=note.startsWith('Companion SENT')?'Waiting for repeater…':'Sending command…';}));reply=await probe.cli(targetKey,text);}
-    Object.assign(pending,{kind:'reply',safeText:recordText(mode==='direct'?displayReply(text,reply.text):reply.text,secret),redacted:secret});display();add('transport','Reply attribution: '+reply.completionBasis);$('assistance').textContent='';status.update({lastTargetResponseAt:Date.now()});
+    Object.assign(pending,{kind:'reply',safeText:recordText(mode==='direct'?displayReply(text,reply.text):reply.text,secret),redacted:secret});display();add('transport','Reply attribution: '+reply.completionBasis+(Number.isInteger(reply.pathLength)?' · reply came back '+(reply.pathLength===255?'direct':(reply.pathLength&63)+' hop'+((reply.pathLength&63)===1?'':'s')):''));$('assistance').textContent='';status.update({lastTargetResponseAt:Date.now()});
   }catch(e){add('transport','Command stopped: '+e.message);if(e instanceof RemoteReplyTimeout&&transport?.connected&&auth){add('status','No reply received. You can send another command.');$('assistance').textContent='Ready · previous command received no reply';}else{blocked=true;add('status','Command stopped. Open diagnostics for details.');$('assistance').textContent='Command stopped · check diagnostics';}}
-  finally{if(pending.kind==='pending'){records=records.filter(r=>r!==pending);display();}busy=false;abort=null;update();$('command').focus();}}
+  finally{if(pending.kind==='pending'){records=records.filter(r=>r!==pending);display();}busy=false;abort=null;update();refreshRoute();$('command').focus();}}
+// Root command names render as a two-column list; every other match list is one line split by middle dots.
+function showChoices(result){
+ const box=$('completion-choices');
+ if(result.rows?.length){box.replaceChildren(...result.rows.map(([name,options])=>{const row=document.createElement('div');row.className='choice-row';const command=document.createElement('span');command.className='choice-command';command.textContent=name;const rest=document.createElement('span');rest.className='choice-options';rest.textContent=options;row.append(command,rest);return row;}));return;}
+ box.textContent=result.values.join(' · ')||result.hint||'No known completion.';
+}
 function errorAction(fn){return ()=>Promise.resolve().then(fn).catch(e=>{add('status',e.message);busy=false;update();});}
 $('reauthenticate').onclick=()=>{showConnection();$('password').focus();};
 function selectTransport(value){if(transport||busy)return;$('mode').value=value;$('mode-usb').setAttribute?.('aria-pressed',String(value==='auto'));$('mode-bluetooth').setAttribute?.('aria-pressed',String(value==='ble'));}
@@ -175,7 +254,13 @@ floatingPanel('diagnostics','diagnostics-head','diagnostics-resize');floatingPan
 $('password').oninput=()=>{passwordRevision++;};$('password').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();login().catch(error=>add('status',error.message));}};
 $('forget-password').onclick=errorAction(async()=>{if(!targetKey)return;passwordRevision++;const forgotten=await credentials.forget(targetKey);$('password').value='';$('credential-status').textContent=forgotten?'Saved password removed.':'Password could not be removed · '+credentials.error;});
 $('login').onclick=errorAction(login);$('refresh-contacts').onclick=errorAction(refreshContacts);$('connect-key').onclick=errorAction(connectKey);$('target').onchange=errorAction(async()=>{auth=false;blocked=false;targetKey=$('target').value;tabState=null;$('password').value='';await offerSessions();});
-if($('packet-stats'))$('packet-stats').onclick=errorAction(async()=>{if(busy||!transport?.protocol)throw Error('Connect a companion and wait for the current command first');busy=true;update();try{const probe=new RemoteProbe(transport.protocol);const bytes=await probe.wait([24],()=>transport.protocol.sendToRadioFrame(Uint8Array.of(56,2)),5000,f=>f[1]===2);const counts=packetCounters(bytes);$('radio-tx').textContent=String(counts.tx);$('radio-rx').textContent=String(counts.rx);add('transport','Companion radio totals · TX '+counts.tx+' · RX '+counts.rx+' · direct TX '+counts.txDirect+' · flood TX '+counts.txFlood+' (all traffic; compare before/after).');}finally{busy=false;update();}});
+// Radio TX/RX are the companion's own packet totals (command 56, subtype 2), not the remote repeater's.
+async function readRadioTotals(quiet=false){const probe=new RemoteProbe(transport.protocol);const bytes=await probe.wait([24],()=>transport.protocol.sendToRadioFrame(Uint8Array.of(56,2)),5000,f=>f[1]===2);const counts=packetCounters(bytes);$('radio-tx').textContent=String(counts.tx);$('radio-rx').textContent=String(counts.rx);if(!quiet)add('transport','Companion radio totals · TX '+counts.tx+' · RX '+counts.rx+' · direct TX '+counts.txDirect+' · flood TX '+counts.txFlood+' (all traffic; compare before/after).');return counts;}
+// While a companion is connected the totals refresh every 10 s; a tick is skipped while a command is in flight.
+let radioPoll=null;
+function startRadioPoll(){stopRadioPoll();radioPoll=setInterval(()=>{if(transport?.connected&&transport.protocol&&!busy){readRadioTotals(true).catch(()=>{});refreshRoute();}},10000);radioPoll.unref?.();}
+function stopRadioPoll(){clearInterval(radioPoll);radioPoll=null;}
+if($('packet-stats'))$('packet-stats').onclick=errorAction(async()=>{if(busy||!transport?.protocol)throw Error('Connect a companion and wait for the current command first');busy=true;update();try{await readRadioTotals();}finally{busy=false;update();}});
 $('radio-refresh').onclick=()=>$('packet-stats').click();
 $('command-form').onsubmit=e=>{e.preventDefault();submit().catch(e=>add('status',e.message));};
 $('cancel').onclick=()=>{if(!busy){$('command').value='';return;}abort?.abort();for(const cancel of [...transport?.protocol?.pending||[]])cancel();blocked=true;add('status','Local wait cancelled; no firmware cancellation sent.');update();};
@@ -186,7 +271,7 @@ $('command').onkeydown=e=>{if(e.isComposing)return;const input=$('command'),text
   if(e.ctrlKey&&e.key.toLowerCase()==='c'&&!input.value.substring(input.selectionStart,input.selectionEnd)){e.preventDefault();if(busy)$('cancel').click();else input.value='';return;}
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit().catch(err=>add('status',err.message));return;}
   if(e.key==='ArrowUp'||e.key==='ArrowDown'){if(region)return;e.preventDefault();const value=history.move(e.key==='ArrowUp'?-1:1,text,cursor);input.value=value.text;input.setSelectionRange(value.cursor,value.cursor);tabState=null;clearChoices();resizePrompt();return;}
-  if(e.key==='Tab'&&!escapeTab){e.preventDefault();if(region){$('assistance').textContent='Region row mode: preserve indentation; blank Enter commits. No command completion.';return;}const result=auth?complete(catalog,text,cursor):localComplete(text,cursor),signature=text+'@'+cursor;if(tabState===signature){const matches=(result.labels||result.values).join('  ')||result.hint||'No known completion.';$('completion-choices').textContent=matches;$('completion-choices').hidden=false;$('assistance').textContent=result.values.length?result.values.length+' matches · keep typing to narrow':'No known completion.';}else{if(result.replacement){const r=result.replacement;input.value=text.slice(0,r.start)+r.text+text.slice(r.end);input.setSelectionRange(r.cursor,r.cursor);}$('assistance').textContent=result.hint||'';}tabState=input.value+'@'+input.selectionStart;resizePrompt();return;}
+  if(e.key==='Tab'&&!escapeTab){e.preventDefault();if(region){$('assistance').textContent='Region row mode: preserve indentation; blank Enter commits. No command completion.';return;}const onCompanion=!!transport?.protocol,result=onCompanion&&companionCommand(text)?companionComplete(text,cursor):auth?complete(catalog,text,cursor):localComplete(text,cursor,{companion:onCompanion}),signature=text+'@'+cursor;if(tabState===signature){showChoices(result);$('completion-choices').hidden=false;$('assistance').textContent=result.values.length?result.values.length+' matches · keep typing to narrow':'No known completion.';}else{if(result.replacement){const r=result.replacement;input.value=text.slice(0,r.start)+r.text+text.slice(r.end);input.setSelectionRange(r.cursor,r.cursor);}$('assistance').textContent=result.hint||'';}tabState=input.value+'@'+input.selectionStart;resizePrompt();return;}
   if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key))tabState=null;
 };
 window.addEventListener('pagehide',()=>{factory?.close();});

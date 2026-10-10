@@ -633,14 +633,15 @@ to {
 }
 .traffic-pair b {
   font-weight:400;
-  color:#b7cbe0
+  color:#9eb5ce
 }
 .traffic-pair span[data-active=true] {
-  color:var(--accent);
-  text-shadow:0 0 12px #2dd1bd80
-}
-.traffic-pair span[data-active=true] b {
   color:var(--accent)
+}
+/* Only the TX/RX label pulses; the byte count keeps its normal colour */
+.traffic-pair span[data-active=true] b {
+  color:#9eb5ce;
+  text-shadow:none
 }
 #radio-refresh {
   font:12px var(--mono);
@@ -869,7 +870,7 @@ to {
 .completion-choices {
   padding:6px 0 10px 0;
   color:#858d9b;
-  font:inherit;
+  font:.9375rem/1.65 var(--mono);
   white-space:pre-wrap;
   overflow-wrap:anywhere;
   line-height:1.65
@@ -901,11 +902,12 @@ to {
   margin-right:1ch
 }
 
+/* Prompts on lines already processed are dimmed; only the live prompt is bright */
 ::highlight(cli-prompt-host) {
-  color:var(--accent)
+  color:color-mix(in srgb,var(--accent) 45%,transparent)
 }
 ::highlight(cli-prompt-symbol) {
-  color:#9eb5ce
+  color:color-mix(in srgb,#9eb5ce 45%,transparent)
 }
 
 
@@ -929,7 +931,7 @@ to {
 }
 
 .app-shell  {
- background:radial-gradient(circle at 88% 92%,rgba(249,162,40,.06),transparent 28%),radial-gradient(circle at 90% 8%,rgba(232,99,122,.08),transparent 25%),linear-gradient(180deg,var(--bg-0),var(--bg-1) 45%,var(--bg-0));
+ background:radial-gradient(circle at 90% 8%,rgba(232,99,122,.08),transparent 25%),linear-gradient(180deg,var(--bg-0),var(--bg-1) 45%,var(--bg-0));
 
 }
 
@@ -1249,9 +1251,26 @@ summary:focus-visible, a:focus-visible {
   height:100%;
   z-index:0;
   pointer-events:none;
+  opacity:.65;
   filter:blur(.5px)
 }
 .app-bar,.workspace-strip,.terminal,.status-bar {
   position:relative;
   z-index:1
+}
+
+.choice-row {
+  display:grid;
+  grid-template-columns:12ch 1fr
+}
+.choice-command {
+  color:var(--ink)
+}
+.choice-options {
+  color:var(--muted)
+}
+
+/* Names the link the byte counters measure, the way "Radio" names the companion's packet totals */
+#link-kind {
+  margin-right:-8px
 }

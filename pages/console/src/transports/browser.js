@@ -17,10 +17,10 @@ class DiagnosticConnection extends Connection {
     observeActivity({direction:'RX',bytes:bytes.length});events.frame?.('RX',bytes);
     if(bytes[0]===0){this.onFrameReceived(bytes);return;}
     if(bytes[0]===24&&bytes.length>=26)this.emit('wire',Uint8Array.from(bytes));
-    const rawMin={1:1,6:10,7:13,8:7,10:1,16:16,17:10,131:1,133:8,134:8};
+    const rawMin={1:1,6:10,7:13,8:7,10:1,16:16,17:10,129:33,131:1,133:8,134:8};
     if(bytes[0]in rawMin&&bytes.length>=rawMin[bytes[0]])this.emit('wire',Uint8Array.from(bytes));
     // Only diagnostic response codes are decoded: unsolicited messages are not exported.
-    const min={1:1,2:5,3:148,4:5,5:58,13:20};
+    const min={1:1,2:5,3:148,4:5,5:58,12:3,13:20};
     if(!(bytes[0]in min))return;
     if(bytes.length<min[bytes[0]]){log('Ignored truncated application response');return;}
     try{if(bytes[0]===13)this.emit(13,deviceInfo(bytes));else this.onFrameReceived(bytes);}catch(e){log('Malformed application response: '+e.message);}

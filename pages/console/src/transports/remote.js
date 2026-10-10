@@ -12,7 +12,7 @@ export function matchingReply(frame,key,tag){const m=message(frame);return m&&m.
 export function replyWaitMs(estimatedTimeoutMs){if(!Number.isFinite(estimatedTimeoutMs)||estimatedTimeoutMs<0)throw Error('Invalid companion timeout estimate');return Math.max(30000,estimatedTimeoutMs+5000);}
 // A lost login reply is common on a busy channel; a repeated login is harmless, so retry promptly.
 export const LOGIN_ATTEMPTS=3;
-export function loginWaitMs(estimatedTimeoutMs){if(!Number.isFinite(estimatedTimeoutMs)||estimatedTimeoutMs<0)throw Error('Invalid companion timeout estimate');return Math.max(8000,estimatedTimeoutMs*2);}
+export function loginWaitMs(estimatedTimeoutMs){if(!Number.isFinite(estimatedTimeoutMs)||estimatedTimeoutMs<0)throw Error('Invalid companion timeout estimate');return Math.max(5000,estimatedTimeoutMs*2);}
 export class RemoteReplyTimeout extends Error {constructor(detail){super(detail);this.name='RemoteReplyTimeout';}}
 export function packetCounters(frame){if(frame[0]!==24||frame[1]!==2||frame.length<26)throw Error('Invalid packet counter response');const v=new DataView(frame.buffer,frame.byteOffset,frame.byteLength);return {rx:v.getUint32(2,true),tx:v.getUint32(6,true),txFlood:v.getUint32(10,true),txDirect:v.getUint32(14,true),rxFlood:v.getUint32(18,true),rxDirect:v.getUint32(22,true)};}
 function sent(frame){if(frame.length<10)throw Error('Truncated SENT response');const estimatedTimeoutMs=new DataView(frame.buffer,frame.byteOffset+6,4).getUint32(0,true);return {viaFlood:!!frame[1],estimatedTimeoutMs};}

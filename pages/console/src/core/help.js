@@ -22,6 +22,7 @@ export function helpText(path,catalog,mode){
 export const HELP_OVERVIEW=[
  ['connect','Open the connection dialog (also F2 or the top-right button)'],
  ['exit','Disconnect (also quit, disconnect, close)'],
+ ['reconnect','Reopen the last device and resume the session'],
  ['clear','Clear the output (also cls)'],
  ['background on|off','Animated mesh background'],
  ['theme <name>','Colour theme: default, amber, grey, green, retro'],
