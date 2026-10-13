@@ -71,7 +71,7 @@ export class RemoteProbe {
     }
     throw Error('Queued-message drain exceeded 1024 records; remote test stopped');
   }
-  async cli(key,command){
+  async cli(key,command,signal=null){
     if(/[\0\r\n]/.test(command)||new TextEncoder().encode(command).length>157)throw Error('Remote command must fit 157 UTF-8 bytes without line breaks/NUL');
     const c=this.c,tag=token();let reply=null,unmatched=0,polls=0;
     const capture=f=>{const m=matchingReply(f,key,tag);if(m)reply=m;else if([7,16].includes(f[0]))unmatched++;};
@@ -81,12 +81,16 @@ export class RemoteProbe {
       const ack=sent(await this.wait([6],async()=>{await c.sendCommandSendTxtMsg(1,0,0,keyBytes(key),tag+'|'+command);this.notify('Companion transport write completed · tag '+tag);}));
       const deadline=Date.now()+replyWaitMs(ack.estimatedTimeoutMs);
       this.notify('Companion SENT received · tag '+tag+' · '+(ack.viaFlood?'flood':'direct')+' · estimate '+ack.estimatedTimeoutMs+' ms · wait '+replyWaitMs(ack.estimatedTimeoutMs)+' ms. SENT confirms acceptance, not radio TX.');
+      const timedOut=()=>new RemoteReplyTimeout('Repeater reply timed out; query outcome uncertain; no retry · tag '+tag+' · queue polls '+polls+' · unmatched messages '+unmatched);
       while(!reply){
+        if(signal?.aborted)throw Error('Stopped waiting for the reply');
         if(c.closed)throw Error('Companion disconnected; query outcome uncertain');
-        if(Date.now()>=deadline)throw new RemoteReplyTimeout('Repeater reply timed out; query outcome uncertain; no retry · tag '+tag+' · queue polls '+polls+' · unmatched messages '+unmatched);
+        if(Date.now()>=deadline)throw timedOut();
         // One local RPC at a time, independent of the outstanding LoRa wait.
-        polls++;const frame=await this.wait([7,8,10,16,17],()=>c.sendCommandSyncNextMessage(),Math.min(5000,Math.max(1,deadline-Date.now())));
-        if(frame[0]===10&&!reply)await new Promise(resolve=>setTimeout(resolve,250));
+        polls++;let frame;
+        try{frame=await this.wait([7,8,10,16,17],()=>c.sendCommandSyncNextMessage(),Math.min(5000,Math.max(1,deadline-Date.now())));}
+        catch(e){if(reply)break;if(c.closed||e.message!=='Companion response timed out')throw e;continue;}
+        if(frame[0]===10&&!reply)await new Promise(resolve=>{const timer=setTimeout(resolve,250);signal?.addEventListener('abort',()=>{clearTimeout(timer);resolve();},{once:true});});
       }
       if(command==='get public.key'){
         const found=reply.text.match(/(?:^|\s)([a-f0-9]{64})(?=$|\s)/i);

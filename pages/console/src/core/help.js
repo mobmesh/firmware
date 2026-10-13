@@ -33,6 +33,7 @@ export const HELP_OVERVIEW=[
  ['F3','Diagnostics panel and live stream'],
  ['Ctrl+Shift+Enter','Full screen'],
  [':raw <command>','Send exactly as typed, skipping catalog checks'],
+ ['Ctrl+C','Stop waiting for a reply (copies instead when text is selected)'],
  ['Esc','Close the open dialog'],
 ];
 export const HELP_KEY_WIDTH=Math.max(...HELP_OVERVIEW.map(([key])=>key.length))+2;

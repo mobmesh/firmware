@@ -93,6 +93,9 @@ button:focus-visible,input:focus-visible,select:focus-visible {
   display:grid;
   place-items:center;
   font:600 22px var(--mono);
+  letter-spacing:0;
+  line-height:1;
+  text-box:trim-both cap alphabetic;
   background:linear-gradient(145deg,#243b3a,#151c27);
   border:1px solid #395b51;
   border-radius:9px;
@@ -1391,4 +1394,36 @@ summary:focus-visible, a:focus-visible {
   display:flex;
   flex-wrap:wrap;
   gap:9px
+}
+.workspace-strip {
+  position:relative
+}
+body[data-login] .workspace-strip::after {
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:-1px;
+  height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent) no-repeat;
+  background-size:35% 100%;
+  animation:login-scan 1.4s ease-in-out infinite;
+  pointer-events:none
+}
+@keyframes login-scan {
+  from { background-position:-60% 0 }
+  to { background-position:160% 0 }
+}
+body[data-login] #admin-led {
+  background:var(--accent);
+  box-shadow:0 0 8px var(--accent);
+  animation:login-pulse .8s ease-in-out infinite alternate
+}
+@keyframes login-pulse {
+  from { opacity:.35 }
+  to { opacity:1 }
+}
+@media (prefers-reduced-motion:reduce) {
+  body[data-login] .workspace-strip::after { animation:none; background-size:100% 100% }
+  body[data-login] #admin-led { animation:none }
 }
