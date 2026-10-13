@@ -1,4 +1,5 @@
 import {wireInput} from '../core/grammar.js';
+const SLOW_REPLIES={'get ota.slot':30000,'ota wan join':30000,'ota wan check':75000};
 export function directCommand(transport,raw,{kind='marked',signal}={}){
   const text=wireInput(raw,'direct');
   return new Promise((resolve,reject)=>{
@@ -7,8 +8,9 @@ export function directCommand(transport,raw,{kind='marked',signal}={}){
     const abort=()=>finish(Error('Wait cancelled; execution outcome uncertain'));
     const result=basis=>({text:content,completionBasis:basis});
     const expired=()=>finish(Error('Reply deadline reached; execution outcome uncertain'));
-    // Slot status verifies the inactive image from flash before producing its reply.
-    const waitMs=kind==='no-reply'?1500:kind==='eof'?60000:stream?15000:text.trim()==='get ota.slot'?30000:5000;
+    // Some commands work before replying: slot status hashes the inactive image, a WiFi join waits
+    // up to 15 s plus a 5 s clock sync, and a WAN check makes up to three 20 s requests.
+    const waitMs=kind==='no-reply'?1500:kind==='eof'?60000:stream?15000:SLOW_REPLIES[text.trim()]||5000;
     let timer=setTimeout(()=>kind==='no-reply'?finish(null,result('sent-no-result')):expired(),waitMs);
     if(signal?.aborted){abort();return;}signal?.addEventListener('abort',abort,{once:true});
     transport.receive(chunk=>{if(chunk===null){kind==='no-reply'?finish(null,result('disconnected-after-send')):finish(Error('Disconnected while waiting; execution outcome uncertain'));return;}content+=chunk;if(content.length>2*1024*1024){finish(Error('Response exceeded retention limit'));return;}if(kind==='eof'&&content.includes('   EOF')){finish(null,result('eof'));return;}if(kind!=='eof'&&(content.includes('  -> ')||(stream&&content.includes(text)))){
