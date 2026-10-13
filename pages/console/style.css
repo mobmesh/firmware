@@ -76,6 +76,13 @@ button:focus-visible,input:focus-visible,select:focus-visible {
   font-size:1.05rem;
   letter-spacing:-.035em
 }
+.brand-link {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  color:inherit;
+  text-decoration:none
+}
 .brand strong {
   font-weight:500;
   color:#aab8ca

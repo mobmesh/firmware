@@ -371,6 +371,7 @@ $('terminal-scroll').addEventListener?.('touchend',()=>{if(!swipe)return;const d
  if(Math.abs(dy)>=30&&pinch<Math.abs(dy)*.5){recall(dy<0?-1:1);$('command').focus();}});
 $('command-form').addEventListener?.('touchend',e=>{if(!swipe)return;const t=e.changedTouches[0],dx=t.clientX-swipe.x,dy=t.clientY-swipe.y;swipe=null;if(Math.abs(dy)>=24&&Math.abs(dy)>Math.abs(dx)*1.5)recall(dy<0?-1:1);});$('manual-close').onclick=()=>{$('manual').hidden=true;};
 $('clear-terminal').onclick=clearTerminal;
+$('brand-back').onclick=e=>{if(history.length>1&&document.referrer.startsWith(location.origin)){e.preventDefault();history.back();}};
 $('fullscreen').onclick=()=>{const action=document.fullscreenElement?document.exitFullscreen?.():document.documentElement?.requestFullscreen?.();Promise.resolve(action).catch(()=>{$('assistance').textContent='Full screen is unavailable in this browser.';});};
 $('terminal-scroll').onclick=e=>{if(!globalThis.getSelection?.()?.toString()&&['terminal-scroll','output','welcome'].includes(e.target.id))$('command').focus();};
 document.addEventListener?.('keydown',e=>{if(e.isComposing)return;if(e.key==='F2'){e.preventDefault();if($('connection-dialog').open)closeConnection();else showConnection();}else if(e.key==='F3'){e.preventDefault();$('diagnostics-toggle').click();}else if(e.key==='F1'){e.preventDefault();toggleManual();}else if(e.ctrlKey&&e.shiftKey&&e.key==='Enter'){e.preventDefault();$('fullscreen').click();}});
