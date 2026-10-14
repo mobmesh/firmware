@@ -249,11 +249,11 @@ jobs:
           fi
 
           # --- 7. do the upstream commands the mods send or intercept still exist? --
-          # Moved commands are collapsed detail worth knowing; anything else the checker
-          # prints besides a pass line is a problem.
+          # Moved commands still work, so they count as a pass with the list folded under it;
+          # anything else the checker prints besides a pass line is a problem.
           awk '
-            /^<details>/ { blk = 1; print "" >> "notes.md" }
-            blk { print >> "notes.md"; if (/^<\/details>/) blk = 0; next }
+            /^<details>/ { blk = 1; s = $0; gsub(/<[^>]*>/, "", s); sub(/ -- /, ": ", s); print "- " s >> "ok.md"; print "" >> "ok.md" }
+            blk { print "  " $0 >> "ok.md"; if (/^<\/details>/) blk = 0; next }
             /^- / { dest = ($0 ~ /still handled$|acknowledged:/) ? "ok.md" : "actions.md"; print >> dest; next }
             /^  - / { print >> dest; next }
           ' "$CONTRACTS"
