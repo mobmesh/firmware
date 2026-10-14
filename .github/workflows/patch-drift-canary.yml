@@ -365,8 +365,8 @@ jobs:
             const passedBlock = other => passed ? `<details><summary>All ${passed}${other} checks passed</summary>\n\n${ok}\n\n</details>` : '';
             const needsAttention = !!actions;
             const title = needsAttention
-              ? 'Upstream changes need attention before the next firmware update'
-              : 'Heads-up: upstream moved code our patches touch (no action needed)';
+              ? 'canary: upstream changes need attention before the next release'
+              : 'canary: upstream moved code patches touch (no action needed)';
             const lead = needsAttention
               ? "Today's releases are unaffected, since they build from tagged upstream versions. The items under **Needs attention** will matter once upstream releases these changes, so they're worth handling before the next firmware update."
               : 'Nothing is broken. Releases build from tagged upstream versions and are unaffected.' +
