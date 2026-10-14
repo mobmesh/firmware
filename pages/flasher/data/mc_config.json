@@ -465,8 +465,8 @@
 					"github-ripple": {
 						"type": "t-deck-prov11",
 						"files": {
-							"flash-wipe": "Ultra-TDeckProV1.1-[^-]+-merged\\.bin",
-							"flash-update": "Ultra-TDeckProV1.1-[^-]+\\.bin"
+							"flash-wipe": "Ultra-TDeckProV1.1-2nd-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-TDeckProV1.1-2nd-[^-]+\\.bin"
 						}
 					}
 				},
@@ -854,6 +854,37 @@
 									"title": "Firmware uf2"
 								}
 							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"maker": "seeed",
+			"name": "Seeed Studio Wio Tracker L2 Pro",
+			"tooltip": "<img class='device' src='/img/wio_tracker_l2.svg'>",
+			"icon": "/img/lora.svg",
+			"type": "esp32",
+			"firmware": [
+				{
+					"class": "ripple",
+					"role": "gui",
+					"github-ripple": {
+						"type": "wio-tracker-l2",
+						"files": {
+							"flash-wipe": "Ultra-WioTracker-L2-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-WioTracker-L2-[^-]+\\.bin"
+						}
+					}
+				},
+				{
+					"class": "ripple",
+					"role": "guiSD",
+					"github-ripple": {
+						"type": "wio-tracker-l2",
+						"files": {
+							"flash-wipe": "Ultra-WioTracker-L2-SD-[^-]+-merged\\.bin",
+							"flash-update": "Ultra-WioTracker-L2-SD-[^-]+\\.bin"
 						}
 					}
 				}
@@ -2128,7 +2159,6 @@
 						}
 					}
 				},
-
 				{
 					"class": "community",
 					"role": "kissRadio",
@@ -4826,8 +4856,8 @@
 					"github-ripple": {
 						"type": "thinknode-m9",
 						"files": {
-							"flash-wipe": "Ultra-Thinknode-M9-.*?-merged\\.bin",
-							"flash-update": "Ultra-Thinknode-M9-[^-]+\\.bin"
+							"flash-wipe": "Ultra-Thinknode-?M9-.*?-merged\\.bin",
+							"flash-update": "Ultra-Thinknode-?M9-[^-]+\\.bin"
 						}
 					}
 				}
