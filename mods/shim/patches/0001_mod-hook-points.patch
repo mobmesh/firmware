@@ -672,9 +672,7 @@ index 546d094..d7d8fb8 100644
  
    switch (mesh::chooseReplyScope(req_scope_known, is_wildcard, !default_scope.isNull())) {
      case mesh::REPLY_SCOPE_REQUEST:
-@@ -984,7 +1220,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
-       snprintf(reply, MAX_POST_TEXT_LEN, "OK");
-     }
+@@ -986,5 +1222,12 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
    } else{
 -    _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
 +    // Mods first: this is the only call site both the release tag and dev spell the same way.
