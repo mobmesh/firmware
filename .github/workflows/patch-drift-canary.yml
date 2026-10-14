@@ -15,7 +15,6 @@ permissions:
 
 env:
   UPSTREAM_REPO: meshcore-dev/MeshCore
-  ISSUE_TITLE: "Patch drift against upstream branches"
   CANARY_EXTRA_MODS: sync-settings
 
 jobs:
@@ -31,11 +30,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           pip install --quiet pyyaml==6.0.3
-          REPORT=report.md
           EXPLAIN=explain.md
-          : > "$REPORT"
           : > "$EXPLAIN"
-          DRIFT=false
+          : > actions.md
+          : > notes.md
+          : > ok.md
+          act()  { echo "- $1" >> actions.md; }
+          note() { echo "- $1" >> notes.md; }
+          ok()   { echo "- $1" >> ok.md; }
+          codes() { for p in $1; do printf ' `%s`' "$p"; done; }
 
           # --- 1. do the patches still apply? -------------------------------------
           # The ordered union, so target-specific mods are included without applying
@@ -61,7 +64,7 @@ jobs:
             rm -rf probe-src
             git clone --quiet --branch "$ref" \
               "https://github.com/${UPSTREAM_REPO}.git" probe-src 2>/dev/null || {
-                echo "- \`$ref\`: **could not clone** (branch missing?)" >> "$REPORT"
+                note "couldn't fetch upstream \`$ref\` today (branch missing?), so it wasn't checked"
                 continue
               }
             sha=$(git -C probe-src rev-parse --short HEAD)
@@ -79,8 +82,7 @@ jobs:
                 if git -C seed-src apply "../$patch"; then
                   git -C seed-src add -A
                 else
-                  echo "- \`$mod/$(basename "$patch")\` does not apply to \`$BASE\` itself -- its three-way results below are unreliable" >> "$REPORT"
-                  DRIFT=true
+                  act "\`$mod/$(basename "$patch")\` doesn't apply to the release it was made for (\`$BASE\`), so its results below aren't reliable. Regenerate it against \`$BASE\`."
                 fi
               done
             done
@@ -140,17 +142,13 @@ jobs:
             rc=0
             python3 scripts/check_command_contracts.py --tree probe-src --base "$BASE" \
               --head HEAD --ref "$ref" --boards "$BOARDS" >> "$CONTRACTS" || rc=$?
-            [ "$rc" = 2 ] && DRIFT=true
-            [ "$rc" != 0 ] && [ "$rc" != 2 ] && echo "- \`$ref\`: command contract check **crashed** (exit $rc) -- see the run log" >> "$CONTRACTS"
-            if [ -z "$placed$conflicted" ]; then
-              echo "- \`$ref\` (\`$sha\`): all patches apply" >> "$REPORT"
-            else
-              DRIFT=true
-              echo "- \`$ref\` (\`$sha\`): **DRIFT**" >> "$REPORT"
-              [ -n "$conflicted" ] && echo "  - **needs a person**:$conflicted" >> "$REPORT"
-              [ -n "$placed" ] && echo "  - three-way relocates unaided:$placed" >> "$REPORT"
-              [ -n "$conflicted" ] && echo "  - patches after the first conflict were applied to a tree missing its hunks; treat their results as provisional" >> "$REPORT"
+            [ "$rc" != 0 ] && [ "$rc" != 2 ] && echo "- \`$ref\`: the command check crashed (exit $rc); see the run log" >> "$CONTRACTS"
+            [ -z "$placed$conflicted" ] && ok "\`$ref\` (\`$sha\`): all patches apply"
+            if [ -n "$conflicted" ]; then
+              act "\`$ref\` (\`$sha\`):$(codes "$conflicted") no longer applies, even with git's three-way merge. It needs updating by hand before upstream releases \`$ref\`."
+              echo "  - patches after the first conflict were tried on an incomplete tree, so treat their results as provisional" >> actions.md
             fi
+            [ -n "$placed" ] && note "\`$ref\` (\`$sha\`): upstream changed the code around$(codes "$placed"), but git still places the patch on its own. Refresh it when upstream releases \`$ref\`."
           done
 
           # --- 2. has a carried upstream PR been merged? ---------------------------
@@ -162,10 +160,9 @@ jobs:
             state=$(gh api "repos/${UPSTREAM_REPO}/pulls/${pr}" \
               --jq 'if .merged then "MERGED" else .state end' 2>/dev/null || echo "unknown")
             if [ "$state" = "MERGED" ]; then
-              DRIFT=true
-              echo "- \`$patch\` carries upstream PR #${pr}, which is now **MERGED** -- the patch may be redundant" >> "$REPORT"
+              act "\`$patch\` carries upstream PR #${pr}, which has now been merged. The patch may no longer be needed; review it before the next release."
             else
-              echo "- \`$patch\` carries upstream PR #${pr} (${state}) -- still needed" >> "$REPORT"
+              ok "\`$patch\` carries upstream PR #${pr} (${state}), still needed"
             fi
           done
 
@@ -178,13 +175,11 @@ jobs:
               probe-src/variants/heltec_v4/HeltecV4Board.h 2>/dev/null \
               | grep -oE '[0-9.]+$' || echo "")
             if [ -z "$found" ]; then
-              DRIFT=true
-              echo "- upstream's \`ADC_MULTIPLIER\` default could not be found in HeltecV4Board.h -- the override may no longer apply" >> "$REPORT"
+              act "upstream's \`ADC_MULTIPLIER\` default is no longer in HeltecV4Board.h, so our 5.32 override may not apply anymore. Check where it moved."
             elif [ "$found" != "$EXPECTED_ADC_MULT" ]; then
-              DRIFT=true
-              echo "- upstream changed \`ADC_MULTIPLIER\` from ${EXPECTED_ADC_MULT} to ${found}; the override stays 5.32 (bench-measured) -- worth re-measuring" >> "$REPORT"
+              act "upstream changed \`ADC_MULTIPLIER\` from ${EXPECTED_ADC_MULT} to ${found}. Our override stays 5.32 (bench-measured); worth re-measuring."
             else
-              echo "- upstream \`ADC_MULTIPLIER\` still ${found}; overridden with 5.32 (bench-measured)" >> "$REPORT"
+              ok "upstream \`ADC_MULTIPLIER\` still ${found}; overridden with 5.32 (bench-measured)"
             fi
           fi
 
@@ -194,10 +189,9 @@ jobs:
           if [ -d probe-src ] && echo " $MODS " | grep -q " power-guard "; then
             if grep -qE 'sleep\(false\)' \
               probe-src/src/helpers/radiolib/CustomSX1262Wrapper.h 2>/dev/null; then
-              echo "- upstream \`CustomSX1262Wrapper::powerOff()\` still sleeps the SX1262; power-guard's poweroff path relies on it" >> "$REPORT"
+              ok "upstream \`CustomSX1262Wrapper::powerOff()\` still sleeps the SX1262; power-guard's poweroff path relies on it"
             else
-              DRIFT=true
-              echo "- upstream \`CustomSX1262Wrapper::powerOff()\` no longer calls \`sleep(false)\` -- power-guard's poweroff path may leave the radio awake (see mods/power-guard/README.md)" >> "$REPORT"
+              act "upstream \`CustomSX1262Wrapper::powerOff()\` no longer calls \`sleep(false)\`, so power-guard's poweroff may leave the radio awake and drain the battery faster. See mods/power-guard/README.md."
             fi
           fi
 
@@ -210,10 +204,9 @@ jobs:
               len=${#cmd}
               if grep -qE "sender_timestamp == 0 && memcmp\\(command, \"$cmd\", $len\\)" \
                 probe-src/src/helpers/CommonCLI.cpp 2>/dev/null; then
-                echo "- upstream still serial-gates \`$cmd\` on \`sender_timestamp == 0\`; power-guard's remote forward relies on it" >> "$REPORT"
+                ok "upstream still serial-gates \`$cmd\` on \`sender_timestamp == 0\`; power-guard's remote forward relies on it"
               else
-                DRIFT=true
-                echo "- upstream's \`$cmd\` serial gate changed shape -- power-guard may forward a command that no longer exists, or one that is now blocked for another reason (see mods/power-guard/README.md)" >> "$REPORT"
+                act "upstream changed how \`$cmd\` is limited to serial, so power-guard's remote forward may stop working for it. See mods/power-guard/README.md."
               fi
             done
           fi
@@ -225,43 +218,45 @@ jobs:
             ROOM=probe-src/examples/simple_room_server/MyMesh.cpp
             # Upstream fixing the repeater/room-server asymmetry itself makes the repeat.gate patch redundant.
             if grep -qE 'recv_pkt_region == NULL' "$ROOM" 2>/dev/null; then
-              DRIFT=true
-              echo "- upstream's room-server \`allowPacketForward\` now bails on \`recv_pkt_region == NULL\` itself -- the repeat.gate patch is likely redundant, and \`set repeat.gate off\` may no longer disable gating (see mods/sync-settings/README.md)" >> "$REPORT"
+              act "upstream's room server now skips forwarding unscoped packets itself, so the repeat.gate patch is probably redundant and \`set repeat.gate off\` may stop working. See mods/sync-settings/README.md."
             else
-              echo "- upstream's room server still forwards regardless of region; the repeat.gate patch is still needed" >> "$REPORT"
+              ok "upstream's room server still forwards regardless of region; the repeat.gate patch is still needed"
             fi
             # The gate reads this to decide scope; a rename compiles but measures the wrong thing.
             if grep -q 'recv_pkt_region' "$ROOM" 2>/dev/null; then
-              echo "- upstream's room server still tracks \`recv_pkt_region\`; repeat.gate depends on it" >> "$REPORT"
+              ok "upstream's room server still tracks \`recv_pkt_region\`; repeat.gate depends on it"
             else
-              DRIFT=true
-              echo "- upstream's room server no longer tracks \`recv_pkt_region\` -- repeat.gate's scope test has lost its input" >> "$REPORT"
+              act "upstream's room server no longer tracks \`recv_pkt_region\`, which repeat.gate uses to decide scope."
             fi
             # repeat.gate is subtractive only because disable_fwd is tested first.
             if grep -A 2 'bool MyMesh::allowPacketForward' "$ROOM" 2>/dev/null | grep -q '_prefs.disable_fwd'; then
-              echo "- upstream's room server still tests \`disable_fwd\` first; repeat.gate stays inert behind \`repeat off\`" >> "$REPORT"
+              ok "upstream's room server still tests \`disable_fwd\` first; repeat.gate stays inert behind \`repeat off\`"
             else
-              DRIFT=true
-              echo "- upstream's room server no longer tests \`disable_fwd\` first in \`allowPacketForward\` -- repeat.gate may now affect a node with repeating off" >> "$REPORT"
+              act "upstream's room server no longer checks \`disable_fwd\` first, so repeat.gate could affect a node with repeating turned off."
             fi
             # sync-settings claims 'set repeat on' to append a notice; a rename drops it silently.
             if grep -qE 'memcmp\(config, "repeat ", 7\)' probe-src/src/helpers/CommonCLI.cpp 2>/dev/null; then
-              echo "- upstream still parses \`set repeat <on|off>\`; sync-settings' repeat.gate notice relies on it" >> "$REPORT"
+              ok "upstream still parses \`set repeat <on|off>\`; sync-settings' repeat.gate notice relies on it"
             else
-              DRIFT=true
-              echo "- upstream's \`set repeat\` parser changed shape -- sync-settings' repeat.gate notice will stop appending, silently" >> "$REPORT"
+              act "upstream changed how \`set repeat\` is parsed, so sync-settings' repeat.gate notice would quietly stop appearing."
             fi
             # ROOM_PASSWORD is how the mod compiles the notice into room servers only.
             if grep -q 'ROOM_PASSWORD' probe-src/variants/heltec_v4/platformio.ini 2>/dev/null; then
-              echo "- \`ROOM_PASSWORD\` still marks the room-server env; sync-settings uses it to target the repeat.gate notice" >> "$REPORT"
+              ok "\`ROOM_PASSWORD\` still marks the room-server env; sync-settings uses it to target the repeat.gate notice"
             else
-              DRIFT=true
-              echo "- \`ROOM_PASSWORD\` no longer marks the heltec_v4 room-server env -- sync-settings' repeat.gate notice will compile out of every build" >> "$REPORT"
+              act "\`ROOM_PASSWORD\` no longer marks the heltec_v4 room-server env, so sync-settings' repeat.gate notice would be left out of every build."
             fi
           fi
 
           # --- 7. do the upstream commands the mods send or intercept still exist? --
-          cat "$CONTRACTS" >> "$REPORT"
+          # Moved commands are collapsed detail worth knowing; anything else the checker
+          # prints besides a pass line is a problem.
+          awk '
+            /^<details>/ { blk = 1; print "" >> "notes.md" }
+            blk { print >> "notes.md"; if (/^<\/details>/) blk = 0; next }
+            /^- / { dest = ($0 ~ /still handled$|acknowledged:/) ? "ok.md" : "actions.md"; print >> dest; next }
+            /^  - / { print >> dest; next }
+          ' "$CONTRACTS"
 
           # --- 8. did the ESP32 platform change its descriptor's reserved tail? ---
           # Metadata layout 1 uses 252-287; recheck esp_app_desc_t on an unknown platform pin.
@@ -269,22 +264,18 @@ jobs:
             pin=$(awk '/^\[/{s=($0=="[esp32_base]")} s && /^platform *=/{sub(/^platform *= */,""); print; exit}' \
               probe-src/platformio.ini 2>/dev/null)
             if [ -z "$pin" ]; then
-              DRIFT=true
-              echo "- upstream's \`[esp32_base]\` platform pin could not be found -- verify that OTA metadata bytes 252-287 remain reserved" >> "$REPORT"
+              act "upstream's \`[esp32_base]\` platform pin couldn't be found. Check that OTA metadata bytes 252-287 are still reserved."
             elif [ "$pin" = 'platformio/espressif32@6.11.0' ]; then
-              echo "- upstream's ESP32 platform is \`$pin\` (Arduino 2.x, IDF 4.4); OTA metadata bytes 252-287 remain reserved" >> "$REPORT"
+              ok "upstream's ESP32 platform is \`$pin\` (Arduino 2.x, IDF 4.4); OTA metadata bytes 252-287 remain reserved"
             else
-              DRIFT=true
-              echo "- upstream's ESP32 platform moved to \`$pin\` -- verify that OTA metadata bytes 252-287 remain reserved before taking it" >> "$REPORT"
+              act "upstream's ESP32 platform moved to \`$pin\`. Check that OTA metadata bytes 252-287 are still reserved before taking it."
             fi
           fi
 
-          echo "drift=$DRIFT" >> "$GITHUB_OUTPUT"
-          # Appended, not merged into $REPORT: the explanations are collapsed detail under
-          # the summary lines, and only exist when something failed.
-          cat "$EXPLAIN" >> "$REPORT"
-          { echo 'report<<REPORT_EOF'; cat "$REPORT"; echo 'REPORT_EOF'; } >> "$GITHUB_OUTPUT"
-          cat "$REPORT" >> "$GITHUB_STEP_SUMMARY"
+          for part in actions notes ok explain; do
+            { echo "$part<<PART_EOF"; cat "$part.md"; echo 'PART_EOF'; } >> "$GITHUB_OUTPUT"
+          done
+          cat actions.md notes.md ok.md "$EXPLAIN" >> "$GITHUB_STEP_SUMMARY"
 
       # Applying and compiling are different questions: a patch can apply against a tree
       # that has deleted the virtual it calls. The widest composition per upstream role,
@@ -349,41 +340,59 @@ jobs:
       - name: Open, update, or close the tracking issue
         uses: actions/github-script@v9
         env:
-          REPORT: ${{ steps.probe.outputs.report }}
+          ACTIONS: ${{ steps.probe.outputs.actions }}
+          NOTES: ${{ steps.probe.outputs.notes }}
+          OK: ${{ steps.probe.outputs.ok }}
+          EXPLAIN: ${{ steps.probe.outputs.explain }}
         with:
           script: |
-            const verdict = '${{ steps.buildcheck.outputs.verdict }}';
-            const buildLine = {
-              ok:       '- `dev`: patched tree **builds**',
-              patches:  '- `dev`: patched tree **FAILS TO BUILD** and the same ref builds vanilla -- the break is in the patches',
-              upstream: '- `dev`: patched tree fails to build, but so does vanilla -- upstream is broken today',
-              '':       '- `dev`: build check skipped (patches need resolving first)',
-            }[verdict] ?? '- `dev`: build check did not report';
-            const drift = ${{ steps.probe.outputs.drift }} || verdict === 'patches';
             // Through env, not template interpolation: a backtick in the report used to
             // terminate the literal and fail the job with a JS syntax error.
-            const report = process.env.REPORT + '\n' + buildLine;
-            const title = process.env.ISSUE_TITLE;
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const body = `${report}\n\nChecked ${new Date().toISOString().slice(0,10)} by [patch-drift-canary](${runUrl}).\n\nThis is a warning, not a build failure -- releases still build from tagged upstream refs.`;
+            const clean = s => (s || '').trim();
+            let actions = clean(process.env.ACTIONS), notes = clean(process.env.NOTES), ok = clean(process.env.OK);
+            const explain = clean(process.env.EXPLAIN);
+            const add = (list, line) => (list ? list + '\n' : '') + line;
+            const verdict = '${{ steps.buildcheck.outputs.verdict }}';
+            if (verdict === 'ok') ok = add(ok, '- `dev`: the patched tree builds');
+            else if (verdict === 'patches') actions = add(actions, "- `dev`: the patched tree no longer builds, while upstream's own `dev` does. The break is in our patches.");
+            else if (verdict === 'upstream') notes = add(notes, "- `dev`: upstream's own `dev` doesn't build today either, so the build check couldn't tell anything.");
+            else if (verdict === '') notes = add(notes, '- `dev`: the build check was skipped until the patches above are updated.');
+            else notes = add(notes, '- `dev`: the build check did not report.');
+
+            const owner = context.repo.owner, repo = context.repo.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const passed = ok.split('\n').filter(l => l.startsWith('- ')).length;
+            const passedBlock = other => passed ? `<details><summary>All ${passed}${other} checks passed</summary>\n\n${ok}\n\n</details>` : '';
+            const needsAttention = !!actions;
+            const title = needsAttention
+              ? 'Upstream changes need attention before the next firmware update'
+              : 'Heads-up: upstream moved code our patches touch (no action needed)';
+            const lead = needsAttention
+              ? "Today's releases are unaffected, since they build from tagged upstream versions. The items under **Needs attention** will matter once upstream releases these changes, so they're worth handling before the next firmware update."
+              : 'Nothing is broken. Releases build from tagged upstream versions and are unaffected.' +
+                (verdict === 'ok' ? ' The patched `dev` tree also builds.' : '') +
+                ' The notes below are small things to tidy up when upstream next releases.';
+            const body = [
+              lead,
+              actions && `### Needs attention\n\n${actions}`,
+              notes && `### Worth knowing\n\n${notes}`,
+              explain,
+              passedBlock(' other'),
+              `Checked ${new Date().toISOString().slice(0, 10)} by [patch-drift-canary](${runUrl}).`,
+            ].filter(Boolean).join('\n\n');
 
             const existing = (await github.rest.issues.listForRepo({
-              owner: context.repo.owner, repo: context.repo.repo,
-              state: 'open', labels: 'patch-drift',
-            })).data.find(i => i.title === title);
+              owner, repo, state: 'open', labels: 'patch-drift',
+            })).data[0];
 
-            if (drift) {
+            if (actions || notes) {
               if (existing) {
-                await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo,
-                  issue_number: existing.number, body });
+                await github.rest.issues.update({ owner, repo, issue_number: existing.number, title, body });
               } else {
-                await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo,
-                  title, body, labels: ['patch-drift'] });
+                await github.rest.issues.create({ owner, repo, title, body, labels: ['patch-drift'] });
               }
             } else if (existing) {
-              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo,
-                issue_number: existing.number,
-                body: `Patches apply cleanly again as of ${runUrl} -- closing.\n\n${report}` });
-              await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo,
-                issue_number: existing.number, state: 'closed' });
+              await github.rest.issues.createComment({ owner, repo, issue_number: existing.number,
+                body: `Everything lines up with upstream again as of [this run](${runUrl}), so this is closed.\n\n${passedBlock('')}` });
+              await github.rest.issues.update({ owner, repo, issue_number: existing.number, state: 'closed' });
             }
