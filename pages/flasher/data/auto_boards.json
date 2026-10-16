@@ -35,7 +35,8 @@
         "firmwareFile": "bin/repeater/heltec_v4.bin",
         "postFlashCommands": [
           "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/heltec_v4.bin",
-          "set tx 20"
+          "set tx 20",
+          "gps advert prefs"
         ]
       },
       "room_server": {
