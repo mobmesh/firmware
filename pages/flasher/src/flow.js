@@ -54,6 +54,12 @@ function selectedRole(flow) {
   return null;
 }
 
+// A companion, KISS or GUI role is set up from its app, which replaces anything sent here. Unknown roles still try.
+function provisionApplies(flow) {
+  const role = selectedRole(flow);
+  return role == null || LOCATION_ROLES.has(role);
+}
+
 /** Display name for the chosen role, for copy that names it. Null when none applies. */
 export function selectedRoleName(flow) {
   const role = selectedRole(flow);
@@ -745,6 +751,7 @@ export const STEPS = [
         await esp32.returnToApplication(s.session, { onStatus });
         s.result = written;
         s.flashedMods = enhanced ? modBits : null;
+        if (!provisionApplies(flow)) await disposeFlow(flow);
         return;
       }
 
@@ -759,6 +766,8 @@ export const STEPS = [
       const exit = await nrf52.returnToApplication(written.port ?? s.port, { onStatus });
       s.port = exit.port;
       s.result = { bytesWritten: written.bytesWritten, exit: exit.method };
+      // With no setup pass to follow, nothing else would release the port.
+      if (!provisionApplies(flow)) await disposeFlow(flow);
     },
   },
 
@@ -766,8 +775,7 @@ export const STEPS = [
     id: 'provision',
     title: 'Post-flash setup',
     kind: 'action',
-    // A companion, KISS or GUI role is set up from its app, which replaces anything sent here. Unknown roles still try.
-    applies: (flow) => { const role = selectedRole(flow); return role == null || LOCATION_ROLES.has(role); },
+    applies: (flow) => provisionApplies(flow),
     // Never fails the flash: the bytes are already on the device, so an unreachable
     // settings pass is a warning the user can act on by hand.
     async run(flow, { onStatus, onProgress }) {
