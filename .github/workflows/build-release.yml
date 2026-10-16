@@ -528,6 +528,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: ${{ github.ref_name }}
+          fetch-depth: 0  # release notes list commits since the previous build
 
       - name: Start from the current branch tip
         run: git pull --ff-only origin "${{ github.ref_name }}"
@@ -597,6 +598,13 @@ jobs:
               exit 1
             fi
             mapfile -t assets < <(jq -r --arg tag "$tag" '.releases[] | select(.release_tag==$tag) | .release_files[]' publish-summary.json)
+            # Running changes list: earlier entries come from this release, the range start from its marker.
+            gh release view "$tag" --json body -q .body > existing-notes.md 2>/dev/null || : > existing-notes.md
+            prior=$(gh release list --limit 100 --json tagName -q '.[].tagName' | grep "^${tag%%-v*}-v" | grep -vx "$tag" | sort -V | tail -1 || true)
+            if [ -n "$prior" ]; then gh release view "$prior" --json body -q .body > previous-notes.md; else : > previous-notes.md; fi
+            python3 scripts/release_changelog.py --notes "$notes" --existing existing-notes.md \
+              --previous previous-notes.md --head "$GITHUB_SHA" > composed-notes.md
+            notes=composed-notes.md
             if gh release view "$tag" > /dev/null 2>&1; then
               edit_args=("$tag" --title "$title" --notes-file "$notes")
               [ "$latest" = true ] && edit_args+=(--latest)
