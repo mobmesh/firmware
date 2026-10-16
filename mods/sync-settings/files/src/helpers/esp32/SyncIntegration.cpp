@@ -804,7 +804,14 @@ static void clearGuard(DatasetState& state) {
   memset(state.manifest_hash, 0, sizeof(state.manifest_hash));
 }
 
+// A clock before this build is unset; upstream 1.18 seeds an unset clock at 1 Mar 2026.
+#ifdef MOBMESH_BUILD_EPOCH
+static bool clockSane(uint32_t now) {
+  return now > 1715770351u && now >= (uint32_t)MOBMESH_BUILD_EPOCH;
+}
+#else
 static bool clockSane(uint32_t now) { return now > 1715770351u; }
+#endif
 
 static bool guardExpired(const DatasetState& state, uint32_t now) {
   return clockSane(now) && state.guard != GUARD_IDLE &&

@@ -18,6 +18,9 @@
 #ifndef POWER_GUARD_CLOCK_FALLBACK_EPOCH
 #define POWER_GUARD_CLOCK_FALLBACK_EPOCH 1715770351UL
 #endif
+#ifndef POWER_GUARD_CLOCK_HORIZON_SECS
+#define POWER_GUARD_CLOCK_HORIZON_SECS 631152000UL
+#endif
 #ifndef POWER_GUARD_POWEROFF_MIN_SECS
 #define POWER_GUARD_POWEROFF_MIN_SECS 60
 #endif
@@ -67,10 +70,22 @@ static void bootPowerCheck() {
   modBoardDeepSleep(secs);
 }
 
+// Credible means no earlier than this build and under twenty years past it.
+static bool clockCredible(uint32_t now) {
+#ifdef MOBMESH_BUILD_EPOCH
+  return now >= (uint32_t)MOBMESH_BUILD_EPOCH &&
+         now - (uint32_t)MOBMESH_BUILD_EPOCH < POWER_GUARD_CLOCK_HORIZON_SECS;
+#else
+  (void)now;
+  return false;
+#endif
+}
+
+// Upstream 1.18 restores the clock across a brownout; only a scrambled one is rebased.
 static void bootClockGuard() {
   if (esp_reset_reason() != ESP_RST_BROWNOUT) return;
   uint32_t now = modClockGet();
-  if (now == POWER_GUARD_CLOCK_FALLBACK_EPOCH) return;
+  if (now == POWER_GUARD_CLOCK_FALLBACK_EPOCH || clockCredible(now)) return;
   Serial.printf("brownout reset -- clock %u rebased to %u\n",
                 (unsigned)now, (unsigned)POWER_GUARD_CLOCK_FALLBACK_EPOCH);
   modClockSet(POWER_GUARD_CLOCK_FALLBACK_EPOCH);

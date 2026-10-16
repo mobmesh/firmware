@@ -41,7 +41,13 @@ void Inbox::clear() {
 static_assert(sizeof(InboxFrame) <= FRAME_MAX + 19, "inbox frame changed");
 
 static const uint32_t DAY_MS = 86400000UL;
+// Raised to the build epoch so upstream 1.18's 1 Mar 2026 seed reads as unset.
+#if defined(MOBMESH_BUILD_EPOCH)
+static const uint32_t CLOCK_FLOOR =
+    MOBMESH_BUILD_EPOCH > 1715770351UL ? (uint32_t)MOBMESH_BUILD_EPOCH : 1715770351UL;
+#else
 static const uint32_t CLOCK_FLOOR = 1715770351UL;
+#endif
 static const uint32_t RESET_AHEAD = 432000UL;
 static const uint32_t CLOCK_SKEW = 86400UL;
 
