@@ -766,7 +766,8 @@ export const STEPS = [
     id: 'provision',
     title: 'Post-flash setup',
     kind: 'action',
-    applies: () => true,
+    // A companion, KISS or GUI role is set up from its app, which replaces anything sent here. Unknown roles still try.
+    applies: (flow) => { const role = selectedRole(flow); return role == null || LOCATION_ROLES.has(role); },
     // Never fails the flash: the bytes are already on the device, so an unreachable
     // settings pass is a warning the user can act on by hand.
     async run(flow, { onStatus, onProgress }) {
