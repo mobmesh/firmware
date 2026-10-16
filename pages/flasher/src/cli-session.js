@@ -196,7 +196,7 @@ export async function readNodeConfig(port, { timeoutMs = CLI_COMMAND_TIMEOUT_MS 
     const radio = parseRadio(await read('get radio'));
     // Null on firmware without sync-settings, which answers this as an unknown command.
     const syncStatus = await read('sync.region publish.status');
-    const syncRegionOn = syncStatus === null || /^unknown/i.test(syncStatus) ? null : /^on\b/.test(syncStatus);
+    const syncRegionOn = syncStatus === null || /^unknown/i.test(syncStatus) ? null : /^sync:on\b/.test(syncStatus);
     return { version, name, latitude, longitude, radio, syncRegionOn };
   } finally {
     await session.close();
