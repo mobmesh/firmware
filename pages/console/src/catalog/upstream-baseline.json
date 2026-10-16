@@ -1,6 +1,6 @@
 {
-  "tag": "repeater-v1.17.1",
-  "commit": "d92964352441e53b93e8667b802e04f6e072b39e",
+  "tag": "repeater-v1.18.0",
+  "commit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
   "commands": [
     "advert",
     "advert.zerohop",
@@ -60,6 +60,7 @@
     "get txdelay",
     "gps",
     "gps advert",
+    "gps diag",
     "gps off",
     "gps on",
     "gps setloc",
@@ -71,6 +72,7 @@
     "neighbor.remove",
     "neighbors",
     "password",
+    "power",
     "poweroff",
     "powersaving",
     "powersaving off",

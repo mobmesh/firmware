@@ -38,7 +38,11 @@ def function_body(text, name):
 def upstream_commands(checkout):
     cli = (checkout / "src/helpers/CommonCLI.cpp").read_text()
     repeater = "".join(p.read_text() for p in sorted((checkout / "examples/simple_repeater").glob("*.cpp")))
-    found = {c for c in literals(cli + repeater, "command") if c not in ("get", "set")}
+    # Upstream v1.18 moved radio settings to CommonRadioPrefs and FEM settings to board code.
+    boards = [p for b in sorted((REPO / "variants").iterdir()) if b.is_dir()
+              for p in sorted((checkout / "variants" / b.name).glob("*Board.cpp"))]
+    moved = "".join(p.read_text() for p in [checkout / "src/helpers/CommonRadioPrefs.cpp", *boards] if p.exists())
+    found = {c for c in literals(cli + repeater + moved, "command") if c not in ("get", "set")}
     found |= {"get " + k for k in literals(function_body(cli, "handleGetCmd"), "config")}
     found |= {"set " + k for k in literals(function_body(cli, "handleSetCmd"), "config")}
     return sorted(found)

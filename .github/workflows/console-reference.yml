@@ -26,7 +26,7 @@ jobs:
           TAG=$(git ls-remote --tags --refs "https://github.com/$UPSTREAM_REPO" 'repeater-v*' | sed 's#.*refs/tags/##' | sort -V | tail -1)
           echo "Latest upstream repeater tag: $TAG"
           git clone --depth 1 --branch "$TAG" --filter=blob:none --sparse "https://github.com/$UPSTREAM_REPO" upstream
-          git -C upstream sparse-checkout set src/helpers examples/simple_repeater
+          git -C upstream sparse-checkout set src/helpers examples/simple_repeater $(ls -d variants/*/ | sed 's#/$##')
 
       - name: Compare with the console reference
         id: check

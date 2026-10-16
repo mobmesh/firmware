@@ -2,10 +2,10 @@
   "status": "draft-parameter-verification-in-progress",
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
-  "upstreamCommit": "d92964352441e53b93e8667b802e04f6e072b39e",
-  "mobmeshCommit": "985976a04e2a3ca1aab958b982c2d242d0ac5b3a",
-  "sourceRows": 234,
-  "effectiveSignatures": 227,
+  "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
+  "mobmeshCommit": "039d88e5b327ff1ce86f73cbefffbdd8c67742e6",
+  "sourceRows": 244,
+  "effectiveSignatures": 229,
   "cliAdditionFiles": [
     {
       "path": "mods/hotspot-ota/docs/cli-additions.md",
