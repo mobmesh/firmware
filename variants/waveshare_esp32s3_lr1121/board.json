@@ -1,0 +1,53 @@
+{
+  "_source_note": "Vendored from upstream MeshCore's boards/esp32-s3-zero.json -- upstream builds waveshare_esp32s3_lr1121 on board = esp32-s3-zero and ships no boards/waveshare_esp32s3_lr1121.json. scripts/generate-board-config.py falls back to this file.",
+  "build": {
+    "arduino": {
+      "ldscript": "esp32s3_out.ld"
+    },
+    "core": "esp32",
+    "extra_flags": [
+      "-D ARDUINO_USB_CDC_ON_BOOT=1",
+      "-D ARDUINO_USB_MSC_ON_BOOT=0",
+      "-D ARDUINO_USB_DFU_ON_BOOT=0",
+      "-D ARDUINO_USB_MODE=1",
+      "-D ARDUINO_RUNNING_CORE=1",
+      "-D ARDUINO_EVENT_RUNNING_CORE=1"
+    ],
+    "f_cpu": "240000000L",
+    "f_flash": "80000000L",
+    "flash_mode": "qio",
+    "hwids": [
+      [
+        "0x303A",
+        "0x1001"
+      ]
+    ],
+    "mcu": "esp32s3",
+    "variant": "esp32s3"
+  },
+  "connectivity": [
+    "wifi",
+    "bluetooth"
+  ],
+  "debug": {
+    "default_tool": "esp-builtin",
+    "onboard_tools": [
+      "esp-builtin"
+    ],
+    "openocd_target": "esp32s3.cfg"
+  },
+  "frameworks": [
+    "arduino",
+    "espidf"
+  ],
+  "name": "ESP32-S3-Zero",
+  "upload": {
+    "flash_size": "4MB",
+    "maximum_ram_size": 327680,
+    "maximum_size": 4194304,
+    "require_upload_port": true,
+    "speed": 921600
+  },
+  "url": "https://www.espressif.com",
+  "vendor": "Espressif"
+}
