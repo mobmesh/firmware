@@ -4614,6 +4614,60 @@
 		},
 		{
 			"maker": "elecrow",
+			"name": "Elecrow ThinkNode M4",
+			"icon": "/img/lora.svg",
+			"tooltip": "<img class='device' src='/img/thinknode_m4.svg'>",
+			"type": "nrf52",
+			"erase": "FLASH_ERASE_nrf52_softdevice_v6.zip",
+			"firmware": [
+				{
+					"class": "community",
+					"role": "companionBle",
+					"github": {
+						"type": "companion",
+						"files": {
+							"flash": "ThinkNode_M4_companion_radio_ble.*?\\.zip",
+							"download": "ThinkNode_M4_companion_radio_ble.*?\\.uf2"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "companionUsb",
+					"github": {
+						"type": "companion",
+						"files": {
+							"flash": "ThinkNode_M4_companion_radio_usb.*?\\.zip",
+							"download": "ThinkNode_M4_companion_radio_usb.*?\\.uf2"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "repeater",
+					"github": {
+						"type": "repeater",
+						"files": {
+							"flash": "ThinkNode_M4_[rR]epeater.*?\\.zip",
+							"download": "ThinkNode_M4_[rR]epeater.*?\\.uf2"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "roomServer",
+					"github": {
+						"type": "room-server",
+						"files": {
+							"flash": "ThinkNode_M4_room_server.*?\\.zip",
+							"download": "ThinkNode_M4_room_server.*?\\.uf2"
+						}
+					}
+				}
+			]
+		},
+		{
+			"maker": "elecrow",
 			"name": "Elecrow ThinkNode M5",
 			"icon": "/img/lora.svg",
 			"tooltip": "<img class='device' src='/img/thinknode_m5.svg'>",
