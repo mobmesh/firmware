@@ -4028,6 +4028,8 @@ static ScopeMatch matchBase(mesh::Packet* packet, RegionMap& base,
 static bool resolve(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out) {
   if (!enabled) return false;
   if (packet == nullptr || base == nullptr || out == nullptr) return false;
+  // Code 0 is reserved and never issued by a key; upstream's own match decides what it means.
+  if (packet->transport_codes[0] == 0) return false;
 
   PacketMatch context = {packet};
   ScopeMatch overlay = matchRegions(regions, matches, &context);
