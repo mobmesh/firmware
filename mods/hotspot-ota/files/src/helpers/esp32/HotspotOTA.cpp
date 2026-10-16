@@ -401,12 +401,36 @@ static bool syncNtpTime() {
 static uint16_t wpa2_sessions = 0;   // WPA2 associations this boot; open networks do not leak
 static bool session_ended = false;  // set when WiFi is switched off, read by poll()
 
+// Last disconnect reason from the WiFi driver, so a failed join can say why.
+static volatile uint8_t join_reason = 0;
+static void onStaDisconnected(arduino_event_t* event) {
+  join_reason = event->event_info.wifi_sta_disconnected.reason;
+}
+
+// Folds driver reasons into five short words; the reference docs explain each.
+static const char* joinFailure(bool start_failed, uint8_t reason, wl_status_t status) {
+  if (start_failed) return "start failed";
+  switch (reason) {
+    case WIFI_REASON_NO_AP_FOUND: return "not found";
+    case WIFI_REASON_AUTH_FAIL: case WIFI_REASON_AUTH_EXPIRE: case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+    case WIFI_REASON_HANDSHAKE_TIMEOUT: case WIFI_REASON_802_1X_AUTH_FAILED: return "bad password";
+    case WIFI_REASON_ASSOC_FAIL: case WIFI_REASON_CONNECTION_FAIL: return "refused";
+  }
+  return status == WL_NO_SSID_AVAIL ? "not found" : "timeout";
+}
+
 // The service is unattended and can be patient; wifiConnect() runs inline and must fail fast.
 static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int max_attempts,
                             bool cancellable, bool sync_clock) {
+  static bool reason_hooked = false;
+  if (!reason_hooked) reason_hooked = WiFi.onEvent(onStaDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED) != 0;
   WiFi.mode(WIFI_STA);
+  bool start_failed = false;
+  wl_status_t last_status = WL_IDLE_STATUS;
+  uint8_t last_reason = 0;
   for (int attempt = 0; attempt < max_attempts; attempt++) {
-    WiFi.begin(ssid, pwd);
+    join_reason = 0;
+    start_failed = WiFi.begin(ssid, pwd) == WL_CONNECT_FAILED;
     uint32_t start = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - start < OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS) {
       if (cancellable && serviceCancelRequested()) {
@@ -421,6 +445,8 @@ static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int
       if (sync_clock) syncNtpTime();
       return true;
     }
+    last_status = WiFi.status();
+    last_reason = join_reason;   // read before the disconnect below reports its own reason
     WiFi.disconnect(true);
     if (attempt < max_attempts - 1) {
       uint32_t retry_start = millis();
@@ -433,7 +459,8 @@ static bool joinWifiStation(const char* ssid, const char* pwd, char reply[], int
       }
     }
   }
-  strcpy(reply, "ERR: could not join hotspot WiFi");
+  strcpy(reply, "ERR: WiFi ");
+  strcat(reply, joinFailure(start_failed, last_reason, last_status));
   return false;
 }
 

@@ -245,6 +245,16 @@ Does not check WAN access or download firmware. A failed join shuts WiFi and pow
 **Restrictions:** Requires saved credentials. Refused during an OTA/WAN operation,
 while the local upload AP is up, or when power-guard reports a low battery.
 
+**Join failures:** the same replies appear in OTA and WAN-verify results.
+
+| Reply | Meaning |
+| --- | --- |
+| `ERR: WiFi not found` | The saved network is not visible; the hotspot may be off or out of range |
+| `ERR: WiFi bad password` | The network rejected the saved password, or the handshake never completed |
+| `ERR: WiFi refused` | The network refused the association |
+| `ERR: WiFi timeout` | No connection and no reason from the network within the join window |
+| `ERR: WiFi start failed` | The WiFi driver did not start; retry, or reboot if it repeats |
+
 ## ota wan leave
 
 ```text
