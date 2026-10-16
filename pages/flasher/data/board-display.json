@@ -6,5 +6,6 @@
   "xiao_s3_wio": {"label": "Xiao ESP32-S3 + Wio-SX1262", "board": "xiao_s3_wio", "icon": "icons/beta.svg"},
   "rak3112": {"label": "RAK3112", "board": "rak3112", "icon": "icons/beta.svg"},
   "ebyte_eora_s3": {"label": "Ebyte EoRa-S3", "board": "ebyte_eora_s3", "icon": "icons/beta.svg"},
-  "station_g3_esp32": {"label": "Station G3", "board": "station_g3_esp32", "icon": "icons/beta.svg"}
+  "station_g3_esp32": {"label": "Station G3", "board": "station_g3_esp32", "icon": "icons/beta.svg"},
+  "waveshare_esp32s3_lr1121": {"label": "Waveshare ESP32-S3-LR1121", "board": "waveshare_esp32s3_lr1121", "icon": "icons/beta.svg"}
 }

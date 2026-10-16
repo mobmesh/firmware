@@ -1,0 +1,47 @@
+ota_board_id: 8
+
+# Override-only board config for waveshare_esp32s3_lr1121: only what this project adds on top of upstream.
+
+capabilities:
+  wifi_station: true
+  dual_ota: true
+  battery_measurement: false
+  external_power_control: unverified
+  fem_lna_control: false
+  deep_sleep_rail_shutdown: false
+
+build_values:
+  PIN_HOTSPOT_PWR: 1   # LR1121 takes 38-42, 45 and 46; 0, 3, 45 and 46 are strapping pins; 19 and 20 are USB
+  OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS: 15000
+  OTA_WIFI_JOIN_RETRY_DELAY_MS: 5000
+  OTA_WIFI_JOIN_MAX_ATTEMPTS: 6
+  OTA_HTTP_TIMEOUT_MS: 20000
+  OTA_WPA2_SESSION_LIMIT: 600   # WPA2 sessions per boot before a reboot; sized from this board's heap
+  OTA_DIAG_WIFI_JOIN_ATTEMPTS: 1
+  OTA_WAN_CHECK_ATTEMPTS: 3
+  OTA_WAN_CHECK_RETRY_DELAY_MS: 10000
+  OTA_RADIO_FAIL_SLEEP_START_SECS: 60
+  OTA_RADIO_FAIL_SLEEP_MAX_SECS: 900
+
+partitions_override: null
+
+qemu:
+  enabled: true
+  machine: esp32s3
+  binary: qemu-system-xtensa
+  mcu: esp32s3
+  mem: 8M
+  globals:
+    bramble.gpio.strap-mode: 4
+    bramble.gpspi2.cs-gpio: 42
+    bramble.gpspi2.spi-base: "0x60025000"
+    bramble.gpspi2.radio: lr1121   # needs espressif-qemu v9.2.2-6 or newer
+    bramble.lr1121.dio9-gpio: 38
+
+flasher:
+  label: "Waveshare ESP32-S3-LR1121"
+  connect_note: "Put the board into flash mode first (hold BOOT, tap RESET, then release BOOT), then connect over USB."
+  post_flash_note: "Press RESET once to put the board back into normal operation."
+  post_flash_commands:
+    repeater:
+      - "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/waveshare_esp32s3_lr1121.bin"

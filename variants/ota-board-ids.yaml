@@ -15,3 +15,5 @@ board_ids:
     board: ebyte_eora_s3
   - id: 7
     board: station_g3_esp32
+  - id: 8
+    board: waveshare_esp32s3_lr1121

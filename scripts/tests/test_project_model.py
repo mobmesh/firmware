@@ -34,12 +34,17 @@ class CurrentProjectModelTestCase(unittest.TestCase):
             ("ebyte_eora_s3", "room_server"),
             ("station_g3_esp32", "repeater"),
             ("station_g3_esp32", "room_server"),
+            ("waveshare_esp32s3_lr1121", "repeater"),
+            ("waveshare_esp32s3_lr1121", "room_server"),
         })
         self.assertEqual(rows[("heltec_v4", "repeater")].asset_basename, "heltec_v4_rep_mobmesh")
         self.assertEqual(rows[("xiao_c3", "room_server")].asset_basename, "xiao_c3_room_mobmesh_beta")
         self.assertEqual(rows[("station_g3_esp32", "repeater")].asset_basename,
                          "station_g3_esp32_rep_mobmesh_beta")
         self.assertEqual(rows[("station_g3_esp32", "room_server")].ota_board_id, 7)
+        self.assertEqual(rows[("waveshare_esp32s3_lr1121", "repeater")].ota_board_id, 8)
+        self.assertEqual(rows[("waveshare_esp32s3_lr1121", "repeater")].asset_basename,
+                         "waveshare_esp32s3_lr1121_rep_mobmesh_beta")
         self.assertEqual(rows[("heltec_v4", "room_server")].ota_role_id, 2)
         self.assertEqual(rows[("heltec_v4", "repeater")].mods,
                          ("shim", "hotspot-ota", "timing-safety", "try-settings", "power-guard", "sync-settings"))

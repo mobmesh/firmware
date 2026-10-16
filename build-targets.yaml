@@ -127,3 +127,17 @@ targets:
     vendor_flasher_assets: false
     beta: true
     mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
+
+  - board: waveshare_esp32s3_lr1121
+    role: repeater
+    build_env: Waveshare_S3_LR1121_repeater
+    vendor_flasher_assets: true
+    beta: true
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
+
+  - board: waveshare_esp32s3_lr1121
+    role: room_server
+    build_env: Waveshare_S3_LR1121_room_server
+    vendor_flasher_assets: false
+    beta: true
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
