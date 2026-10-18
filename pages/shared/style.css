@@ -773,6 +773,43 @@ input.field:focus {
   gap: 1.1rem;
 }
 
+/* Icon-only links name themselves in a pill on hover; top/left reset the fixed-position offsets. */
+.site-header .header-links a {
+  position: relative;
+  top: auto;
+  left: auto;
+}
+
+.site-header .header-links a::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  left: 50%;
+  transform: translate(-50%, -0.25rem);
+  padding: 0.3rem 0.65rem;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--fg);
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  box-shadow: 0 8px 24px -8px rgba(45, 209, 189, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 30;
+}
+
+.site-header .header-links a:hover::after,
+.site-header .header-links a:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 /* Brand and GitHub hold the top row; the nav drops beneath and centres itself. */
 @media (max-width: 760px) {
   .site-header-inner {
