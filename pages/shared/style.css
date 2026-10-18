@@ -766,6 +766,13 @@ input.field:focus {
   transform: none;
 }
 
+.site-header .header-links {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+
 /* Brand and GitHub hold the top row; the nav drops beneath and centres itself. */
 @media (max-width: 760px) {
   .site-header-inner {
