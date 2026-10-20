@@ -4701,8 +4701,8 @@
 					"github": {
 						"type": "repeater",
 						"files": {
-							"flash-wipe": "ThinkNode_M5_repeater.*?-merged\\.bin",
-							"flash-update": "ThinkNode_M5_repeater.*?-[a-f0-9]{7}\\.bin"
+							"flash-wipe": "ThinkNode_M5_[Rr]epeater.*?-merged\\.bin",
+							"flash-update": "ThinkNode_M5_[Rr]epeater.*?-[a-f0-9]{7}\\.bin"
 						}
 					}
 				},
