@@ -131,7 +131,7 @@ hangs up straight away if the image is:
 | For a different board or role | `image is for X, this node is Y` |
 | The firmware already running | `already running vX (sha) -- nothing to do` |
 
-A good image downloads in full and is then checked against its SHA-256. The SHA-256 and the
+An already-running image is reported as `done`, not `failed`: nothing needed doing. A good image downloads in full and is then checked against its SHA-256. The SHA-256 and the
 build stamp catch a corrupt download or the wrong image; they do not prove who published it.
 
 ### Timed automatic updates

@@ -87,7 +87,7 @@ period.
 | Save the normal firmware URL | `set ota.fw.url <url>` | Keeps future remote update commands short |
 | Start a remote update | `start ota wan update` | Queues the saved URL for background download and installation |
 | Update on a schedule | `set ota.wan.auto on`, then `get ota.wan.auto.status` | Checks every `ota.wan.auto.interval` days; installs a new image once `ota.wan.auto.confirm` checks in a row find it |
-| Watch progress | `get ota.status` | Shows join, check, download, verify, completion, or failure |
+| Watch progress | `get ota.status` | Shows join, check, download, verify, then `succeeded`, `done` (nothing to install, such as the same build), `failed` or `canceled` |
 | Cancel safely | `ota cancel` | Stops work before verification or partition commit begins |
 | Inspect fallback | `get ota.slot` | Shows both OTA slots and whether the inactive image is actually valid |
 | Use local upload mode | `start ota`, `get ota.ap`, `stop ota` | Starts, inspects, or ends the local Wi-Fi upload page |

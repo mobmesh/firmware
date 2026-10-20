@@ -111,6 +111,7 @@ enum class OtaServiceState : uint8_t {
   Succeeded,
   Failed,
   Canceled,
+  Done,
   WanComplete
 };
 
@@ -188,6 +189,7 @@ struct AutoSnapshot {
   char rejected_sha[9];
 };
 static bool service_automatic = false;
+static bool service_nothing_to_do = false;   // the server's image was declined, which is not a failure
 static bool service_auto_pending = false;
 static AutoSnapshot service_auto_snapshot;
 static AutoOutcome service_auto_outcome;
@@ -364,6 +366,7 @@ static const char* serviceStateName(OtaServiceState state) {
     case OtaServiceState::Succeeded: return "succeeded";
     case OtaServiceState::Failed: return "failed";
     case OtaServiceState::Canceled: return "canceled";
+    case OtaServiceState::Done: return "done";
     case OtaServiceState::WanComplete: return "wan-complete";
   }
   return "unknown";
@@ -617,6 +620,7 @@ static const char* autoRefusal(const OtaMetadata& incoming, char reply[]) {
   const AutoSnapshot& snap = service_auto_snapshot;
   if (sameRelease(incoming, snap.rejected_version, snap.rejected_sha)) {
     noteAutoImage(incoming, OTA_AUTO_REJECTED, 0);
+    service_nothing_to_do = true;
     sprintf(reply, "skipped %s (%s) -- rolled back on this node", incoming.upstream_version,
             incoming.repo_sha);
     return reply;
@@ -625,6 +629,7 @@ static const char* autoRefusal(const OtaMetadata& incoming, char reply[]) {
   uint8_t count = otaAutoSighting(same, snap.candidate_count);
   if (count < snap.confirm) {
     noteAutoImage(incoming, OTA_AUTO_COUNTED, count);
+    service_nothing_to_do = true;
     sprintf(reply, "counted %s (%s) %u of %u", incoming.upstream_version, incoming.repo_sha,
             (unsigned)count, (unsigned)snap.confirm);
     return reply;
@@ -780,6 +785,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
           sprintf(reply, "already running %s (%s) -- nothing to do",
                   incoming.upstream_version, incoming.repo_sha);
           refusal = reply;
+          service_nothing_to_do = true;
           if (automatic) noteAutoImage(incoming, OTA_AUTO_CURRENT, 0);
         }
       }
@@ -985,8 +991,9 @@ static void serviceTaskMain(void*) {
   StrHelper::strncpy(service_result, result, sizeof(service_result));
   if (kind == ServiceKind::Ota) {
     service_state = ok ? OtaServiceState::Succeeded
-                       : (service_cancel_requested ? OtaServiceState::Canceled
-                                                   : OtaServiceState::Failed);
+                       : service_cancel_requested ? OtaServiceState::Canceled
+                       : service_nothing_to_do ? OtaServiceState::Done
+                                               : OtaServiceState::Failed;
   } else {
     service_state = OtaServiceState::WanComplete;
   }
@@ -1030,6 +1037,7 @@ static bool startService(const HotspotOtaConfig& cfg, const AutoSnapshot* automa
     service_automatic = automatic != NULL;
     service_auto_pending = automatic != NULL;
     service_auto_outcome = {};
+    service_nothing_to_do = false;
     if (automatic != NULL) service_auto_snapshot = *automatic;
     service_bypass_marker = automatic != NULL ? false : marker_bypass;
     if (automatic == NULL) marker_bypass = false;
@@ -1337,14 +1345,14 @@ void HotspotOTA::poll() {
   clock_epoch = service_clock_epoch;
   service_clock_epoch = 0;
   if (service_auto_pending && (state == OtaServiceState::Succeeded || state == OtaServiceState::Failed
-                               || state == OtaServiceState::Canceled)) {
+                               || state == OtaServiceState::Canceled || state == OtaServiceState::Done)) {
     service_auto_pending = false;
     auto_finished = true;
     auto_outcome = service_auto_outcome;
   }
   if (service_sleep_inhibited
       && (state == OtaServiceState::Failed || state == OtaServiceState::Canceled
-          || state == OtaServiceState::WanComplete)) {
+          || state == OtaServiceState::Done || state == OtaServiceState::WanComplete)) {
     service_sleep_inhibited = false;
     service_kind = ServiceKind::None;
     release_sleep = true;

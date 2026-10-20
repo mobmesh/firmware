@@ -206,7 +206,7 @@ get ota.wan.auto.status
 | `current` | The server holds the running image |
 | `counted` | A new image was seen and counted |
 | `installed` | A new image was installed |
-| `failed` | The check could not complete; see `get ota.status` |
+| `failed` | The check could not complete; `get ota.status` shows why |
 | `skipped lock` | A sync-settings campaign held a lock |
 | `skipped busy` | Another update, survey, upload AP or probation was active |
 | `skipped rolled-back` | The server holds a release this node rolled back from |
@@ -222,9 +222,11 @@ get ota.status
 | `> <state>` | Current operation state |
 | `> downloading <bytes>/<total>` | Download progress with known content length |
 | `> downloading <bytes> bytes` | Download progress without known content length |
-| `> <state>: <result>` | Final result or error |
+| `> succeeded: <result>` | Image installed; the node reboots |
+| `> done: <result>` | Nothing installed, by design: the image is already running, was counted by `ota.wan.auto`, or rolled back on this node |
+| `> failed: <result>` / `> canceled: <result>` | The update did not complete |
 
-Failure and cancellation results remain until another operation starts.
+Done, failure and cancellation results remain until another operation starts.
 `wan-complete` means WAN verification finished; read `get ota.wan.health` for its outcome.
 
 ## get ota.ap
