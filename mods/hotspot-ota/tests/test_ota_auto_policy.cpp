@@ -36,7 +36,11 @@ int main() {
   expect(otaAutoNextDue(anchor, 7, anchor + 10 * week + 1, anchor + 10 * week + 1) == anchor + 11 * week,
          "a forward jump gives one catch-up, then the grid");
   expect(otaAutoNextDue(anchor, 7, anchor + 4 * week, anchor + week + 60) == anchor + 2 * week,
-         "a clock corrected backwards counts from now");
+         "a clock corrected back a full interval or more counts from now");
+  expect(otaAutoNextDue(anchor, 7, anchor + week + 1, anchor + week - 300) == anchor + 2 * week,
+         "a small correction back past the due point does not repeat the check");
+  expect(otaAutoNextDue(anchor, 7, anchor + week + 1, anchor + 2) == anchor + 2 * week,
+         "a correction just under an interval still keeps the last check");
   expect(otaAutoNextDue(anchor, 14, 0, anchor) == anchor + 2 * week, "interval change keeps the anchor");
 
   expect(!otaAutoClockBelievable(1772323200u, 1790000000u), "1 Mar 2026 seed is older than the build");

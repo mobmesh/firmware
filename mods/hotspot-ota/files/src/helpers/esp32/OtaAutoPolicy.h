@@ -67,10 +67,10 @@ inline bool otaAutoParseConfirm(const char* text, uint8_t& count) {
   return true;
 }
 
-// Next anchor + k*interval (k >= 1) after the last check; a last check ahead of now counts from now.
+// Next anchor + k*interval (k >= 1) after the last check; only a last check a full interval ahead counts from now.
 inline uint32_t otaAutoNextDue(uint32_t anchor, uint8_t interval_days, uint32_t last_check, uint32_t now) {
-  if (last_check > now) last_check = now;
   uint64_t step = (uint64_t)interval_days * OTA_AUTO_DAY_SECS;
+  if (last_check > now && (uint64_t)(last_check - now) >= step) last_check = now;
   uint64_t k = 1;
   if (last_check >= anchor) k = (uint64_t)(last_check - anchor) / step + 1;
   uint64_t due = (uint64_t)anchor + k * step;
