@@ -3,13 +3,13 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "18e586857a20135b7ebe2db6df29223e0aa168f3",
-  "sourceRows": 251,
-  "effectiveSignatures": 236,
+  "mobmeshCommit": "46c82ccea8a145b0f90282898ea37496b47e7f0e",
+  "sourceRows": 252,
+  "effectiveSignatures": 237,
   "cliAdditionFiles": [
     {
       "path": "mods/hotspot-ota/docs/cli-additions.md",
-      "sha256": "9e8828aacbe1024ebf42b75e850baae604766627ba17e8f3fbb652119c378a51"
+      "sha256": "a7f3848db245009a67d530485540e995c7d3e3a44cb1b2423760958fbb6ec887"
     },
     {
       "path": "mods/power-guard/docs/cli-additions.md",
