@@ -73,7 +73,8 @@ All of these work over serial or remotely over the mesh. Full details are in
 <tr><td><code>get ota.wan.health</code></td><td>Show the latest verification and whether this WiFi setup has succeeded before.</td></tr>
 <tr><td><code>get ota.wan.radio</code></td><td>Show ESP32 WiFi, driver, and link state alongside the <code>ota.wan.pwr</code> value.</td></tr>
 <tr><td><code>get ota.status</code></td><td>Current step, download progress, or the final result.</td></tr>
-<tr><td><code>get ota.slot</code></td><td>Version and state of both slots.</td></tr>
+<tr><td><code>get ota.slot</code></td><td>Version and state of both slots, including how far new firmware is through probation.</td></tr>
+<tr><td><code>ota slot confirm</code></td><td>Accept firmware on probation now, ending the trial early.</td></tr>
 <tr><td><code>ota wan survey</code></td><td>List nearby WiFi networks and whether each is open, keeping the strongest result per name and security state. Scans once; paging shows the same result.</td></tr>
 <tr><td><code>ota wan survey &lt;offset&gt;</code></td><td>Show results from <code>&lt;offset&gt;</code> onward, as <code>next N</code> suggests.</td></tr>
 <tr><td><code>ota wan survey refresh</code></td><td>Throw the old result away and scan again.</td></tr>
@@ -202,7 +203,14 @@ visits. This mod gives new firmware a trial period instead:
 <img src="assets/rollback-flow.svg" width="700" alt="Automatic firmware rollback: keep a working image or reboot into the previous one">
 
 - Works after either update path, with no extra hardware.
-- `poweroff` is refused during the trial, since sleeping then would roll back a good update.
+- New firmware must also hear the mesh within an hour, if the node was hearing it before the
+  update. When nothing arrives on its own, the node sends a flood advert and listens for a
+  neighbour to relay it. Silence means the update goes back. A node that heard nothing for 3
+  days, a node low on battery, and a USB flash all keep the 90-second check only.
+- `reboot` and `poweroff` are refused during the trial; `ota slot confirm` ends it early, and
+  `get ota.slot` shows where it is.
+- A rollback caused by a crash blocks that release for timed updates. Any other rollback (silence,
+  a brownout, a low-battery sleep) lets timed updates try it once more.
 - A radio failure with no recent update gets a few quick retries, then the node deep-sleeps
   and tries again on each wake, backing off to once every 15 minutes.
 

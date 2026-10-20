@@ -15,6 +15,7 @@
 #include <helpers/ModHooks.h>          // modClockSet()
 #include "RollbackGuard.h"             // probation state -- see start()
 #include "OtaAutoPolicy.h"
+#include "ProbationPolicy.h"
 
 // The OTA_WIFI_*, OTA_HTTP_*, OTA_WAN_* and PIN_HOTSPOT_PWR values are injected as build flags
 // from variants/<board>/overrides.yaml, which carries each board's values and rationale.
@@ -852,6 +853,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
     return false;
   }
 
+  HotspotOTA::noteInstall();
   strcpy(reply, "OK - update installed");
   return true;
 }
@@ -1719,9 +1721,74 @@ void HotspotOTA::autoTick(bool ap_busy) {
   startService(cfg, &snap, reply);
 }
 
+// A release that rolled back for anything but a crash gets one retry: armed when an install commits.
+#define SOFT_REJECT_PATH "/ota_soft_reject"
+struct __attribute__((packed)) SoftReject {
+  char version[13];
+  char sha[9];
+  uint8_t armed;
+};
+
+static bool readSoftReject(SoftReject& out) {
+  if (!SPIFFS.exists(SOFT_REJECT_PATH)) return false;
+  File f = SPIFFS.open(SOFT_REJECT_PATH, "r");
+  if (!f) return false;
+  bool ok = f.read((uint8_t*)&out, sizeof(out)) == sizeof(out);
+  f.close();
+  out.version[12] = 0;
+  out.sha[8] = 0;
+  return ok;
+}
+
+static void writeSoftReject(const SoftReject& value) {
+  File f = SPIFFS.open(SOFT_REJECT_PATH, "w");
+  if (!f) return;
+  f.write((const uint8_t*)&value, sizeof(value));
+  f.close();
+}
+
+static const char* goodPath() {
+  const esp_partition_t* running = esp_ota_get_running_partition();
+  return running != NULL && running->subtype == ESP_PARTITION_SUBTYPE_APP_OTA_1 ? "/ota_good_b" : "/ota_good_a";
+}
+
+bool HotspotOTA::runningIsKnownGood() {
+  OtaMetadata running;
+  if (!::runningMetadata(running) || !SPIFFS.exists(goodPath())) return false;
+  File f = SPIFFS.open(goodPath(), "r");
+  if (!f) return false;
+  char good[22] = {0};
+  bool ok = f.read((uint8_t*)good, sizeof(good)) == sizeof(good);
+  f.close();
+  good[12] = 0;
+  good[21] = 0;
+  return ok && sameRelease(running, good, good + 13);
+}
+
+void HotspotOTA::noteInstall() {
+  RollbackGuard::noteInstall();
+  SoftReject soft;
+  if (readSoftReject(soft) && !soft.armed) {
+    soft.armed = 1;
+    writeSoftReject(soft);
+  }
+}
+
 void HotspotOTA::onImageConfirmed() {
   OtaMetadata running;
   if (!::runningMetadata(running)) return;
+  if (!HotspotOTA::runningIsKnownGood()) {
+    char good[22] = {0};
+    StrHelper::strncpy(good, running.upstream_version, 13);
+    StrHelper::strncpy(good + 13, running.repo_sha, 9);
+    File f = SPIFFS.open(goodPath(), "w");
+    if (f) {
+      f.write((const uint8_t*)good, sizeof(good));
+      f.close();
+    }
+  }
+  SoftReject soft;
+  if (readSoftReject(soft) && sameRelease(running, soft.version, soft.sha)) SPIFFS.remove(SOFT_REJECT_PATH);
   AutoRecord& record = autoRecord();
   if (sameRelease(running, record.boot_version, record.boot_sha)) return;
   clearCandidate(record);
@@ -1733,7 +1800,7 @@ void HotspotOTA::onImageConfirmed() {
   saveAutoRecord(record);
 }
 
-void HotspotOTA::onImageRejected() {
+void HotspotOTA::onImageRejected(bool crash) {
   const esp_partition_t* other = esp_ota_get_next_update_partition(NULL);
   if (other == NULL) return;
   uint8_t block[OTA_META_LEN];
@@ -1742,7 +1809,19 @@ void HotspotOTA::onImageRejected() {
       || !parseMetadata(block, meta)) return;
   AutoRecord& record = autoRecord();
   if (sameRelease(meta, record.rejected_version, record.rejected_sha)) return;
-  setRelease(record.rejected_version, record.rejected_sha, meta.upstream_version, meta.repo_sha);
+  SoftReject soft = {};
+  bool known = readSoftReject(soft) && sameRelease(meta, soft.version, soft.sha);
+  // The slot stays invalid across later boots; an unarmed record means this rollback was already counted.
+  if (known && !soft.armed) return;
+  RejectOutcome outcome = probationRejectOutcome(crash, known);
+  if (outcome.reject) {
+    setRelease(record.rejected_version, record.rejected_sha, meta.upstream_version, meta.repo_sha);
+    if (SPIFFS.exists(SOFT_REJECT_PATH)) SPIFFS.remove(SOFT_REJECT_PATH);
+  } else {
+    soft = {};
+    setRelease(soft.version, soft.sha, meta.upstream_version, meta.repo_sha);
+    writeSoftReject(soft);
+  }
   clearCandidate(record);
   saveAutoRecord(record);
 }

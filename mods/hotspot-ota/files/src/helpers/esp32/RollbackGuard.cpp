@@ -7,10 +7,15 @@
 #include <SPIFFS.h>
 #include <helpers/ModHooks.h>
 #include "HotspotOTA.h"
+#include "ProbationPolicy.h"
 
 // Long enough to catch an early crash/boot-loop; short enough not to add much to the ~2 minutes a
 // hotspot-fetch update can already take.
-#define OTA_ROLLBACK_CONFIRM_DELAY_MS   90000
+#define OTA_ROLLBACK_CONFIRM_DELAY_MS   PROBATION_CRASH_CHECK_MS
+#define RX_POLL_IDLE_MS     60000UL
+#define RX_POLL_WINDOW_MS   5000UL
+#define HEARD_PATH          "/ota_heard"
+#define RADIO_FAIL_PATH     "/ota_radio_fail"
 
 // The counter lives in SPIFFS, not RTC memory, which is unreliable across esp_restart().
 // Confirm retries are spaced because the call writes otadata.
@@ -38,6 +43,21 @@ static char pending_version[24] = {0};
 static bool version_write_pending = false;
 static bool confirm_reported = false;
 
+// Mesh check: decided once the crash check passes, then held until the counters rise or the window ends.
+static bool heard_before = false;
+static bool known_good = false;
+static bool mesh_decided = false;
+static bool mesh_required = false;
+static uint32_t window_start_ms = 0;
+static uint8_t adverts_sent = 0;
+
+// Recency of valid packets, for the record an install leaves for the next image.
+static uint32_t rx_total = 0;
+static bool have_rise = false;
+static uint32_t last_rise_ms = 0;
+static uint32_t last_rx_poll_ms = 0;
+static bool rx_polled = false;
+
 static bool isPendingVerify(esp_ota_img_states_t* out_state = nullptr) {
   esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;
   const esp_partition_t* running = esp_ota_get_running_partition();
@@ -58,9 +78,16 @@ RollbackGuard::ProbationState RollbackGuard::probation() {
   // synchronously, so the RAM flag could only ever differ from it after a *failed* confirm.
   out.pending = (state == ESP_OTA_IMG_PENDING_VERIFY);
   if (out.pending) {
-    uint32_t elapsed = millis() - boot_time_ms;
-    out.remaining_secs = (elapsed >= OTA_ROLLBACK_CONFIRM_DELAY_MS)
-                         ? 0 : (OTA_ROLLBACK_CONFIRM_DELAY_MS - elapsed + 999) / 1000;
+    uint32_t now = millis();
+    uint32_t end_ms;
+    if (mesh_decided && mesh_required) {
+      end_ms = window_start_ms + PROBATION_WINDOW_MS;
+    } else {
+      end_ms = boot_time_ms + OTA_ROLLBACK_CONFIRM_DELAY_MS;
+      if (!mesh_decided && heard_before && !known_good) end_ms += PROBATION_WINDOW_MS;
+    }
+    int32_t left = (int32_t)(end_ms - now);
+    out.remaining_secs = left <= 0 ? 0 : ((uint32_t)left + 999) / 1000;
   }
   return out;
 }
@@ -162,12 +189,77 @@ static bool otherSlotRejected() {
   return state == ESP_OTA_IMG_INVALID || state == ESP_OTA_IMG_ABORTED;
 }
 
+static void removeIfPresent(const char* path) {
+  if (SPIFFS.exists(path)) SPIFFS.remove(path);
+}
+
+static bool readFlag(const char* path) {
+  if (!SPIFFS.exists(path)) return false;
+  File f = SPIFFS.open(path, "r");
+  if (!f) return false;
+  uint8_t value = 0;
+  bool ok = f.read(&value, 1) == 1;
+  f.close();
+  return ok && value == 1;
+}
+
+static void writeFlag(const char* path, bool value) {
+  File f = SPIFFS.open(path, "w");
+  if (!f) return;
+  uint8_t byte = value ? 1 : 0;
+  f.write(&byte, 1);
+  f.close();
+}
+
+// The reset that ended the previous boot; a panic, a watchdog or a recorded radio failure is a crash.
+static bool lastBootCrashed() {
+  esp_reset_reason_t reason = esp_reset_reason();
+  bool crash = reason == ESP_RST_PANIC || reason == ESP_RST_INT_WDT || reason == ESP_RST_TASK_WDT
+               || reason == ESP_RST_WDT || readFlag(RADIO_FAIL_PATH);
+  removeIfPresent(RADIO_FAIL_PATH);
+  return crash;
+}
+
+static void pollRx(uint32_t interval_ms) {
+  if (rx_polled && millis() - last_rx_poll_ms < interval_ms) return;
+  rx_polled = true;
+  last_rx_poll_ms = millis();
+  char command[] = "stats-packets";
+  char reply[200] = {0};
+  modCliDispatch(0, command, reply);
+  uint32_t total = 0;
+  if (!probationParseRx(reply, total)) return;
+  if (total > rx_total) {
+    have_rise = true;
+    last_rise_ms = millis();
+  } else if (!probationHeardRecently(have_rise, last_rise_ms, millis())) {
+    have_rise = false;   // expired here, so a millis() wrap cannot make an old rise look recent
+  }
+  rx_total = total;
+}
+
+static void sendAdvert() {
+  char command[] = "advert";
+  char reply[200] = {0};
+  modCliDispatch(0, command, reply);
+}
+
+static void confirmNow() {
+  if (esp_ota_mark_app_valid_cancel_rollback() == ESP_OK) confirmed_or_not_applicable = true;
+}
+
 void RollbackGuard::poll() {
   if (version_write_pending) {
     writeVersion(partitionLetter(esp_ota_get_running_partition()), pending_version);
     version_write_pending = false;
-    if (otherSlotRejected()) HotspotOTA::onImageRejected();
+    if (otherSlotRejected()) HotspotOTA::onImageRejected(lastBootCrashed());
+    else removeIfPresent(RADIO_FAIL_PATH);
+    heard_before = readFlag(HEARD_PATH);
+    removeIfPresent(HEARD_PATH);
+    known_good = !confirmed_or_not_applicable && HotspotOTA::runningIsKnownGood();
   }
+  bool listening = !confirmed_or_not_applicable && mesh_decided && mesh_required;
+  pollRx(listening ? RX_POLL_WINDOW_MS : RX_POLL_IDLE_MS);
   if (confirmed_or_not_applicable) {
     if (!confirm_reported) {
       confirm_reported = true;
@@ -176,6 +268,34 @@ void RollbackGuard::poll() {
     return;
   }
   if (millis() - boot_time_ms < OTA_ROLLBACK_CONFIRM_DELAY_MS) return;
+  if (!mesh_decided) {
+    mesh_decided = true;
+    // Read once, before any advert: a transmit dips the reading, and a low battery may end in a deep sleep.
+    bool battery_ok = modLoadAllowed();
+    mesh_required = probationNeedsMeshCheck(true, heard_before, known_good, battery_ok);
+    window_start_ms = millis();
+    Serial.printf("probation: mesh check %s (heard %d, known-good %d, battery %d, rx %u)\n",
+                  mesh_required ? "on" : "off", heard_before, known_good, battery_ok, (unsigned)rx_total);
+  }
+  if (mesh_required) {
+    if (rx_total > 0) {
+      Serial.println("probation: mesh heard");
+      mesh_required = false;
+    } else {
+      uint32_t elapsed = millis() - window_start_ms;
+      if (probationWindowOver(elapsed)) {
+        Serial.println("probation: mesh silent, rolling back");
+        esp_ota_mark_app_invalid_rollback_and_reboot();   // does not return on success
+        return;
+      }
+      if (probationAdvertDue(elapsed, adverts_sent)) {
+        adverts_sent++;
+        Serial.printf("probation: advert %u\n", (unsigned)adverts_sent);
+        sendAdvert();
+      }
+      return;
+    }
+  }
   // Retried rather than latched blindly: a failed confirm leaves otadata PENDING_VERIFY, and
   // claiming success would hand the next OTA the only known-good image. Paced off the loop.
   if (last_confirm_attempt_ms != 0 && millis() - last_confirm_attempt_ms < CONFIRM_RETRY_MS) return;
@@ -189,6 +309,7 @@ bool RollbackGuard::reportUnhealthy() {
 }
 
 void RollbackGuard::onRadioInitFailure() {
+  if (isPendingVerify()) writeFlag(RADIO_FAIL_PATH, true);
   reportUnhealthy();   // OTA-probation case: forces rollback + reboot, doesn't return on success
 
   // Not on probation -- transient or genuine radio failure unrelated to any update. Retry with cap
@@ -232,8 +353,29 @@ RollbackGuard::Slots RollbackGuard::slots() {
   return out;
 }
 
+// Running slot: its state, or which probation stage it is in.
+static void activeLabel(esp_ota_img_states_t state, char* out, size_t len) {
+  RollbackGuard::ProbationState probation = RollbackGuard::probation();
+  if (!probation.pending) {
+    snprintf(out, len, "%s", stateLabel(state));
+  } else if (mesh_decided && mesh_required) {
+    snprintf(out, len, "pending: mesh %u/%u %um", (unsigned)adverts_sent, (unsigned)PROBATION_ADVERTS,
+             (unsigned)((probation.remaining_secs + 59) / 60));
+  } else {
+    uint32_t elapsed = millis() - boot_time_ms;
+    uint32_t left = elapsed >= OTA_ROLLBACK_CONFIRM_DELAY_MS ? 0 : (OTA_ROLLBACK_CONFIRM_DELAY_MS - elapsed + 999) / 1000;
+    snprintf(out, len, "pending: boot %us", (unsigned)left);
+  }
+}
+
+// Other slot: its recorded state, or dirty when that says valid but the image no longer verifies.
+static const char* standbyLabel(esp_ota_img_states_t state, const char* image) {
+  if (state == ESP_OTA_IMG_VALID && strcmp(image, "image-invalid") == 0) return "dirty";
+  return stateLabel(state);
+}
+
 const char* RollbackGuard::status(bool verify_inactive) {
-  static char buf[128];
+  static char buf[160];
   char active_letter = partitionLetter(esp_ota_get_running_partition());
 
   const esp_partition_t* a = findPartitionByLetter('A');
@@ -251,13 +393,15 @@ const char* RollbackGuard::status(bool verify_inactive) {
   bool b_inactive = (active_letter != 'B');
   const char* image = !verify_inactive ? "image-unchecked"
                                        : imageLabel(b_inactive ? b : a);
+  char active[40];
+  activeLabel(b_inactive ? state_a : state_b, active, sizeof(active));
 
   if (b_inactive) {
-    snprintf(buf, sizeof(buf), "Slots: A=%s (active, %s) | B=%s (recorded-%s, %s)",
-             ver_a, stateLabel(state_a), ver_b, stateLabel(state_b), image);
+    snprintf(buf, sizeof(buf), "Slots: A=%s (active, %s) | B=%s (standby, %s, %s)",
+             ver_a, active, ver_b, standbyLabel(state_b, image), image);
   } else {
-    snprintf(buf, sizeof(buf), "Slots: A=%s (recorded-%s, %s) | B=%s (active, %s)",
-             ver_a, stateLabel(state_a), image, ver_b, stateLabel(state_b));
+    snprintf(buf, sizeof(buf), "Slots: A=%s (standby, %s, %s) | B=%s (active, %s)",
+             ver_a, standbyLabel(state_a, image), image, ver_b, active);
   }
   return buf;
 }
@@ -294,4 +438,18 @@ bool RollbackGuard::setActivePartition(char letter, char reply[]) {
 
   strcpy(reply, "OK - rebooting");
   return true;   // caller reboots
+}
+
+bool RollbackGuard::heardRecently() {
+  return probationHeardRecently(have_rise, last_rise_ms, millis());
+}
+
+void RollbackGuard::noteInstall() {
+  writeFlag(HEARD_PATH, RollbackGuard::heardRecently());
+}
+
+bool RollbackGuard::confirm() {
+  if (confirmed_or_not_applicable || !isPendingVerify()) return false;
+  confirmNow();
+  return confirmed_or_not_applicable;
 }

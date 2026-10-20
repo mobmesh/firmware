@@ -25,6 +25,15 @@ namespace RollbackGuard {
   };
   ProbationState probation();
 
+  // Whether valid packets were heard within the recency limit, measured in uptime.
+  bool heardRecently();
+
+  // Called when an install commits: leaves the next image the recency it needs to judge itself.
+  void noteInstall();
+
+  // `ota slot confirm`: accepts the pending image now. False when nothing is pending.
+  bool confirm();
+
   // Reports the firmware unhealthy. Forces rollback and reboot when this boot is pending-verify
   // (does not return); returns false otherwise so the caller falls back to its own handling.
   bool reportUnhealthy();

@@ -74,8 +74,8 @@ examples.
 `hotspot-ota` lets a repeater or room server update itself without a person at the site. It
 can power an attached cellular hotspot, join configured Wi-Fi, verify WAN access, download
 the correct firmware, write the inactive OTA slot, and reboot. It also hardens MeshCore's
-local `start ota` upload mode and protects a newly installed image with a 90-second probation
-period.
+local `start ota` upload mode and protects a newly installed image with a probation
+period that rolls back an image that crashes or cannot hear the mesh.
 
 ### Common tasks
 
@@ -89,7 +89,8 @@ period.
 | Update on a schedule | `set ota.wan.auto on`, then `get ota.wan.auto.status` | Checks every `ota.wan.auto.interval` days; installs a new image once `ota.wan.auto.confirm` checks in a row find it |
 | Watch progress | `get ota.status` | Shows join, check, download, verify, then `succeeded`, `done` (nothing to install, such as the same build), `failed` or `canceled` |
 | Cancel safely | `ota cancel` | Stops work before verification or partition commit begins |
-| Inspect fallback | `get ota.slot` | Shows both OTA slots and whether the inactive image is actually valid |
+| Inspect fallback | `get ota.slot` | Shows both OTA slots and whether the standby image is actually valid |
+| Check probation | `get ota.slot`, `ota slot confirm` | Shows whether new firmware is still proving itself; `ota slot confirm` accepts it early |
 | Use local upload mode | `start ota`, `get ota.ap`, `stop ota` | Starts, inspects, or ends the local Wi-Fi upload page |
 
 The [full OTA and WAN syntax](#9-complete-command-and-syntax-reference) is included in the
@@ -142,7 +143,9 @@ After reboot, inspect both slots:
 get ota.slot
 ```
 
-The active image reports `pending` during probation and later `valid`.
+The active image reports `pending: boot <seconds>s` for the first 90 seconds, then
+`pending: mesh <adverts>/3 <minutes>m` while it waits to hear the mesh, and finally `valid`.
+The other slot reports `standby`; `dirty` there means a failed download partly overwrote it.
 
 ### Example: timed automatic updates
 
@@ -199,7 +202,8 @@ proves the original Wi-Fi and hotspot-power states were restored.
   updating.
 - The complete image's appended SHA-256 must match; this check has no override.
 - Destructive commands are refused while flash is being written.
-- A new image remains on probation until the radio and firmware have stayed healthy.
+- A new image remains on probation for 90 seconds, then, if the node heard the mesh before the
+  update, until it hears the mesh again (up to an hour, prompting neighbours with an advert).
 - A probation failure returns to the previous slot automatically.
 - The hotspot rail is forced off during startup so a reset cannot leave the modem powered.
 
@@ -827,7 +831,8 @@ project.
 | `get ota.status` | Show background OTA or WAN-verification progress and result. |
 | `ota cancel` | Cancel before verification or commit begins. |
 | `set ota.fw.marker <on\|off>` | One-attempt, RAM-only identity-check override; SHA-256 remains mandatory. |
-| `get ota.slot` | Inspect active/inactive slots, probation, recorded state, and inactive image validity. |
+| `get ota.slot` | Inspect both slots: the active one's state or probation stage, the standby one's state and image validity. |
+| `ota slot confirm` | Accept firmware on probation now. |
 | `ota slot boot <A\|B>` | Reboot immediately into a verified image in the selected slot. |
 | `get ota.ap` | Show local upload AP state and remaining lifetime. |
 | `stop ota` | End local upload AP mode; refused during an active write. |

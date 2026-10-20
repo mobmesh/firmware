@@ -25,9 +25,10 @@ are in the [mod README](../README.md).
 | [`get ota.wan.health`](#get-otawanhealth) | Read verification result and proven status |
 | [`get ota.wan.radio`](#get-otawanradio) | Read WiFi, driver, link, and power state |
 | [`get ota.wan.pwr`](#get--set-otawanpwr) | Read hotspot-power control state |
-| [`get ota.slot`](#get-otaslot) | Inspect both firmware slots |
+| [`get ota.slot`](#get-otaslot) | Inspect both firmware slots and probation |
 | [`get ota.wan.auto.status`](#get-otawanautostatus) | Read the automatic update schedule |
 | [`ota cancel`](#ota-cancel) | Cancel an update before verification |
+| [`ota slot confirm`](#ota-slot-confirm) | Accept firmware on probation now |
 | [`ota wan join`](#ota-wan-join) | Join the saved WiFi network |
 | [`ota wan leave`](#ota-wan-leave) | Disconnect WiFi and turn off hotspot power |
 | [`ota wan check`](#ota-wan-check) | Check internet access after a manual join |
@@ -288,25 +289,33 @@ get ota.slot
 **Response format:**
 
 ```text
-> Slots: A=<version> (active, <state>) | B=<version> (recorded-<state>, <image>)
+> Slots: A=<version> (active, <state>) | B=<version> (standby, <state>, <image>)
 ```
 
-The active and inactive descriptions swap when B is running.
+The active and standby descriptions swap when B is running.
 A is `ota_0`; B is `ota_1`. Versions include the build SHA, recorded after each
 slot boots; a slot without a recorded version shows `v?`.
 
+Example, B running new firmware that is waiting to hear the mesh:
+
+```text
+> Slots: A=v1.18.0-35b63b8 (standby, valid, image-ok) | B=v1.18.0-ffa154e (active, pending: mesh 2/3 34m)
+```
+
 | Active state | Meaning |
 | --- | --- |
-| `pending` | On rollback probation; confirms after approximately 90 seconds with a working radio |
 | `valid` | Confirmed |
-| `n/a` | Rollback state unavailable |
+| `pending: boot <seconds>s` | New firmware in its first 90 seconds |
+| `pending: mesh <sent>/3 <minutes>m` | Waiting to hear the mesh; `<sent>` adverts sent so far, `<minutes>` left |
+| `n/a` | Rollback state unavailable, or flashed over USB |
 
-| Inactive recorded state | Meaning |
+| Standby state | Meaning |
 | --- | --- |
-| `recorded-valid` | Previously accepted |
+| `valid` | Previously confirmed, and the image still verifies |
+| `dirty` | Was confirmed, but has since been partly overwritten, for example by a failed download |
 | `new` | Selected but not yet booted |
 | `invalid` | Rejected by rollback |
-| `aborted` | Update did not finish |
+| `aborted` | Did not confirm before a reset |
 | `n/a` | No applicable rollback record |
 
 | Image result | Meaning |
@@ -316,10 +325,31 @@ slot boots; a slot without a recorded version shows `v?`.
 | `image-absent` | Partition does not exist |
 | `image-unchecked` | Flash writer is active; verification was skipped |
 
-Recorded validity does not prove the image is intact. Only the inactive image is
-verified; reading and hashing it takes longer than other status queries.
-A reset during probation causes rollback; radio initialization failure triggers
-immediate rollback. Requires rollback-guard support.
+Only the standby image is verified; reading and hashing it takes longer than other
+status queries. Requires rollback-guard support.
+
+### Probation
+
+New firmware must survive 90 seconds. If the node heard the mesh in the 3 days before an
+update installed over WiFi or the upload page, it must also hear a valid packet within the
+next hour, or it returns to the previous firmware. When nothing is heard on its own, it
+sends a flood advert, up to 3, 20 minutes apart; a neighbour relaying it counts. The
+listening step is skipped when the battery is below the power-guard resume level, when the
+image was already confirmed on this node, and after a USB flash. Radio initialization
+failure rolls back at once.
+
+Any reset during probation returns to the previous firmware, so `reboot`, `poweroff` and
+`shutdown` are refused until it ends; `ota slot confirm` ends it early.
+
+## ota slot confirm
+
+```text
+ota slot confirm
+```
+
+**Response:** `OK - firmware confirmed` or `ERR: no firmware on probation`.
+
+**Effect:** Ends probation and keeps the running firmware, skipping any remaining checks.
 
 ## ota cancel
 
@@ -434,8 +464,8 @@ ota slot boot <A|B>
 
 **Response:** `OK - rebooting` or `ERR: ...`.
 
-**Effect:** Selects the requested slot and reboots immediately. Rearms approximately
-90 seconds of rollback probation, including for a previously valid image.
+**Effect:** Selects the requested slot and reboots immediately. Rearms 90 seconds of
+rollback probation, including for a previously valid image; it never waits to hear the mesh.
 
 **Restrictions:** Refused if the slot is already active, absent, or has no valid image,
 or if an OTA/WAN operation or upload is writing. Requires rollback-guard support.

@@ -248,6 +248,7 @@ static void apStart(const char* id, char* reply) {
           }
           upload->state = AP_UPLOAD_DONE;
           apUploadRelease(upload);
+          HotspotOTA::noteInstall();
         }
       });
     ap_routed = true;
@@ -385,10 +386,12 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
       && (HotspotOTA::refuseWhileActive(reply) || refuseWhileApWriting(reply))) return true;
 
   // Any reset while pending verify rolls back, and a timed sleep is a reset.
-  if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
+  if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0
+      || (memcmp(command, "reboot", 6) == 0 && (command[6] == 0 || command[6] == ' '))) {
     RollbackGuard::ProbationState probation = RollbackGuard::probation();
     if (probation.pending) {
-      sprintf(reply, "ERR: firmware on probation; retry in %us", (unsigned)probation.remaining_secs);
+      sprintf(reply, "ERR: firmware on probation; ota slot confirm, or retry in %us",
+              (unsigned)probation.remaining_secs);
       return true;
     }
   }
@@ -434,6 +437,8 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
       strcpy(reply, apTeardown() ? "OK - OTA AP stopped"
                                  : "ERR: AP stop failed; reboot to clear");
     }
+  } else if (strcmp(command, "ota slot confirm") == 0) {
+    strcpy(reply, RollbackGuard::confirm() ? "OK - firmware confirmed" : "ERR: no firmware on probation");
   } else if (strcmp(command, "ota cancel") == 0) {
     HotspotOTA::cancel(reply);
   } else if (memcmp(command, "ota wan join", 12) == 0) {
@@ -565,7 +570,7 @@ static bool handleGet(char* command, char* reply) {
     // Skip verification while either writer owns that slot -- this mod's service, or an upstream
     // `start ota` upload. A torn image mid-write is expected, not a fault.
     bool quiet = HotspotOTA::isActive() || HotspotOTA::flashWriteInProgress();
-    sprintf(reply, "> %s", RollbackGuard::status(!quiet));
+    snprintf(reply, MAX_TEXT_LEN, "> %s", RollbackGuard::status(!quiet));
   } else {
     return false;
   }

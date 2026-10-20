@@ -70,5 +70,7 @@ namespace HotspotOTA {
   void autoTick(bool ap_busy);
   void setAutoBlocked(bool blocked);   // written only by sync-settings, once per loop
   void onImageConfirmed();
-  void onImageRejected();
+  void onImageRejected(bool crash);
+  bool runningIsKnownGood();
+  void noteInstall();   // an install committed: record recency and arm a pending retry
 }
