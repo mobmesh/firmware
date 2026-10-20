@@ -62,6 +62,12 @@ class ReleaseChangelogTestCase(unittest.TestCase):
         self.assertEqual(body.count("## Upstream release notes"), 1)
         self.assertEqual(body.count("<!-- mobmesh-build:"), 1)
 
+    def test_entries_use_level_four_headings(self):
+        head = self.commit("mods/a.txt", "fix: one")
+        body = self.compose(f"<!-- mobmesh-build:{self.base} -->", head)
+        self.assertIn(f"\n#### Build `{head[:7]}`", body)
+        self.assertNotIn("\n### ", body)
+
     def test_same_commit_adds_no_entry(self):
         head = self.commit("mods/a.txt", "fix: one")
         body = self.compose(f"<!-- mobmesh-build:{self.base} -->", head)

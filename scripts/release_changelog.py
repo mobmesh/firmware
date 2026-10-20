@@ -49,7 +49,7 @@ def compose(notes, existing, previous, head, repo, date):
         heading = ('Rebuild' if prior else 'Build') + f' `{head[:7]}`, {date}'
         lines = [f'- {s}' for s in listed] or (['- No firmware changes.'] if since else
                                                ['- First MeshCore Enhanced+ build of this upstream release.'])
-        block = '\n'.join([f'### {heading}', ''] + lines + ([''] + [prior] if prior else []))
+        block = '\n'.join([f'#### {heading}', ''] + lines + ([''] + [prior] if prior else []))
     intro, _, upstream = notes.partition(UPSTREAM)
     parts = [intro.rstrip(), '', SECTION, '', block.rstrip(), '']
     if upstream:
