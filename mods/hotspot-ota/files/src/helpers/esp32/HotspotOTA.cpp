@@ -14,6 +14,7 @@
 #include <helpers/TxtDataHelpers.h>   // StrHelper lives here, no standalone StrHelper.h
 #include <helpers/ModHooks.h>          // modClockSet()
 #include "RollbackGuard.h"             // probation state -- see start()
+#include "OtaAutoPolicy.h"
 
 // The OTA_WIFI_*, OTA_HTTP_*, OTA_WAN_* and PIN_HOTSPOT_PWR values are injected as build flags
 // from variants/<board>/overrides.yaml, which carries each board's values and rationale.
@@ -171,6 +172,26 @@ static WanResult service_wan_result = WanResult::Unknown;
 static WanResult wan_done_result = WanResult::Unknown;
 static WanRuntimeState service_wan_initial;
 
+// What an automatic run decided about the image it found; applied to the auto record by poll().
+struct AutoOutcome {
+  uint8_t result;
+  uint8_t count;
+  char version[13];
+  char sha[9];
+};
+struct AutoSnapshot {
+  uint8_t confirm;
+  uint8_t candidate_count;
+  char candidate_version[13];
+  char candidate_sha[9];
+  char rejected_version[13];
+  char rejected_sha[9];
+};
+static bool service_automatic = false;
+static bool service_auto_pending = false;
+static AutoSnapshot service_auto_snapshot;
+static AutoOutcome service_auto_outcome;
+
 static void sha256(const uint8_t* data, size_t len, uint8_t out[32]) {
   mbedtls_sha256_context ctx;
   mbedtls_sha256_init(&ctx);
@@ -248,6 +269,74 @@ static bool saveWanRecord(WanRecord record) {
   file.close();
   WanRecord check;
   return written == sizeof(record) && readWanSlot(target, check)
+         && check.sequence == record.sequence;
+}
+
+static const char* AUTO_PATHS[] = {"/ota_auto0", "/ota_auto1"};
+static const uint8_t AUTO_RECORD_VERSION = 1;
+
+struct __attribute__((packed)) AutoRecord {
+  char magic[4];
+  uint8_t version;
+  uint8_t enabled;
+  uint8_t interval_days;
+  uint8_t confirm;
+  uint32_t anchor;
+  uint32_t last_check;
+  uint8_t last_result;
+  char candidate_version[13];
+  char candidate_sha[9];
+  uint8_t candidate_count;
+  char rejected_version[13];
+  char rejected_sha[9];
+  char boot_version[13];
+  char boot_sha[9];
+  uint32_t sequence;
+  uint8_t digest[32];
+};
+
+static_assert(sizeof(AutoRecord) == 120, "auto record layout changed");
+
+static bool autoRecordValid(const AutoRecord& record) {
+  if (memcmp(record.magic, "OAUT", 4) != 0 || record.version != AUTO_RECORD_VERSION) return false;
+  uint8_t digest[32];
+  sha256((const uint8_t*)&record, offsetof(AutoRecord, digest), digest);
+  return memcmp(digest, record.digest, sizeof(digest)) == 0;
+}
+
+static bool readAutoSlot(uint8_t slot, AutoRecord& record) {
+  if (!SPIFFS.exists(AUTO_PATHS[slot])) return false;
+  File file = SPIFFS.open(AUTO_PATHS[slot], "r");
+  if (!file) return false;
+  size_t read = file.read((uint8_t*)&record, sizeof(record));
+  bool exact = read == sizeof(record) && !file.available();
+  file.close();
+  return exact && autoRecordValid(record);
+}
+
+static bool loadAutoRecord(AutoRecord& record, int* selected = NULL) {
+  AutoRecord slots[2];
+  bool valid0 = readAutoSlot(0, slots[0]);
+  bool valid1 = readAutoSlot(1, slots[1]);
+  if (!valid0 && !valid1) return false;
+  int slot = !valid0 ? 1 : (!valid1 || newerSequence(slots[0].sequence, slots[1].sequence) ? 0 : 1);
+  record = slots[slot];
+  if (selected != NULL) *selected = slot;
+  return true;
+}
+
+static bool saveAutoRecord(AutoRecord& record) {
+  AutoRecord current;
+  int current_slot = -1;
+  record.sequence = loadAutoRecord(current, &current_slot) ? current.sequence + 1 : 1;
+  sha256((const uint8_t*)&record, offsetof(AutoRecord, digest), record.digest);
+  uint8_t target = current_slot < 0 ? 0 : 1 - current_slot;
+  File file = SPIFFS.open(AUTO_PATHS[target], "w");
+  if (!file) return false;
+  size_t written = file.write((const uint8_t*)&record, sizeof(record));
+  file.close();
+  AutoRecord check;
+  return written == sizeof(record) && readAutoSlot(target, check)
          && check.sequence == record.sequence;
 }
 
@@ -511,7 +600,41 @@ static void drainAndClose(HTTPClient& http) {
   http.end();
 }
 
-static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, char reply[]) {
+static bool sameRelease(const OtaMetadata& meta, const char* version, const char* sha) {
+  return version[0] != 0 && strcmp(meta.upstream_version, version) == 0 && strcmp(meta.repo_sha, sha) == 0;
+}
+
+static void noteAutoImage(const OtaMetadata& incoming, uint8_t result, uint8_t count) {
+  service_auto_outcome.result = result;
+  service_auto_outcome.count = count;
+  StrHelper::strncpy(service_auto_outcome.version, incoming.upstream_version,
+                     sizeof(service_auto_outcome.version));
+  StrHelper::strncpy(service_auto_outcome.sha, incoming.repo_sha, sizeof(service_auto_outcome.sha));
+}
+
+// An automatic run installs only a release it has now seen `confirm` checks in a row.
+static const char* autoRefusal(const OtaMetadata& incoming, char reply[]) {
+  const AutoSnapshot& snap = service_auto_snapshot;
+  if (sameRelease(incoming, snap.rejected_version, snap.rejected_sha)) {
+    noteAutoImage(incoming, OTA_AUTO_REJECTED, 0);
+    sprintf(reply, "skipped %s (%s) -- rolled back on this node", incoming.upstream_version,
+            incoming.repo_sha);
+    return reply;
+  }
+  bool same = sameRelease(incoming, snap.candidate_version, snap.candidate_sha);
+  uint8_t count = otaAutoSighting(same, snap.candidate_count);
+  if (count < snap.confirm) {
+    noteAutoImage(incoming, OTA_AUTO_COUNTED, count);
+    sprintf(reply, "counted %s (%s) %u of %u", incoming.upstream_version, incoming.repo_sha,
+            (unsigned)count, (unsigned)snap.confirm);
+    return reply;
+  }
+  noteAutoImage(incoming, OTA_AUTO_NONE, count);
+  return NULL;
+}
+
+static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bool automatic,
+                       char reply[]) {
   if (cfg.ssid[0] == 0 || cfg.url[0] == 0) {
     strcpy(reply, "ERR: ota.wan.wifi not configured");
     return false;
@@ -657,8 +780,10 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, ch
           sprintf(reply, "already running %s (%s) -- nothing to do",
                   incoming.upstream_version, incoming.repo_sha);
           refusal = reply;
+          if (automatic) noteAutoImage(incoming, OTA_AUTO_CURRENT, 0);
         }
       }
+      if (refusal == NULL && automatic) refusal = autoRefusal(incoming, reply);
 
       if (refusal != NULL) {
         if (refusal != reply) strcpy(reply, refusal);
@@ -832,19 +957,21 @@ static void serviceTaskMain(void*) {
   HotspotOtaConfig cfg;
   WanRuntimeState initial;
   bool bypass_marker_check;
+  bool automatic;
   ServiceKind kind;
 
   portENTER_CRITICAL(&service_mux);
   cfg = service_config;
   initial = service_wan_initial;
   bypass_marker_check = service_bypass_marker;
+  automatic = service_automatic;
   kind = service_kind;
   portEXIT_CRITICAL(&service_mux);
 
   char result[MAX_TEXT_LEN] = {0};
   bool ok;
   if (kind == ServiceKind::Ota) {
-    ok = runService(cfg, bypass_marker_check, result);
+    ok = runService(cfg, bypass_marker_check, automatic, result);
     digitalWrite(PIN_HOTSPOT_PWR, LOW);
     if (!stopWifiRadio() && !ok) strcpy(result, "ERR: WiFi shutdown failed; reboot to clear");
   } else if (kind == ServiceKind::WanVerify) {
@@ -867,7 +994,7 @@ static void serviceTaskMain(void*) {
   vTaskDelete(NULL);
 }
 
-bool HotspotOTA::start(const HotspotOtaConfig& cfg, char reply[]) {
+static bool startService(const HotspotOtaConfig& cfg, const AutoSnapshot* automatic, char reply[]) {
   if (cfg.ssid[0] == 0 || cfg.url[0] == 0) {
     strcpy(reply, "ERR: ota.wan.wifi not configured");
     return false;
@@ -900,8 +1027,12 @@ bool HotspotOTA::start(const HotspotOtaConfig& cfg, char reply[]) {
   if (!busy) {
     service_config = cfg;
     service_kind = ServiceKind::Ota;
-    service_bypass_marker = marker_bypass;
-    marker_bypass = false;
+    service_automatic = automatic != NULL;
+    service_auto_pending = automatic != NULL;
+    service_auto_outcome = {};
+    if (automatic != NULL) service_auto_snapshot = *automatic;
+    service_bypass_marker = automatic != NULL ? false : marker_bypass;
+    if (automatic == NULL) marker_bypass = false;
     service_cancel_requested = false;
     service_written = 0;
     service_total = -1;
@@ -922,6 +1053,7 @@ bool HotspotOTA::start(const HotspotOtaConfig& cfg, char reply[]) {
     portENTER_CRITICAL(&service_mux);
     service_state = OtaServiceState::Failed;
     service_kind = ServiceKind::None;
+    service_auto_pending = false;
     strcpy(service_result, "ERR: could not start OTA task");
     service_sleep_inhibited = false;
     portEXIT_CRITICAL(&service_mux);
@@ -932,6 +1064,10 @@ bool HotspotOTA::start(const HotspotOtaConfig& cfg, char reply[]) {
 
   strcpy(reply, "OK - OTA queued");
   return true;
+}
+
+bool HotspotOTA::start(const HotspotOtaConfig& cfg, char reply[]) {
+  return startService(cfg, NULL, reply);
 }
 
 bool HotspotOTA::cancel(char reply[]) {
@@ -1184,18 +1320,28 @@ void HotspotOTA::survey(const char* argument, char reply[]) {
   }
 }
 
+static void autoFinish(bool installed, const AutoOutcome& outcome);
+
 void HotspotOTA::poll() {
   HotspotOTA::surveyPoll();
   OtaServiceState state;
   bool release_sleep = false;
   uint32_t clock_epoch;
   ServiceKind kind;
+  bool auto_finished = false;
+  AutoOutcome auto_outcome;
 
   portENTER_CRITICAL(&service_mux);
   state = service_state;
   kind = service_kind;
   clock_epoch = service_clock_epoch;
   service_clock_epoch = 0;
+  if (service_auto_pending && (state == OtaServiceState::Succeeded || state == OtaServiceState::Failed
+                               || state == OtaServiceState::Canceled)) {
+    service_auto_pending = false;
+    auto_finished = true;
+    auto_outcome = service_auto_outcome;
+  }
   if (service_sleep_inhibited
       && (state == OtaServiceState::Failed || state == OtaServiceState::Canceled
           || state == OtaServiceState::WanComplete)) {
@@ -1206,6 +1352,7 @@ void HotspotOTA::poll() {
   portEXIT_CRITICAL(&service_mux);
 
   if (clock_epoch != 0) modClockSet(clock_epoch);
+  if (auto_finished) autoFinish(state == OtaServiceState::Succeeded, auto_outcome);
   if (release_sleep) updateSleepInhibit();
   if (release_sleep && kind == ServiceKind::WanVerify) {
     portENTER_CRITICAL(&service_mux);
@@ -1454,4 +1601,266 @@ HotspotOTA::WanRun HotspotOTA::wanVerifyResult(uint32_t run) {
     }
   }
   return run == current ? WanRun::Pending : WanRun::Unknown;
+}
+
+// --- Timed automatic updates (ota.wan.auto). Loop task only, so no locking. ---
+
+#ifdef MOBMESH_BUILD_EPOCH
+#define OTA_AUTO_BUILD_EPOCH ((uint32_t)MOBMESH_BUILD_EPOCH)
+#else
+#define OTA_AUTO_BUILD_EPOCH 0u
+#endif
+#define OTA_AUTO_TICK_MS 1000
+
+static AutoRecord auto_record;
+static bool auto_loaded = false;
+static bool auto_blocked = false;
+static uint32_t auto_tick_ms = 0;
+
+static AutoRecord& autoRecord() {
+  if (!auto_loaded) {
+    if (!loadAutoRecord(auto_record)) {
+      auto_record = {};
+      memcpy(auto_record.magic, "OAUT", 4);
+      auto_record.version = AUTO_RECORD_VERSION;
+      auto_record.interval_days = OTA_AUTO_INTERVAL_DEF;
+      auto_record.confirm = OTA_AUTO_CONFIRM_DEF;
+    }
+    auto_loaded = true;
+  }
+  return auto_record;
+}
+
+static void clearCandidate(AutoRecord& record) {
+  record.candidate_version[0] = 0;
+  record.candidate_sha[0] = 0;
+  record.candidate_count = 0;
+}
+
+static void setRelease(char* version, char* sha, const char* new_version, const char* new_sha) {
+  StrHelper::strncpy(version, new_version, 13);
+  StrHelper::strncpy(sha, new_sha, 9);
+}
+
+static bool autoClockOk(uint32_t now) {
+  return otaAutoClockBelievable(now, OTA_AUTO_BUILD_EPOCH);
+}
+
+static void autoRecordCheck(AutoRecord& record, uint8_t result, uint32_t now) {
+  record.last_result = result;
+  record.last_check = now;
+  saveAutoRecord(record);
+}
+
+static void autoFinish(bool installed, const AutoOutcome& outcome) {
+  AutoRecord& record = autoRecord();
+  uint8_t result = outcome.result != OTA_AUTO_NONE ? outcome.result
+                                                   : (installed ? OTA_AUTO_INSTALLED : OTA_AUTO_FAILED);
+  if (result == OTA_AUTO_COUNTED || result == OTA_AUTO_INSTALLED) {
+    setRelease(record.candidate_version, record.candidate_sha, outcome.version, outcome.sha);
+    record.candidate_count = outcome.count;
+  } else if (result == OTA_AUTO_CURRENT || result == OTA_AUTO_REJECTED) {
+    clearCandidate(record);
+  }
+  record.last_result = result;
+  saveAutoRecord(record);
+}
+
+void HotspotOTA::setAutoBlocked(bool blocked) {
+  auto_blocked = blocked;
+}
+
+void HotspotOTA::autoTick(bool ap_busy) {
+  if (millis() - auto_tick_ms < OTA_AUTO_TICK_MS) return;
+  auto_tick_ms = millis();
+  AutoRecord& record = autoRecord();
+  if (!record.enabled) return;
+  uint32_t now = modClockGet();
+  if (!autoClockOk(now)) return;
+
+  if (record.anchor == 0) {
+    uint8_t key[32];
+    if (!modPublisherKey(key)) return;
+    record.anchor = now + otaAutoNodeOffset(key);
+    saveAutoRecord(record);
+    return;
+  }
+  if (now < otaAutoNextDue(record.anchor, record.interval_days, record.last_check, now)) return;
+
+  if (auto_blocked) {
+    autoRecordCheck(record, OTA_AUTO_SKIP_LOCK, now);
+    return;
+  }
+  RollbackGuard::ProbationState probation = RollbackGuard::probation();
+  if (ap_busy || HotspotOTA::isActive() || Update.isRunning() || survey_state != SurveyState::Idle
+      || !probation.known || probation.pending) {
+    autoRecordCheck(record, OTA_AUTO_SKIP_BUSY, now);
+    return;
+  }
+
+  HotspotOtaConfig cfg;
+  HotspotOTA::loadConfig(cfg);
+  AutoSnapshot snap = {};
+  snap.confirm = record.confirm;
+  snap.candidate_count = record.candidate_count;
+  setRelease(snap.candidate_version, snap.candidate_sha, record.candidate_version, record.candidate_sha);
+  setRelease(snap.rejected_version, snap.rejected_sha, record.rejected_version, record.rejected_sha);
+  char reply[MAX_TEXT_LEN];
+  // Saved before the run, so a crash mid-download cannot fire it again straight after the reboot.
+  autoRecordCheck(record, OTA_AUTO_FAILED, now);
+  startService(cfg, &snap, reply);
+}
+
+void HotspotOTA::onImageConfirmed() {
+  OtaMetadata running;
+  if (!::runningMetadata(running)) return;
+  AutoRecord& record = autoRecord();
+  if (sameRelease(running, record.boot_version, record.boot_sha)) return;
+  clearCandidate(record);
+  if (sameRelease(running, record.rejected_version, record.rejected_sha)) {
+    record.rejected_version[0] = 0;
+    record.rejected_sha[0] = 0;
+  }
+  setRelease(record.boot_version, record.boot_sha, running.upstream_version, running.repo_sha);
+  saveAutoRecord(record);
+}
+
+void HotspotOTA::onImageRejected() {
+  const esp_partition_t* other = esp_ota_get_next_update_partition(NULL);
+  if (other == NULL) return;
+  uint8_t block[OTA_META_LEN];
+  OtaMetadata meta;
+  if (esp_partition_read(other, OTA_META_OFFSET, block, sizeof(block)) != ESP_OK
+      || !parseMetadata(block, meta)) return;
+  AutoRecord& record = autoRecord();
+  if (sameRelease(meta, record.rejected_version, record.rejected_sha)) return;
+  setRelease(record.rejected_version, record.rejected_sha, meta.upstream_version, meta.repo_sha);
+  clearCandidate(record);
+  saveAutoRecord(record);
+}
+
+static void formatUtc(uint32_t epoch, bool with_time, char* out, size_t len) {
+  time_t t = (time_t)epoch;
+  struct tm tm;
+  gmtime_r(&t, &tm);
+  strftime(out, len, with_time ? "%m-%d %H:%M UTC" : "%m-%d", &tm);
+}
+
+static void autoStatus(char reply[]) {
+  AutoRecord& record = autoRecord();
+  if (!record.enabled) {
+    strcpy(reply, "> off");
+    return;
+  }
+  if (record.anchor == 0 || !autoClockOk(modClockGet())) {
+    strcpy(reply, "> on; waiting for clock");
+    return;
+  }
+  portENTER_CRITICAL(&service_mux);
+  bool checking = service_auto_pending;
+  portEXIT_CRITICAL(&service_mux);
+  if (checking) {
+    strcpy(reply, "> on; checking");
+    return;
+  }
+  char next[24];
+  formatUtc(otaAutoNextDue(record.anchor, record.interval_days, record.last_check, modClockGet()), true, next,
+            sizeof(next));
+  if (record.candidate_count > 0 && record.last_result == OTA_AUTO_COUNTED) {
+    snprintf(reply, MAX_TEXT_LEN, "> on; next %s; %s (%s) %u of %u", next,
+             record.candidate_version, record.candidate_sha, (unsigned)record.candidate_count,
+             (unsigned)record.confirm);
+  } else if (record.last_result != OTA_AUTO_NONE) {
+    char last[8];
+    formatUtc(record.last_check, false, last, sizeof(last));
+    snprintf(reply, MAX_TEXT_LEN, "> on; next %s; last %s %s", next, last,
+             otaAutoResultName(record.last_result));
+  } else {
+    snprintf(reply, MAX_TEXT_LEN, "> on; next %s", next);
+  }
+}
+
+static const char* ordinal(uint8_t n) {
+  static char text[6];
+  const char* suffix = (n % 100 >= 11 && n % 100 <= 13) ? "th"
+                     : n % 10 == 1 ? "st" : n % 10 == 2 ? "nd" : n % 10 == 3 ? "rd" : "th";
+  snprintf(text, sizeof(text), "%u%s", (unsigned)n, suffix);
+  return text;
+}
+
+static void autoPlan(const AutoRecord& record, char reply[]) {
+  if (record.anchor == 0) {
+    snprintf(reply, MAX_TEXT_LEN,
+             "OK - checks every %ud once the clock is set; installs on the %s check that finds a new release",
+             (unsigned)record.interval_days, ordinal(record.confirm));
+    return;
+  }
+  char at[8], first[8];
+  uint32_t due = otaAutoNextDue(record.anchor, record.interval_days, record.last_check, modClockGet());
+  time_t t = (time_t)due;
+  struct tm tm;
+  gmtime_r(&t, &tm);
+  strftime(at, sizeof(at), "%H:%M", &tm);
+  strftime(first, sizeof(first), "%m-%d", &tm);
+  snprintf(reply, MAX_TEXT_LEN,
+           "OK - checks every %ud at %s UTC, next %s; installs on the %s check that finds a new release",
+           (unsigned)record.interval_days, at, first, ordinal(record.confirm));
+}
+
+bool HotspotOTA::autoSet(const char* key, const char* value, char reply[]) {
+  AutoRecord& record = autoRecord();
+  if (strcmp(key, "ota.wan.auto") == 0) {
+    bool on = strcmp(value, "on") == 0;
+    if (!on && strcmp(value, "off") != 0) {
+      strcpy(reply, "ERR: expected on|off");
+      return true;
+    }
+    if (on && !record.enabled && !HotspotOTA::wanProven()) {
+      strcpy(reply, "ERR: WAN not proven; run ota wan verify first");
+      return true;
+    }
+    if (on && !record.enabled) {
+      uint32_t now = modClockGet();
+      record.anchor = autoClockOk(now) ? now : 0;
+      record.last_check = 0;
+      record.last_result = OTA_AUTO_NONE;
+    }
+    record.enabled = on ? 1 : 0;
+  } else if (strcmp(key, "ota.wan.auto.interval") == 0) {
+    if (!otaAutoParseInterval(value, record.interval_days)) {
+      sprintf(reply, "ERR: expected <%u-%u>d", OTA_AUTO_INTERVAL_MIN, OTA_AUTO_INTERVAL_MAX);
+      return true;
+    }
+  } else if (strcmp(key, "ota.wan.auto.confirm") == 0) {
+    if (!otaAutoParseConfirm(value, record.confirm)) {
+      sprintf(reply, "ERR: expected %u-%u", OTA_AUTO_CONFIRM_MIN, OTA_AUTO_CONFIRM_MAX);
+      return true;
+    }
+  } else {
+    return false;
+  }
+  if (!saveAutoRecord(record)) {
+    strcpy(reply, "ERR: could not save");
+  } else if (record.enabled) {
+    autoPlan(record, reply);
+  } else {
+    strcpy(reply, "OK");
+  }
+  return true;
+}
+
+bool HotspotOTA::autoGet(const char* key, char reply[]) {
+  AutoRecord& record = autoRecord();
+  if (strcmp(key, "ota.wan.auto") == 0) {
+    sprintf(reply, "> %s", record.enabled ? "on" : "off");
+  } else if (strcmp(key, "ota.wan.auto.interval") == 0) {
+    sprintf(reply, "> %ud", (unsigned)record.interval_days);
+  } else if (strcmp(key, "ota.wan.auto.confirm") == 0) {
+    sprintf(reply, "> %u", (unsigned)record.confirm);
+  } else if (strcmp(key, "ota.wan.auto.status") == 0) {
+    autoStatus(reply);
+  } else {
+    return false;
+  }
+  return true;
 }

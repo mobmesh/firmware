@@ -6,6 +6,7 @@
 #include <esp_image_format.h>   // esp_image_verify() -- bootloader_support, linked into the app
 #include <SPIFFS.h>
 #include <helpers/ModHooks.h>
+#include "HotspotOTA.h"
 
 // Long enough to catch an early crash/boot-loop; short enough not to add much to the ~2 minutes a
 // hotspot-fetch update can already take.
@@ -35,6 +36,7 @@ static uint32_t last_confirm_attempt_ms = 0;
 // Defer the SPIFFS write to poll() to avoid adding stack depth inside MeshCore's init chain.
 static char pending_version[24] = {0};
 static bool version_write_pending = false;
+static bool confirm_reported = false;
 
 static bool isPendingVerify(esp_ota_img_states_t* out_state = nullptr) {
   esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;
@@ -153,12 +155,26 @@ void RollbackGuard::begin(const char* version) {
   version_write_pending = true;   // actually written on the first poll() -- see comment above
 }
 
+static bool otherSlotRejected() {
+  const esp_partition_t* other = esp_ota_get_next_update_partition(NULL);
+  esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;
+  if (other == NULL || esp_ota_get_state_partition(other, &state) != ESP_OK) return false;
+  return state == ESP_OTA_IMG_INVALID || state == ESP_OTA_IMG_ABORTED;
+}
+
 void RollbackGuard::poll() {
   if (version_write_pending) {
     writeVersion(partitionLetter(esp_ota_get_running_partition()), pending_version);
     version_write_pending = false;
+    if (otherSlotRejected()) HotspotOTA::onImageRejected();
   }
-  if (confirmed_or_not_applicable) return;
+  if (confirmed_or_not_applicable) {
+    if (!confirm_reported) {
+      confirm_reported = true;
+      HotspotOTA::onImageConfirmed();
+    }
+    return;
+  }
   if (millis() - boot_time_ms < OTA_ROLLBACK_CONFIRM_DELAY_MS) return;
   // Retried rather than latched blindly: a failed confirm leaves otadata PENDING_VERIFY, and
   // claiming success would hand the next OTA the only known-good image. Paced off the loop.

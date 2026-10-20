@@ -345,6 +345,11 @@ void hotspotOtaLoop() {
   RollbackGuard::poll();
   HotspotOTA::poll();
   apPoll();
+#ifdef OTA_AP_OWNED
+  HotspotOTA::autoTick(ap_up || ap_reboot_pending);
+#else
+  HotspotOTA::autoTick(false);
+#endif
 }
 
 // Mirrors the shapes CommonCLI::handleCommand() accepts -- same prefix lengths, `erase` serial-only
@@ -466,6 +471,14 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
 
 static bool handleSet(char* command, char* reply) {
   char* config = &command[4];
+  if (memcmp(config, "ota.wan.auto", 12) == 0) {
+    char* space = strchr(config, ' ');
+    if (space == NULL) return false;
+    *space = 0;
+    bool handled = HotspotOTA::autoSet(config, space + 1, reply);
+    *space = ' ';
+    return handled;
+  }
   if (memcmp(config, "ota.wan.wifi ", 13) == 0) {
     if (HotspotOTA::isActive()) {
       strcpy(reply, "ERR: OTA/WAN operation active");
@@ -528,6 +541,7 @@ static bool handleSet(char* command, char* reply) {
 
 static bool handleGet(char* command, char* reply) {
   char* config = &command[4];
+  if (memcmp(config, "ota.wan.auto", 12) == 0) return HotspotOTA::autoGet(config, reply);
   if (memcmp(config, "ota.fw.url", 10) == 0) {
     HotspotOtaConfig cfg;
     HotspotOTA::loadConfig(cfg);

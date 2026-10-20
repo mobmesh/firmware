@@ -84,6 +84,10 @@ All of these work over serial or remotely over the mesh. Full details are in
 <tr><td><code>ota slot boot &lt;A|B&gt;</code></td><td>Boot the other slot, if it holds a valid image.</td></tr>
 <tr><td><code>start ota wan &lt;url&gt;</code></td><td>Join WiFi, download from <code>&lt;url&gt;</code>, check it, and install it.</td></tr>
 <tr><td><code>start ota wan update</code></td><td>Same, using the saved <code>ota.fw.url</code>.</td></tr>
+<tr><td><code>get / set ota.wan.auto &lt;on|off&gt;</code></td><td>Turn timed automatic updates on or off. Needs a proven WAN setup. See below.</td></tr>
+<tr><td><code>get / set ota.wan.auto.interval &lt;N&gt;d</code></td><td>Days between automatic checks, 4 to 90. Default 7.</td></tr>
+<tr><td><code>get / set ota.wan.auto.confirm &lt;N&gt;</code></td><td>Checks in a row that must find the same new image before it installs, 2 to 10. Default 2.</td></tr>
+<tr><td><code>get ota.wan.auto.status</code></td><td>Next check time, last result, and any image being counted.</td></tr>
 </tbody>
 </table>
 
@@ -129,6 +133,29 @@ hangs up straight away if the image is:
 
 A good image downloads in full and is then checked against its SHA-256. The SHA-256 and the
 build stamp catch a corrupt download or the wrong image; they do not prove who published it.
+
+### Timed automatic updates
+
+With `ota.wan.auto` on, the node runs `start ota wan update` by itself every
+`ota.wan.auto.interval` days, counted from when it was turned on. It's off by default.
+
+```text
+ota wan verify
+set ota.wan.auto on
+  -> OK - checks every 7d at 14:05 UTC, next 10-26; installs on the 2nd check that finds a new release
+```
+
+| Rule | Why |
+| --- | --- |
+| A new image installs only after `ota.wan.auto.confirm` checks in a row find it | A release pulled or replaced in the meantime never spreads |
+| A release this node rolled back from is skipped | A bad image is not reinstalled at every check |
+| Checks wait while the clock is unset | A node that lost power can't keep to a schedule |
+| Checks wait while a sync-settings campaign holds a lock | A campaign isn't interrupted |
+| A skipped or failed check waits for the next interval | No retries spend data on a metered hotspot |
+
+A check that finds the running image costs one short WiFi session. A check that only counts
+a new image reads about 1 KB, and the image downloads once, on the confirming check.
+Manual `start ota wan update` is unaffected by these rules.
 
 ---
 

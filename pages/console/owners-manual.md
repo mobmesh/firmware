@@ -86,6 +86,7 @@ period.
 | Prove WAN and NTP | `ota wan verify` then `get ota.wan.health` | Tests the path and restores the Wi-Fi/GPIO state it found |
 | Save the normal firmware URL | `set ota.fw.url <url>` | Keeps future remote update commands short |
 | Start a remote update | `start ota wan update` | Queues the saved URL for background download and installation |
+| Update on a schedule | `set ota.wan.auto on`, then `get ota.wan.auto.status` | Checks every `ota.wan.auto.interval` days; installs a new image once `ota.wan.auto.confirm` checks in a row find it |
 | Watch progress | `get ota.status` | Shows join, check, download, verify, completion, or failure |
 | Cancel safely | `ota cancel` | Stops work before verification or partition commit begins |
 | Inspect fallback | `get ota.slot` | Shows both OTA slots and whether the inactive image is actually valid |
@@ -142,6 +143,33 @@ get ota.slot
 ```
 
 The active image reports `pending` during probation and later `valid`.
+
+### Example: timed automatic updates
+
+Needs a proven WAN setup. The schedule counts from the moment it is turned on:
+
+```text
+ota wan verify
+set ota.wan.auto.interval 7d
+set ota.wan.auto.confirm 2
+set ota.wan.auto on
+```
+
+The reply states the schedule:
+
+```text
+OK - checks every 7d at 14:05 UTC, next 10-26; installs on the 2nd check that finds a new release
+```
+
+After a check that found a new release, status shows it being counted:
+
+```text
+> on; next 11-02 14:05 UTC; v1.18.1 (a1b2c3d) 1 of 2
+```
+
+Checks skip while the clock is unset, while a sync-settings campaign holds a lock, or while
+another update is active, and wait for the next interval. A release this node rolled back
+from is never reinstalled automatically.
 
 ### Example: diagnose the WAN path without updating
 
@@ -792,6 +820,10 @@ project.
 | `set ota.fw.url <url>` | Save the URL used by `start ota wan update`. |
 | `start ota wan <url>` | Queue a WAN firmware update from the supplied URL. |
 | `start ota wan update` | Queue an update using the saved URL. |
+| `get / set ota.wan.auto <on\|off>` | Timed automatic updates; default off. `on` needs `proven=yes` WAN health. |
+| `get / set ota.wan.auto.interval <N>d` | Days between automatic checks, 4–90; default `7d`. |
+| `get / set ota.wan.auto.confirm <N>` | Checks in a row that must find the same new image before it installs, 2–10; default 2. |
+| `get ota.wan.auto.status` | Next check time, last result, or the image being counted. |
 | `get ota.status` | Show background OTA or WAN-verification progress and result. |
 | `ota cancel` | Cancel before verification or commit begins. |
 | `set ota.fw.marker <on\|off>` | One-attempt, RAM-only identity-check override; SHA-256 remains mandatory. |

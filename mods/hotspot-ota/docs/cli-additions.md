@@ -16,6 +16,9 @@ are in the [mod README](../README.md).
 | [`set ota.fw.url <url>`](#get--set-otafwurl) | Save the default firmware URL |
 | [`set ota.fw.marker <on\|off>`](#set-otafwmarker) | Control the next update's stamp check |
 | [`set ota.wan.pwr <on\|off>`](#get--set-otawanpwr) | Switch hotspot power |
+| [`set ota.wan.auto <on\|off>`](#get--set-otawanauto) | Turn timed automatic updates on or off |
+| [`set ota.wan.auto.interval <N>d`](#get--set-otawanautointerval) | Set days between automatic checks |
+| [`set ota.wan.auto.confirm <N>`](#get--set-otawanautoconfirm) | Set checks in a row before installing |
 | [`get ota.fw.url`](#get--set-otafwurl) | Read the saved URL |
 | [`get ota.status`](#get-otastatus) | Read update or WAN-verification progress |
 | [`get ota.ap`](#get-otaap) | Read local upload AP state |
@@ -23,6 +26,7 @@ are in the [mod README](../README.md).
 | [`get ota.wan.radio`](#get-otawanradio) | Read WiFi, driver, link, and power state |
 | [`get ota.wan.pwr`](#get--set-otawanpwr) | Read hotspot-power control state |
 | [`get ota.slot`](#get-otaslot) | Inspect both firmware slots |
+| [`get ota.wan.auto.status`](#get-otawanautostatus) | Read the automatic update schedule |
 | [`ota cancel`](#ota-cancel) | Cancel an update before verification |
 | [`ota wan join`](#ota-wan-join) | Join the saved WiFi network |
 | [`ota wan leave`](#ota-wan-leave) | Disconnect WiFi and turn off hotspot power |
@@ -111,6 +115,101 @@ Reports the control-pin state, not measured supply voltage. Does not join WiFi o
 start an update. Manual `on` bypasses the automatic power-guard battery check.
 External rail control is validated on Heltec V4; check board configuration before
 using another board's pin.
+
+## get / set ota.wan.auto
+
+```text
+get ota.wan.auto
+set ota.wan.auto <on|off>
+```
+
+| Item | Definition |
+| --- | --- |
+| `on` / `off` | Run `start ota wan update` on a schedule, or stop. Default `off`. |
+| Get response | `> on` or `> off` |
+| Set response | `on`: the schedule (below); `off`: `OK`; or `ERR: expected on\|off`, `ERR: WAN not proven; run ota wan verify first` |
+| Storage | Persistent across reboots and firmware updates |
+| Restrictions | `on` requires `get ota.wan.health` to show `proven=yes` |
+
+Turning it on replies with the schedule:
+
+| Clock | Reply |
+| --- | --- |
+| Set | `OK - checks every 7d at 14:05 UTC, next 10-27; installs on the 2nd check that finds a new release` |
+| Unset | `OK - checks every 7d once the clock is set; installs on the 2nd check that finds a new release` |
+
+Changing the interval or confirm count while on replies the same way. The schedule starts from that moment: the first check runs one interval
+later, then every interval after. With the clock unset, the schedule starts once the
+clock is set, plus a per-node offset of up to 24 hours. Turning it off and on again
+starts a new schedule.
+
+Each check uses the normal WAN update and its checks. It also:
+
+- installs a new image only after `ota.wan.auto.confirm` checks in a row have found it;
+- skips a release this node rolled back from;
+- skips while the clock is older than the firmware build;
+- skips while any sync-settings campaign holds a lock;
+- skips while an update, survey, upload AP or rollback probation is active.
+
+A skipped or failed check waits for the next interval. An unchanged image costs one short
+WiFi session; a check that only counts a new image reads about 1 KB.
+
+## get / set ota.wan.auto.interval
+
+```text
+get ota.wan.auto.interval
+set ota.wan.auto.interval <N>d
+```
+
+| Item | Definition |
+| --- | --- |
+| `N` | Days between checks, 4–90; the `d` is required. Default `7d`. |
+| Get response | `> <N>d` |
+| Set response | `OK` (the schedule when auto is on) or `ERR: expected <4-90>d` |
+| Storage | Persistent |
+
+Changing the interval keeps the schedule's start and changes only the spacing.
+
+## get / set ota.wan.auto.confirm
+
+```text
+get ota.wan.auto.confirm
+set ota.wan.auto.confirm <N>
+```
+
+| Item | Definition |
+| --- | --- |
+| `N` | Checks in a row that must find the same new image before it installs, 2–10. Default `2`. |
+| Get response | `> <N>` |
+| Set response | `OK` (the schedule when auto is on) or `ERR: expected 2-10` |
+| Storage | Persistent; the running count also survives reboots |
+
+A different image restarts the count, including a republish of the same version.
+
+## get ota.wan.auto.status
+
+```text
+get ota.wan.auto.status
+```
+
+| Response | Meaning |
+| --- | --- |
+| `> off` | Automatic updates are off |
+| `> on; waiting for clock` | On; the schedule starts once the clock is set |
+| `> on; checking` | A check is running now; `get ota.status` shows its progress |
+| `> on; next <MM-DD HH:MM> UTC` | Scheduled; no check has run yet |
+| `> on; next <MM-DD HH:MM> UTC; last <MM-DD> <result>` | Scheduled; the last check's result |
+| `> on; next <MM-DD HH:MM> UTC; <version> (<sha>) <n> of <confirm>` | A new image has been counted |
+
+| Result | Meaning |
+| --- | --- |
+| `current` | The server holds the running image |
+| `counted` | A new image was seen and counted |
+| `installed` | A new image was installed |
+| `failed` | The check could not complete; see `get ota.status` |
+| `skipped lock` | A sync-settings campaign held a lock |
+| `skipped busy` | Another update, survey, upload AP or probation was active |
+| `skipped rolled-back` | The server holds a release this node rolled back from |
 
 ## get ota.status
 

@@ -33,8 +33,10 @@
 #error "sync-settings requires transmit completion hooks"
 #endif
 
-#if SYNC_SETTINGS_WITH_TIME && defined(WITH_HOTSPOT_OTA) && defined(MOBMESH_HAS_EXTERNAL_POWER)
+#ifdef WITH_HOTSPOT_OTA
 #include <helpers/esp32/HotspotOTA.h>
+#endif
+#if SYNC_SETTINGS_WITH_TIME && defined(WITH_HOTSPOT_OTA) && defined(MOBMESH_HAS_EXTERNAL_POWER)
 #define SYNC_TIME_PREFLIGHT 1
 #else
 #define SYNC_TIME_PREFLIGHT 0
@@ -4091,6 +4093,33 @@ static int exportRegions(RegionMap* base, char* out, size_t capacity,
 bool allowFlood(bool scope_known) {
   return !config.repeat_gate || scope_known;
 }
+#ifdef WITH_HOTSPOT_OTA
+static bool datasetLocked(uint8_t dataset, const DatasetState& state, uint32_t now) {
+  return (state.guard != GUARD_IDLE && !guardExpired(state, now)) || transmitter().active(dataset) ||
+         transmitter().aborting(dataset) || receiver.campaign(dataset).state != RECEIVE_IDLE;
+}
+
+// Any campaign holding a lock vetoes hotspot-ota's timed updates; manual updates are not affected.
+static bool campaignLocked() {
+  uint32_t now = modClockGet();
+#if SYNC_SETTINGS_WITH_REGION
+  if (datasetLocked(REGION, region_state, now)) return true;
+#endif
+#if SYNC_SETTINGS_WITH_POLICY
+  if (datasetLocked(POLICY, policy_state, now) || policy_recovery.phase != RECOVERY_IDLE) return true;
+#endif
+#if SYNC_SETTINGS_WITH_RADIO
+  if (radio_record.phase != RADIO_GUARD_IDLE || radioMigration().active() ||
+      radioPublisherMachine().active()) return true;
+#endif
+#if SYNC_SETTINGS_WITH_TIME
+  if (time_record.active) return true;
+#endif
+  (void)now;
+  return false;
+}
+#endif
+
 }  // namespace sync
 }  // namespace mobmesh
 
@@ -4149,6 +4178,9 @@ void syncRecv(const mesh::Packet* packet, bool accepted,
 
 void syncLoop() {
   if (!mobmesh::sync::booted) mobmesh::sync::boot();
+#ifdef WITH_HOTSPOT_OTA
+  HotspotOTA::setAutoBlocked(mobmesh::sync::campaignLocked());
+#endif
 #if SYNC_SETTINGS_WITH_RADIO
   if (mobmesh::sync::radio_ready) {
     mobmesh::sync::RadioValues live;

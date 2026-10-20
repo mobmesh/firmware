@@ -63,4 +63,12 @@ namespace HotspotOTA {
   // `ota wan survey`: one asynchronous scan, paged from the scan API's own result set.
   void survey(const char* argument, char reply[]);
   void surveyPoll();
+
+  // Timed automatic updates (`ota.wan.auto`).
+  bool autoSet(const char* key, const char* value, char reply[]);
+  bool autoGet(const char* key, char reply[]);
+  void autoTick(bool ap_busy);
+  void setAutoBlocked(bool blocked);   // written only by sync-settings, once per loop
+  void onImageConfirmed();
+  void onImageRejected();
 }
