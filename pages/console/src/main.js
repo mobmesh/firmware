@@ -5,7 +5,7 @@ import {deferredObserver} from './core/observer.js';
 import {CredentialVault} from './storage/credentials.js';
 import {initializeCompanion,authenticateRepeater} from './transports/diagnostic-engine.js';
 import {TemporaryTargets} from './transports/temporary-targets.js';
-import {loadCatalog} from './core/catalog.js';import {complete} from './core/completion.js';import {helpRequest,helpText,helpOverview,HELP_KEY_WIDTH} from './core/help.js';import {History} from './core/editor.js';import {wireInput} from './core/grammar.js';import {sensitive,safeDraft,safeRecord} from './core/redaction.js';
+import {loadCatalog,parseBuild} from './core/catalog.js';import {complete} from './core/completion.js';import {helpRequest,helpText,helpOverview,HELP_KEY_WIDTH,UNAVAILABLE,unavailable} from './core/help.js';import {History} from './core/editor.js';import {wireInput} from './core/grammar.js';import {sensitive,safeDraft,safeRecord} from './core/redaction.js';
 // Nothing is persisted yet, so the transcript shows secrets as typed; redaction applies once sessions are saved.
 const PERSISTENT=false;const recordText=(text,secret=false)=>PERSISTENT?safeRecord(text,secret):text;import {ConnectionStatus} from './core/connection-status.js';import {retained} from './core/output.js';import {transportFactory} from './transports/browser.js';import {directCommand,displayReply} from './transports/direct.js';import {RemoteProbe,RemoteReplyTimeout,packetCounters,keyBytes} from './transports/remote.js';import Constants from './vendor/meshcore/constants.js';import {fullKey,frameSummary,directReply} from './protocol.js';
 const $=id=>document.getElementById(id),status=new ConnectionStatus(),writerId=crypto.randomUUID(),credentials=new CredentialVault();
@@ -66,14 +66,14 @@ function highlightTranscript(visible){
   if(record.kind==='help-overview'){let at=offset;for(const line of text.split('\n')){mark('cli-help',at,at+HELP_KEY_WIDTH);mark('cli-help-prose',at+HELP_KEY_WIDTH,at+line.length);at+=line.length+1;}}
   if(record.kind==='completion')mark('cli-help',offset,offset+text.split('\n')[0].length);
   // Help blocks are a syntax line then prose; the prose is dimmed so the syntax stands out.
-  if(record.kind==='local-help'){let at=offset;for(const block of text.split('\n\n')){const first=block.indexOf('\n'),end=first<0?block.length:first;mark('cli-help',at,at+end);if(first>=0)mark('cli-help-prose',at+first+1,at+block.length);at+=block.length+2;}}
+  if(record.kind==='local-help'){let at=offset;for(const block of text.split('\n\n')){const first=block.indexOf('\n'),end=first<0?block.length:first;if(block.includes('\n'+UNAVAILABLE))mark('cli-unavailable',at,at+block.length);else{mark('cli-help',at,at+end);if(first>=0)mark('cli-help-prose',at+first+1,at+block.length);}at+=block.length+2;}}
   if(record.kind==='status'&&/stopped|timed out|failed|uncertain|disconnected/i.test(text))mark('cli-error',offset,offset+text.length);
   else if(record.kind==='status'&&/verified/i.test(text))mark('cli-success',offset,offset+text.split('\n')[0].length);
   for(const match of text.matchAll(/\b[a-f0-9]{64}\b/gi))mark('cli-key',offset+match.index,offset+match.index+match[0].length);
   if(record.kind==='command')for(const match of text.matchAll(/\b\d+(?:\.\d+)?\b/g))mark('cli-number',offset+match.index,offset+match.index+match[0].length);
   offset+=text.length+1;
  }
- for(const name of ['cli-prompt-host','cli-prompt-symbol','cli-help-prose','cli-command','cli-argument','cli-number','cli-help','cli-error','cli-key','cli-success'])CSS.highlights.set(name,new Highlight(...(groups.get(name)||[])));
+ for(const name of ['cli-prompt-host','cli-prompt-symbol','cli-help-prose','cli-command','cli-argument','cli-number','cli-help','cli-error','cli-key','cli-success','cli-unavailable'])CSS.highlights.set(name,new Highlight(...(groups.get(name)||[])));
 }
 async function restorePassword(){const key=targetKey,revision=++passwordRevision;$('password').value='';$('credential-status').textContent='Saved on this browser only.';if(!key||mode==='direct')return;const password=await credentials.read(key);if(targetKey!==key||passwordRevision!==revision)return;if(password){$('password').value=password;$('credential-status').textContent='Saved password recalled for this repeater.';}else if(credentials.error)$('credential-status').textContent='Password storage unavailable in this browser.';}
 function add(kind,text,secret=false){const r={eventId:crypto.randomUUID(),sessionId:session?.sessionId||'provisional',writerId,sequence:sequence++,timestamp:Date.now(),kind,safeText:recordText(text,secret),promptHost:kind==='command'?$('prompt-host').textContent:null,targetKey,route:route(),redacted:secret};records.push(r);const keep=retained(records);records=keep.records;if(keep.truncated)$('assistance').textContent='Oldest output records truncated at 2 MiB.';display();return r;}
@@ -111,6 +111,23 @@ async function loadManual(){
  for(const node of [...body.querySelectorAll('*')].flatMap(e=>[...e.childNodes]).filter(n=>n.nodeType===3&&n.textContent.includes('↗')))node.textContent=node.textContent.replaceAll('↗','');
  $('manual-native').replaceChildren(...nativeReference());
  $('manual-companion').replaceChildren(...companionReference());
+ markManual();
+}
+// Manual rows whose every command is missing from the connected node's build are greyed with the reason.
+function markManual(){
+ for(const row of $('manual-enhanced').querySelectorAll('tbody tr')){
+  row.classList.remove('unavailable');row.querySelector('.unavailable-note')?.remove();
+  const forms=[...(row.cells[0]?.querySelectorAll('code')||[])].flatMap(code=>{const m=code.textContent.match(/^get \/ set (.+)$/);return m?['get '+m[1].replace(/ <.*$/,''),'set '+m[1]]:[code.textContent];});
+  const entries=forms.map(form=>catalog.resolve(form)).filter(Boolean);if(!entries.length)continue;
+  const missing=entries.map(entry=>catalog.availability(entry));if(missing.some(m=>!m))continue;
+  row.classList.add('unavailable');const note=document.createElement('span');note.className='unavailable-note';note.textContent=unavailable(missing[0]).trim();row.cells[1]?.append(note);
+ }
+}
+// The node's `ver` reply decides which catalog commands it has; a reply that does not parse leaves the newest build assumed.
+function applyBuild(text){
+ const build=parseBuild(text);catalog.setBuild(build);
+ if(text!==null)add('transport',build?'Build · MeshCore '+build.upstream+(build.ota?' · MobMesh '+(build.sha||build.date||'unknown')+(catalog.buildIndex===catalog.builds.length-1?' · newest catalogued':' · catalog build '+catalog.builds[catalog.buildIndex][0]):' · no MobMesh OTA part'):'Build · version reply not recognised; assuming the newest build');
+ if(manualLoaded){$('manual-native').replaceChildren(...nativeReference());markManual();}
 }
 // Until the user moves or resizes it, the reference keeps the panels' top anchor and stretches to just above the status bar.
 function placeManual(){const panel=$('manual'),area=document.querySelector('.terminal')?.getBoundingClientRect();if(!area||panel.dataset.placed==='user')return;panel.style.top='';panel.style.bottom='auto';const top=panel.getBoundingClientRect().top;panel.style.height=Math.round(area.bottom-16-top)+'px';}
@@ -121,7 +138,7 @@ function nativeReference(){
  const overridden=new Set(catalog.entries.filter(e=>e.origin==='mobmesh').map(e=>e.path.join(' ')));
  const rows=catalog.entries.filter(e=>e.origin==='upstream'&&!overridden.has(e.path.join(' '))).sort((a,b)=>(a.helpSyntax||a.syntax).localeCompare(b.helpSyntax||b.syntax));
  const table=el('table'),head=el('tr');head.append(el('th','Command / syntax'),el('th','Description'));table.append(el('thead'));table.tHead.append(head);
- const tbody=el('tbody');for(const entry of rows){const row=el('tr'),cell=el('td');cell.append(el('code',entry.helpSyntax||entry.syntax));row.append(cell,el('td',entry.brief||entry.summary));tbody.append(row);}table.append(tbody);
+ const tbody=el('tbody');for(const entry of rows){const row=el('tr'),cell=el('td'),missing=catalog.availability(entry),text=el('td',entry.brief||entry.summary);cell.append(el('code',entry.helpSyntax||entry.syntax));if(missing){row.className='unavailable';const note=el('span',unavailable(missing).trim());note.className='unavailable-note';text.append(note);}row.append(cell,text);tbody.append(row);}table.append(tbody);
  return [el('p',rows.length+' upstream commands from the console catalog. Commands MobMesh changes are under Enhanced+.'),table];
 }
 // The Companion tab lists the same commands "/?" does, so the two cannot disagree.
@@ -250,13 +267,13 @@ async function companionRun(name,arg){
  return rows.map(x=>x.advName.slice(0,26).padEnd(width)+(CONTACT_TYPES[x.type]||'type '+x.type).padEnd(10)+routeText(x.outPathLen,x.outPath,contacts).replace(/^Route: /,'')).join('\n')+'\n'+rows.length+' contact'+(rows.length===1?'':'s');
 }
 async function readDirectName(){try{const reply=directReply('get name',(await directCommand(transport,'get name')).text);return reply?.value.replace(/^>\s*/,'').trim()||null;}catch{return null;}}
-async function open(reuse=null,quiet=false){if(busy||transport)return;busy=true;directName=null;writable=false;session=null;targetKey=null;if(reuse){keptHistory=history;add('boundary','── reconnecting ──');}else{records=[];history=new History();}auth=false;region=false;$('live').textContent='';mode=reuse?.mode||$('mode').value;linkTx=0;linkRx=0;$('tx-count').textContent='0 B';$('rx-count').textContent='0 B';$('radio-tx').textContent='—';$('radio-rx').textContent='—';temporaryTargets=new TemporaryTargets();const localEpoch=++epoch;status.update({epoch,linkState:'connecting',deviceConnected:false,lastTargetResponseAt:null});update();factory=transportFactory({text:live,frame:(direction,bytes)=>live(frameSummary(direction,bytes)),log:()=>{},activity,disconnected:()=>{if(localEpoch!==epoch)return;blocked=busy;auth=false;update();add('status','Physical device disconnected. Pending execution may be uncertain.'+(temporaryTargets.created.size?' Temporary companion entries may remain because cleanup could not run.':''));}});
+async function open(reuse=null,quiet=false){if(busy||transport)return;busy=true;applyBuild(null);directName=null;writable=false;session=null;targetKey=null;if(reuse){keptHistory=history;add('boundary','── reconnecting ──');}else{records=[];history=new History();}auth=false;region=false;$('live').textContent='';mode=reuse?.mode||$('mode').value;linkTx=0;linkRx=0;$('tx-count').textContent='0 B';$('rx-count').textContent='0 B';$('radio-tx').textContent='—';$('radio-rx').textContent='—';temporaryTargets=new TemporaryTargets();const localEpoch=++epoch;status.update({epoch,linkState:'connecting',deviceConnected:false,lastTargetResponseAt:null});update();factory=transportFactory({text:live,frame:(direction,bytes)=>live(frameSummary(direction,bytes)),log:()=>{},activity,disconnected:()=>{if(localEpoch!==epoch)return;blocked=busy;auth=false;update();add('status','Physical device disconnected. Pending execution may be uncertain.'+(temporaryTargets.created.size?' Temporary companion entries may remain because cleanup could not run.':''));}});
   // The Connecting line is rewritten with the outcome rather than followed by it.
   let connecting=null,focusAfter=null;const settle=text=>{if(connecting&&records.includes(connecting)){connecting.safeText=recordText(text);display();}else add('status',text);};
   try{
     if(mode==='ble'){if(!navigator.bluetooth)throw Error('Web Bluetooth unavailable');const device=reuse?.device||await navigator.bluetooth.requestDevice({filters:[{services:[Constants.Ble.ServiceUuid.toLowerCase()]}]});lastLink={mode:'ble',device,targetKey:reuse?.targetKey||null};connecting=add('status',reuse?'Reconnecting . . .':'Connecting . . .');transport=await factory.ble(device);}else{if(!navigator.serial)throw Error('Web Serial unavailable');const port=reuse?.port||await navigator.serial.requestPort();lastLink={mode:'auto',port,targetKey:reuse?.targetKey||null};connecting=add('status',reuse?'Reconnecting . . .':'Connecting . . .');transport=await factory.serial(port,'auto');mode=transport.mode;}
     blocked=false;region=false;
-    if(mode==='direct'){const key=await directCommand(transport,'get public.key');const m=key.text.match(/(?:^|\s)([a-f0-9]{64})(?=$|\s)/i);if(!m)throw Error('Full target public key was not returned');targetKey=m[1].toLowerCase();lastLink.targetKey=targetKey;directName=await readDirectName();auth=true;await offerSessions();settle(reuse?'Reconnected to repeater console.':'Connected to repeater console.');closeConnection();}
+    if(mode==='direct'){const key=await directCommand(transport,'get public.key');const m=key.text.match(/(?:^|\s)([a-f0-9]{64})(?=$|\s)/i);if(!m)throw Error('Full target public key was not returned');targetKey=m[1].toLowerCase();lastLink.targetKey=targetKey;directName=await readDirectName();applyBuild(await directCommand(transport,'ver').then(r=>r.text,()=>''));auth=true;await offerSessions();settle(reuse?'Reconnected to repeater console.':'Connected to repeater console.');closeConnection();}
     else{const initialized=await initializeCompanion(transport.protocol,transport.deviceInfo);transport.gatewayKey=initialized.gatewayKey;transport.selfInfo=initialized.selfInfo;contacts=initialized.contacts;renderContacts();routeNote=null;routeStale=false;watchRoute(transport.protocol);await readRadioTotals().catch(e=>add('transport','Companion radio totals unavailable: '+e.message));startRadioPoll();if(reuse?.targetKey&&contacts.some(c=>c.type===2&&fullKey(c.publicKey)===reuse.targetKey))$('target').value=reuse.targetKey;targetKey=$('target').value||null;auth=false;$('remote').hidden=false;
       // Reconnect logs back in to the same repeater with its saved password; without one the dialog asks.
       const back=reuse?.targetKey||null,saved=back?await credentials.read(back):null;
@@ -304,6 +321,7 @@ async function login(providedPassword=null){
   add('transport','Diagnostic engine login · target '+key.slice(0,12)+' · stored route '+path+' · '+(path===255?'flood':path===0?'direct zero-hop':'direct stored path'));
   const remembered=password,remember=$('remember-password').checked!==false;const result=await authenticateRepeater(c,key,password,note=>{notes.push(note);const attempt=note.match(/^Login dispatch · attempt (\d+)\/(\d+)/);if(attempt)$('assistance').textContent='Logging in to '+name+' · attempt '+attempt[1]+' of '+attempt[2];else if(/^Login reply not heard/.test(note))$('assistance').textContent='No reply from '+name+' yet · retrying';});password='';if(remember){const saved=await credentials.save(key,remembered);$('credential-status').textContent=saved?'Password saved for this repeater.':'Password could not be saved · '+credentials.error;}else await credentials.forget(key);
   for(const note of notes)add('transport',note);
+  applyBuild(await new RemoteProbe(c,()=>{}).cli(key,'ver').then(r=>r.text,e=>{add('transport','Build · ver not read: '+e.message);return '';}));
   auth=true;blocked=false;if(lastLink)lastLink.targetKey=key;rememberRepeater(key);if(result.login?.gatewaySent?.viaFlood)routeStale=true;if(!session)await chooseSession();$('assistance').textContent='';
   // The companion's next-step line is rewritten once login completes.
   if(stepLine&&records.includes(stepLine)){stepLine.safeText='Connected · repeater admin access verified.';stepLine=null;display();}else add('status','Connected · repeater admin access verified.');status.update({lastTargetResponseAt:Date.now()});closeConnection();
@@ -352,6 +370,7 @@ async function submit(){clearChoices();tabState=null;
   if(!transport?.connected||!session||!writable||!auth||(blocked&&!region)){if(blocked&&transport?.connected&&mode!=='direct'){await relogin();if(auth&&!blocked)$('assistance').textContent='Logged back in. Press Enter to send the command.';}else{showConnection();$('assistance').textContent='Connect and authenticate before sending';}return;}
   let text;try{text=wireInput(raw,mode);}catch(e){add('status',e.message);return;}
   const entry=catalog.resolve(raw);if(mode!=='direct'&&entry?.remote===false){add('status','This command is only available over direct serial.');return;}
+  const missing=entry&&catalog.availability(entry);if(missing)add('status',unavailable(missing).trim()+'. Sending anyway.');
   const secret=sensitive(raw,catalog);$('assistance').textContent='Sending command…';busy=true;abort=new AbortController();update();add('command',raw,secret);if(!secret)history.add(raw);$('command').value='';
   // Grey placeholder under the command; the reply replaces it, a failure removes it.
   const pending=add('pending','...');

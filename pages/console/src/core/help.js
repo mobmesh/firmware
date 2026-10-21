@@ -15,8 +15,13 @@ export function helpText(path,catalog,mode){
  if(path&&!entries.length){const resolved=catalog.resolve(path);if(resolved)entries=catalog.related(resolved.path.join(' '));}
  if(!entries.length)return 'No catalog help for '+path;
  const local=path?[]:Object.entries(LOCAL_COMMANDS).map(([name,description])=>name+'\n'+description);
- return [...local,...entries.map(entry=>`${entry.helpSyntax||entry.syntax}\n${entry.brief||entry.summary}`)].join('\n\n');
+ // A retired command is left out when the command that replaced it is listed and usable.
+ entries=entries.filter(e=>!e.replacedBy||!catalog.availability(e)||!entries.some(r=>r.syntax===e.replacedBy&&!catalog.availability(r)));
+ return [...local,...entries.map(entry=>`${entry.helpSyntax||entry.syntax}\n${entry.brief||entry.summary}`+unavailable(catalog.availability(entry)))].join('\n\n');
 }
+// Help blocks ending in this line are greyed in the transcript.
+export const UNAVAILABLE='Not in this node\'s build: ';
+export function unavailable(missing){return missing?'\n'+UNAVAILABLE+missing.reason+(missing.replacedBy?'; use '+missing.replacedBy:''):'';}
 
 // Shown for a bare help request: console controls rather than the whole firmware catalog.
 export const HELP_OVERVIEW=[

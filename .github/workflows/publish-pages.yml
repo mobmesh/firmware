@@ -19,6 +19,11 @@ jobs:
     steps:
       - name: Checkout this repo
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # the console catalog is stamped from main's history
+
+      - name: Stamp the console catalog with build history
+        run: python3 scripts/console/catalog_lifespans.py | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Configure Pages
         uses: actions/configure-pages@v6

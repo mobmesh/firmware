@@ -756,6 +756,18 @@ to {
 ::highlight(cli-help-prose) {
   color:color-mix(in srgb,#cbd5e3 50%,transparent)
 }
+::highlight(cli-unavailable) {
+  color:color-mix(in srgb,#cbd5e3 32%,transparent)
+}
+.manual-panel tr.unavailable td,
+.manual-panel tr.unavailable code {
+  color:color-mix(in srgb,currentColor 45%,transparent)
+}
+.manual-panel .unavailable-note {
+  display:block;
+  font-size:.85em;
+  font-style:italic
+}
 ::highlight(cli-error) {
   color:#efb09a
 }
