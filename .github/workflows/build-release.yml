@@ -631,6 +631,8 @@ jobs:
               [ "$latest" = true ] && edit_args+=(--latest)
               gh release edit "${edit_args[@]}"
               gh release upload "$tag" --clobber "${assets[@]}"
+              # A rebuild replaces the assets, so the tag follows the commit they were built from.
+              gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}" -f sha="$GITHUB_SHA" -F force=true > /dev/null
             else
               gh release create "$tag" "${assets[@]}" \
                 --title "$title" --notes-file "$notes" --latest="$latest"
