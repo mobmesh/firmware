@@ -73,15 +73,26 @@ class ReleaseChangelogTestCase(unittest.TestCase):
         self.assertIn("- cli: removed 'old c'", body)
         self.assertNotIn("'get a'", body)
 
-    def test_rebuild_prepends_and_keeps_earlier_entries(self):
+    def test_rebuild_shows_one_build_line_and_appends_changes(self):
         first = self.commit("mods/a.txt", "feat: one")
         body = self.compose(f"<!-- mobmesh-build:{self.base} -->", first)
         second = self.commit("mods/a.txt", "feat: two")
         body = self.compose(body, second)
-        self.assertLess(body.index("Build `" + second[:7]), body.index("Build `" + first[:7]))
+        self.assertEqual(body.count("#### Build"), 1)
+        self.assertIn(f"#### Build `{second[:7]}`", body)
+        self.assertNotIn(first[:7], body.split("<!--")[0])
+        self.assertLess(body.index("- feat: two"), body.index("- feat: one"))
         self.assertEqual(body.count("## MeshCore Enhanced+ Changes"), 1)
         self.assertEqual(body.count("## Upstream release notes"), 1)
         self.assertEqual(body.count("<!-- mobmesh-build:"), 1)
+
+    def test_older_per_build_headings_are_folded_into_one(self):
+        old = ("## MeshCore Enhanced+ Changes\n\n#### Build `aaaaaaa`, 2026-10-01\n\n- feat: new\n\n"
+               f"### Build `bbbbbbb`, 2026-09-01\n\n- feat: old\n\n<!-- mobmesh-build:{self.base} -->")
+        head = self.commit("mods/a.txt", "feat: newest")
+        body = self.compose(old, head)
+        self.assertEqual(body.count("Build `"), 1)
+        self.assertIn(f"- feat: newest\n- feat: new\n- feat: old", body)
 
     def test_same_commit_adds_no_entry(self):
         head = self.commit("mods/a.txt", "feat: one")
@@ -99,24 +110,15 @@ class ReleaseChangelogTestCase(unittest.TestCase):
         self.assertNotIn("MeshCore Enhanced+ Changes", body)
         self.assertTrue(body.rstrip().endswith(f"<!-- mobmesh-build:{head} -->"))
 
-    def test_rebuild_with_nothing_new_adds_no_entry(self):
+    def test_rebuild_with_nothing_new_moves_the_build_line_only(self):
         first = self.commit("mods/a.txt", "feat: one")
         body = self.compose(f"<!-- mobmesh-build:{self.base} -->", first)
         head = self.commit("mods/a.txt", "fix: just a fix")
         rebuilt = self.compose(body, head)
         self.assertEqual(rebuilt.count("#### Build"), 1)
+        self.assertIn(f"#### Build `{head[:7]}`", rebuilt)
+        self.assertIn("- feat: one", rebuilt)
         self.assertNotIn("just a fix", rebuilt)
-        self.assertTrue(rebuilt.rstrip().endswith(f"<!-- mobmesh-build:{head} -->"))
-
-    def test_hand_edited_body_with_repeated_heading_keeps_its_list(self):
-        edited = ("Built from x.\n\n## MeshCore Enhanced+ Changes\n\n## MeshCore Enhanced+ Changes\n\n"
-                  "- feat: kept by hand\n\n\n## Upstream release notes\n\nNotes.\n\n## Upstream release notes\n\n"
-                  f"Notes.\n\n<!-- mobmesh-build:{self.base} -->")
-        head = self.commit("mods/a.txt", "fix: nothing to list")
-        body = self.compose(edited, head)
-        self.assertIn("- feat: kept by hand", body)
-        self.assertEqual(body.count("## MeshCore Enhanced+ Changes"), 1)
-        self.assertEqual(body.count("## Upstream release notes"), 1)
 
     def test_entries_use_level_four_headings(self):
         head = self.commit("mods/a.txt", "feat: one")

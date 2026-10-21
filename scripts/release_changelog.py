@@ -64,18 +64,28 @@ def cli_changes(repo, since, head):
     return lines
 
 
+BUILD_LINE = re.compile(r'^#{3,4} (Re)?[Bb]uild `[0-9a-f]+`.*$')
+
+
 def compose(notes, existing, previous, head, repo, date):
-    prior = entries(existing)
+    # One build line for the commit the assets come from; changes accumulate beneath it, newest first.
+    lines = entries(existing).splitlines()
+    kept_heading = next((line for line in lines if BUILD_LINE.match(line)), None)
+    prior_items = [line for line in lines if line.strip() and not BUILD_LINE.match(line)]
     since = marker(existing) or marker(previous)
-    block = prior
-    if since and not (head.startswith(since) or since.startswith(head)):
-        lines = [f'- {s}' for s in subjects(repo, since, head)] + cli_changes(repo, since, head)
-        if lines:
-            block = '\n'.join([f'#### Build `{head[:7]}`, {date}', ''] + lines + ([''] + [prior] if prior else []))
+    new = []
+    if since and (head.startswith(since) or since.startswith(head)):
+        heading = kept_heading or f'#### Build `{head[:7]}`, {date}'
+    else:
+        heading = f'#### Build `{head[:7]}`, {date}'
+        if since:
+            new = [f'- {s}' for s in subjects(repo, since, head)] + cli_changes(repo, since, head)
+            new = [line for line in new if line not in prior_items]
+    items = new + prior_items
     intro, _, upstream = notes.partition(UPSTREAM)
     parts = [intro.rstrip(), '']
-    if block:
-        parts += [SECTION, '', block.rstrip(), '']
+    if items:
+        parts += [SECTION, '', heading, '', '\n'.join(items), '']
     if upstream:
         parts += [UPSTREAM + upstream.rstrip(), '']
     parts.append(f'<!-- mobmesh-build:{head} -->')
