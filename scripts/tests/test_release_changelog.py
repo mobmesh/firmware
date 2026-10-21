@@ -73,6 +73,14 @@ class ReleaseChangelogTestCase(unittest.TestCase):
         self.assertIn("- cli: removed 'old c'", body)
         self.assertNotIn("'get a'", body)
 
+    def test_new_argument_reads_as_a_changed_command(self):
+        first = self.write_index([("ota wan verify", "Verify")], "docs: index")
+        head = self.write_index([("ota wan verify [refresh]", "Verify; run again for the result")], "docs: arg")
+        body = self.compose(f"<!-- mobmesh-build:{first} -->", head)
+        self.assertIn("- cli: changed 'ota wan verify [refresh]'", body)
+        self.assertNotIn("cli: new", body)
+        self.assertNotIn("cli: removed", body)
+
     def test_rebuild_shows_one_build_line_and_appends_changes(self):
         first = self.commit("mods/a.txt", "feat: one")
         body = self.compose(f"<!-- mobmesh-build:{self.base} -->", first)

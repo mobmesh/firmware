@@ -56,11 +56,21 @@ def cli_index(repo, rev):
     return index
 
 
+def command_words(syntax):
+    """The command without its arguments, so a new argument reads as a change, not a new command."""
+    return ' '.join(w for w in syntax.split() if not w.startswith(('<', '[', '-')))
+
+
 def cli_changes(repo, since, head):
     before, after = cli_index(repo, since), cli_index(repo, head)
-    lines = [f"- cli: new '{c}'" for c in after if c not in before]
-    lines += [f"- cli: changed '{c}'" for c in after if c in before and after[c] != before[c]]
-    lines += [f"- cli: removed '{c}'" for c in before if c not in after]
+    added = [c for c in after if c not in before]
+    removed = [c for c in before if c not in after]
+    reshaped = {c for c in added if any(command_words(c) == command_words(r) for r in removed)}
+    removed = [r for r in removed if not any(command_words(r) == command_words(c) for c in reshaped)]
+    lines = [f"- cli: new '{c}'" for c in added if c not in reshaped]
+    lines += [f"- cli: changed '{c}'" for c in after
+              if c in reshaped or (c in before and after[c] != before[c])]
+    lines += [f"- cli: removed '{c}'" for c in removed]
     return lines
 
 
