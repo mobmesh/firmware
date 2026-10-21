@@ -52,6 +52,7 @@ namespace HotspotOTA {
   void radioStatus(char reply[]);
   bool checkWan(char reply[]);
   bool verifyWan(char reply[]);
+  void verifyCommand(bool refresh, char reply[]);   // `ota wan verify [refresh]`
   void wanHealth(char reply[]);
   bool wanProven();
   bool resetWanHealth();

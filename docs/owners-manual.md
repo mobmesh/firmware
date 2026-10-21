@@ -83,7 +83,7 @@ period that rolls back an image that crashes or cannot hear the mesh.
 |---|---|---|
 | Configure Wi-Fi | `set ota.wan.wifi <ssid>,<password>` | Saves credentials independently of normal node preferences |
 | Find nearby Wi-Fi | `ota wan survey` | Scans once; use the suggested `next` offset to page through results |
-| Prove WAN and NTP | `ota wan verify` then `get ota.wan.health` | Tests the path and restores the Wi-Fi/GPIO state it found |
+| Prove WAN and NTP | `ota wan verify`, then `ota wan verify` again | Tests the path and restores the Wi-Fi/GPIO state it found; the second run shows the result |
 | Save the normal firmware URL | `set ota.fw.url <url>` | Keeps future remote update commands short |
 | Start a remote update | `start ota wan update` | Queues the saved URL for background download and installation |
 | Update on a schedule | `set ota.wan.auto on`, then `get ota.wan.auto.status` | Checks every `ota.wan.auto.interval` days; installs a new image once `ota.wan.auto.confirm` checks in a row find it |
@@ -108,18 +108,19 @@ set ota.wan.wifi MyHotspot,my-password
 ota wan verify
 ```
 
-`ota wan verify` is non-blocking. Watch it finish:
+`ota wan verify` runs in the background. Run it again to see how it went, as with
+`ota wan survey`:
 
 ```text
-get ota.status
-get ota.wan.health
+ota wan verify
+  -> OK - verifying
+ota wan verify
+  -> WAN OK; NTP OK; state restored (proven)
 ```
 
-A successful health record resembles:
-
-```text
-latest=WAN_1|NTP_1 proven=yes
-```
+The result is shown for 2 minutes; after that, `ota wan verify` starts a new check, and
+`ota wan verify refresh` always does. `get ota.wan.health` keeps the latest result and the
+`proven` flag.
 
 ### Example: start a remote firmware update
 
@@ -153,6 +154,7 @@ Needs a proven WAN setup. The schedule counts from the moment it is turned on:
 
 ```text
 ota wan verify
+ota wan verify          (again, once it shows proven)
 set ota.wan.auto.interval 7d
 set ota.wan.auto.confirm 2
 set ota.wan.auto on
@@ -841,7 +843,7 @@ project.
 | `ota wan survey` | Scan nearby Wi-Fi networks once; show names and whether each is open. |
 | `ota wan survey <offset>` | Show the saved results starting at the suggested `next` offset. |
 | `ota wan survey refresh` | Discard saved results and start a fresh scan. |
-| `ota wan verify` | Queue WAN and NTP checks, then restore initial Wi-Fi/GPIO state. |
+| `ota wan verify [refresh]` | Check WAN and NTP, then restore the initial Wi-Fi/GPIO state; run again for the result, `refresh` to recheck. |
 | `ota wan leave` | Disconnect Wi-Fi and drop hotspot power. |
 | `get ota.wan.health` | Show latest `WAN_n\|NTP_n`, restore state, and durable `proven` flag. |
 | `get ota.wan.radio` | Show ESP32 Wi-Fi, driver, link, and hotspot-power states. |

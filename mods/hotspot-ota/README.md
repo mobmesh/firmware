@@ -25,12 +25,14 @@ Save the WiFi network and firmware URL, then verify the connection before starti
 set ota.wan.wifi MyHotspot,hunter2
 set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/heltec_v4.bin
 ota wan verify
+ota wan verify
 start ota wan update
 get ota.status
 ```
 
 Use the URL for this node's board and role. `ota wan verify` checks internet and time-server
-access without starting an update; `get ota.status` shows download progress or the result.
+access without starting an update; run it again to see the result. `get ota.status` shows
+download progress or the result.
 After setup, later updates need only `start ota wan update`.
 
 ---
@@ -80,7 +82,7 @@ All of these work over serial or remotely over the mesh. Full details are in
 <tr><td><code>ota wan survey refresh</code></td><td>Throw the old result away and scan again.</td></tr>
 <tr><td><code>ota wan join</code> / <code>ota wan leave</code></td><td>Join WiFi without downloading, or disconnect and cut hotspot power.</td></tr>
 <tr><td><code>ota wan check</code></td><td>After a manual <code>ota wan join</code>, check whether the node can reach the internet.</td></tr>
-<tr><td><code>ota wan verify</code></td><td>Test WAN and NTP, then restore the current WiFi and hotspot-power state. Success marks the setup proven good for automatic NTP refresh in sync.time campaigns.</td></tr>
+<tr><td><code>ota wan verify [refresh]</code></td><td>Test WAN and NTP, then restore the current WiFi and hotspot-power state. Run it again for the result, as with <code>ota wan survey</code>; <code>refresh</code> starts a new check. Success marks the setup proven good for automatic NTP refresh in sync.time campaigns.</td></tr>
 <tr><td><code>ota cancel</code></td><td>Stop an update any time before it starts verifying.</td></tr>
 <tr><td><code>ota slot boot &lt;A|B&gt;</code></td><td>Boot the other slot, if it holds a valid image.</td></tr>
 <tr><td><code>start ota wan &lt;url&gt;</code></td><td>Join WiFi, download from <code>&lt;url&gt;</code>, check it, and install it.</td></tr>
@@ -141,6 +143,7 @@ With `ota.wan.auto` on, the node runs `start ota wan update` by itself every
 `ota.wan.auto.interval` days, counted from when it was turned on. It's off by default.
 
 ```text
+ota wan verify
 ota wan verify
 set ota.wan.auto on
   -> OK - checks every 7d at 14:05 UTC, next 10-26; installs on the 2nd check that finds a new release

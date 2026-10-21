@@ -33,7 +33,7 @@ are in the [mod README](../README.md).
 | [`ota wan leave`](#ota-wan-leave) | Disconnect WiFi and turn off hotspot power |
 | [`ota wan check`](#ota-wan-check) | Check internet access after a manual join |
 | [`ota wan survey [offset\|refresh]`](#ota-wan-survey) | Scan or page nearby networks |
-| [`ota wan verify`](#ota-wan-verify) | Verify WAN/NTP and restore the starting state |
+| [`ota wan verify [refresh]`](#ota-wan-verify) | Verify WAN/NTP and restore the starting state; run again for the result |
 | [`ota slot boot <A\|B>`](#ota-slot-boot) | Select a valid slot and reboot |
 | [`start ota`](#start-ota) | Open the local upload AP |
 | [`start ota wan <url>`](#start-ota-wan) | Download and install an application image |
@@ -442,16 +442,24 @@ off when scanning finishes.
 ## ota wan verify
 
 ```text
-ota wan verify
+ota wan verify [refresh]
 ```
 
-**Response:** `OK - WAN verification queued` or `ERR: ...`.
+| Item | Definition |
+| --- | --- |
+| No argument | Starts a check, or shows the last result if it finished within 2 minutes |
+| `refresh` | Always starts a new check |
+| Response while checking | `OK - verifying` |
+| Response when done | e.g. `WAN OK; NTP OK; state restored (proven)`, or `ERR: ...` |
+
+Run it once to start, then again for the result, as with `ota wan survey`. A second
+run while a check is going shows `OK - verifying` rather than starting another.
 
 **Effect:** Powers and joins as needed, checks WAN twice, and attempts NTP twice.
 Restores WiFi and hotspot power to their starting state. A reboot cancels verification.
 
-**Result:** `get ota.status` reports `wan-complete`; `get ota.wan.health` reports
-success, failure, and the persistent proven flag.
+**Result:** the reply shows it for 2 minutes. `get ota.wan.health` keeps the latest
+result and the persistent proven flag after that.
 
 **Restrictions:** Requires saved credentials. Refused while another operation or
 local upload AP is active, or when power-guard reports a low battery.

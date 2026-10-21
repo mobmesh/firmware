@@ -172,6 +172,9 @@ static uint32_t wan_run_seq = 0;
 static uint32_t wan_done_run = 0;
 static WanResult service_wan_result = WanResult::Unknown;
 static WanResult wan_done_result = WanResult::Unknown;
+static uint32_t wan_done_ms = 0;
+static char wan_done_text[MAX_TEXT_LEN] = {0};
+#define OTA_VERIFY_RESULT_FRESH_MS 120000
 static WanRuntimeState service_wan_initial;
 
 // What an automatic run decided about the image it found; applied to the auto record by poll().
@@ -1368,7 +1371,9 @@ void HotspotOTA::poll() {
     portENTER_CRITICAL(&service_mux);
     wan_done_run = service_run;
     wan_done_result = service_wan_result;
+    memcpy(wan_done_text, service_result, sizeof(wan_done_text));
     portEXIT_CRITICAL(&service_mux);
+    wan_done_ms = millis();
   }
   if (release_sleep) session_ended = true;
   bool session_limit = false;
@@ -1533,6 +1538,23 @@ bool HotspotOTA::verifyWan(char reply[]) {
 
   strcpy(reply, "OK - WAN verification queued");
   return true;
+}
+
+// `ota wan verify [refresh]`: starts a check, or shows a result under two minutes old, as survey does.
+void HotspotOTA::verifyCommand(bool refresh, char reply[]) {
+  portENTER_CRITICAL(&service_mux);
+  bool running = service_kind == ServiceKind::WanVerify && serviceIsActive(service_state);
+  portEXIT_CRITICAL(&service_mux);
+  if (running) {
+    strcpy(reply, "OK - verifying");
+    return;
+  }
+  if (!refresh && wan_done_ms != 0 && millis() - wan_done_ms < OTA_VERIFY_RESULT_FRESH_MS
+      && wan_done_text[0] != 0) {
+    snprintf(reply, MAX_TEXT_LEN, "%s%s", wan_done_text, HotspotOTA::wanProven() ? " (proven)" : "");
+    return;
+  }
+  if (HotspotOTA::verifyWan(reply)) strcpy(reply, "OK - verifying");
 }
 
 static const char* wanResultName(WanResult result) {

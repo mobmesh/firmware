@@ -453,9 +453,13 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
     }
   } else if (const char* survey_arg = verbArgument(command, "ota wan survey")) {
     HotspotOTA::survey(survey_arg, reply);
-  } else if (strcmp(command, "ota wan verify") == 0) {
+  } else if (const char* verify_arg = verbArgument(command, "ota wan verify")) {
+    if (*verify_arg != 0 && strcmp(verify_arg, "refresh") != 0) {
+      strcpy(reply, "ERR: syntax: ota wan verify [refresh]");
+      return true;
+    }
     if (refuseWhileApUp(reply)) return true;
-    HotspotOTA::verifyWan(reply);
+    HotspotOTA::verifyCommand(*verify_arg != 0, reply);
   } else if (memcmp(command, "ota wan check", 13) == 0) {
     HotspotOTA::checkWan(reply);
   } else if (memcmp(command, "ota slot boot ", 14) == 0) {
