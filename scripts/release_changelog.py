@@ -42,7 +42,7 @@ def subjects(repo, since, head):
 
 
 def cli_index(repo, rev):
-    """Command -> purpose from every mod's cli-additions.md command index at rev."""
+    """Command syntax -> purpose from every mod's cli-additions.md command index at rev; only the syntax is compared."""
     files = subprocess.run(['git', '-C', str(repo), 'ls-tree', '-r', '--name-only', rev, 'mods'],
                            capture_output=True, text=True, check=True).stdout.split()
     index = {}
@@ -68,8 +68,7 @@ def cli_changes(repo, since, head):
     reshaped = {c for c in added if any(command_words(c) == command_words(r) for r in removed)}
     removed = [r for r in removed if not any(command_words(r) == command_words(c) for c in reshaped)]
     lines = [f"- cli: new '{c}'" for c in added if c not in reshaped]
-    lines += [f"- cli: changed '{c}'" for c in after
-              if c in reshaped or (c in before and after[c] != before[c])]
+    lines += [f"- cli: changed '{c}'" for c in after if c in reshaped]
     lines += [f"- cli: removed '{c}'" for c in removed]
     return lines
 

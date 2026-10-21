@@ -69,7 +69,7 @@ class ReleaseChangelogTestCase(unittest.TestCase):
                                 "docs: change index")
         body = self.compose(f"<!-- mobmesh-build:{first} -->", head)
         self.assertIn("- cli: new 'new d | e'", body)
-        self.assertIn("- cli: changed 'set b <x>'", body)
+        self.assertNotIn("set b <x>", body)
         self.assertIn("- cli: removed 'old c'", body)
         self.assertNotIn("'get a'", body)
 
