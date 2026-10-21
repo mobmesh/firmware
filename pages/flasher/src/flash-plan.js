@@ -186,8 +186,10 @@ export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}
 
 // The image's own SHA-256 is its last 32 bytes. Header byte 23 says the digest is there --
 // a build setting, not a format guarantee -- so an image carrying none returns null.
-async function verifyEmbeddedDigest(bytes, label) {
-  if (bytes.length < 56 || bytes[0] !== 0xe9 || bytes[23] !== 1) return null;
+async function verifyEmbeddedDigest(file, label) {
+  // A merged image's tail is the app's digest, so the app at its own offset is what is checked.
+  const bytes = looksMerged(file) ? appImage(file, STOCK_ESP32_APP_ADDRESS - STOCK_ESP32_MERGED_ADDRESS) : file;
+  if (!bytes || bytes.length < 56 || bytes[0] !== 0xe9 || bytes[23] !== 1) return null;
 
   const expected = [...bytes.slice(-32)].map((b) => b.toString(16).padStart(2, '0')).join('');
   const digest = await crypto.subtle.digest('SHA-256', bytes.slice(0, -32));
@@ -199,6 +201,21 @@ async function verifyEmbeddedDigest(bytes, label) {
     );
   }
   return actual;
+}
+
+// The app image at `offset`, sized by walking its segment headers; null if it runs past the file.
+function appImage(bytes, offset) {
+  if (bytes.length < offset + 24 || bytes[offset] !== 0xe9) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let end = offset + 24;
+  for (let segment = 0; segment < bytes[offset + 1]; segment++) {
+    if (end + 8 > bytes.length) return null;
+    end += 8 + view.getUint32(end + 4, true);
+  }
+  // A checksum byte closes the image on a 16-byte boundary; the digest follows when appended.
+  end += 16 - ((end - offset) % 16);
+  if (bytes[offset + 23] === 1) end += 32;
+  return end <= bytes.length ? bytes.subarray(offset, end) : null;
 }
 
 // Stage one: everything the network can supply, before the device is touched. The planned
