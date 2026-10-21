@@ -21,6 +21,7 @@
         "sync.publisher add A1AB03109DDC62D94CAF0C0CE5E386614FDF5B2EAF0DDA8A37ABC7B6A97CCE82",
         "sync.publisher add A1AB04BC9FFCB01E368169AB66696298997494F33BA62ED48DD45F64C158989E",
         "sync.publisher add A1AB055D6A29A7D70AB7222C3F933C00719ED0960E136E6C5CC0429BC5F73B5F",
+        "setperm A1AB055D6A29A7D70AB7222C3F933C00719ED0960E136E6C5CC0429BC5F73B5F 3",
         "set sync.channel public",
         "sync.region def us us-southeast|us us-gc",
         "sync.region def us us-al us-al-mob|us-al us-al-fhp|us-al us-al-guf|us us-ms|us us-fl us-fl-nw",
