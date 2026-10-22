@@ -3791,8 +3791,8 @@
     "brief": "Manage region list."
   },
   {
-    "id": "upstream.setperm.68e716ca",
-    "syntax": "setperm <pubkey-prefix> <permissions>",
+    "id": "upstream.setperm.2cc25862",
+    "syntax": "setperm <pubkey> <0|1|2|3>",
     "path": [
       "setperm"
     ],
@@ -3803,28 +3803,33 @@
       },
       {
         "kind": "text",
-        "name": "pubkey-prefix",
+        "name": "pubkey",
         "optional": false,
         "choices": [],
-        "help": "pubkey-prefix: operator-supplied value; see source help for constraints"
+        "help": "pubkey: full 64-hex public key; a prefix only when removing with 0"
       },
       {
-        "kind": "text",
-        "name": "permissions",
+        "kind": "enum",
+        "name": "0|1|2|3",
         "optional": false,
-        "choices": [],
-        "help": "permissions: operator-supplied value; see source help for constraints"
+        "choices": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "help": "0 remove, 1 read-only, 2 read-write, 3 admin"
       }
     ],
     "origin": "upstream",
     "mod": null,
-    "summary": "Permissions 0/1/2/3; documented omission needs separator test",
-    "details": "Permissions 0/1/2/3; documented omission needs separator test",
+    "summary": "Add, change or remove an access-list entry",
+    "details": "Adding or changing an entry needs the full 64-hex public key; a shorter key replies `Err - invalid params`.\n0 removes the entry and accepts a key prefix. Omitting the permissions replies `Err - bad params`.\n",
     "source": "https://github.com/meshcore-dev/MeshCore/blob/81dbae592ffad40b4212bc0b37e82b38da08f4bc/examples/simple_repeater/MyMesh.cpp#L1242",
     "grammarVerified": false,
     "remote": null,
     "sensitive": false,
-    "brief": "Set access permissions for a public key."
+    "brief": "Grant a public key 1 read-only, 2 read-write or 3 admin; 0 removes it."
   },
   {
     "id": "upstream.get.acl.e2b283a4",
