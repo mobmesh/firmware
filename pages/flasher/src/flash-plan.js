@@ -162,7 +162,8 @@ export async function loadCustomManifest({ baseUrl = CUSTOM_MANIFEST_BASE } = {}
   try {
     const shown = await fetch(assetUrl(baseUrl, CUSTOM_DISPLAY_FILE), { cache: 'no-store' });
     if (!shown.ok) throw new ManifestError('no display list');
-    displays = Object.entries(await shown.json()).map(([id, entry]) => ({
+    // `"hidden": true` keeps an entry in the file but off the board picker.
+    displays = Object.entries(await shown.json()).filter(([, entry]) => entry.hidden !== true).map(([id, entry]) => ({
       id,
       label: entry.label,
       board: entry.board ?? id,
