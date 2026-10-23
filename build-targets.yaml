@@ -56,6 +56,21 @@ targets:
 
   # Beta boards: `beta: true` appends _beta to every release asset name until each is proven in the field.
 
+  # Vendored from Cloud-121/MeshCore: variants/grumpy_node/vendor/, copied in by copy-src.
+  - board: grumpy_node
+    role: repeater
+    build_env: Grumpy_Node_repeater
+    vendor_flasher_assets: true
+    beta: true
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
+
+  - board: grumpy_node
+    role: room_server
+    build_env: Grumpy_Node_room_server
+    vendor_flasher_assets: false
+    beta: true
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
+
   - board: heltec_v3
     role: repeater
     build_env: Heltec_v3_repeater

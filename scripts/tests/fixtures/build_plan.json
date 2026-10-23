@@ -132,6 +132,68 @@
     },
     {
       "id": "repeater",
+      "board_id": "grumpy_node",
+      "upstream_variant": "grumpy_node",
+      "role": "repeater",
+      "ota_board_id": 9,
+      "ota_role_id": 1,
+      "build_env": "Grumpy_Node_repeater",
+      "upstream_tag_prefix": "repeater",
+      "release_title": "Repeater",
+      "asset_basename": "grumpy_node_rep_mobmesh_beta",
+      "vendor_flasher_assets": true,
+      "make_latest": true,
+      "mods": [
+        "shim",
+        "hotspot-ota",
+        "timing-safety",
+        "try-settings",
+        "sync-settings"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": true,
+      "capabilities": {
+        "wifi_station": "available",
+        "dual_ota": "available",
+        "battery_measurement": "unverified",
+        "external_power_control": "unverified",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      }
+    },
+    {
+      "id": "room_server",
+      "board_id": "grumpy_node",
+      "upstream_variant": "grumpy_node",
+      "role": "room_server",
+      "ota_board_id": 9,
+      "ota_role_id": 2,
+      "build_env": "Grumpy_Node_room_server",
+      "upstream_tag_prefix": "room-server",
+      "release_title": "Room",
+      "asset_basename": "grumpy_node_room_mobmesh_beta",
+      "vendor_flasher_assets": false,
+      "make_latest": false,
+      "mods": [
+        "shim",
+        "hotspot-ota",
+        "timing-safety",
+        "try-settings",
+        "sync-settings"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": true,
+      "capabilities": {
+        "wifi_station": "available",
+        "dual_ota": "available",
+        "battery_measurement": "unverified",
+        "external_power_control": "unverified",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      }
+    },
+    {
+      "id": "repeater",
       "board_id": "heltec_v3",
       "upstream_variant": "heltec_v3",
       "role": "repeater",

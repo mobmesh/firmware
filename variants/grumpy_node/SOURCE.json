@@ -1,0 +1,22 @@
+{
+  "repo": "Cloud-121/MeshCore",
+  "ref": "grumpy-v1.18.0",
+  "commit": "51774384269fea7b4cbe536bc97188219232a663",
+  "files": {
+    "GrumpyNodeBoard.cpp": "631d2d5e4f8c8b6227c27a8cd6a7f1bc0504aed79cab81b5ad155c917d050909",
+    "GrumpyNodeBoard.h": "1c408df52d4a38fa667d8a3cc1cfe67b822b1ba5fc2a4bd757e9520652832d15",
+    "target.cpp": "8ef557efeaffe9e14b14166d9111689365d7eb63450f88920cb779b976198a0b",
+    "target.h": "260afd1721630efcfa1f6578be4d04e5916237e84df9c01cb4807558de573b83",
+    "platformio.ini": "29e72f3927e59533a8fa2eee329af221f6cb5934c4515a9d16588a440ed83b15"
+  },
+  "sections": [
+    "Grumpy_Node",
+    "env:Grumpy_Node_repeater",
+    "env:Grumpy_Node_room_server"
+  ],
+  "not_copied": [
+    "GrumpyWebSetup.cpp",
+    "GrumpyWebSetup.h",
+    "partitions.csv"
+  ]
+}

@@ -17,3 +17,5 @@ board_ids:
     board: station_g3_esp32
   - id: 8
     board: waveshare_esp32s3_lr1121
+  - id: 9
+    board: grumpy_node

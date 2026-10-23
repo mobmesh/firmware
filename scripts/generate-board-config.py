@@ -686,6 +686,24 @@ def cmd_copy_src(args):
             shutil.copy2(path, dest)
             copied += 1
     print(f"OK: copied {copied} mod source file(s) into {upstream}")
+    if args.board:
+        copy_vendored_variant(upstream, args.board)
+
+
+def copy_vendored_variant(upstream: Path, board: str) -> None:
+    """Copy a board upstream does not carry from variants/<board>/vendor/ (see scripts/vendor_variant.py)."""
+    src = REPO_ROOT / "variants" / board / "vendor"
+    if not src.is_dir():
+        return
+    variant = ProjectModel.load(REPO_ROOT).boards[board].upstream_variant
+    dest = upstream / "variants" / variant
+    if dest.exists():
+        sys.exit(f"ERROR: upstream now has variants/{variant}; drop variants/{board}/vendor/ and use upstream's")
+    dest.mkdir(parents=True)
+    for path in sorted(src.iterdir()):
+        if path.name != "LICENSE":
+            shutil.copy2(path, dest / path.name)
+    print(f"OK: copied vendored variant {board} into {dest}")
 
 
 def read_section_values(ini_path: Path, section: str, key: str) -> list[str]:
@@ -972,6 +990,7 @@ def main():
     p_cs = sub.add_parser("copy-src", help="copy each mod's own source into the upstream clone")
     p_cs.add_argument("--upstream", required=True, help="path to the upstream clone's root")
     p_cs.add_argument("--mods", required=True, help="comma-separated mod names")
+    p_cs.add_argument("--board", help="also copy this board's vendored variant, if it has one")
     p_cs.set_defaults(func=cmd_copy_src)
 
     p_cm = sub.add_parser("compose-mods", help="generate shim aggregate sources for selected mods")

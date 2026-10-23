@@ -24,6 +24,8 @@ class CurrentProjectModelTestCase(unittest.TestCase):
             ("heltec_v4", "room_server"),
             ("xiao_c3", "repeater"),
             ("xiao_c3", "room_server"),
+            ("grumpy_node", "repeater"),
+            ("grumpy_node", "room_server"),
             ("heltec_v3", "repeater"),
             ("heltec_v3", "room_server"),
             ("xiao_s3_wio", "repeater"),
@@ -43,6 +45,8 @@ class CurrentProjectModelTestCase(unittest.TestCase):
                          "station_g3_esp32_rep_mobmesh_beta")
         self.assertEqual(rows[("station_g3_esp32", "room_server")].ota_board_id, 7)
         self.assertEqual(rows[("waveshare_esp32s3_lr1121", "repeater")].ota_board_id, 8)
+        self.assertEqual(rows[("grumpy_node", "repeater")].asset_basename, "grumpy_node_rep_mobmesh_beta")
+        self.assertEqual(rows[("grumpy_node", "room_server")].ota_board_id, 9)
         self.assertEqual(rows[("waveshare_esp32s3_lr1121", "repeater")].asset_basename,
                          "waveshare_esp32s3_lr1121_rep_mobmesh_beta")
         self.assertEqual(rows[("heltec_v4", "room_server")].ota_role_id, 2)

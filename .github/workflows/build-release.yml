@@ -160,7 +160,7 @@ jobs:
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         run: |
           python3 scripts/generate-board-config.py copy-src \
-            --upstream upstream-src --mods "${{ join(matrix.mods, ',') }}"
+            --upstream upstream-src --mods "${{ join(matrix.mods, ',') }}" --board "${{ matrix.board_id }}"
 
       - name: Compose selected mod integrations
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'

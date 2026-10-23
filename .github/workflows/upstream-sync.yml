@@ -1,4 +1,4 @@
-# Daily pull of the mirrored upstream files. Never builds, never publishes.
+# Daily pull of the mirrored upstream files and vendored board variants. Never builds, never publishes.
 #
 # mc_config has no version tag and moves fast, so the job validates shape, never counts.
 # It names firmware by stream and pattern, so /releases must be mirrored with it.
@@ -120,20 +120,61 @@ jobs:
             curl -sSfL --max-time 60 -o "$RELEASES_DEST" "$RELEASES_URL"
           done
 
+  vendored_variants:
+    name: pull vendored board variants from their forks' newest releases
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+
+      # Same files and ini sections as last time, from each fork's newest release; a change ships with the next build.
+      - name: Re-vendor and commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          vendor() {
+            changed=""
+            for source in variants/*/SOURCE.json; do
+              board=$(basename "$(dirname "$source")")
+              repo=$(jq -r .repo "$source")
+              tag=$(gh api "repos/$repo/releases/latest" --jq .tag_name)
+              python3 scripts/vendor_variant.py --repo "$repo" --ref "$tag" --board "$board" \
+                --files "$(jq -r '.files | keys_unsorted | join(",")' "$source")" \
+                --sections "$(jq -r '.sections | join(",")' "$source")"
+              git add "variants/$board/vendor" "$source"
+              git diff --staged --quiet -- "variants/$board/vendor" || changed="$changed $board@$tag"
+            done
+          }
+          for i in 1 2 3 4 5; do
+            vendor
+            [ -z "$changed" ] && { git reset --quiet --hard; echo "no vendored variant changed"; break; }
+            git commit -m "build: vendor$changed"
+            git push && break
+            if [ "$i" -eq 5 ]; then
+              echo "::error::failed to push the vendored variants after 5 attempts"
+              exit 1
+            fi
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+          done
+
   report:
     name: track failures in one issue
-    needs: [mc_config]
+    needs: [mc_config, vendored_variants]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@v9
         with:
           script: |
-            const failed = ${{ needs.mc_config.result == 'failure' }};
+            const failed = ${{ needs.mc_config.result == 'failure' || needs.vendored_variants.result == 'failure' }};
             const title = process.env.ISSUE_TITLE;
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const which = [
               `mirror MeshCore's stock device manifest: ${{ needs.mc_config.result }}`,
+              `pull vendored board variants: ${{ needs.vendored_variants.result }}`,
             ].map(l => `- ${l}`).join('\n');
             const body = `A daily upstream sync failed, so a file this repo mirrors is no longer being refreshed.\n\n${which}\n\nSee [the run](${runUrl}) for the failing step. This closes itself once a later run succeeds.`;
 
