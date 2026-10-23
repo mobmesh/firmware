@@ -2291,6 +2291,152 @@ static void listRegions(const char* arg, char* reply) {
   if (i < regions.count()) snprintf(reply + used, 160 - used, "\nnext %u", i);
   else if (used == 0) strcpy(reply, "empty");
 }
+
+// While sync.region is on, native `region` reads also list the overlay, each name ending in '~'; native names never do.
+static const size_t REGION_NATIVE_LIMIT = 155;   // config.meshcore.io reads 156+ bytes as truncated and locks editing
+
+static bool nameMarked(const char* start, const char* end) {
+  return end > start && end[-1] == '~';
+}
+
+// A `region load` line names its region first, after the indent.
+static bool loadLineMarked(const char* line) {
+  while (*line == ' ') line++;
+  const char* end = line;
+  while (*end && RegionMap::is_name_char((uint8_t)*end)) end++;
+  return nameMarked(line, end);
+}
+
+// Native writes naming an overlay entry are refused rather than creating a native copy.
+static bool guardNativeRegion(const char* command, char* reply) {
+  if (strncmp(command, "region ", 7) != 0) return false;
+  const char* args = command + 7;
+  while (*args == ' ') args++;
+  static const char* const writes[] = {"put ", "remove ", "allowf ", "denyf ", "def "};
+  const char* rest = nullptr;
+  for (const char* verb : writes) {
+    size_t len = strlen(verb);
+    if (strncmp(args, verb, len) == 0) rest = args + len;
+  }
+  if (rest == nullptr) return false;
+  for (const char* p = rest; *p;) {
+    while (*p == ' ' || *p == '|' || *p == ',') p++;
+    const char* start = p;
+    while (*p && *p != ' ' && *p != '|' && *p != ',') p++;
+    if (nameMarked(start, p)) {
+      snprintf(reply, 160, "Err - %.*s is managed by sync.region", (int)(p - start), start);
+      return true;
+    }
+  }
+  return false;
+}
+
+// One overlay line in the native format: indent, name without a leading '#', the marker, then " F" when flood-allowed.
+static size_t overlayLine(char* out, size_t capacity, uint8_t depth, const RegionView& entry) {
+  const char* name = (const char*)entry.name;
+  int len = entry.name_len;
+  if (len > 0 && name[0] == '#') { name++; len--; }
+  int n = snprintf(out, capacity, "%*s%.*s~%s\n", depth + 1, "", len, name, entry.denied ? "" : " F");
+  return n < 0 || (size_t)n >= capacity ? 0 : (size_t)n;
+}
+
+// The native tree first, untouched; the overlay only fills what is left under the limit.
+static bool listNativeRegions(uint32_t sender_timestamp, char* reply) {
+  if (!enabled || !overlay_ready || regions.count() == 0) return false;
+  char command[] = "region";
+  modCliDispatch(sender_timestamp, command, reply);
+  size_t base = strlen(reply);
+  if (base == 0 || reply[base - 1] != '\n' || base >= REGION_NATIVE_LIMIT) return true;
+  uint8_t depth[REGION_MAX] = {};
+  for (uint8_t i = 0; i < regions.count(); ++i) {
+    RegionView entry;
+    regions.get(i, entry);
+    depth[i] = entry.parent == 0 ? 0 : (uint8_t)(depth[entry.parent - 1] + 1);
+  }
+  // Pass 0 lists every entry, pass 1 only top-level entries, pass 2 a single stub.
+  for (int pass = 0; pass < 3; ++pass) {
+    size_t used = base;
+    bool fits = true;
+    if (pass == 2) {
+      static const char stub[] = " sync~\n";
+      fits = used + sizeof(stub) - 1 <= REGION_NATIVE_LIMIT;
+      if (fits) { memcpy(reply + used, stub, sizeof(stub)); used += sizeof(stub) - 1; }
+    } else {
+      for (uint8_t i = 0; fits && i < regions.count(); ++i) {
+        if (pass == 1 && depth[i] > 0) continue;
+        RegionView entry;
+        regions.get(i, entry);
+        size_t n = overlayLine(reply + used, REGION_NATIVE_LIMIT + 1 - used, depth[i], entry);
+        if (n == 0) fits = false;
+        else used += n;
+      }
+    }
+    if (fits) {
+      reply[used] = 0;
+      return true;
+    }
+  }
+  reply[base] = 0;
+  return true;
+}
+
+// `region list allowed|denied`: native names first, then overlay names with the same flood flag, each marked '~'.
+static bool listNativeNames(uint32_t sender_timestamp, bool denied, char* reply) {
+  if (!enabled || !overlay_ready || regions.count() == 0) return false;
+  char command[24];
+  strcpy(command, denied ? "region list denied" : "region list allowed");
+  modCliDispatch(sender_timestamp, command, reply);
+  size_t base = strcmp(reply, "-none-") == 0 ? 0 : strlen(reply);
+  if (base < REGION_NATIVE_LIMIT) {
+    uint8_t depth[REGION_MAX] = {};
+    for (uint8_t i = 0; i < regions.count(); ++i) {
+      RegionView entry;
+      regions.get(i, entry);
+      depth[i] = entry.parent == 0 ? 0 : (uint8_t)(depth[entry.parent - 1] + 1);
+    }
+    // Pass 0 adds every matching entry, pass 1 only top-level ones, pass 2 a single stub.
+    for (int pass = 0; pass < 3; ++pass) {
+      size_t used = base;
+      bool fits = true, any = false;
+      for (uint8_t i = 0; fits && i < regions.count(); ++i) {
+        RegionView entry;
+        regions.get(i, entry);
+        if (entry.denied != denied || (pass == 1 && depth[i] > 0)) continue;
+        any = true;
+        if (pass == 2) break;
+        const char* name = (const char*)entry.name;
+        int len = entry.name_len;
+        if (len > 0 && name[0] == '#') { name++; len--; }
+        int n = snprintf(reply + used, REGION_NATIVE_LIMIT + 1 - used, "%s%.*s~", used ? "," : "", len, name);
+        if (n < 0 || (size_t)n > REGION_NATIVE_LIMIT - used) fits = false;
+        else used += (size_t)n;
+      }
+      if (pass == 2 && any) {
+        int n = snprintf(reply + used, REGION_NATIVE_LIMIT + 1 - used, "%ssync~", used ? "," : "");
+        fits = n >= 0 && (size_t)n <= REGION_NATIVE_LIMIT - used;
+        if (fits) used += (size_t)n;
+      }
+      if (fits) {
+        if (used == 0) strcpy(reply, "-none-");
+        else reply[used] = 0;
+        return true;
+      }
+    }
+  }
+  if (base == 0) strcpy(reply, "-none-");
+  else reply[base] = 0;
+  return true;
+}
+
+static bool regionNativeCli(uint32_t sender_timestamp, char* command, char* reply) {
+  if (guardNativeRegion(command, reply)) return true;
+  size_t len = strlen(command);
+  while (len > 0 && command[len - 1] == ' ') len--;
+  if (len == 6 && strncmp(command, "region", 6) == 0) return listNativeRegions(sender_timestamp, reply);
+  if (len == 19 && strncmp(command, "region list allowed", 19) == 0) return listNativeNames(sender_timestamp, false, reply);
+  if (len == 18 && strncmp(command, "region list denied", 18) == 0) return listNativeNames(sender_timestamp, true, reply);
+  return false;
+}
 #endif
 
 static bool setRepeatGate(bool on, char* reply) {
@@ -3812,6 +3958,7 @@ static bool handleCli(const ModCliContext& context, char* command, char* reply) 
     return true;
   }
 #if SYNC_SETTINGS_WITH_REGION
+  if (regionNativeCli(context.sender_timestamp, command, reply)) return true;
   if (strcmp(command, "sync.region on") == 0 ||
       strcmp(command, "sync.region off") == 0) {
     bool on = command[12] == 'o' && command[13] == 'n';
@@ -4135,6 +4282,15 @@ bool syncRoute(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out) {
   (void)packet;
   (void)base;
   (void)out;
+  return false;
+#endif
+}
+
+bool syncSkipRegionLoadLine(const char* line) {
+#if SYNC_SETTINGS_WITH_REGION
+  return mobmesh::sync::loadLineMarked(line);
+#else
+  (void)line;
   return false;
 #endif
 }

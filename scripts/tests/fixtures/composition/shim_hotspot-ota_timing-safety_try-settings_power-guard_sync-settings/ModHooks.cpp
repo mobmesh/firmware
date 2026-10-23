@@ -32,6 +32,10 @@ int modExportRegions(RegionMap* base, char* out, size_t capacity,
   return syncExportRegions(base, out, capacity, excluded_flags);
 }
 
+bool modSkipRegionLoadLine(const char* line) {
+  return syncSkipRegionLoadLine(line);
+}
+
 size_t modOwnerInfoMarker(uint8_t out[4]) {
   return syncOwnerInfoMarker(out);
 }

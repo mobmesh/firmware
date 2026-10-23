@@ -30,6 +30,10 @@ int modExportRegions(RegionMap* base, char* out, size_t capacity,
   return -1;
 }
 
+bool modSkipRegionLoadLine(const char* line) {
+  return false;
+}
+
 size_t modOwnerInfoMarker(uint8_t out[4]) {
   return 0;
 }

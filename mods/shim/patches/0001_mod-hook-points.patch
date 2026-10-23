@@ -1,5 +1,5 @@
 diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
-index 7d0179f..7519ca4 100644
+index 61b6c14..d491e2e 100644
 --- a/examples/simple_repeater/MyMesh.cpp
 +++ b/examples/simple_repeater/MyMesh.cpp
 @@ -1,6 +1,196 @@
@@ -307,7 +307,7 @@ index 7d0179f..7519ca4 100644
    return Mesh::onRecvPacket(pkt);
  }
  
-@@ -878,6 +1122,14 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
+@@ -879,6 +1123,14 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
    next_local_advert = next_flood_advert = 0;
    dirty_contacts_expiry = 0;
    set_radio_at = revert_radio_at = 0;
@@ -322,7 +322,16 @@ index 7d0179f..7519ca4 100644
    _logging = false;
    region_load_active = false;
    recv_pkt_region = NULL;
-@@ -1280,7 +1532,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -1202,6 +1454,8 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+       region_load_active = false;
+ 
+       sprintf(reply, "OK - loaded %d regions", region_map.getCount());
++    } else if (modSkipRegionLoadLine(command)) {
++      reply[0] = 0;   // a mod-managed entry that `region` lists but the native map never stores
+     } else {
+       char *np = command;
+       while (*np == ' ') np++;   // skip indent
+@@ -1282,7 +1536,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
        strcpy(reply, "OK - Discover sent");
      }
    } else{
@@ -338,7 +347,7 @@ index 7d0179f..7519ca4 100644
    }
  }
  
-@@ -1317,6 +1576,10 @@ void MyMesh::loop() {
+@@ -1319,6 +1580,10 @@ void MyMesh::loop() {
      MESH_DEBUG_PRINTLN("Radio params restored");
    }
  
@@ -350,36 +359,56 @@ index 7d0179f..7519ca4 100644
    if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
      acl.save(_fs);
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
-index a714db6..0909307 100644
+index d475b13..c90efdf 100644
 --- a/examples/simple_repeater/main.cpp
 +++ b/examples/simple_repeater/main.cpp
-@@ -4,2 +4,3 @@
+@@ -2,6 +2,7 @@
+ #include <Mesh.h>
+ 
  #include "MyMesh.h"
 +#include <helpers/ModHooks.h>
  
-@@ -20,2 +21,6 @@ MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock,
+ #ifdef DISPLAY_CLASS
+   #include "UITask.h"
+@@ -18,6 +19,10 @@ SimpleMeshTables tables;
+ 
+ MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
  
 +// Defined here, not in the generated hook file, which sees neither MyMesh nor the_mesh.
 +void modSendZeroHopAdvert(int delay_millis) { the_mesh.sendSelfAdvertisement(delay_millis, false); }
 +
 +
  void halt() {
-@@ -62,3 +67,3 @@ void setup() {
+   while (1) ;
+ }
+@@ -60,7 +65,7 @@ void setup() {
+   }
+ #endif
  
 -  if (!radio_init()) {
 +  if (!modRadioInit(FIRMWARE_VERSION "-" OTA_MOD_SHORT_SHA)) {
      MESH_DEBUG_PRINTLN("Radio init failed!");
-@@ -125,2 +130,3 @@ void setup() {
+     halt();
+   }
+@@ -123,6 +128,7 @@ void setup() {
+ }
+ 
  void loop() {
 +  modLoop();
    // Handle Serial CLI
-@@ -197,3 +203,3 @@ void loop() {
+   int len = strlen(command);
+   // `command` must stay NUL-terminated within its bounds. If it ever isn't,
+@@ -205,7 +211,7 @@ void loop() {
+ #ifdef HAS_EXTERNAL_WATCHDOG
+   external_watchdog.loop();
  #endif
 -  if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
 +  if ((the_mesh.getNodePrefs()->powersaving_enabled || modWantsPowerSaving()) && !the_mesh.hasPendingWork()) {
  #if defined(NRF52_PLATFORM)
+     board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
+ #else
 diff --git a/examples/simple_room_server/MyMesh.cpp b/examples/simple_room_server/MyMesh.cpp
-index 546d094..d7d8fb8 100644
+index da4c776..9df78f8 100644
 --- a/examples/simple_room_server/MyMesh.cpp
 +++ b/examples/simple_room_server/MyMesh.cpp
 @@ -1,4 +1,194 @@
@@ -672,7 +701,18 @@ index 546d094..d7d8fb8 100644
  
    switch (mesh::chooseReplyScope(req_scope_known, is_wildcard, !default_scope.isNull())) {
      case mesh::REPLY_SCOPE_REQUEST:
-@@ -986,5 +1222,12 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -903,6 +1139,8 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+       region_load_active = false;
+ 
+       sprintf(reply, "OK - loaded %d regions", region_map.getCount());
++    } else if (modSkipRegionLoadLine(command)) {
++      reply[0] = 0;   // a mod-managed entry that `region` lists but the native map never stores
+     } else {
+       char *np = command;
+       while (*np == ' ') np++;   // skip indent
+@@ -986,7 +1224,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+   } else if (memcmp(command, "set repeat on", 13) == 0) {
+     strcpy(reply, "ERR - repeat now deprecated");
    } else{
 -    _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
 +    // Mods first: this is the only call site both the release tag and dev spell the same way.
@@ -686,7 +726,7 @@ index 546d094..d7d8fb8 100644
    }
  }
  
-@@ -1064,6 +1307,10 @@ void MyMesh::loop() {
+@@ -1066,6 +1311,10 @@ void MyMesh::loop() {
      MESH_DEBUG_PRINTLN("Radio params restored");
    }
  
@@ -698,26 +738,42 @@ index 546d094..d7d8fb8 100644
    if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
      acl.save(_fs, MyMesh::saveFilter);
 diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
-index d833fff..2af9258 100644
+index 65fc55e..320fe88 100644
 --- a/examples/simple_room_server/main.cpp
 +++ b/examples/simple_room_server/main.cpp
-@@ -4,2 +4,3 @@
+@@ -2,6 +2,7 @@
+ #include <Mesh.h>
+ 
  #include "MyMesh.h"
 +#include <helpers/ModHooks.h>
  
-@@ -19,2 +20,6 @@ MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock,
+ #ifdef ETHERNET_ENABLED
+   #define ETHERNET_CLI_BANNER "MeshCore Room Server CLI"
+@@ -17,6 +18,10 @@ StdRNG fast_rng;
+ SimpleMeshTables tables;
+ MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
  
 +// Defined here, not in the generated hook file, which sees neither MyMesh nor the_mesh.
 +void modSendZeroHopAdvert(int delay_millis) { the_mesh.sendSelfAdvertisement(delay_millis, false); }
 +
 +
  void halt() {
-@@ -47,3 +52,3 @@ void setup() {
+   while (1) ;
+ }
+@@ -45,7 +50,7 @@ void setup() {
+   }
+ #endif
  
 -  if (!radio_init()) { halt(); }
 +  if (!modRadioInit(FIRMWARE_VERSION "-" OTA_MOD_SHORT_SHA)) { halt(); }
  
-@@ -106,2 +111,3 @@ void setup() {
+   fast_rng.begin(radio_driver.getRngSeed());
+ 
+@@ -104,6 +109,7 @@ void setup() {
+ }
+ 
  void loop() {
 +  modLoop();
    int len = strlen(command);
+   // `command` must stay NUL-terminated within its bounds. If it ever isn't,
+   // strlen() above can return >= sizeof(command) and the loop below would then

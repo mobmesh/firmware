@@ -303,6 +303,14 @@ sync.time <on|off>
 
 **Storage:** Enable states are persistent when saved successfully.
 
+**Extension:** While `sync.region` is on, native `region` lists the native tree unchanged, then
+the overlay with `~` after each name, e.g. ` gulf~ F`; `region list allowed` and `region list denied`
+append overlay names with the matching flood flag the same way. The overlay only uses space
+left under 155 bytes: every entry, else top-level entries, else one `sync~` entry. A name ending
+in `~` is reserved for the overlay: native `region put`, `remove`, `allowf`, `denyf` and `def`
+naming one are refused with `Err - <name> is managed by sync.region`, and `region load` skips
+such lines, so a native tool saving its list never copies overlay entries.
+
 **Restrictions:** Radio off refuses during a local publication or durable commit;
 use `sync.radio publish.abort` for a local migration. Trust is still required for
 accepting signed campaigns even where `on` does not require a populated trust list.

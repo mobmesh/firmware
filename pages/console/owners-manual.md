@@ -454,6 +454,12 @@ remains untouched and keeps its own 32 entries.
 Overlay matches take priority, while an exact flood deny in either table wins. Turning
 `sync.region off` immediately removes the overlay from routing but does not erase it.
 
+While `sync.region` is on, native `region`, `region list allowed` and `region list denied`
+also list the overlay after the native entries, each name ending in `~`, so native tools
+such as the MeshCore app and config.meshcore.io show it.
+Those entries are read-only to native commands, and
+`region load` skips them, so saving from a native tool never copies them.
+
 #### Subscriber example
 
 ```text
