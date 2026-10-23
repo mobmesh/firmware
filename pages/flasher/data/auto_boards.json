@@ -380,5 +380,51 @@
         "firmwareFile": "bin/room_server/waveshare_esp32s3_lr1121.bin"
       }
     }
+  },
+  "grumpy_node": {
+    "label": "Grumpy Node",
+    "connectNote": "Put the board into flash mode first (hold BOOT, tap RESET, then release BOOT), then connect over USB.",
+    "postFlashNote": "Press RESET once to put the board back into normal operation.",
+    "partitionsOverridden": true,
+    "qemu": {
+      "enabled": true,
+      "machine": "esp32c3",
+      "binary": "qemu-system-riscv32",
+      "mcu": "esp32c3",
+      "mem": "",
+      "globals": {
+        "bramble.gpio.strap-mode": 8,
+        "bramble.gpspi2.cs-gpio": 20,
+        "bramble.gpspi2.spi-base": "0x60024000"
+      }
+    },
+    "offsets": {
+      "bootloader": "0x0",
+      "partitions": "0x8000",
+      "otadata": "0xe000",
+      "app0": "0x10000",
+      "app1": "0x1e0000",
+      "appMaxSize": "0x1d0000"
+    },
+    "bootApp0": "bin/boot/boot_app0.bin",
+    "bootloaderFile": "bin/boot/grumpy_node_bootloader.bin",
+    "partitionsFile": "bin/boot/grumpy_node_partitions.bin",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "grumpy_node_rep_mobmesh_beta",
+        "version": "v1.18.0",
+        "firmwareFile": "bin/repeater/grumpy_node.bin",
+        "postFlashCommands": [
+          "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/grumpy_node.bin"
+        ]
+      },
+      "room_server": {
+        "label": "Room",
+        "assetBasename": "grumpy_node_room_mobmesh_beta",
+        "version": "v1.18.0",
+        "firmwareFile": "bin/room_server/grumpy_node.bin"
+      }
+    }
   }
 }
