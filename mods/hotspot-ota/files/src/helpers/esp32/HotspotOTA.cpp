@@ -21,6 +21,12 @@
 // from variants/<board>/overrides.yaml, which carries each board's values and rationale.
 #define OTA_WAN_CHECK_HOST       "google.com"   // 3rd-party host, distinct from the firmware host
 
+// Level that powers the hotspot rail; a board with an active-low switch sets PIN_HOTSPOT_PWR_ON: 0.
+#ifndef PIN_HOTSPOT_PWR_ON
+#define PIN_HOTSPOT_PWR_ON HIGH
+#endif
+#define PIN_HOTSPOT_PWR_OFF (PIN_HOTSPOT_PWR_ON == HIGH ? LOW : HIGH)
+
 // Neither target board has a battery-backed RTC, so the clock is always wrong after a reboot.
 // Piggybacked on WiFi join to reuse the radio-on window OTA already paid for.
 #define OTA_NTP_SERVER            "us.pool.ntp.org"   // regional zone -- lower latency on a blocking call
@@ -651,12 +657,12 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
 
   setServiceState(OtaServiceState::PoweringOn);
   pinMode(PIN_HOTSPOT_PWR, OUTPUT);
-  digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // must stay HIGH throughout -- load switch, not a latch
+  digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_ON);   // must stay on throughout -- load switch, not a latch
 
   if (!alreadyConnectedTo(cfg)) {
     setServiceState(OtaServiceState::Joining);
     if (!joinWifiStation(cfg.ssid, cfg.password, reply, OTA_WIFI_JOIN_MAX_ATTEMPTS, true, true)) {
-      digitalWrite(PIN_HOTSPOT_PWR, LOW);
+      digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
       return false;
     }
   }
@@ -665,7 +671,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
   bool wan_ok = checkWanConnectivity(OTA_WAN_CHECK_ATTEMPTS, true);
   if (serviceCancelRequested()) {
     strcpy(reply, "ERR: canceled");
-    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
     WiFi.disconnect(true);
     return false;
   }
@@ -676,7 +682,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);   // GitHub release URLs 302 to a presigned link
   if (!http.begin(cfg.url)) {
     strcpy(reply, "ERR: could not open URL");
-    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
     WiFi.disconnect(true);
     return false;
   }
@@ -685,7 +691,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
   if (serviceCancelRequested()) {
     strcpy(reply, "ERR: canceled");
     http.end();
-    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
     WiFi.disconnect(true);
     return false;
   }
@@ -696,7 +702,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
       sprintf(reply, "ERR: HTTP GET failed (%d)", code);
     }
     http.end();
-    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
     WiFi.disconnect(true);
     return false;
   }
@@ -705,7 +711,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
   if (!Update.begin(len > 0 ? (size_t)len : UPDATE_SIZE_UNKNOWN, U_FLASH)) {
     strcpy(reply, "ERR: Update.begin failed");
     http.end();
-    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
     WiFi.disconnect(true);
     return false;
   }
@@ -727,7 +733,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
       closeNow(http);
       Update.abort();
       trailing.release();
-      digitalWrite(PIN_HOTSPOT_PWR, LOW);
+      digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
       WiFi.disconnect(true);
       return false;
     }
@@ -738,7 +744,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
         closeNow(http);
         Update.abort();
         trailing.release();
-        digitalWrite(PIN_HOTSPOT_PWR, LOW);
+        digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
         WiFi.disconnect(true);
         return false;
       }
@@ -753,7 +759,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
       drainAndClose(http);   // network torn down before touching Update state -- see drainAndClose()
       Update.abort();
       trailing.release();
-      digitalWrite(PIN_HOTSPOT_PWR, LOW);
+      digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
       WiFi.disconnect(true);
       return false;
     }
@@ -800,7 +806,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
         closeNow(http);   // network torn down before touching Update state -- see drainAndClose()
         Update.abort();
         trailing.release();
-        digitalWrite(PIN_HOTSPOT_PWR, LOW);
+        digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
         WiFi.disconnect(true);
         return false;
       }
@@ -812,7 +818,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
     strcpy(reply, "ERR: canceled");
     Update.abort();
     trailing.release();
-    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
     WiFi.disconnect(true);
     return false;
   }
@@ -821,7 +827,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
     strcpy(reply, "ERR: download incomplete");
     Update.abort();
     trailing.release();
-    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
     WiFi.disconnect(true);
     return false;
   }
@@ -831,7 +837,7 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
     strcpy(reply, "ERR: not a hotspot ota build (truncated), would lose remote-update ability -- aborting");
     Update.abort();
     trailing.release();
-    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
     WiFi.disconnect(true);
     return false;
   }
@@ -841,13 +847,13 @@ static bool runService(const HotspotOtaConfig& cfg, bool bypass_marker_check, bo
   if (!hash_ok) {
     strcpy(reply, "ERR: SHA-256 mismatch");
     Update.abort();
-    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
     WiFi.disconnect(true);
     return false;
   }
 
   // Hash verified and bytes are already in the inactive partition -- network dependency ends here.
-  digitalWrite(PIN_HOTSPOT_PWR, LOW);
+  digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
   WiFi.disconnect(true);
 
   setServiceState(OtaServiceState::Committing);
@@ -900,7 +906,7 @@ static bool restoreWanState(const WanRuntimeState& initial, const HotspotOtaConf
   }
 
   pinMode(PIN_HOTSPOT_PWR, OUTPUT);
-  digitalWrite(PIN_HOTSPOT_PWR, initial.power ? HIGH : LOW);
+  digitalWrite(PIN_HOTSPOT_PWR, initial.power ? PIN_HOTSPOT_PWR_ON : PIN_HOTSPOT_PWR_OFF);
   delay(20);
   return wifi_ok && wanStateMatches(initial);
 }
@@ -916,7 +922,7 @@ static bool runWanVerify(const HotspotOtaConfig& cfg, const WanRuntimeState& ini
   credentialDigest(cfg, record.credentials);
 
   pinMode(PIN_HOTSPOT_PWR, OUTPUT);
-  digitalWrite(PIN_HOTSPOT_PWR, HIGH);
+  digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_ON);
 
   bool joined = alreadyConnectedTo(cfg);
   if (!joined) {
@@ -983,7 +989,7 @@ static void serviceTaskMain(void*) {
   bool ok;
   if (kind == ServiceKind::Ota) {
     ok = runService(cfg, bypass_marker_check, automatic, result);
-    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
     if (!stopWifiRadio() && !ok) strcpy(result, "ERR: WiFi shutdown failed; reboot to clear");
   } else if (kind == ServiceKind::WanVerify) {
     ok = runWanVerify(cfg, initial, result);
@@ -1406,12 +1412,12 @@ bool HotspotOTA::saveConfig(const HotspotOtaConfig& cfg) {
 
 void HotspotOTA::setPower(bool on) {
   pinMode(PIN_HOTSPOT_PWR, OUTPUT);
-  digitalWrite(PIN_HOTSPOT_PWR, on ? HIGH : LOW);
+  digitalWrite(PIN_HOTSPOT_PWR, on ? PIN_HOTSPOT_PWR_ON : PIN_HOTSPOT_PWR_OFF);
 }
 
 bool HotspotOTA::getPower() {
   // No pinMode() here -- reading shouldn't have side effects; digitalRead() works regardless.
-  return digitalRead(PIN_HOTSPOT_PWR) == HIGH;
+  return digitalRead(PIN_HOTSPOT_PWR) == PIN_HOTSPOT_PWR_ON;
 }
 
 bool HotspotOTA::wifiConnect(char reply[]) {
@@ -1431,11 +1437,11 @@ bool HotspotOTA::wifiConnect(char reply[]) {
   }
 
   pinMode(PIN_HOTSPOT_PWR, OUTPUT);
-  digitalWrite(PIN_HOTSPOT_PWR, HIGH);   // hotspot needs power before its AP exists to join
+  digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_ON);   // hotspot needs power before its AP exists to join
 
   if (!joinWifiStation(cfg.ssid, cfg.password, reply, OTA_DIAG_WIFI_JOIN_ATTEMPTS, false, true)) {
     bool stopped = stopWifiRadio();
-    digitalWrite(PIN_HOTSPOT_PWR, LOW);
+    digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
     if (!stopped) strcpy(reply, "ERR: WiFi shutdown failed; reboot to clear");
     return false;
   }
@@ -1447,7 +1453,7 @@ bool HotspotOTA::wifiConnect(char reply[]) {
 bool HotspotOTA::wifiDisconnect() {
   if (HotspotOTA::isActive()) return false;
   bool stopped = stopWifiRadio();
-  digitalWrite(PIN_HOTSPOT_PWR, LOW);
+  digitalWrite(PIN_HOTSPOT_PWR, PIN_HOTSPOT_PWR_OFF);
   session_ended = true;   // poll() acts after this command's reply has gone out
   return stopped;
 }

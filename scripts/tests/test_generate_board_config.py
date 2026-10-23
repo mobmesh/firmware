@@ -122,6 +122,25 @@ class InjectEnvTestCase(unittest.TestCase):
         room_section = result.split("[env:heltec_v4_room_server]")[1]
         self.assertNotIn("WITH_HOTSPOT_OTA", room_section)
 
+    def test_active_low_hotspot_power_level(self):
+        self._make_mod("hotspot-ota", {
+            "0001": (
+                "id: \"0001\"\ntitle: hotspot-fetch-ota\nrequires: []\n"
+                "env_flag: WITH_HOTSPOT_OTA\n"
+                "build_src_filter: [\"+<helpers/esp32/HotspotOTA.cpp>\"]\n"
+            ),
+        })
+        self._make_overrides("heltec_v4", (
+            "build_values:\n  PIN_HOTSPOT_PWR: 2\n  PIN_HOTSPOT_PWR_ON: 0\npartitions_override: null\n"
+        ))
+        ini_path = self._write("platformio.ini", SAMPLE_INI)
+
+        self._run(ini_path)
+
+        repeater_section = ini_path.read_text().split("[env:heltec_v4_room_server]")[0]
+        self.assertIn("-D PIN_HOTSPOT_PWR=2", repeater_section)
+        self.assertIn("-D PIN_HOTSPOT_PWR_ON=0", repeater_section)
+
     def _minimal_mod_and_overrides(self):
         self._make_mod("hotspot-ota", {"0001": "id: \"0001\"\ntitle: x\nrequires: []\n"})
         self._make_overrides("heltec_v4", "build_values: {}\npartitions_override: null\n")
@@ -703,6 +722,16 @@ class OtaWebPageTestCase(InjectEnvTestCase):
         self.assertNotIn("DISABLE_WIFI_OTA", result)
         self.assertFalse(self._header(ini_path).exists())
 
+
+
+
+class HotspotPowerLevelTestCase(unittest.TestCase):
+    def test_level_defaults_to_high_and_every_write_uses_it(self):
+        source = (SCRIPT_PATH.parents[1] / "mods/hotspot-ota/files/src/helpers/esp32/HotspotOTA.cpp").read_text()
+        self.assertIn("#ifndef PIN_HOTSPOT_PWR_ON\n#define PIN_HOTSPOT_PWR_ON HIGH", source)
+        writes = [line for line in source.splitlines() if "digitalWrite(PIN_HOTSPOT_PWR" in line]
+        self.assertTrue(writes)
+        self.assertFalse([line for line in writes if "HIGH" in line or "LOW" in line])
 
 
 if __name__ == "__main__":
