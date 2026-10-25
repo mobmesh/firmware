@@ -472,7 +472,7 @@ function renderError(error, retry) {
 
 // The advert budget, minus the zone's name prefix. Advisory, not a cap: the firmware
 // stores 31 bytes either way and only the advert clips.
-const NAME_BYTES = 20;
+const NAME_BYTES = 19;
 const NAME_STORED_BYTES = 31;
 
 // Stands in for a password that is set but cannot be read back — no `get` exists for it.
@@ -696,7 +696,7 @@ function renderLocation(step) {
     counter.textContent = `${used}/${NAME_BYTES}`;
     counter.classList.toggle('is-full', used === NAME_BYTES);
     counter.classList.toggle('is-over', used > NAME_BYTES);
-    const clipping = used >= NAME_BYTES + 2;
+    const clipping = used > NAME_BYTES;
     nameWarn.hidden = !clipping;
     // One note at a time: a warning about what was just typed outranks a standing fact.
     nameKeepsId.hidden = !isUpgrade || clipping;

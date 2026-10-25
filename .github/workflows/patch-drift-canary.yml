@@ -272,6 +272,23 @@ jobs:
             fi
           fi
 
+          # --- 9. does the name badge still fit, and still reach every advert? ----
+          # NameBadge.h keeps 19 bytes for a 32-byte advert with location; neither change below conflicts.
+          if [ -d probe-src ]; then
+            if grep -qE '^#define MAX_ADVERT_DATA_SIZE +32$' probe-src/src/MeshCore.h 2>/dev/null; then
+              ok "upstream's advert data is still 32 bytes; the name badge's 19-byte cut still fits"
+            else
+              act "upstream changed \`MAX_ADVERT_DATA_SIZE\`, so the name badge's 19-byte cut in mods/shim/files/src/helpers/NameBadge.h is wrong."
+            fi
+            # The patched tree builds adverts from the badged name; any builder still reading node_name skips the badge.
+            unbadged=$(grep -rlE 'AdvertDataBuilder[^;]*node_name' probe-src/src probe-src/examples 2>/dev/null || true)
+            if [ -z "$unbadged" ]; then
+              ok "every advert upstream builds still goes through \`buildAdvertData\`; the name badge reaches them all"
+            else
+              act "upstream builds an advert from \`node_name\` outside \`buildAdvertData\`, so those adverts go out without the name badge:$(codes "$unbadged")"
+            fi
+          fi
+
           for part in actions notes ok explain; do
             { echo "$part<<PART_EOF"; cat "$part.md"; echo 'PART_EOF'; } >> "$GITHUB_OUTPUT"
           done

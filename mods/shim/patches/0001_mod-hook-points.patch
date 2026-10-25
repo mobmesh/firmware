@@ -777,3 +777,35 @@ index 65fc55e..320fe88 100644
    int len = strlen(command);
    // `command` must stay NUL-terminated within its bounds. If it ever isn't,
    // strlen() above can return >= sizeof(command) and the loop below would then
+diff --git a/src/helpers/CommonCLI.cpp b/src/helpers/CommonCLI.cpp
+index 04199e2..4cfc57b 100644
+--- a/src/helpers/CommonCLI.cpp
++++ b/src/helpers/CommonCLI.cpp
+@@ -2,6 +2,7 @@
+ #include "CommonCLI.h"
+ #include "TxtDataHelpers.h"
+ #include "AdvertDataHelpers.h"
++#include "NameBadge.h"
+ #include "TxtDataHelpers.h"
+ #include <RTClib.h>
+ 
+@@ -168,14 +169,16 @@ void CommonCLI::savePrefs() {
+ }
+ 
+ uint8_t CommonCLI::buildAdvertData(uint8_t node_type, uint8_t* app_data) {
++  char tx_name[sizeof(_prefs->node_name)];
++  const char* name = nameBadgeTx(_prefs->node_name, tx_name);
+   if (_prefs->advert_loc_policy == ADVERT_LOC_NONE) {
+-    AdvertDataBuilder builder(node_type, _prefs->node_name);
++    AdvertDataBuilder builder(node_type, name);
+     return builder.encodeTo(app_data);
+   } else if (_prefs->advert_loc_policy == ADVERT_LOC_SHARE) {
+-    AdvertDataBuilder builder(node_type, _prefs->node_name, _sensors->node_lat, _sensors->node_lon);
++    AdvertDataBuilder builder(node_type, name, _sensors->node_lat, _sensors->node_lon);
+     return builder.encodeTo(app_data);
+   } else {
+-    AdvertDataBuilder builder(node_type, _prefs->node_name, _prefs->node_lat, _prefs->node_lon);
++    AdvertDataBuilder builder(node_type, name, _prefs->node_lat, _prefs->node_lon);
+     return builder.encodeTo(app_data);
+   }
+ }
