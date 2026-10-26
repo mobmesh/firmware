@@ -697,96 +697,11 @@
 					"class": "ripple",
 					"role": "gui",
 					"notice": "rippleUserGuide",
-					"version": {
-						"v10.1": {
-							"files": [
-								{
-									"type": "download",
-									"name": "Ultra-WioTrackerL1-v10.1.uf2",
-									"title": "UF2 file for manual USB DFU mass storage update"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-WioTrackerL1-v10.1.zip",
-									"title": "App firmware"
-								}
-							],
-							"notes": "ix for Path dialog \"bad format\" bug\nMessage details screen now formats multi-line messages\n'Heard By' names bug fix\nmulti-byte path DM send timeout bug fix\nnew 'Get Telemetry...' menu in conversation screens\nChannel scope, select \"*\" for un-scoped"
-						},
-						"v9.6": {
-							"files": [
-								{
-									"type": "download",
-									"name": "Ultra-WioTrackerL1-v9.6.uf2",
-									"title": "UF2 file for manual USB DFU mass storage update"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-WioTrackerL1-v9.6.zip",
-									"title": "App firmware"
-								}
-							],
-							"notes": "Default Scope region support\nmultibyte path hash support\nOff-grid (client repeat) mode\nBandwidth 500 support\nDiscover list now overwrites oldest entry if full\nregion names now without '#'\nchannel names now up to 11 chars\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/469784'>Full changelog</a></b>"
-						},
-						"v8.2": {
-							"files": [
-								{
-									"type": "download",
-									"name": "Ultra-WioTrackerL1-v8.2.uf2",
-									"title": "UF2 file for manual USB DFU mass storage update"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-WioTrackerL1-v8.2.zip",
-									"title": "App firmware"
-								}
-							],
-							"notes": "* Updated UI colour scheme\n* New Regions screen, with 'Scan Local' menu\n* New 'Owner Info' menu, from Discover > Scan Local\n\n<b><a target='_blank' href='https://buymeacoffee.com/ripplebiz/e/469784'>Full changelog</a></b>"
-						},
-						"v7.14": {
-							"files": [
-								{
-									"type": "download",
-									"name": "Ultra-WioTrackerL1-v7.14.uf2",
-									"title": "UF2 file for manual USB DFU mass storage update"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-WioTrackerL1-v7.14.zip",
-									"title": "App firmware"
-								}
-							],
-							"notes": "* NEW: 'Scan Local' menu in Discover\n* Message text: now converts accented chars to ASCII equivalent\n* Popular emojis now converted, eg ':thumbsup'\n* Contacts can be tagged and custom notes added\n* Repeater CLI, 'neighbors' command now using binary req/resp\n* Max group channels now upped to 6\n* Bug fix: some CLI responses were lost from dup timestamp.\n* #channel key calc now forces lowercase\n* Better canned messages for CLI screens\n* Group channel message, 'Reply To' menu\n* Kid Mode: now supports up to 1 group channel chat"
-						},
-						"v7.12.1": {
-							"files": [
-								{
-									"type": "download",
-									"name": "Ultra-WioTrackerL1-v7.12.1.uf2",
-									"title": "UF2 file for manual USB DFU mass storage update"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-WioTrackerL1-v7.12.1.zip",
-									"title": "App firmware"
-								}
-							],
-							"notes": "* Battery scale fix\n* UI style updates\n* Remote admin prefixes, extra spaces allowed\n* Presets updated\n* Msg details: ‘heard by’\n* Repeater and room CLI: “get” command (get full telemetry)\n* Channel details: Alerts ON/OFF menu"
-						},
-						"v7.12": {
-							"files": [
-								{
-									"type": "download",
-									"name": "Ultra-WioTrackerL1-v7.12.uf2",
-									"title": "UF2 file for manual USB DFU mass storage update"
-								},
-								{
-									"type": "flash-update",
-									"name": "Ultra-WioTrackerL1-v7.12.zip",
-									"title": "App firmware"
-								}
-							],
-							"notes": "* Fixed PIN unlock screen\n* Added kid mode support\n* Repeater and Room CLI: new \"get\" command for full telemetry fetch"
+					"github-ripple": {
+						"type": "wio-tracker-l1",
+						"files": {
+							"flash": "Ultra-WioTrackerL1-v.*\\.zip",
+							"download": "Ultra-WioTrackerL1-v.*\\.uf2"
 						}
 					}
 				},
