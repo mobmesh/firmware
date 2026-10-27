@@ -51,9 +51,10 @@ class CurrentProjectModelTestCase(unittest.TestCase):
                          "waveshare_esp32s3_lr1121_rep_mobmesh_beta")
         self.assertEqual(rows[("heltec_v4", "room_server")].ota_role_id, 2)
         self.assertEqual(rows[("heltec_v4", "repeater")].mods,
-                         ("shim", "hotspot-ota", "timing-safety", "try-settings", "power-guard", "sync-settings"))
+                         ("shim", "hotspot-ota", "timing-safety", "try-settings", "power-guard", "sync-settings",
+                          "flood-gate"))
         self.assertEqual(rows[("xiao_c3", "repeater")].mods,
-                         ("shim", "hotspot-ota", "timing-safety", "try-settings", "sync-settings"))
+                         ("shim", "hotspot-ota", "timing-safety", "try-settings", "sync-settings", "flood-gate"))
         for board in ("heltec_v4", "xiao_c3"):
             self.assertEqual(rows[(board, "room_server")].mods,
                              ("shim", "hotspot-ota", "timing-safety", "try-settings", "sync-settings"))

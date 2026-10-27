@@ -1,0 +1,15 @@
+# Mod-level facts. build_src_filter is derived from what is under files/, so the two
+# cannot drift apart.
+name: flood-gate
+
+env_flags: [WITH_FLOOD_GATE]
+
+integration:
+  header: helpers/esp32/FloodGateIntegration.h
+  hooks:
+    loop: floodGateLoop
+    allow_forward: floodGateAllowFlood
+    cli:
+      handler: floodGateHandleCli
+      # Claims only its own verb, like try-settings.
+      priority: 120

@@ -168,7 +168,6 @@ def load_integrations(mods: list) -> list:
     symbols = {}
     radio_owner = None
     route_owner = None
-    allow_forward_owner = None
     region_export_owner = None
     owner_info_owner = None
     for order, mod_name in enumerate(mods):
@@ -223,12 +222,6 @@ def load_integrations(mods: list) -> list:
                         f"route is exclusive but claimed by '{route_owner}' and '{mod_name}'"
                     )
                 route_owner = mod_name
-            if phase is IntegrationPhase.ALLOW_FORWARD:
-                if allow_forward_owner is not None:
-                    raise ValueError(
-                        f"allow_forward is exclusive but claimed by '{allow_forward_owner}' and '{mod_name}'"
-                    )
-                allow_forward_owner = mod_name
             if phase is IntegrationPhase.REGION_EXPORT:
                 if region_export_owner is not None:
                     raise ValueError(
@@ -279,8 +272,7 @@ def render_mod_hooks(integrations: list) -> str:
     sleep_calls = "".join(f"  {symbol}();\n" for symbol in sleeps)
     radio_call = f"{radio[0]}(build_id)" if radio else "modBoardRadioInit()"
     route_call = f"{routes[0]}(packet, base, out)" if routes else "false"
-    allow_forward_call = (f"{allow_forwards[0]}(packet, scope_known)"
-                          if allow_forwards else "true")
+    allow_forward_expr = " && ".join(f"{symbol}(packet, scope_known)" for symbol in allow_forwards) or "true"
     region_export_call = (
         f"{region_exports[0]}(base, out, capacity, excluded_flags)"
         if region_exports else "-1"
@@ -321,7 +313,7 @@ bool modResolveRegion(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out
 }}
 
 bool modAllowFlood(const mesh::Packet* packet, bool scope_known) {{
-  return {allow_forward_call};
+  return {allow_forward_expr};
 }}
 
 int modExportRegions(RegionMap* base, char* out, size_t capacity,

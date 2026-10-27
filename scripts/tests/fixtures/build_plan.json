@@ -22,7 +22,8 @@
         "timing-safety",
         "try-settings",
         "power-guard",
-        "sync-settings"
+        "sync-settings",
+        "flood-gate"
       ],
       "build_flags_append": [
         "-UDISPLAY_CLASS"
@@ -86,7 +87,8 @@
         "hotspot-ota",
         "timing-safety",
         "try-settings",
-        "sync-settings"
+        "sync-settings",
+        "flood-gate"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -148,7 +150,8 @@
         "hotspot-ota",
         "timing-safety",
         "try-settings",
-        "sync-settings"
+        "sync-settings",
+        "flood-gate"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -210,7 +213,8 @@
         "hotspot-ota",
         "timing-safety",
         "try-settings",
-        "sync-settings"
+        "sync-settings",
+        "flood-gate"
       ],
       "build_flags_append": [
         "-UDISPLAY_CLASS"
@@ -274,7 +278,8 @@
         "hotspot-ota",
         "timing-safety",
         "try-settings",
-        "sync-settings"
+        "sync-settings",
+        "flood-gate"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -336,7 +341,8 @@
         "hotspot-ota",
         "timing-safety",
         "try-settings",
-        "sync-settings"
+        "sync-settings",
+        "flood-gate"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -398,7 +404,8 @@
         "hotspot-ota",
         "timing-safety",
         "try-settings",
-        "sync-settings"
+        "sync-settings",
+        "flood-gate"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -460,7 +467,8 @@
         "hotspot-ota",
         "timing-safety",
         "try-settings",
-        "sync-settings"
+        "sync-settings",
+        "flood-gate"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -522,7 +530,8 @@
         "hotspot-ota",
         "timing-safety",
         "try-settings",
-        "sync-settings"
+        "sync-settings",
+        "flood-gate"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,

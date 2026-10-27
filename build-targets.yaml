@@ -28,7 +28,7 @@ targets:
     build_env: heltec_v4_repeater
     vendor_flasher_assets: true
     # heltec_v4 only: its battery divider is the one that has been bench-measured.
-    mods: [hotspot-ota, timing-safety, try-settings, power-guard, sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, power-guard, sync-settings, flood-gate]
     # Headless: drops the OLED and the button's long-press power-off.
     # Joined form -- PlatformIO splits "-U FOO" into a bare -U.
     build_flags_append: ["-UDISPLAY_CLASS"]
@@ -45,7 +45,7 @@ targets:
     build_env: Xiao_C3_repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings, flood-gate]
 
   - board: xiao_c3
     role: room_server
@@ -62,7 +62,7 @@ targets:
     build_env: Grumpy_Node_repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings, flood-gate]
 
   - board: grumpy_node
     role: room_server
@@ -76,7 +76,7 @@ targets:
     build_env: Heltec_v3_repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings, flood-gate]
     # Headless, as heltec_v4.
     build_flags_append: ["-UDISPLAY_CLASS"]
 
@@ -92,7 +92,7 @@ targets:
     build_env: Xiao_S3_WIO_repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings, flood-gate]
 
   - board: xiao_s3_wio
     role: room_server
@@ -106,7 +106,7 @@ targets:
     build_env: RAK_3112_repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings, flood-gate]
 
   - board: rak3112
     role: room_server
@@ -120,7 +120,7 @@ targets:
     build_env: Ebyte_EoRa-S3_Repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings, flood-gate]
 
   - board: ebyte_eora_s3
     role: room_server
@@ -134,7 +134,7 @@ targets:
     build_env: Station_G3_ESP32_repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings, flood-gate]
 
   - board: station_g3_esp32
     role: room_server
@@ -148,7 +148,7 @@ targets:
     build_env: Waveshare_S3_LR1121_repeater
     vendor_flasher_assets: true
     beta: true
-    mods: [hotspot-ota, timing-safety, try-settings, sync-settings]
+    mods: [hotspot-ota, timing-safety, try-settings, sync-settings, flood-gate]
 
   - board: waveshare_esp32s3_lr1121
     role: room_server
