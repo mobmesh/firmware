@@ -3,10 +3,14 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "2c2ee03005794950b237d50b0a250c5353f300fa",
-  "sourceRows": 252,
-  "effectiveSignatures": 238,
+  "mobmeshCommit": "c1bd06ecb0e7af6f16553d2102e46086e944fd38",
+  "sourceRows": 260,
+  "effectiveSignatures": 246,
   "cliAdditionFiles": [
+    {
+      "path": "mods/flood-gate/docs/cli-additions.md",
+      "sha256": "77482526cf6577357673857ac6d169a4d41b521b5f1db51db4ba8d9c0d4dd933"
+    },
     {
       "path": "mods/hotspot-ota/docs/cli-additions.md",
       "sha256": "8e5d5dd946eaa1e09d75543ceaedbbd0fe2e2d437760fef8f92f21b1a6f65b7a"
@@ -241,6 +245,26 @@
     [
       "2c2ee03",
       "2026-10-23"
+    ],
+    [
+      "e831f1e",
+      "2026-10-23"
+    ],
+    [
+      "cce22fc",
+      "2026-10-23"
+    ],
+    [
+      "f0bc686",
+      "2026-10-25"
+    ],
+    [
+      "b765613",
+      "2026-10-25"
+    ],
+    [
+      "c1bd06e",
+      "2026-10-25"
     ]
   ]
 }

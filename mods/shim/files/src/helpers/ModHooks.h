@@ -33,7 +33,7 @@ enum {
 };
 
 bool modResolveRegion(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out);
-// Vetoes a flood forward; scope_known is whether the packet resolved to a permitted region.
+// AND of mods' flood-forward vetoes, true when none; scope_known is whether the packet resolved to a permitted region.
 bool modAllowFlood(const mesh::Packet* packet, bool scope_known);
 bool modResolveRegionName(const char* name, ModRegionMatch* out);
 bool modRegionNameForKey(const uint8_t key[16], char* out, size_t capacity);
