@@ -3,7 +3,7 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "c1bd06ecb0e7af6f16553d2102e46086e944fd38",
+  "mobmeshCommit": "e1aa29f843b92eb7a3de5496b465477bed88e93e",
   "sourceRows": 260,
   "effectiveSignatures": 246,
   "cliAdditionFiles": [
@@ -265,6 +265,10 @@
     [
       "c1bd06e",
       "2026-10-25"
+    ],
+    [
+      "e1aa29f",
+      "2026-10-27"
     ]
   ]
 }
