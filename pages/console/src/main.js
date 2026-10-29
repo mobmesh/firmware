@@ -92,7 +92,7 @@ let backgroundOn=true;try{backgroundOn=localStorage.getItem('console-background'
 setBackground(backgroundOn);
 try{const saved=localStorage.getItem('console-theme');if(THEMES.includes(saved))applyTheme(saved);}catch{}
 // F1 shows the owner's manual command reference from the copy kept beside the page.
-const MANUAL_SOURCES=['owners-manual.md'],MANUAL_HEADING='## 9. Complete command and syntax reference';
+const MANUAL_SOURCES=['owners-manual.md'],MANUAL_HEADING='## 10. Complete command and syntax reference';
 let manualLoaded=false;
 async function loadManual(){
  const {marked}=await import('../../shared/vendor/marked/marked.esm.js');
