@@ -8,8 +8,8 @@
 MeshCore Enhanced+ is MeshCore with added safety protections and features for remote and regionally
 coordinated mesh nodes. It is built against new upstream MeshCore releases as they occur.
 Independent **mods** add remote firmware updates, battery protection, reversible settings,
-and signed settings distribution. The native radio, routing, identity, CLI, repeater, and
-room-server behavior remain the foundation.
+signed settings distribution, and control over what a repeater forwards. The native radio,
+routing, identity, CLI, repeater, and room-server behavior remain the foundation.
 
 ---
 
@@ -28,9 +28,10 @@ room-server behavior remain the foundation.
    - [Radio campaigns](#radio-campaigns)
    - [Time campaigns](#time-campaigns)
    - [Status, reports, and aborts](#status-reports-and-aborts)
-7. [`shim`: the integration layer](#7-shim-the-integration-layer)
-8. [Browser tools and initial flashing](#8-browser-tools-and-initial-flashing)
-9. [Complete command and syntax reference](#9-complete-command-and-syntax-reference)
+7. [`flood-gate`: what a repeater repeats](#7-flood-gate-what-a-repeater-repeats)
+8. [`shim`: the integration layer](#8-shim-the-integration-layer)
+9. [Browser tools and initial flashing](#9-browser-tools-and-initial-flashing)
+10. [Complete command and syntax reference](#10-complete-command-and-syntax-reference)
 
 ---
 
@@ -44,7 +45,7 @@ and applies two small maintained patches where upstream code itself must change.
 |---|---|
 | **Upstream MeshCore** | Radio, packet routing, identity, native settings, CLI, repeater and room-server applications |
 | **Shim** | Shared hook points and generated dispatch between MeshCore and installed mods |
-| **Feature mods** | OTA, power management, reversible settings, synchronization, and timing fixes |
+| **Feature mods** | OTA, power management, reversible settings, synchronization, forwarding control, and timing fixes |
 | **Board configuration** | Hardware facts such as GPIOs, battery thresholds, partitions, and supported capabilities |
 | **Build and release checks** | Composition tests, strict patch application, compatibility builds, identity stamping, and emulated boot |
 
@@ -61,9 +62,10 @@ emulation is configured, the exact app image slated for release must boot and an
 | [try‑settings](#4-try-settings-reversible-configuration) | Timed trials for settings that may strand a remote node | All targets |
 | [timing‑safety](#5-timing-safety-clock-and-timer-fixes) | Long-uptime timer correction and safe elapsed-time reporting after reboot | All targets |
 | [sync‑settings](#6-sync-settings-fleet-settings-over-the-mesh) | Signed region, policy, radio, and time campaigns | All targets |
-| [`shim`](#7-shim-the-integration-layer) | Generated integration and shared safety interlocks | All targets |
+| [flood‑gate](#7-flood-gate-what-a-repeater-repeats) | Allows an operator to temporarily opt out of repeating channel floods; useful to protect the mesh from attack | Repeaters |
+| [`shim`](#8-shim-the-integration-layer) | Generated integration and shared safety interlocks | All targets |
 
-The [complete command reference](#9-complete-command-and-syntax-reference) is at the end of
+The [complete command reference](#10-complete-command-and-syntax-reference) is at the end of
 this manual. The command tables inside each feature section focus on common tasks and
 examples.
 
@@ -93,7 +95,7 @@ period that rolls back an image that crashes or cannot hear the mesh.
 | Check probation | `get ota.slot`, `ota slot confirm` | Shows whether new firmware is still proving itself; `ota slot confirm` accepts it early |
 | Use local upload mode | `start ota`, `get ota.ap`, `stop ota` | Starts, inspects, or ends the local Wi-Fi upload page |
 
-The [full OTA and WAN syntax](#9-complete-command-and-syntax-reference) is included in the
+The [full OTA and WAN syntax](#10-complete-command-and-syntax-reference) is included in the
 final command table.
 
 ### Example: configure Wi-Fi
@@ -244,7 +246,7 @@ leaves service to protect the battery.
 | Sleep temporarily | `poweroff <seconds>` | Sleeps for 60–86400 seconds and then wakes |
 | Read remote diagnostics | `stats-core`, `stats-radio`, `stats-packets` | Makes native statistics available through authenticated remote CLI |
 
-See the [full power command syntax](#9-complete-command-and-syntax-reference) at the end.
+See the [full power command syntax](#10-complete-command-and-syntax-reference) at the end.
 
 ### What happens during a low-battery event
 
@@ -287,7 +289,7 @@ reachable on the new setting.
 | Revert now | `tryset revert` | Restores the saved value immediately |
 | Try radio parameters | `tryset 300 radio 910.525,62.5,7,6` | Uses MeshCore's native temporary-radio mechanism |
 
-The [complete `tryset` syntax and key list](#9-complete-command-and-syntax-reference) appear
+The [complete `tryset` syntax and key list](#10-complete-command-and-syntax-reference) appear
 in the final reference.
 
 ### Example workflow
@@ -384,7 +386,7 @@ the native `get public.key` command or copied through the browser configurator.
 
 Trust is shared across region, policy, radio, and time. Removing a publisher revokes future
 authority but retains replay history. `forget` is a separate action that erases that history.
-The [full trust and channel command reference](#9-complete-command-and-syntax-reference) is
+The [full trust and channel command reference](#10-complete-command-and-syntax-reference) is
 at the end.
 
 ### How a campaign works
@@ -522,7 +524,7 @@ sync.region save
 Changes are live in RAM immediately and persistent only after `save`. `reload` discards
 unsaved edits. A future accepted campaign replaces local overlay edits while sync remains on.
 
-See the [complete region command reference](#9-complete-command-and-syntax-reference) for
+See the [complete region command reference](#10-complete-command-and-syntax-reference) for
 listing, hierarchy definition, flood flags, removal, clear, reload, publication, schedules,
 status, reports, and generation recovery.
 
@@ -579,7 +581,7 @@ set sync.policy.publish.duration 3d
 ```
 
 An interrupted multi-setting apply is recovered at boot so a receiver is not left with an
-unexplained mixture. See the [full policy syntax](#9-complete-command-and-syntax-reference)
+unexplained mixture. See the [full policy syntax](#10-complete-command-and-syntax-reference)
 for schedules, raw transmission, reports, abort, and exceptional generation reset.
 
 ### [<u>Radio campaigns</u>↗](../mods/sync-settings/docs/radio.md)
@@ -659,7 +661,7 @@ would strand it.
 
 Cancellation is signed and repeated. Before cutover it is sent on R1; during confirmation it
 is sent on R2. Once durable saving begins, cancellation is too late. The [full radio command
-reference](#9-complete-command-and-syntax-reference) includes schedule, status, reports, and
+reference](#10-complete-command-and-syntax-reference) includes schedule, status, reports, and
 abort.
 
 ### [<u>Time campaigns</u>↗](../mods/sync-settings/docs/time.md)
@@ -719,7 +721,7 @@ The publisher refreshes its own clock before the next qualifying sample, then si
 it trusts. Without a proven hotspot it uses the local clock, and after a reset it waits until
 that clock is believable.
 
-See the [full time command reference](#9-complete-command-and-syntax-reference) for tolerance,
+See the [full time command reference](#10-complete-command-and-syntax-reference) for tolerance,
 sample duration, NTP cadence, status, and local schedule abort.
 
 ### Status, reports, and aborts
@@ -770,7 +772,46 @@ so abort means **stop unfinished work**, not **reverse history**.
 
 ---
 
-## 7. [<u>shim</u>↗](../mods/shim/README.md): the integration layer
+## 7. [<u>flood-gate</u>↗](../mods/flood-gate/README.md): what a repeater repeats
+
+`flood-gate` lets an operator stop a repeater forwarding channel floods that entered the mesh
+through a listed repeater near their origin, or that carry a path hash narrower than a set
+width. Its command is `sinkhole`. Every entry is a timeout: 24 hours by default, 168 at most.
+It ships on every repeater target.
+
+### Common tasks
+
+| Scenario | Commands | Result |
+|---|---|---|
+| Check an entry before enforcing it | `sinkhole watch a1b2 chan public` | Counts matching floods but still forwards them |
+| See what it would catch | `sinkhole show 1` | Match count, hop position, path width, last match |
+| Enforce it | `sinkhole add a1b2 24 chan public` | Drops matching floods for 24 hours |
+| Drop narrow-path floods from anyone | `sinkhole add * 168 minbytes 2` | Floods with 1-byte path hashes stop at this repeater |
+| List entries | `sinkhole list` | One line per entry by slot |
+| Lift an entry | `sinkhole remove a1b2` | Forwarding resumes at once |
+| Check totals | `sinkhole stats` | Drops, watch matches and entries in use since boot |
+
+See the [full sinkhole syntax](#10-complete-command-and-syntax-reference) at the end.
+
+### What an entry matches
+
+- Only channel messages and datagrams; adverts, direct messages, requests and logins always pass.
+- The listed repeater must be among the first three hops from the origin (`depth` changes this);
+  further down the path the flood forwards normally.
+- Scoped and unscoped floods are treated alike. Direct-routed traffic is untouched.
+- A repeater's own packets leave with an empty path, so an entry catches what it relays, not what
+  it sends.
+
+### Safety boundaries
+
+- Matching packets are still received and processed locally; only forwarding stops.
+- Every entry expires. Time left counts uptime, is saved every 10 minutes, and survives a reboot.
+- Up to 16 entries. Re-adding the same hash and channel replaces the entry and restarts its timer.
+- `*` needs `minbytes`, so one entry can never silence every channel flood.
+
+---
+
+## 8. [<u>shim</u>↗](../mods/shim/README.md): the integration layer
 
 `shim` is the shared boundary between upstream MeshCore and the feature mods. It provides
 generated startup, loop, CLI, packet, region, radio, and safety hook dispatch so each feature
@@ -784,7 +825,7 @@ allowing an invalid mod combination to reach a device.
 
 ---
 
-## 8. Browser tools and initial flashing
+## 9. Browser tools and initial flashing
 
 The browser tools at `https://tools.mobmesh.org/` flash both Enhanced+ and stock MeshCore.
 Connect the device with a data-capable USB cable, select the board and role, and follow the
@@ -804,7 +845,7 @@ attempting a remote WAN update.
 
 ---
 
-## 9. Complete command and syntax reference
+## 10. Complete command and syntax reference
 
 Parameters in angle brackets are required. Values in square brackets are optional.
 Alternatives separated by `|` mean choose one value; do not type the brackets themselves.
@@ -881,6 +922,20 @@ These commands are available on the Heltec V4 repeater.
 ### timing-safety
 
 `timing-safety` has no operator commands.
+
+### flood-gate commands
+
+These commands are available on repeaters, over serial and authenticated remote CLI.
+
+| Command / syntax | Purpose and important limits |
+|---|---|
+| `sinkhole list [from]` | List entries by slot from `from` (default 1); a full reply ends with `next <slot>`. |
+| `sinkhole show <slot>` | Show one entry with its match, hop-position, path-width and last-match counters. |
+| `sinkhole add <hash\|*> [hours] [chan <channel>] [depth <n\|any>] [minbytes <2\|3>]` | Drop matching channel floods. Hash is 2–6 hex digits; hours 1–168, default 24; depth 1–63, default 3. |
+| `sinkhole watch <hash\|*> [hours] [chan <channel>] [depth <n\|any>] [minbytes <2\|3>]` | As `add`, but count matches without dropping. |
+| `sinkhole remove <hash\|*> [chan <channel>]` | Lift entries; without a channel, every entry for that hash. |
+| `sinkhole clear` | Lift every entry. |
+| `sinkhole stats` | Drops, watch matches and entries in use since boot. |
 
 ### sync-settings commands
 

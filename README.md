@@ -20,6 +20,7 @@ Select a mod link below for its own README, including behavior and requirements.
 | [sync‑settings](mods/sync-settings/README.md) | Signed region, policy, radio and time campaigns sent across the mesh by trusted publishers. |
 | [try‑settings](mods/try-settings/README.md) | Timed setting trials that revert unless the operator confirms the node still works. |
 | [power‑guard](mods/power-guard/README.md) | Battery-aware power saving, brownout protection, safe sleep and recovery for supported repeaters. |
+| [flood‑gate](mods/flood-gate/README.md) | Allows an operator to temporarily opt out of repeating channel floods. Useful to protect the mesh from attack. |
 | [timing‑safety](mods/timing-safety/README.md) | Timer rollover and post-reboot clock fixes. |
 | [shim](mods/shim/README.md) | Shared upstream hooks that connect selected mods to MeshCore. |
 
