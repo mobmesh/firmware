@@ -10,7 +10,7 @@
     "set flood.advert.interval 23",
     "set path.hash.mode 1",
     "set loop.detect minimal",
-    "set agc.reset.interval 4",
+    "set agc.reset.interval 16",
     "set multi.acks 1",
 
     {
