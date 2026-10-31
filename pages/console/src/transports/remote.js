@@ -1,18 +1,20 @@
 import {DIRECT_COMMANDS,fullKey} from '../protocol.js';
 export const TARGET_KEY='c0ad2d3f4a49d2c38cbb918cb2f8a5acb82d10e4a372e3a34bd98db01917a9d0';
-const tokens=new Set();
-export function token(){for(let i=0;i<1296;i++){const t=i.toString(36).padStart(2,'0').toUpperCase();if(!tokens.has(t)){tokens.add(t);return t;}}throw Error('Reply tags exhausted; reload only after outstanding traffic settles');}
 export function keyBytes(key){if(!/^[a-f0-9]{64}$/i.test(key))throw Error('Invalid full public key');return Uint8Array.from(key.match(/../g),b=>parseInt(b,16));}
 export function message(frame){
   const code=frame[0],offset=code===16?4:1;
   if(![7,16].includes(code)||frame.length<offset+12)return null;
   return {senderPrefix:fullKey(frame.slice(offset,offset+6)),pathLength:frame[offset+6],textType:frame[offset+7],senderTimestamp:new DataView(frame.buffer,frame.byteOffset+offset+8,4).getUint32(0,true),text:new TextDecoder().decode(frame.slice(offset+12)).replace(/\0+$/,'')};
 }
-export function matchingReply(frame,key,tag){const m=message(frame);return m&&m.senderPrefix===key.slice(0,12)&&m.textType===1&&m.text.startsWith(tag+'|')?{...m,text:m.text.slice(3)}:null;}
 export function replyWaitMs(estimatedTimeoutMs){if(!Number.isFinite(estimatedTimeoutMs)||estimatedTimeoutMs<0)throw Error('Invalid companion timeout estimate');return Math.max(30000,estimatedTimeoutMs+5000);}
 // A lost login reply is common on a busy channel; a repeated login is harmless, so retry promptly.
 export const LOGIN_ATTEMPTS=3;
 export function loginWaitMs(estimatedTimeoutMs){if(!Number.isFinite(estimatedTimeoutMs)||estimatedTimeoutMs<0)throw Error('Invalid companion timeout estimate');return Math.max(5000,estimatedTimeoutMs*2);}
+// Rows of one reply arrive about 1.5 s apart; the reply ends after this long without another.
+export const REPLY_QUIET_MS=3000;
+let tail=null;
+export function tailActive(){return !!tail;}
+export async function stopTail(){const t=tail;if(!t)return;t.stop();await t.done;}
 export class RemoteReplyTimeout extends Error {constructor(detail){super(detail);this.name='RemoteReplyTimeout';}}
 export function packetCounters(frame){if(frame[0]!==24||frame[1]!==2||frame.length<26)throw Error('Invalid packet counter response');const v=new DataView(frame.buffer,frame.byteOffset,frame.byteLength);return {rx:v.getUint32(2,true),tx:v.getUint32(6,true),txFlood:v.getUint32(10,true),txDirect:v.getUint32(14,true),rxFlood:v.getUint32(18,true),rxDirect:v.getUint32(22,true)};}
 function sent(frame){if(frame.length<10)throw Error('Truncated SENT response');const estimatedTimeoutMs=new DataView(frame.buffer,frame.byteOffset+6,4).getUint32(0,true);return {viaFlood:!!frame[1],estimatedTimeoutMs};}
@@ -71,32 +73,49 @@ export class RemoteProbe {
     }
     throw Error('Queued-message drain exceeded 1024 records; remote test stopped');
   }
-  async cli(key,command,signal=null){
+  async cli(key,command,signal=null,onRows=null){
     if(/[\0\r\n]/.test(command)||new TextEncoder().encode(command).length>157)throw Error('Remote command must fit 157 UTF-8 bytes without line breaks/NUL');
-    const c=this.c,tag=token();let reply=null,unmatched=0,polls=0;
-    const capture=f=>{const m=matchingReply(f,key,tag);if(m)reply=m;else if([7,16].includes(f[0]))unmatched++;};
+    // A new command closes the previous reply: its late rows are no longer collected.
+    await stopTail();
+    const c=this.c,rows=[];let unmatched=0,polls=0,stale=0,lastRow=0,handedOff=false;
+    const fromTarget=f=>{const m=message(f);return m&&m.senderPrefix===key.slice(0,12)&&m.textType===1?m:null;};
+    // Drop anything already queued, so a leftover message is never taken as this command's reply.
+    for(;;){let f;try{f=await this.wait([7,8,10,16,17],()=>c.sendCommandSyncNextMessage(),2000);}catch(e){if(c.closed||e.message!=='Companion response timed out')throw e;break;}if(f[0]===10)break;stale++;}
+    if(stale)this.notify('Discarded '+stale+' queued message'+(stale>1?'s':'')+' before sending');
+    const capture=f=>{const m=fromTarget(f);if(m){rows.push(m);lastRow=Date.now();}else if([7,16].includes(f[0]))unmatched++;};
+    const joined=()=>{const sorted=[...rows].sort((x,y)=>x.senderTimestamp-y.senderTimestamp);return {...sorted[0],text:sorted.map(r=>r.text).join('\n'),rows:sorted.length};};
+    const poll=async until=>{polls++;let frame;
+      try{frame=await this.wait([7,8,10,16,17],()=>c.sendCommandSyncNextMessage(),Math.min(5000,Math.max(1,until-Date.now())));}
+      catch(e){if(c.closed||e.message!=='Companion response timed out')throw e;return;}
+      if(frame[0]===10)await new Promise(resolve=>setTimeout(resolve,250));};
     c.on('wire',capture);
     try{
-      this.notify('Dispatching remote CLI · tag '+tag+' · target '+key.slice(0,12));
-      const ack=sent(await this.wait([6],async()=>{await c.sendCommandSendTxtMsg(1,0,0,keyBytes(key),tag+'|'+command);this.notify('Companion transport write completed · tag '+tag);}));
+      this.notify('Dispatching remote CLI · target '+key.slice(0,12));
+      const ack=sent(await this.wait([6],async()=>{await c.sendCommandSendTxtMsg(1,0,0,keyBytes(key),command);this.notify('Companion transport write completed');}));
       const deadline=Date.now()+replyWaitMs(ack.estimatedTimeoutMs);
-      this.notify('Companion SENT received · tag '+tag+' · '+(ack.viaFlood?'flood':'direct')+' · estimate '+ack.estimatedTimeoutMs+' ms · wait '+replyWaitMs(ack.estimatedTimeoutMs)+' ms. SENT confirms acceptance, not radio TX.');
-      const timedOut=()=>new RemoteReplyTimeout('Repeater reply timed out; query outcome uncertain; no retry · tag '+tag+' · queue polls '+polls+' · unmatched messages '+unmatched);
-      while(!reply){
+      this.notify('Companion SENT received · '+(ack.viaFlood?'flood':'direct')+' · estimate '+ack.estimatedTimeoutMs+' ms · wait '+replyWaitMs(ack.estimatedTimeoutMs)+' ms. SENT confirms acceptance, not radio TX.');
+      while(!rows.length){
         if(signal?.aborted)throw Error('Stopped waiting for the reply');
         if(c.closed)throw Error('Companion disconnected; query outcome uncertain');
-        if(Date.now()>=deadline)throw timedOut();
-        // One local RPC at a time, independent of the outstanding LoRa wait.
-        polls++;let frame;
-        try{frame=await this.wait([7,8,10,16,17],()=>c.sendCommandSyncNextMessage(),Math.min(5000,Math.max(1,deadline-Date.now())));}
-        catch(e){if(reply)break;if(c.closed||e.message!=='Companion response timed out')throw e;continue;}
-        if(frame[0]===10&&!reply)await new Promise(resolve=>{const timer=setTimeout(resolve,250);signal?.addEventListener('abort',()=>{clearTimeout(timer);resolve();},{once:true});});
+        if(Date.now()>=deadline)throw new RemoteReplyTimeout('Repeater reply timed out; query outcome uncertain; no retry · queue polls '+polls+' · unmatched messages '+unmatched);
+        await poll(deadline);
       }
+      const reply=joined();
       if(command==='get public.key'){
         const found=reply.text.match(/(?:^|\s)([a-f0-9]{64})(?=$|\s)/i);
         if(!found||found[1].toLowerCase()!==key)throw Error('Remote public key does not match the selected V4 identity');
       }
-      return {command,tag,gatewaySent:ack,...reply,completionBasis:'matching-sender-cli-type-and-reflected-tag'};
-    }finally{c.off('wire',capture);}
+      // Later rows of the same reply arrive in the background until REPLY_QUIET_MS pass without one or the next command starts.
+      let stopped=false,seen=rows.length;
+      const done=(async()=>{try{
+        await null;
+        while(!stopped&&!c.closed&&Date.now()<deadline&&Date.now()-lastRow<REPLY_QUIET_MS){
+          await poll(Math.min(deadline,lastRow+REPLY_QUIET_MS));
+          if(rows.length>seen){seen=rows.length;onRows?.(joined());}
+        }
+      }catch{}finally{c.off('wire',capture);if(tail?.done===done)tail=null;}})();
+      tail={stop:()=>{stopped=true;},done};handedOff=true;
+      return {command,gatewaySent:ack,...reply,completionBasis:'matching-sender-cli-type'};
+    }finally{if(!handedOff)c.off('wire',capture);}
   }
 }
