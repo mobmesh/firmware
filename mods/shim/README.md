@@ -49,6 +49,8 @@ what gets wired in and in what order.
 A few ground rules:
 
 - **CLI commands:** mods get first look, ahead of upstream's own commands.
+- **Several replies:** a mod's command can answer with up to 6 replies instead of one;
+  over LoRa each goes out as its own message, 1.5 s apart.
 - **One owner:** some jobs, like radio setup or region handling, can only belong to one mod.
 - **No surprises at runtime:** a mix of mods that doesn't fit together fails the build,
   not the node.

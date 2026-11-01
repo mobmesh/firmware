@@ -50,6 +50,12 @@ void modObserveTx(uint32_t packet_id, bool succeeded);
 bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
                          const char* fw_version, const char* fw_build_date);
 
+// Several replies to one command: queue each with modCliAddRow and leave `reply` empty.
+void modCliBegin(uint32_t sender_timestamp);   // called by modHandleCliCommand before any mod
+bool modCliAddRow(uint32_t sender_timestamp, const char* text);   // serial prints at once; false when full
+// Next queued remote reply framed as TXT_TYPE_CLI_DATA, delay counted from upstream's reply delay; false when none left.
+bool modCliNextRow(uint32_t sender_timestamp, uint8_t* frame, size_t* len, uint32_t* delay_millis);
+
 // The reverse direction. Bodies name the concrete `board`, `rtc_clock` and `the_mesh`, so
 // an upstream refactor breaks this one file instead of silently unhooking a mod.
 bool     modBoardRadioInit();

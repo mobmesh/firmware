@@ -386,6 +386,7 @@ def render_mod_cli(integrations: list) -> str:
 bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
                          const char* fw_version, const char* fw_build_date) {{
   const ModCliContext context = {{sender_timestamp, fw_version, fw_build_date}};
+  modCliBegin(sender_timestamp);
 {calls}
   // Upstream's poweroff never wakes, so it is never reachable; a mod that can wake handles it above.
   if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {{

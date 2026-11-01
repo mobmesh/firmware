@@ -1,5 +1,5 @@
 diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
-index 61b6c14..89f6aff 100644
+index 61b6c14..58bdfdf 100644
 --- a/examples/simple_repeater/MyMesh.cpp
 +++ b/examples/simple_repeater/MyMesh.cpp
 @@ -1,6 +1,196 @@
@@ -315,7 +315,20 @@ index 61b6c14..89f6aff 100644
    return Mesh::onRecvPacket(pkt);
  }
  
-@@ -879,6 +1124,14 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
+@@ -757,6 +1002,12 @@ void MyMesh::onPeerDataRecv(mesh::Packet *packet, uint8_t type, int sender_idx,
+           }
+         }
+       }
++      size_t row_len; uint32_t row_delay;   // rows a mod queued with modCliAddRow, sent like the reply above
++      while (modCliNextRow(sender_timestamp, temp, &row_len, &row_delay)) {
++        auto row = createDatagram(PAYLOAD_TYPE_TXT_MSG, client->id, secret, temp, row_len);
++        if (row && client->out_path_len == OUT_PATH_UNKNOWN) sendFloodReply(row, CLI_REPLY_DELAY_MILLIS + row_delay, packet->getPathHashSize());
++        else if (row) sendDirect(row, client->out_path, client->out_path_len, CLI_REPLY_DELAY_MILLIS + row_delay);
++      }
+     } else {
+       MESH_DEBUG_PRINTLN("onPeerDataRecv: possible replay attack detected");
+     }
+@@ -879,6 +1130,14 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
    next_local_advert = next_flood_advert = 0;
    dirty_contacts_expiry = 0;
    set_radio_at = revert_radio_at = 0;
@@ -330,7 +343,7 @@ index 61b6c14..89f6aff 100644
    _logging = false;
    region_load_active = false;
    recv_pkt_region = NULL;
-@@ -1202,6 +1455,8 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -1202,6 +1461,8 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
        region_load_active = false;
  
        sprintf(reply, "OK - loaded %d regions", region_map.getCount());
@@ -339,7 +352,7 @@ index 61b6c14..89f6aff 100644
      } else {
        char *np = command;
        while (*np == ' ') np++;   // skip indent
-@@ -1282,7 +1537,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -1282,7 +1543,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
        strcpy(reply, "OK - Discover sent");
      }
    } else{
@@ -355,7 +368,7 @@ index 61b6c14..89f6aff 100644
    }
  }
  
-@@ -1319,6 +1581,10 @@ void MyMesh::loop() {
+@@ -1319,6 +1587,10 @@ void MyMesh::loop() {
      MESH_DEBUG_PRINTLN("Radio params restored");
    }
  

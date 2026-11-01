@@ -10,6 +10,7 @@
 bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
                          const char* fw_version, const char* fw_build_date) {
   const ModCliContext context = {sender_timestamp, fw_version, fw_build_date};
+  modCliBegin(sender_timestamp);
   if (hotspotOtaHandleCli(context, command, reply)) return true;
   if (powerGuardHandleCli(context, command, reply)) return true;
   if (floodGateHandleCli(context, command, reply)) return true;
