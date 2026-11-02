@@ -23,7 +23,8 @@
         "try-settings",
         "power-guard",
         "sync-settings",
-        "flood-gate"
+        "flood-gate",
+        "radio-diag"
       ],
       "build_flags_append": [
         "-UDISPLAY_CLASS"
@@ -88,7 +89,8 @@
         "timing-safety",
         "try-settings",
         "sync-settings",
-        "flood-gate"
+        "flood-gate",
+        "radio-diag"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -151,7 +153,8 @@
         "timing-safety",
         "try-settings",
         "sync-settings",
-        "flood-gate"
+        "flood-gate",
+        "radio-diag"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -214,7 +217,8 @@
         "timing-safety",
         "try-settings",
         "sync-settings",
-        "flood-gate"
+        "flood-gate",
+        "radio-diag"
       ],
       "build_flags_append": [
         "-UDISPLAY_CLASS"
@@ -279,7 +283,8 @@
         "timing-safety",
         "try-settings",
         "sync-settings",
-        "flood-gate"
+        "flood-gate",
+        "radio-diag"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -342,7 +347,8 @@
         "timing-safety",
         "try-settings",
         "sync-settings",
-        "flood-gate"
+        "flood-gate",
+        "radio-diag"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -405,7 +411,8 @@
         "timing-safety",
         "try-settings",
         "sync-settings",
-        "flood-gate"
+        "flood-gate",
+        "radio-diag"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -468,7 +475,8 @@
         "timing-safety",
         "try-settings",
         "sync-settings",
-        "flood-gate"
+        "flood-gate",
+        "radio-diag"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,
@@ -531,7 +539,8 @@
         "timing-safety",
         "try-settings",
         "sync-settings",
-        "flood-gate"
+        "flood-gate",
+        "radio-diag"
       ],
       "build_flags_append": [],
       "qemu_boot_check": true,

@@ -22,6 +22,10 @@ test makes sure it stays that way.
 `timing-safety` is the exception: it fixes upstream code directly instead of adding
 anything, so it doesn't need shim.
 
+## Idle rest
+
+On ESP32 repeaters, an awake node with nothing queued rests 1 ms at the end of each main-loop pass, not spinning. USB stays up and radio interrupts still latch during the rest. A heltec_v4 V4.3 with the LNA on dropped from 46 mA to 38-39 mA when booted without USB, and from 45 mA to 37 mA with it, with no adverts lost in a 200-advert test.
+
 ## Keeping up with upstream
 
 `patch-drift-canary` checks shim's upstream patch every day:

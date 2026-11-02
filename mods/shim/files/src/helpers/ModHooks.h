@@ -64,6 +64,14 @@ uint16_t modBoardBattMilliVolts();
 void     modBoardDeepSleep(uint32_t secs);     // does not return
 void     modBoardInhibitSleep(bool inhibit);
 uint32_t modClockGet();
+bool     modRadioRssiNow(float* out);          // instantaneous RSSI; false while a packet is being received
+
+// Raw RSSI sweeps, SX126x only; elsewhere available() is false and the rest do nothing.
+bool  modRadioScanAvailable();
+void  modRadioScanEnter(float bw_khz);
+void  modRadioScanCalibrate(float mhz);
+float modRadioScanRead(float mhz);            // settles 5 ms, averages 16 instantaneous reads
+void  modRadioScanLeave(float freq, float bw, uint8_t sf, uint8_t cr);   // back on the given channel
 void     modClockSet(uint32_t epoch);
 
 // Straight into upstream's CLI chain, bypassing mod dispatch, so validation stays in

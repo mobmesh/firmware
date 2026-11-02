@@ -52,9 +52,10 @@ class CurrentProjectModelTestCase(unittest.TestCase):
         self.assertEqual(rows[("heltec_v4", "room_server")].ota_role_id, 2)
         self.assertEqual(rows[("heltec_v4", "repeater")].mods,
                          ("shim", "hotspot-ota", "timing-safety", "try-settings", "power-guard", "sync-settings",
-                          "flood-gate"))
+                          "flood-gate", "radio-diag"))
         self.assertEqual(rows[("xiao_c3", "repeater")].mods,
-                         ("shim", "hotspot-ota", "timing-safety", "try-settings", "sync-settings", "flood-gate"))
+                         ("shim", "hotspot-ota", "timing-safety", "try-settings", "sync-settings", "flood-gate",
+                          "radio-diag"))
         for board in ("heltec_v4", "xiao_c3"):
             self.assertEqual(rows[(board, "room_server")].mods,
                              ("shim", "hotspot-ota", "timing-safety", "try-settings", "sync-settings"))

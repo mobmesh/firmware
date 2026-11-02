@@ -56,6 +56,45 @@ uint16_t modBoardBattMilliVolts()          { return board.getBattMilliVolts(); }
 void     modBoardDeepSleep(uint32_t secs)  { board.enterDeepSleep(secs); }
 void     modBoardInhibitSleep(bool inhibit) { board.setInhibitSleep(inhibit); }
 uint32_t modClockGet()                     { return rtc_clock.getCurrentTime(); }
+bool     modRadioRssiNow(float* out) {
+  if (radio_driver.isReceiving()) return false;
+  *out = radio_driver.getCurrentRSSI();
+  return true;
+}
+
+#if defined(USE_SX1262) || defined(USE_SX1268)
+extern RADIO_CLASS radio;
+
+bool  modRadioScanAvailable()          { return true; }
+void  modRadioScanEnter(float bw_khz) {
+  radio.standby();
+  radio.setBandwidth(bw_khz);
+}
+void  modRadioScanCalibrate(float mhz) { radio.calibrateImage(mhz); }
+float modRadioScanRead(float mhz) {
+  radio.standby();
+  radio.setFrequency(mhz, true);
+  radio.startReceive();
+  delayMicroseconds(5000);
+  float sum = 0;
+  for (int i = 0; i < 16; i++) {
+    sum += radio.getRSSI(false);
+    delayMicroseconds(100);
+  }
+  return sum / 16;
+}
+void  modRadioScanLeave(float freq, float bw, uint8_t sf, uint8_t cr) {
+  radio.standby();
+  radio_driver.setParams(freq, bw, sf, cr);
+  radio_driver.resetAGC();
+}
+#else
+bool  modRadioScanAvailable()          { return false; }
+void  modRadioScanEnter(float)         { }
+void  modRadioScanCalibrate(float)     { }
+float modRadioScanRead(float)          { return 0; }
+void  modRadioScanLeave(float, float, uint8_t, uint8_t) { }
+#endif
 void     modClockSet(uint32_t epoch)       { rtc_clock.setCurrentTime(epoch); }
 
 #ifdef MOBMESH_HAS_FEM_LNA

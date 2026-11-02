@@ -5,12 +5,14 @@
 #include <helpers/esp32/TrySetIntegration.h>
 #include <helpers/sync_settings/SyncIntegration.h>
 #include <helpers/esp32/FloodGateIntegration.h>
+#include <helpers/radio_diag/RadioDiagIntegration.h>
 
 bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
                          const char* fw_version, const char* fw_build_date) {
   const ModCliContext context = {sender_timestamp, fw_version, fw_build_date};
   modCliBegin(sender_timestamp);
   if (hotspotOtaHandleCli(context, command, reply)) return true;
+  if (radioDiagHandleCli(context, command, reply)) return true;
   if (floodGateHandleCli(context, command, reply)) return true;
   if (trySetHandleCli(context, command, reply)) return true;
   if (syncCli(context, command, reply)) return true;
