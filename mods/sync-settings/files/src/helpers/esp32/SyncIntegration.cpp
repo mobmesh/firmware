@@ -24,6 +24,8 @@
 #include <helpers/ModHooks.h>
 #include <helpers/RegionMap.h>
 #include <SPIFFS.h>
+#include <dirent.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -224,8 +226,48 @@ static PairPaths RADIO_PATHS = {{"/sync_rr0", "/sync_rr1"}};
 static PairPaths TIME_PATHS = {{"/sync_ts0", "/sync_ts1"}};
 #endif
 
+// One directory read at boot replaces a full partition scan per absent store.
+static const uint8_t BOOT_LISTING_MAX = 16;
+static const uint8_t BOOT_NAME_MAX = 12;
+
+struct BootListing {
+  uint8_t count;
+  char names[BOOT_LISTING_MAX][BOOT_NAME_MAX];
+};
+
+static BootListing* boot_listing = nullptr;
+
+static bool readBootListing(BootListing& listing) {
+  DIR* dir = opendir("/spiffs");
+  if (dir == nullptr) return false;
+  listing.count = 0;
+  bool complete = true;
+  errno = 0;
+  while (struct dirent* entry = readdir(dir)) {
+    const char* name = entry->d_name[0] == '/' ? entry->d_name + 1 : entry->d_name;
+    if (strncmp(name, "sync_", 5) != 0) continue;
+    if (listing.count == BOOT_LISTING_MAX || strlen(name) >= BOOT_NAME_MAX) {
+      complete = false;
+      break;
+    }
+    strcpy(listing.names[listing.count++], name);
+  }
+  if (errno != 0) complete = false;
+  closedir(dir);
+  return complete;
+}
+
+static bool absentFromBootListing(const char* path) {
+  if (boot_listing == nullptr) return false;
+  for (uint8_t i = 0; i < boot_listing->count; ++i) {
+    if (strcmp(boot_listing->names[i], path + 1) == 0) return false;
+  }
+  return true;
+}
+
 static bool fileExists(uint8_t slot, void* context) {
   PairPaths* paths = static_cast<PairPaths*>(context);
+  if (absentFromBootListing(paths->path[slot])) return false;
   return SPIFFS.exists(paths->path[slot]);
 }
 
@@ -245,6 +287,7 @@ static bool fileRead(uint8_t slot, uint8_t* out, size_t capacity,
 static bool fileWrite(uint8_t slot, const uint8_t* data, size_t len, void* context) {
   PairPaths* paths = static_cast<PairPaths*>(context);
   bool present = fileExists(slot, context);
+  boot_listing = nullptr;
   File file = SPIFFS.open(paths->path[slot], "w", !present);
   if (!file) return false;
   bool ok = file.write(data, len) == len;
@@ -1708,6 +1751,9 @@ static bool settleGuard(uint8_t dataset, uint8_t* scratch) {
 
 static void boot() {
   Temp scratch(STORE_MAX);
+  Temp listing(sizeof(BootListing));
+  BootListing* names = reinterpret_cast<BootListing*>(static_cast<uint8_t*>(listing));
+  boot_listing = names != nullptr && readBootListing(*names) ? names : nullptr;
   config_ready = loadConfig(scratch);
 #if SYNC_SETTINGS_WITH_REGION
   overlay_ready = loadRegions(scratch);
@@ -1770,6 +1816,7 @@ static void boot() {
 #if SYNC_SETTINGS_WITH_REGION
   enabled = overlay_ready && region_state_ready && region_state.enabled;
 #endif
+  boot_listing = nullptr;
   booted = true;
   for (uint8_t i = 0; i < SYNC_SETTINGS_DATASET_COUNT; ++i) housekeeping_at[i] = millis();
 }
