@@ -27,7 +27,7 @@ int diagErrors(uint32_t received, uint32_t errors, char* out, size_t len) {
     return DIAG_UNKNOWN;
   }
   uint32_t tenths = (uint32_t)((uint64_t)errors * 1000 / total);
-  snprintf(out, len, "%lu.%lu%% failed decodes", (unsigned long)(tenths / 10), (unsigned long)(tenths % 10));
+  snprintf(out, len, "%lu.%lu%% failed", (unsigned long)(tenths / 10), (unsigned long)(tenths % 10));
   if (tenths >= ERRORS_PROBLEM * 10) return DIAG_PROBLEM;
   if (tenths >= ERRORS_CAUTION * 10) return DIAG_CAUTION;
   return DIAG_GOOD;

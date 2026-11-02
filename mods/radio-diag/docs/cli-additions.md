@@ -35,7 +35,7 @@ the single best fix and the command with details. Arrives as several replies.
 | 📶 LNA | The running or last `diag lna` study; boards with a switchable LNA only | A study has run |
 | 📡 Nearby | Last `diag rfscan`, one run when none is cached or it is 24 h old; SX126x only. 🔴 energy on the channel, 🟡 a steady signal 250 kHz beside it, 🟢 anything further out (noted, the receiver rejects it) | The scan succeeds |
 | 🔊 Noise | `diag noise` verdict | 6 hours watched with the clock set |
-| ❌ Errors | Upstream packet counters over the last 24 h (since boot until the noise watch has an hour): 2% failed decodes 🟡, 10% 🔴 | 50 packets |
+| 📉 Decodes | Upstream packet counters over the last 24 h (since boot until the noise watch has an hour): 2% failed decodes 🟡, 10% 🔴 | 50 packets |
 | 📊 Load | Upstream airtime over uptime: 25% 🟡, 50% 🔴 | 10 minutes up |
 | 🧭 Paths | Share of packets per neighbour: 70% or more through one 🟡 | 20 packets |
 | 🕐 Clock | Neighbours' zero-hop advert times | 3 neighbours' adverts |

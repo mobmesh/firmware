@@ -30,7 +30,7 @@ int main() {
   char text[48], lines[16][DIAG_LINE];
 
   CHECK(diagErrors(10, 1, text, sizeof(text)) == DIAG_UNKNOWN);
-  CHECK(diagErrors(990, 10, text, sizeof(text)) == DIAG_GOOD && strcmp(text, "1.0% failed decodes") == 0);
+  CHECK(diagErrors(990, 10, text, sizeof(text)) == DIAG_GOOD && strcmp(text, "1.0% failed") == 0);
   CHECK(diagErrors(950, 50, text, sizeof(text)) == DIAG_CAUTION);
   CHECK(diagErrors(800, 200, text, sizeof(text)) == DIAG_PROBLEM);
   CHECK(diagLoad(10, 300, text, sizeof(text)) == DIAG_UNKNOWN);
@@ -45,7 +45,7 @@ int main() {
   CHECK(any(lines, n, "healthy repeater"));
   CHECK(any(lines, n, "Nothing to fix."));
 
-  area(s, "Errors", DIAG_UNKNOWN, 7, "decode errors")->learning = true;
+  area(s, "Decodes", DIAG_UNKNOWN, 7, "failed decodes")->learning = true;
   s.uptime_s = 7200;
   n = diagFormat(s, lines, 16);
   CHECK(any(lines, n, "still learning (2h up)"));
@@ -61,9 +61,9 @@ int main() {
   n = diagFormat(s, lines, 16);
   CHECK(strstr(lines[0], "weak link") != nullptr);
   CHECK(any(lines, n, "Best fix: Links fix"));
-  area(s, "Errors", DIAG_PROBLEM, 7, "decode errors")->see = "diag rfscan";
+  area(s, "Decodes", DIAG_PROBLEM, 7, "failed decodes")->see = "diag rfscan";
   n = diagFormat(s, lines, 16);
-  CHECK(strstr(lines[0], "decode errors") != nullptr);   // a problem outranks any caution
+  CHECK(strstr(lines[0], "failed decodes") != nullptr);   // a problem outranks any caution
   CHECK(any(lines, n, "See: diag rfscan"));
 
   LinkTable t;

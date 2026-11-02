@@ -645,7 +645,7 @@ static void noiseArea(DiagSummary& sum) {
 
 // The last 24 h when the noise log has counts, else since boot.
 static void errorsArea(DiagSummary& sum) {
-  DiagArea* a = diagAdd(sum, "❌", "Errors");
+  DiagArea* a = diagAdd(sum, "📉", "Decodes");
   uint32_t recv = statValue("stats-packets", "recv"), errors = statValue("stats-packets", "recv_errors");
   uint32_t day_recv, day_errors, hour = clockHour();
   bool day = hour && noiseCounts(noise_log, hour, &day_recv, &day_errors);
@@ -657,7 +657,7 @@ static void errorsArea(DiagSummary& sum) {
                  : diagErrors(recv, errors, a->text, sizeof(a->text));
   if (day && a->level != DIAG_UNKNOWN) strncat(a->text, ", 24h", sizeof(a->text) - strlen(a->text) - 1);
   a->learning = true;
-  fix(a, 7, "decode errors", "Many failed decodes: look for", "interference with diag rfscan.", "diag rfscan");
+  fix(a, 7, "failed decodes", "Many failed decodes: look for", "interference with diag rfscan.", "diag rfscan");
 }
 
 static void runSummary(const ModCliContext& context, char* reply) {

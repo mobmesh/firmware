@@ -19,7 +19,7 @@ set diag.tz -5h
 
 ## Summary
 
-`diag` puts every area on one screen: links, LNA, nearby interference, noise, decode errors, channel load,
+`diag` puts every area on one screen: links, LNA, nearby interference, noise, failed decodes, channel load,
 paths and clock, each 🟢 🟡 🔴 or ⚪ while data builds up. The worst area sets the header and comes with one fix. It reads
 what the other checks collected, running an interference scan only when none is cached or the last is a day old.
 
