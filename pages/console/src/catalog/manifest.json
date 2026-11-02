@@ -4,8 +4,8 @@
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
   "mobmeshCommit": "e1aa29f843b92eb7a3de5496b465477bed88e93e",
-  "sourceRows": 260,
-  "effectiveSignatures": 246,
+  "sourceRows": 269,
+  "effectiveSignatures": 255,
   "cliAdditionFiles": [
     {
       "path": "mods/flood-gate/docs/cli-additions.md",
@@ -18,6 +18,10 @@
     {
       "path": "mods/power-guard/docs/cli-additions.md",
       "sha256": "1e77ad6082b51e30e9f2c0e08d5c8dbae8f0e940e23fcb38cc3ca2377df8591b"
+    },
+    {
+      "path": "mods/radio-diag/docs/cli-additions.md",
+      "sha256": "03f474b59d83a6e02be792e10685b63c30f82480f49e6457403c209698888b5a"
     },
     {
       "path": "mods/sync-settings/docs/cli-additions.md",
@@ -269,6 +273,10 @@
     [
       "e1aa29f",
       "2026-10-27"
+    ],
+    [
+      "0dd099f",
+      "2026-11-02"
     ]
   ]
 }

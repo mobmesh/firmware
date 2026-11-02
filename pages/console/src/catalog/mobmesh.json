@@ -4227,5 +4227,276 @@
     "brief": "Show drops, watch matches and entries in use since boot.",
     "helpSyntax": "sinkhole stats",
     "since": "e1aa29f"
+  },
+  {
+    "id": "mobmesh.diag.be3f1b44",
+    "syntax": "diag",
+    "path": [
+      "diag"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "diag"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "radio-diag",
+    "summary": "diag",
+    "details": "## diag\n\n```text\ndiag\n```\n\n**Response:** a header set by the worst area, one line per area with 🟢 🟡 🔴 or ⚪ (not enough data yet), then\nthe single best fix and the command with details. Arrives as several replies.\n\n| Area | Source | ⚪ until |\n| --- | --- | --- |\n| 🔗 Links | `diag links` table | A neighbour has 5 packets |\n| 📶 LNA | The running or last `diag lna` study; boards with a switchable LNA only | A study has run |\n| 📡 Nearby | Last `diag rfscan`, one run when none is cached or it is 24 h old; SX126x only. 🔴 energy on the channel, 🟡 a steady signal 250 kHz beside it, 🟢 anything further out (noted, the receiver rejects it) | The scan succeeds |\n| 🔊 Noise | `diag noise` verdict | 6 hours watched with the clock set |\n| ❌ Errors | Upstream packet counters over the last 24 h (since boot until the noise watch has an hour): 2% failed decodes 🟡, 10% 🔴 | 50 packets |\n| 📊 Load | Upstream airtime over uptime: 25% 🟡, 50% 🔴 | 10 minutes up |\n| 🧭 Paths | Share of packets per neighbour: 70% or more through one 🟡 | 20 packets |\n| 🕐 Clock | Neighbours' zero-hop advert times | 3 neighbours' adverts |\n\n**Best fix:** a problem outranks a caution; among equals, causes come before symptoms: interference and noise, antenna,\nLNA, one-way link, weak link, load, errors, LNA power saving, paths, clock.\n\n**Effect:** instant from cache; about 5 s when it runs a scan (see `diag rfscan`). Starts nothing else.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/0dd099f865272a2e4cd870d693e6ef26e68eb0b5/mods/radio-diag/docs/cli-additions.md#L26",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Summarize links, LNA, nearby interference and noise, with what to try next.",
+    "since": "0dd099f"
+  },
+  {
+    "id": "mobmesh.diag.lna.a8dc0b11",
+    "syntax": "diag lna",
+    "path": [
+      "diag",
+      "lna"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "diag"
+      },
+      {
+        "kind": "literal",
+        "value": "lna"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "radio-diag",
+    "summary": "diag lna",
+    "details": "## diag lna\n\n```text\ndiag lna\n```\n\n**Response:** while a study runs, progress (`📶 LNA: ⚪ studying, <h> of <h>h`, pairs, neighbours heard, a\nleaning). Otherwise the last result, or `📶 LNA: no study yet.` Results longer than one reply arrive as\nseveral.\n\n| Result | Meaning |\n| --- | --- |\n| `📶 LNA: 🟢 keep it on` | On hears more, or a neighbour is heard only with it on |\n| `📶 LNA: 🔴 overloaded` | Off hears more or decodes clearer |\n| `📶 LNA: 🟡 no benefit here` | No significant difference after 60 or more pairs |\n| `📶 LNA: 🔴 not working` | Floor moved less than 10 dB between on and off |\n| `📶 LNA: ⚪ not enough data` | Fewer than 30 decided pairs or 2 neighbours |\n\nA result that suggests a change ends with `tryset 86400 radio.fem.rxgain <on|off>` and `then: tryset keep`.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/0dd099f865272a2e4cd870d693e6ef26e68eb0b5/mods/radio-diag/docs/cli-additions.md#L51",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show the LNA study result, or its progress while one runs.",
+    "since": "0dd099f"
+  },
+  {
+    "id": "mobmesh.diag.lna.start.19a85edc",
+    "syntax": "diag lna start [hours]",
+    "path": [
+      "diag",
+      "lna",
+      "start"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "diag"
+      },
+      {
+        "kind": "literal",
+        "value": "lna"
+      },
+      {
+        "kind": "literal",
+        "value": "start"
+      },
+      {
+        "kind": "number",
+        "name": "6–168",
+        "optional": true,
+        "choices": [],
+        "help": "Study length, 6-168 hours; omitted means 48"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "radio-diag",
+    "summary": "diag lna start",
+    "details": "## diag lna start\n\n```text\ndiag lna start [hours]\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `hours` | Study length, 6-168; omitted means 48 |\n\n**Response:** `📶 LNA study started, up to <hours>h` and what happens, or one of:\n\n| Response | Meaning |\n| --- | --- |\n| `ERR: no switchable LNA on this board` | The board cannot switch its LNA |\n| `ERR: study already running (diag lna stop)` | One study at a time |\n| `ERR: hours 6-168` | Length out of range |\n\n**Effect:** switches the live LNA state in paired blocks; the saved `radio.fem.rxgain` is not written.\nEnds at the requested length, or early once the result is clear and at least 24 hours (or the\nrequested length, if shorter) have passed. The LNA is then restored to its state at the start.\n\n**Persistence:** progress is saved about hourly and resumes after a reboot, unless `radio.fem.rxgain`\nno longer matches its value at the start.\n\n**Ends without a restore:** a `set radio.fem.rxgain` or `tryset ... radio.fem.rxgain`; the command still\nruns and its value stands.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/0dd099f865272a2e4cd870d693e6ef26e68eb0b5/mods/radio-diag/docs/cli-additions.md#L71",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Start a study comparing the LNA on and off; the saved setting is not changed.",
+    "since": "0dd099f"
+  },
+  {
+    "id": "mobmesh.diag.lna.stop.b4a33023",
+    "syntax": "diag lna stop",
+    "path": [
+      "diag",
+      "lna",
+      "stop"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "diag"
+      },
+      {
+        "kind": "literal",
+        "value": "lna"
+      },
+      {
+        "kind": "literal",
+        "value": "stop"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "radio-diag",
+    "summary": "diag lna stop",
+    "details": "## diag lna stop\n\n```text\ndiag lna stop\n```\n\n**Response:** the result so far, as for `diag lna`, or `ERR: no study running`.\n\n**Effect:** restores the LNA to its state at the start.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/0dd099f865272a2e4cd870d693e6ef26e68eb0b5/mods/radio-diag/docs/cli-additions.md#L99",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Stop the LNA study and restore the LNA to its state at the start.",
+    "since": "0dd099f"
+  },
+  {
+    "id": "mobmesh.diag.links.0a845bce",
+    "syntax": "diag links",
+    "path": [
+      "diag",
+      "links"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "diag"
+      },
+      {
+        "kind": "literal",
+        "value": "links"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "radio-diag",
+    "summary": "diag links",
+    "details": "## diag links\n\n```text\ndiag links\n```\n\n**Response:** a verdict, one line per neighbour (strongest first: SNR, margin above the decode limit for the\ncurrent spreading factor, ✅ >= 6 dB, 🟡 3-6, 🔴 < 3, `hears us`), then one action.\n\n| Result | Rule |\n| --- | --- |\n| `🔗 Links: ⚪ not enough data` | No neighbour with 5 or more packets yet |\n| `🔗 Links: 🔴 most links weak` | 3 or more neighbours, two thirds under 3 dB: check antenna, cable and connector |\n| `🔗 Links: 🟡 one-way link` | A neighbour heard well (10+ packets, >= 6 dB) relayed none of 20+ echoes of our relays |\n| `🔗 Links: 🟡 <n> link(s) close to dropping` | A neighbour under 3 dB |\n| `🔗 Links: 🟡 <n> link(s) can drop` | A neighbour at 3-6 dB |\n| `🔗 Links: 🟡 our clock off` | 3 or more neighbours' zero-hop adverts, two thirds more than 2 min ahead or behind us |\n| `🔗 Links: 🟢 all solid` | Every judged neighbour >= 6 dB |\n\n**Method:** passive; every reception since boot counts toward its transmitter (last path entry, or a zero-hop\nadvert's sender), duplicates included, with a running SNR average. `hears us` means it relayed a packet\nstraight after us, or relayed our own advert. Neighbours silent for 24 h drop out. Never transmits, not saved.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/0dd099f865272a2e4cd870d693e6ef26e68eb0b5/mods/radio-diag/docs/cli-additions.md#L109",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Report how much signal margin each heard neighbour has.",
+    "since": "0dd099f"
+  },
+  {
+    "id": "mobmesh.diag.noise.aef3c236",
+    "syntax": "diag noise",
+    "path": [
+      "diag",
+      "noise"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "diag"
+      },
+      {
+        "kind": "literal",
+        "value": "noise"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "radio-diag",
+    "summary": "diag noise",
+    "details": "## diag noise\n\n```text\ndiag noise\n```\n\n**Response:** a verdict, the floor and when it occurs, one line per 4-hour block of local time (midnight first)\nwith the rise above the floor, then what it does to the links and one action. Arrives as several replies.\n\n| Result | Rule |\n| --- | --- |\n| `🔊 Noise: ⚪ watching, <n> of 24h` | Fewer than 6 hours watched |\n| `🔊 Noise: 🟢 quiet site` | No hour 3 dB or more above the floor, decodes normal |\n| `🔊 Noise: 🟡 errors, not noise` | Decodes failing in a block without a noise rise: a colliding node or a strong signal |\n| `🔊 Noise: 🟡 loud <hours>, no loss` | 3 dB or more above the floor, decodes normal |\n| `🔊 Noise: 🟡 loud <hours>` | As above, too few packets to judge decodes |\n| `🔊 Noise: 🔴 loud <hours>, links drop` | The rise exceeds the weakest judged link's margin (`diag links`) |\n| `🔊 Noise: 🔴 loud <hours>, losing packets` | Loud, and failed decodes rose with it |\n\n`<hours>` is the longest loud run, such as `8am-5pm`, or `at times` when loud at three or more separate times.\n\n| Block line | Meaning |\n| --- | --- |\n| 🟢 | Under 3 dB above the floor |\n| 🟡 | 3 dB or more, or failed decodes above normal |\n| 🔴 | Loud with failed decodes above normal, or loud enough to sink the weakest link |\n| ⚪ `no data` | No hour of the block watched yet |\n| `+<lo> to +<hi> dB` | Lowest and highest hourly rise above the floor |\n| `<n>% err` | Shown only when the block's failed-decode rate is at least twice and 3 points above normal (the quietest block with 20 or more packets) |\n\nThen `Not mesh traffic.` or `Busy mesh hours.` (loud hours with at least twice the packets of quiet ones),\n`<id> drops below its limit <hours>.` or `Links keep <n>+ dB margin through it.`, and\n`Try: diag rfscan at <hour> to find it.` Or `ERR: clock not set (time <epoch>)`.\n\n**Method:** one idle RSSI reading every 15 s (skipped mid-packet), median per hour, plus upstream's packet\nand failed-decode counters per hour. The floor is the quietest hour of the last 24. Hours sampled with the\nLNA in the other state from now (an LNA study's opposite blocks, or a changed setting) are left out, because\nthe LNA moves the floor by 20 dB or more. Never transmits.\n\n**Effect:** none; the watch runs from boot whenever the clock is set and saves its 24 hours to flash each\nhour.\n",
+    "source": "https://github.com/mobmesh/firmware/blob/0dd099f865272a2e4cd870d693e6ef26e68eb0b5/mods/radio-diag/docs/cli-additions.md#L132",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Report the last 24 hours of noise floor and failed decodes, in 4-hour blocks.",
+    "since": "0dd099f"
+  },
+  {
+    "id": "mobmesh.diag.rfscan.19202212",
+    "syntax": "diag rfscan",
+    "path": [
+      "diag",
+      "rfscan"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "diag"
+      },
+      {
+        "kind": "literal",
+        "value": "rfscan"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "radio-diag",
+    "summary": "diag rfscan",
+    "details": "## diag rfscan\n\n```text\ndiag rfscan\n```\n\n**Response:** a header (`near <freq> ±4M 6sw fl<floor> LNA <on|off|n/a>`), a legend, one line per whole\nMHz from mesh frequency -4 to +4, then findings. Arrives as several replies.\n\n| Line part | Meaning |\n| --- | --- |\n| ⚫ 🟡 🟠 🔴 | Bursts out of 6 sweeps: none, 1-2, 3-4, 5-6 |\n| `·` | Average within 4 dB of the floor |\n| 🟩 🟨 🟧 🟥 | One square per 2 dB above 4 dB, up to 12, followed by the average in dBm |\n| `◂mesh` | The row holding the mesh frequency |\n\n| Finding | Rule |\n| --- | --- |\n| `⚠️ mesh channel steady <n> dB` | The mesh channel itself averages 6 dB or more above the floor |\n| `⚠️ steady <freq> (<offset>) <n> dB` | A nearby step averages 10 dB or more above the floor |\n| `⚠️ bursts <freq> (<offset>) <n>/6 pk<dBm>` | A nearby step burst in 3 or more of 6 sweeps |\n| `mesh ch bursts <n>/6 (mesh traffic?)` | Bursts on the mesh channel itself |\n| `weak steady <freq> (<offset>) <n> dB` | Nothing above, but a step 6-10 dB over the floor |\n| `nearby band clear` | No finding |\n\nOr `ERR: rfscan needs an SX126x radio`, `ERR: radio busy, try again` (a packet was arriving), or\n`ERR: radio settings unavailable`.\n\n**Method:** floor from 26 readings 1 MHz apart around the mesh frequency (25th percentile); then 6 sweeps\nof 33 steps, 250 kHz apart, at 250 kHz bandwidth, in two runs of three with 1.5 s back on the mesh between\nthem. Each step settles 5 ms and averages 16 readings; a burst is a sweep 6 dB or more above that step's\nown average. Never transmits, and leaves the LNA as it is.\n\n**Effect:** the command takes about 5 s; the node is off its channel for at most about 1.3 s at a time\nand then returns to its current channel (a running `tempradio` trial included).\n",
+    "source": "https://github.com/mobmesh/firmware/blob/0dd099f865272a2e4cd870d693e6ef26e68eb0b5/mods/radio-diag/docs/cli-additions.md#L174",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Scan the mesh frequency +/-4 MHz for interference; takes about 5 s.",
+    "since": "0dd099f"
+  },
+  {
+    "id": "mobmesh.get.diag.tz.07e7e782",
+    "syntax": "get diag.tz",
+    "path": [
+      "get",
+      "diag.tz"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "get"
+      },
+      {
+        "kind": "literal",
+        "value": "diag.tz"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "radio-diag",
+    "summary": "diag.tz",
+    "details": "## diag.tz\n\n```text\nget diag.tz\nset diag.tz <offset>\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `offset` | Whole hours from UTC, -12 to +14, with or without `h` (`-5h`, `-5`, `+9`) |\n\n**Response:** `> <hours>` for `get`; `OK` or `Error, must be from -12 to +14` for `set`.\n\n**Storage:** persistent. Stored like the companion's `tz_offset` (whole hours, key `tz_offset`) in the\nmod's own file. A fixed offset with no daylight-saving rules: update it when the clocks change.\n\n**Effect:** reports print local times when the offset is not 0, and UTC times when it is 0.",
+    "source": "https://github.com/mobmesh/firmware/blob/0dd099f865272a2e4cd870d693e6ef26e68eb0b5/mods/radio-diag/docs/cli-additions.md#L210",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Show the UTC offset used for times in diag reports.",
+    "since": "0dd099f"
+  },
+  {
+    "id": "mobmesh.set.diag.tz.e2562540",
+    "syntax": "set diag.tz <offset>",
+    "path": [
+      "set",
+      "diag.tz"
+    ],
+    "elements": [
+      {
+        "kind": "literal",
+        "value": "set"
+      },
+      {
+        "kind": "literal",
+        "value": "diag.tz"
+      },
+      {
+        "kind": "text",
+        "name": "offset",
+        "optional": false,
+        "choices": [],
+        "help": "Whole hours from UTC, -12 to +14, with or without h: -5h, -5, +9"
+      }
+    ],
+    "origin": "mobmesh",
+    "mod": "radio-diag",
+    "summary": "diag.tz",
+    "details": "## diag.tz\n\n```text\nget diag.tz\nset diag.tz <offset>\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `offset` | Whole hours from UTC, -12 to +14, with or without `h` (`-5h`, `-5`, `+9`) |\n\n**Response:** `> <hours>` for `get`; `OK` or `Error, must be from -12 to +14` for `set`.\n\n**Storage:** persistent. Stored like the companion's `tz_offset` (whole hours, key `tz_offset`) in the\nmod's own file. A fixed offset with no daylight-saving rules: update it when the clocks change.\n\n**Effect:** reports print local times when the offset is not 0, and UTC times when it is 0.",
+    "source": "https://github.com/mobmesh/firmware/blob/0dd099f865272a2e4cd870d693e6ef26e68eb0b5/mods/radio-diag/docs/cli-additions.md#L211",
+    "grammarVerified": false,
+    "remote": null,
+    "sensitive": false,
+    "brief": "Set the UTC offset used for times in diag reports.",
+    "since": "0dd099f"
   }
 ]
