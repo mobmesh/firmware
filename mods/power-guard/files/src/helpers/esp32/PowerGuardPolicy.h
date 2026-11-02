@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <helpers/ModHooks.h>     // the board, without naming a board class
 #include <Preferences.h>          // stored overrides
+#include <nvs.h>                  // checks for the namespace without logging its absence
 
 // Engages MeshCore's power-saving sleep when the battery is low, releasing it on recovery.
 // Runtime-only: NodePrefs is operator intent and hits flash on every change.
@@ -79,8 +80,11 @@ class PowerGuardPolicy {
   void ensureLoaded() {
     if (_loaded) return;
     _loaded = true;
+    nvs_handle_t handle;
+    esp_err_t opened = nvs_open("mobmesh", NVS_READONLY, &handle);
+    if (opened == ESP_OK) nvs_close(handle);
     Preferences p;
-    if (p.begin("mobmesh", true)) {
+    if (opened != ESP_ERR_NVS_NOT_FOUND && p.begin("mobmesh", true)) {
       _sleep_mv = p.getUShort("safe_mv", POWER_GUARD_SAFE_MV);
       _safe_on = p.getUChar("safe_on", SAFE_UNSET);
       p.end();
