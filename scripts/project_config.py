@@ -42,6 +42,7 @@ class IntegrationPhase(str, Enum):
     REGION_EXPORT = "region_export"
     REGION_LOAD_SKIP = "region_load_skip"
     OWNER_INFO = "owner_info"
+    DIRECT = "direct"
     RECV = "recv"
     TX = "tx"
     WANTS_POWER_SAVING = "wants_power_saving"

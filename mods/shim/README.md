@@ -16,15 +16,11 @@ unless a mod such as power-guard provides a version that does.
 ## What it touches
 
 A single patch adds the call points to the repeater's and room server's `main.cpp`
-and `MyMesh.cpp`. That's the only place any mod reaches into upstream code, and a
+and `MyMesh.cpp`, and to `Mesh.cpp` and `Dispatcher.cpp` for direct routing. That's the only place any mod reaches into upstream code, and a
 test makes sure it stays that way.
 
 `timing-safety` is the exception: it fixes upstream code directly instead of adding
 anything, so it doesn't need shim.
-
-## Idle rest
-
-On ESP32 repeaters, an awake node with nothing queued rests 1 ms at the end of each main-loop pass, not spinning. USB stays up and radio interrupts still latch during the rest. A heltec_v4 V4.3 with the LNA on dropped from 46 mA to 38-39 mA when booted without USB, and from 45 mA to 37 mA with it, with no adverts lost in a 200-advert test.
 
 ## Keeping up with upstream
 

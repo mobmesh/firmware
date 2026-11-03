@@ -170,6 +170,7 @@ def load_integrations(mods: list) -> list:
     route_owner = None
     region_export_owner = None
     owner_info_owner = None
+    direct_owner = None
     for order, mod_name in enumerate(mods):
         definition = load_mod_definition(mod_name)
         integration = definition.integration
@@ -234,6 +235,12 @@ def load_integrations(mods: list) -> list:
                         f"owner_info is exclusive but claimed by '{owner_info_owner}' and '{mod_name}'"
                     )
                 owner_info_owner = mod_name
+            if phase is IntegrationPhase.DIRECT:
+                if direct_owner is not None:
+                    raise ValueError(
+                        f"direct is exclusive but claimed by '{direct_owner}' and '{mod_name}'"
+                    )
+                direct_owner = mod_name
         integrations.append(parsed)
     return integrations
 
@@ -256,6 +263,8 @@ def render_mod_hooks(integrations: list) -> str:
                          for item in integrations if "region_load_skip" in item["hooks"]]
     owner_infos = [item["hooks"]["owner_info"]["symbol"]
                    for item in integrations if "owner_info" in item["hooks"]]
+    directs = [item["hooks"]["direct"]["symbol"]
+               for item in integrations if "direct" in item["hooks"]]
     recvs = [item["hooks"]["recv"]["symbol"]
              for item in integrations if "recv" in item["hooks"]]
     txs = [item["hooks"]["tx"]["symbol"]
@@ -278,6 +287,8 @@ def render_mod_hooks(integrations: list) -> str:
         if region_exports else "-1"
     )
     owner_info_call = f"return {owner_infos[0]}(out);" if owner_infos else "return 0;"
+    direct_call = (f"return {directs[0]}(event, packet, delay_millis);" if directs
+                   else "(void)event;\n  (void)packet;\n  (void)delay_millis;\n  return false;")
     recv_block = (
         "void modObserveRecv(const mesh::Packet* packet, bool accepted,\n"
         "                    const uint8_t scope_key[16]) {\n"
@@ -329,6 +340,10 @@ size_t modOwnerInfoMarker(uint8_t out[4]) {{
   {owner_info_call}
 }}
 
+bool modDirectEvent(ModDirectEvent event, const mesh::Packet* packet, uint32_t delay_millis) {{
+  {direct_call}
+}}
+
 {recv_block}
 
 {tx_block}
@@ -350,6 +365,7 @@ uint16_t modBoardBattMilliVolts()          {{ return board.getBattMilliVolts(); 
 void     modBoardDeepSleep(uint32_t secs)  {{ board.enterDeepSleep(secs); }}
 void     modBoardInhibitSleep(bool inhibit) {{ board.setInhibitSleep(inhibit); }}
 uint32_t modClockGet()                     {{ return rtc_clock.getCurrentTime(); }}
+uint32_t modAirtimeFor(int len)            {{ return radio_driver.getEstAirtimeFor(len); }}
 bool     modRadioRssiNow(float* out) {{
   if (radio_driver.isReceiving()) return false;
   *out = radio_driver.getCurrentRSSI();

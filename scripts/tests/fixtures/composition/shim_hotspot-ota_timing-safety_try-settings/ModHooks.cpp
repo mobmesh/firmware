@@ -35,6 +35,13 @@ size_t modOwnerInfoMarker(uint8_t out[4]) {
   return 0;
 }
 
+bool modDirectEvent(ModDirectEvent event, const mesh::Packet* packet, uint32_t delay_millis) {
+  (void)event;
+  (void)packet;
+  (void)delay_millis;
+  return false;
+}
+
 void modObserveRecv(const mesh::Packet*, bool, const uint8_t*) {}
 
 void modObserveTx(uint32_t, bool) {}
@@ -56,6 +63,7 @@ uint16_t modBoardBattMilliVolts()          { return board.getBattMilliVolts(); }
 void     modBoardDeepSleep(uint32_t secs)  { board.enterDeepSleep(secs); }
 void     modBoardInhibitSleep(bool inhibit) { board.setInhibitSleep(inhibit); }
 uint32_t modClockGet()                     { return rtc_clock.getCurrentTime(); }
+uint32_t modAirtimeFor(int len)            { return radio_driver.getEstAirtimeFor(len); }
 bool     modRadioRssiNow(float* out) {
   if (radio_driver.isReceiving()) return false;
   *out = radio_driver.getCurrentRSSI();

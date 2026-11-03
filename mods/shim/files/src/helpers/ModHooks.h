@@ -45,6 +45,19 @@ void modObserveRecv(const mesh::Packet* packet, bool accepted,
                     const uint8_t scope_key[16]);
 void modObserveTx(uint32_t packet_id, bool succeeded);
 
+// Direct routing, one owner. Recv returns true to drop the packet; busy holds the long idle sleep; the rest return false.
+enum ModDirectEvent {
+  MOD_DIRECT_RECV,
+  MOD_DIRECT_FORWARD,
+  MOD_DIRECT_FORWARD_MULTI_ACK,
+  MOD_DIRECT_BUSY,
+  MOD_DIRECT_SENT,
+};
+bool modDirectEvent(ModDirectEvent event, const mesh::Packet* packet, uint32_t delay_millis);
+bool modDirectResend(const mesh::Packet* packet);
+bool modDirectReply(const uint8_t* data, size_t len, uint32_t delay_millis);
+uint32_t modAirtimeFor(int len);
+
 // Every mod CLI command, dispatched from MyMesh before upstream's own chain runs. Version
 // and build date are passed because only the call site can see the example's macros.
 bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
