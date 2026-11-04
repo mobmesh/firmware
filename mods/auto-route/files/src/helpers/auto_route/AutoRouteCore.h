@@ -8,7 +8,7 @@
 #define AR_REPLY_KEY   4
 #define AR_SLOTS       6
 #define AR_LINKS       32
-#define AR_NEIGHBOURS  20
+#define AR_NEIGHBORS  20
 #define AR_RESENDS     2
 #define AR_LAST_RESENDS 1
 #define AR_ARM_FORWARD 1
@@ -27,7 +27,7 @@ struct ArLink {
   uint32_t at;
 };
 
-struct ArNeighbour {
+struct ArNeighbor {
   ArHash id;
   int8_t snr;
   uint32_t at;
@@ -42,7 +42,7 @@ struct ArSlot {
 
 struct ArTables {
   ArLink links[AR_LINKS];
-  ArNeighbour neighbours[AR_NEIGHBOURS];
+  ArNeighbor neighbors[AR_NEIGHBORS];
 };
 
 ArHash arHash(const uint8_t* bytes, uint8_t len);

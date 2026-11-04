@@ -39,7 +39,7 @@ int main() {
   // No evidence: no detour
   CHECK(!chosen(t, bad, next, self, &via));
 
-  // A pair with no neighbour in it is not kept
+  // A pair with no neighbor in it is not kept
   arSawHop(t, next, a, NOW);
   CHECK(links(t) == 0);
 
@@ -55,7 +55,7 @@ int main() {
   arSawHop(t, b, next, NOW);
   CHECK(chosen(t, bad, next, self, &via) && via == 0x50);
 
-  // Each side of a neighbour is kept once, and the far side of a pair is not
+  // Each side of a neighbor is kept once, and the far side of a pair is not
   static ArTables u;
   arHeard(u, a, 20, NOW);
   arSawHop(u, bad, a, NOW);

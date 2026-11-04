@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 420" role="img" aria-labelledby="title desc">
   <title id="title">Direct traffic around a failing hop</title>
-  <desc id="desc">A client sends direct traffic through relay A towards relay B, which stays silent. Relay A resends, and the first resend goes through a neighbour known to reach relay C. Relay C forwards to the destination, whose short hop reply stops the last resend.</desc>
+  <desc id="desc">A client sends direct traffic through relay A towards relay B, which stays silent. Relay A resends, and the first resend goes through a neighbor known to reach relay C. Relay C forwards to the destination, whose short hop reply stops the last resend.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker>
     <marker id="arrow-good" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#4fa88a"/></marker>
@@ -36,12 +36,12 @@
   <path class="good" d="M308 200V306H426"/>
   <text class="tag" x="322" y="290" fill="#4fa88a">FIRST RESEND</text>
   <rect x="426" y="262" width="148" height="88" rx="22" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
-  <text class="label" x="444" y="300">Neighbour</text><text class="body" x="444" y="325">Known to reach C</text>
+  <text class="label" x="444" y="300">Neighbor</text><text class="body" x="444" y="325">Known to reach C</text>
   <path class="good" d="M574 306H668V200"/>
   <text class="tag" x="586" y="328" fill="#4fa88a">SAME PATH LENGTH</text>
 
   <path class="line" d="M884 200V246H734V200"/>
   <text class="tag" x="809" y="268" text-anchor="middle" fill="#7e9eac">HOP REPLY STOPS THE RESEND</text>
 
-  <text class="sub" x="42" y="392">Only the repeater making the swap needs this mod. The neighbour can be stock.</text>
+  <text class="sub" x="42" y="392">Only the repeater making the swap needs this mod. The neighbor can be stock.</text>
 </svg>

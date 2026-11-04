@@ -22,7 +22,7 @@ Select a mod link below for its own README, including behavior and requirements.
 | [power‑guard](mods/power-guard/README.md) | Battery-aware power saving, brownout protection, safe sleep and recovery for supported repeaters. |
 | [flood‑gate](mods/flood-gate/README.md) | Allows an operator to temporarily opt out of repeating specified channel floods. Doesn't stop an attack, but provides an option to not participate in one. |
 | [radio‑diag](mods/radio-diag/README.md) | Radio diagnostics with plain verdicts: an LNA study that finds whether a site hears better with the LNA on or off, and a nearby-interference scan. |
-| [auto‑route](mods/auto-route/README.md) | Keeps direct traffic moving: resends a direct packet until the next hop is heard, and sends it around a failing hop through a neighbour known to reach the hop after. Off by default. |
+| [auto‑route](mods/auto-route/README.md) | Keeps direct traffic moving: resends a direct packet until the next hop is heard, and sends it around a failing hop through a neighbor known to reach the hop after. Off by default. |
 | [timing‑safety](mods/timing-safety/README.md) | Timer rollover and post-reboot clock fixes. |
 | [shim](mods/shim/README.md) | Shared upstream hooks that connect selected mods to MeshCore. |
 

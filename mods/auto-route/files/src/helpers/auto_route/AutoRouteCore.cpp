@@ -30,7 +30,7 @@ static T& slotFor(T* items, int count, uint32_t now, Same same) {
 }
 
 void arHeard(ArTables& t, const ArHash& id, int8_t snr, uint32_t now) {
-  ArNeighbour& n = slotFor(t.neighbours, AR_NEIGHBOURS, now, [&](const ArNeighbour& x) {
+  ArNeighbor& n = slotFor(t.neighbors, AR_NEIGHBORS, now, [&](const ArNeighbor& x) {
     return x.at != 0 && x.id.len == id.len && memcmp(x.id.b, id.b, id.len) == 0;
   });
   n.id = id;
@@ -48,22 +48,22 @@ static ArLink& linkFor(ArTables& t, const ArHash& via, const ArHash& hop, uint32
   return l;
 }
 
-static const ArNeighbour* neighbour(const ArTables& t, const ArHash& id, uint32_t now) {
-  for (int i = 0; i < AR_NEIGHBOURS; i++) {
-    const ArNeighbour& n = t.neighbours[i];
+static const ArNeighbor* neighbor(const ArTables& t, const ArHash& id, uint32_t now) {
+  for (int i = 0; i < AR_NEIGHBORS; i++) {
+    const ArNeighbor& n = t.neighbors[i];
     if (n.at != 0 && (int32_t)(now - n.at) <= (int32_t)AR_FRESH_MS && arMatch(n.id, id)) return &n;
   }
   return nullptr;
 }
 
-// Only a neighbour heard directly can be a detour, so only its own sides of a path are kept.
+// Only a neighbor heard directly can be a detour, so only its own sides of a path are kept.
 void arSawHop(ArTables& t, const ArHash& before, const ArHash& after, uint32_t now) {
-  if (neighbour(t, before, now)) linkFor(t, before, after, now).forward++;
-  if (neighbour(t, after, now)) linkFor(t, after, before, now).reverse++;
+  if (neighbor(t, before, now)) linkFor(t, before, after, now).forward++;
+  if (neighbor(t, after, now)) linkFor(t, after, before, now).reverse++;
 }
 
 void arSawOrigin(ArTables& t, const ArHash& via, const ArHash& origin, uint32_t now) {
-  if (neighbour(t, via, now)) linkFor(t, via, origin, now).reverse++;
+  if (neighbor(t, via, now)) linkFor(t, via, origin, now).reverse++;
 }
 
 bool arArmed(const ArLink& link) {
@@ -77,7 +77,7 @@ bool arChoose(const ArTables& t, const ArHash& failing, const ArHash& next, cons
     const ArLink& l = t.links[i];
     if (l.at == 0 || (int32_t)(now - l.at) > (int32_t)AR_FRESH_MS || !arArmed(l) || !arMatch(l.hop, next)) continue;
     if (l.via.len < failing.len || arMatch(l.via, failing) || arMatch(l.via, self) || arMatch(l.via, next)) continue;
-    const ArNeighbour* n = neighbour(t, l.via, now);
+    const ArNeighbor* n = neighbor(t, l.via, now);
     if (n == nullptr) continue;
     if (best < 0 || n->snr > best_snr) {
       best = i;

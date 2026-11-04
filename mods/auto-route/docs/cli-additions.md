@@ -43,7 +43,7 @@ get autoroute.stats
 | `reply` | Resends stopped by a hop reply |
 | `exhausted` | Packets that used every resend |
 | `detour` | Packets sent around a failing hop |
-| `noalt` | Times no armed neighbour was available |
+| `noalt` | Times no armed neighbor was available |
 | `replied` | Hop replies sent |
 | `noslot` | Packets not protected because every slot was in use |
 | `stale` | Packets given up on because they sat queued for 10 s without being sent |
@@ -54,6 +54,6 @@ get autoroute.stats
 get autoroute.links
 ```
 
-**Response:** `>` then entries of `<hop>><neighbour>:<forward>/<reverse>`, with `*` when armed. For example `30a1>40b2:0/4*` says neighbour `40b2` was seen receiving from `30a1` four times. Arrives as several replies when long.
+**Response:** `>` then entries of `<hop>><neighbor>:<forward>/<reverse>`, with `*` when armed. For example `30a1>40b2:0/4*` says neighbor `40b2` was seen receiving from `30a1` four times. Arrives as several replies when long.
 
 [↩ Back to auto-route readme](../README.md)

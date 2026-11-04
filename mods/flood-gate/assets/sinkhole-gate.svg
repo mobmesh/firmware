@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 390" role="img" aria-labelledby="title desc">
+  <title id="title">How a sinkhole entry gates a channel flood</title>
+  <desc id="desc">A repeater checks the path of a channel flood. If a listed repeater is in the first three hops, the flood is not forwarded but is still received locally. Otherwise it is forwarded as normal.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker>
+    <style>
+      .bg{fill:#18212b}.card{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.body{font:14px system-ui,sans-serif;fill:#b0c1cd}.chip{font:700 13px ui-monospace,monospace;fill:#e1ebf2;text-anchor:middle}.tag{font:700 13px system-ui,sans-serif}.line{fill:none;stroke:#7e9eac;stroke-width:2.5;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1000" height="390" rx="28"/>
+  <text class="head" x="42" y="48">Sinkhole: stop a flood near its source</text>
+  <text class="sub" x="42" y="75">Channel floods that entered through a listed repeater go no further.</text>
+
+  <rect class="card" x="42" y="132" width="236" height="132" rx="22"/>
+  <text class="label" x="60" y="170">Channel flood</text>
+  <text class="body" x="60" y="194">Its path names its relays</text>
+  <rect x="60" y="212" width="60" height="30" rx="12" fill="#3d302a" stroke="#86634f" stroke-width="1.5"/>
+  <text class="chip" x="90" y="232">a1b2</text>
+  <rect x="130" y="212" width="60" height="30" rx="12" fill="#2b3b49" stroke="#3d5262" stroke-width="1.5"/>
+  <text class="chip" x="160" y="232">c3d4</text>
+  <rect x="200" y="212" width="60" height="30" rx="12" fill="#2b3b49" stroke="#3d5262" stroke-width="1.5"/>
+  <text class="chip" x="230" y="232">e5f6</text>
+  <path class="line" d="M278 198H330"/>
+
+  <rect x="330" y="138" width="196" height="120" rx="24" fill="#263c49" stroke="#4e788d" stroke-width="1.5"/>
+  <text class="label" x="350" y="192">Listed repeater</text>
+  <text class="label" x="350" y="218">in the first 3 hops?</text>
+
+  <path class="line" d="M526 172H590V142H634"/>
+  <text class="tag" x="548" y="162" fill="#e3a078">YES</text>
+  <rect x="634" y="98" width="324" height="88" rx="22" fill="#3d302a" stroke="#86634f" stroke-width="1.5"/>
+  <text class="label" x="656" y="135">Not forwarded</text>
+  <text class="body" x="656" y="161">Still received and read locally</text>
+
+  <path class="line" d="M526 224H590V268H634"/>
+  <text class="tag" x="548" y="246" fill="#4fa88a">NO</text>
+  <rect x="634" y="224" width="324" height="88" rx="22" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
+  <text class="label" x="656" y="261">Forwarded</text>
+  <text class="body" x="656" y="287">As normal</text>
+
+  <text class="sub" x="42" y="346">Try <tspan font-weight="700" fill="#e1ebf2">watch</tspan> first: it counts matches without dropping them.</text>
+</svg>

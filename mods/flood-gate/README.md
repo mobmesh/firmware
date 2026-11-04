@@ -13,6 +13,8 @@ sinkhole add * 168 minbytes 2
 sinkhole list
 ```
 
+<img src="assets/sinkhole-gate.svg" width="700" alt="A channel flood with a listed repeater in its first three hops is not forwarded but is still received locally; any other flood is forwarded">
+
 - A flood is dropped when the listed repeater is one of its first three hops (`depth` changes this); further down the path it forwards normally.
 - `watch` counts matches without dropping, to check an entry before enforcing it.
 - Only channel messages and datagrams are matched; adverts, direct messages, requests and logins always pass.
