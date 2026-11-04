@@ -45,14 +45,20 @@ void modObserveRecv(const mesh::Packet* packet, bool accepted,
                     const uint8_t scope_key[16]);
 void modObserveTx(uint32_t packet_id, bool succeeded);
 
-// Direct routing, one owner. Recv returns true to drop the packet; busy holds the long idle sleep; the rest return false.
+// Direct routing, one owner. Recv returns true to drop the packet; busy holds the long idle sleep; the setting events below it answer or apply; the rest return false.
 enum ModDirectEvent {
   MOD_DIRECT_RECV,
   MOD_DIRECT_FORWARD,
   MOD_DIRECT_FORWARD_MULTI_ACK,
   MOD_DIRECT_BUSY,
   MOD_DIRECT_SENT,
+  MOD_DIRECT_PRESENT,
+  MOD_DIRECT_ENABLED,
+  MOD_DIRECT_DETOUR,
+  MOD_DIRECT_APPLY,
 };
+// The value MOD_DIRECT_APPLY takes in delay_millis.
+enum ModDirectSetting { MOD_ROUTE_KEEP, MOD_ROUTE_OFF, MOD_ROUTE_ON, MOD_ROUTE_ON_NO_DETOUR };
 bool modDirectEvent(ModDirectEvent event, const mesh::Packet* packet, uint32_t delay_millis);
 bool modDirectResend(const mesh::Packet* packet);
 bool modDirectReply(const uint8_t* data, size_t len, uint32_t delay_millis);
@@ -102,6 +108,8 @@ struct ModPolicyValues {
   uint8_t multi_acks;
   float airtime_factor;
   float tx_delay_factor;
+  float rx_delay;
+  float direct_tx_delay;
   uint8_t agc_reset_interval;
 };
 

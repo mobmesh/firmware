@@ -276,10 +276,10 @@ sync.policy
 **Response format:**
 
 ```text
-flood:<all>/<unscoped>/<advert> adv:<local>m/<flood>h path:<mode> loop:<value> ack:<value> gate:<value> af:<factor> tx:<factor> agc:<seconds>s
+flood:<all>/<unscoped>/<advert> adv:<local>m/<flood>h path:<mode> loop:<value> ack:<value> gate:<value> route:<value> af:<factor> tx:<factor> rx:<factor> dtx:<factor> agc:<seconds>s
 ```
 
-**Effect:** Read-only view of selected native policy values and `repeat.gate`.
+**Effect:** Read-only view of selected native policy values and `repeat.gate`. `route` is 0 without `auto-route`, 1 off, 2 on, 3 on with detours off.
 Storage or unavailable native-policy errors return `Err - ...`.
 
 ## sync subscriptions

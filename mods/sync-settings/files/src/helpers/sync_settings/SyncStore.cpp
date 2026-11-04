@@ -605,22 +605,27 @@ size_t writeState(const DatasetState& state, uint8_t* out, size_t capacity) {
 
 StoreResult readPolicyRecovery(const uint8_t* data, size_t len,
                                PolicyRecovery& out, HashFn hash, void* context) {
-  if (data == nullptr || len != 74 || data[0] > RECOVERY_RESTORING) {
+  // An older record's apply finished at its own boot, so what it says no longer matters.
+  if (data != nullptr && len == POLICY_RECOVERY_OLD_LEN) {
+    memset(&out, 0, sizeof(out));
+    return STORE_OK;
+  }
+  if (data == nullptr || len != POLICY_RECOVERY_LEN || data[0] > RECOVERY_RESTORING) {
     return STORE_PAYLOAD;
   }
   if (data[0] == RECOVERY_IDLE) {
-    if (anyNonzero(data + 1, 73)) return STORE_PAYLOAD;
+    if (anyNonzero(data + 1, POLICY_RECOVERY_LEN - 1)) return STORE_PAYLOAD;
     memset(&out, 0, sizeof(out));
     return STORE_OK;
   }
   if ((data[1] & 0xfe) != 0 || read32(data + 2) == 0 ||
       read16(data + 6) == 0 || read32(data + 8) == 0 ||
       !validPolicyPayload(data + 44, POLICY_DATA_LEN) ||
-      !validPolicyPayload(data + 59, POLICY_DATA_LEN) || hash == nullptr) {
+      !validPolicyPayload(data + POLICY_RECOVERY_TARGET, POLICY_DATA_LEN) || hash == nullptr) {
     return STORE_PAYLOAD;
   }
   uint8_t digest[DIGEST_LEN];
-  hash(data + 59, POLICY_DATA_LEN, digest, context);
+  hash(data + POLICY_RECOVERY_TARGET, POLICY_DATA_LEN, digest, context);
   if (memcmp(digest, data + 12, DIGEST_LEN) != 0) return STORE_DIGEST;
   PolicyRecovery value = {};
   value.phase = data[0];
@@ -630,17 +635,17 @@ StoreResult readPolicyRecovery(const uint8_t* data, size_t len,
   value.generation = read32(data + 8);
   memcpy(value.digest, data + 12, DIGEST_LEN);
   memcpy(value.prior, data + 44, POLICY_DATA_LEN);
-  memcpy(value.target, data + 59, POLICY_DATA_LEN);
+  memcpy(value.target, data + POLICY_RECOVERY_TARGET, POLICY_DATA_LEN);
   out = value;
   return STORE_OK;
 }
 
 size_t writePolicyRecovery(const PolicyRecovery& recovery, uint8_t* out,
                            size_t capacity, HashFn hash, void* context) {
-  if (out == nullptr || capacity < 74) return 0;
+  if (out == nullptr || capacity < POLICY_RECOVERY_LEN) return 0;
   if (recovery.phase == RECOVERY_IDLE) {
-    memset(out, 0, 74);
-    return 74;
+    memset(out, 0, POLICY_RECOVERY_LEN);
+    return POLICY_RECOVERY_LEN;
   }
   if (recovery.phase > RECOVERY_RESTORING || recovery.receipt_id == 0 ||
       recovery.publisher_id == 0 || recovery.generation == 0 || hash == nullptr ||
@@ -649,7 +654,7 @@ size_t writePolicyRecovery(const PolicyRecovery& recovery, uint8_t* out,
   uint8_t digest[DIGEST_LEN];
   hash(recovery.target, POLICY_DATA_LEN, digest, context);
   if (memcmp(digest, recovery.digest, DIGEST_LEN) != 0) return 0;
-  memset(out, 0, 74);
+  memset(out, 0, POLICY_RECOVERY_LEN);
   out[0] = recovery.phase;
   out[1] = recovery.reset ? 1 : 0;
   write32(out + 2, recovery.receipt_id);
@@ -657,8 +662,8 @@ size_t writePolicyRecovery(const PolicyRecovery& recovery, uint8_t* out,
   write32(out + 8, recovery.generation);
   memcpy(out + 12, recovery.digest, DIGEST_LEN);
   memcpy(out + 44, recovery.prior, POLICY_DATA_LEN);
-  memcpy(out + 59, recovery.target, POLICY_DATA_LEN);
-  return 74;
+  memcpy(out + POLICY_RECOVERY_TARGET, recovery.target, POLICY_DATA_LEN);
+  return POLICY_RECOVERY_LEN;
 }
 
 void defaultRadioRecord(RadioRecord& record) {
@@ -878,7 +883,7 @@ static_assert(STATE_FIXED_LEN + STATE_REPLAY_MAX * STATE_REPLAY_LEN == 725,
               "state record bound changed");
 static_assert(PUBLISHER_FIXED_LEN + PUBLISHER_MAX * PUBLISHER_RECORD_LEN == 629,
               "publisher record bound changed");
-static_assert(STORE_OVERHEAD + 74 == 118, "policy recovery bound changed");
+static_assert(STORE_OVERHEAD + POLICY_RECOVERY_LEN == 152, "policy recovery bound changed");
 static_assert(STORE_OVERHEAD + 784 == 828, "radio record bound changed");
 
 }  // namespace sync

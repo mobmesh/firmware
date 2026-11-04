@@ -1,8 +1,8 @@
 const MONTHS=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-// A `ver` reply: "v1.18.0 (15 Oct 2026) + ota (21 Oct 2026 - 75a1ec6)"; only MobMesh ESP32 builds add the ota part, bench builds omit its hash.
+// A `ver` reply: "v1.18.0 (15 Oct 2026) + MobMesh (21 Oct 2026 - 75a1ec6)", or "+ ota" from older builds; only MobMesh ESP32 builds add that part, bench builds omit its hash.
 export function parseBuild(text){
   const version=/v?(\d+\.\d+\.\d+)/.exec(text||'');if(!version)return null;
-  const ota=/\+ ota \((\d{1,2}) (\w{3}) (\d{4})(?: - ([0-9a-f]{7,40}))?\)/.exec(text),month=ota?MONTHS.indexOf(ota[2].toLowerCase()):-1;
+  const ota=/\+ (?:ota|MobMesh) \((\d{1,2}) (\w{3}) (\d{4})(?: - ([0-9a-f]{7,40}))?\)/.exec(text),month=ota?MONTHS.indexOf(ota[2].toLowerCase()):-1;
   return {upstream:version[1],ota:!!ota,sha:ota?.[4]||null,date:month<0?null:`${ota[3]}-${String(month+1).padStart(2,'0')}-${ota[1].padStart(2,'0')}`};
 }
 const older=(a,b)=>{const x=a.split('.').map(Number),y=b.split('.').map(Number);for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]<y[i];return false;};

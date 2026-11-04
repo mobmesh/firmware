@@ -1,8 +1,8 @@
 diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
-index 61b6c149..dbc9995d 100644
+index 61b6c149..2032eb39 100644
 --- a/examples/simple_repeater/MyMesh.cpp
 +++ b/examples/simple_repeater/MyMesh.cpp
-@@ -1,6 +1,213 @@
+@@ -1,6 +1,215 @@
  #include "MyMesh.h"
 +#include <helpers/ModHooks.h>
  #include <algorithm>
@@ -38,6 +38,8 @@ index 61b6c149..dbc9995d 100644
 +  out->multi_acks = mod_prefs_ref->multi_acks;
 +  out->airtime_factor = mod_prefs_ref->airtime_factor;
 +  out->tx_delay_factor = mod_prefs_ref->tx_delay_factor;
++  out->rx_delay = mod_prefs_ref->rx_delay_base;
++  out->direct_tx_delay = mod_prefs_ref->direct_tx_delay_factor;
 +  out->agc_reset_interval = mod_prefs_ref->agc_reset_interval;
 +  return true;
 +}
@@ -216,7 +218,7 @@ index 61b6c149..dbc9995d 100644
  /* ------------------------------ Config -------------------------------- */
  
  #ifndef LORA_FREQ
-@@ -157,7 +364,14 @@ uint8_t MyMesh::handleAnonRegionsReq(const mesh::Identity& sender, uint32_t send
+@@ -157,7 +366,14 @@ uint8_t MyMesh::handleAnonRegionsReq(const mesh::Identity& sender, uint32_t send
      uint32_t now = getRTCClock()->getCurrentTime();
      memcpy(&reply_data[4], &now, 4);     // include our clock (for easy clock sync, and packet hash uniqueness)
  
@@ -232,7 +234,7 @@ index 61b6c149..dbc9995d 100644
    }
    return 0;
  }
-@@ -175,6 +389,16 @@ uint8_t MyMesh::handleAnonOwnerReq(const mesh::Identity& sender, uint32_t sender
+@@ -175,6 +391,16 @@ uint8_t MyMesh::handleAnonOwnerReq(const mesh::Identity& sender, uint32_t sender
      uint32_t now = getRTCClock()->getCurrentTime();
      memcpy(&reply_data[4], &now, 4);     // include our clock (for easy clock sync, and packet hash uniqueness)
      sprintf((char *) &reply_data[8], "%s\n%s", _prefs.node_name, _prefs.owner_info);
@@ -249,7 +251,7 @@ index 61b6c149..dbc9995d 100644
  
      return 8 + strlen((char *) &reply_data[8]);   // reply length
    }
-@@ -415,6 +639,11 @@ void MyMesh::sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, ui
+@@ -415,6 +641,11 @@ void MyMesh::sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, ui
    bool is_wildcard = recv_pkt_region != NULL && recv_pkt_region->isWildcard();
    bool req_scope_known = recv_pkt_region != NULL && !is_wildcard
                        && region_map.getTransportKeysFor(*recv_pkt_region, &req_scope, 1) > 0;
@@ -261,7 +263,7 @@ index 61b6c149..dbc9995d 100644
  
    switch (mesh::chooseReplyScope(req_scope_known, is_wildcard, !default_scope.isNull())) {
      case mesh::REPLY_SCOPE_REQUEST:
-@@ -455,6 +684,7 @@ bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
+@@ -455,6 +686,7 @@ bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
        return false;
      }
    }
@@ -269,7 +271,7 @@ index 61b6c149..dbc9995d 100644
    return true;
  }
  
-@@ -503,6 +733,9 @@ void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
+@@ -503,6 +735,9 @@ void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
  }
  
  void MyMesh::logTx(mesh::Packet *pkt, int len) {
@@ -279,7 +281,7 @@ index 61b6c149..dbc9995d 100644
  #ifdef WITH_BRIDGE
    if (_prefs.bridge_pkt_src == 0) {
      bridge.sendPacket(pkt);
-@@ -528,6 +761,9 @@ void MyMesh::logTx(mesh::Packet *pkt, int len) {
+@@ -528,6 +763,9 @@ void MyMesh::logTx(mesh::Packet *pkt, int len) {
  }
  
  void MyMesh::logTxFail(mesh::Packet *pkt, int len) {
@@ -289,7 +291,7 @@ index 61b6c149..dbc9995d 100644
    if (_logging) {
      File f = openAppend(PACKET_LOG_FILE);
      if (f) {
-@@ -554,8 +790,16 @@ uint32_t MyMesh::getDirectRetransmitDelay(const mesh::Packet *packet) {
+@@ -554,8 +792,16 @@ uint32_t MyMesh::getDirectRetransmitDelay(const mesh::Packet *packet) {
  }
  
  mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
@@ -307,7 +309,7 @@ index 61b6c149..dbc9995d 100644
    } else if (pkt->getRouteType() == ROUTE_TYPE_FLOOD) {
      if (region_map.getWildcard().flags & REGION_DENY_FLOOD) {
        recv_pkt_region = NULL;
-@@ -565,6 +809,24 @@ mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
+@@ -565,6 +811,24 @@ mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
    } else {
      recv_pkt_region = NULL;
    }
@@ -332,7 +334,7 @@ index 61b6c149..dbc9995d 100644
    return Mesh::onRecvPacket(pkt);
  }
  
-@@ -757,6 +1019,12 @@ void MyMesh::onPeerDataRecv(mesh::Packet *packet, uint8_t type, int sender_idx,
+@@ -757,6 +1021,12 @@ void MyMesh::onPeerDataRecv(mesh::Packet *packet, uint8_t type, int sender_idx,
            }
          }
        }
@@ -345,7 +347,7 @@ index 61b6c149..dbc9995d 100644
      } else {
        MESH_DEBUG_PRINTLN("onPeerDataRecv: possible replay attack detected");
      }
-@@ -879,6 +1147,14 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
+@@ -879,6 +1149,14 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
    next_local_advert = next_flood_advert = 0;
    dirty_contacts_expiry = 0;
    set_radio_at = revert_radio_at = 0;
@@ -360,7 +362,7 @@ index 61b6c149..dbc9995d 100644
    _logging = false;
    region_load_active = false;
    recv_pkt_region = NULL;
-@@ -1202,6 +1478,8 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -1202,6 +1480,8 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
        region_load_active = false;
  
        sprintf(reply, "OK - loaded %d regions", region_map.getCount());
@@ -369,7 +371,7 @@ index 61b6c149..dbc9995d 100644
      } else {
        char *np = command;
        while (*np == ' ') np++;   // skip indent
-@@ -1282,7 +1560,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -1282,7 +1562,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
        strcpy(reply, "OK - Discover sent");
      }
    } else{
@@ -385,7 +387,7 @@ index 61b6c149..dbc9995d 100644
    }
  }
  
-@@ -1319,6 +1604,10 @@ void MyMesh::loop() {
+@@ -1319,6 +1606,10 @@ void MyMesh::loop() {
      MESH_DEBUG_PRINTLN("Radio params restored");
    }
  
@@ -457,10 +459,10 @@ index d475b13d..d94067e0 100644
 +#endif
  }
 diff --git a/examples/simple_room_server/MyMesh.cpp b/examples/simple_room_server/MyMesh.cpp
-index da4c776c..5cff3cc6 100644
+index da4c776c..e8fc8f9a 100644
 --- a/examples/simple_room_server/MyMesh.cpp
 +++ b/examples/simple_room_server/MyMesh.cpp
-@@ -4,6 +4,197 @@
+@@ -4,6 +4,216 @@
  #define PUSH_NOTIFY_DELAY_MILLIS    2000
  #define SYNC_PUSH_INTERVAL          1200
  
@@ -497,6 +499,8 @@ index da4c776c..5cff3cc6 100644
 +  out->multi_acks = mod_prefs_ref->multi_acks;
 +  out->airtime_factor = mod_prefs_ref->airtime_factor;
 +  out->tx_delay_factor = mod_prefs_ref->tx_delay_factor;
++  out->rx_delay = mod_prefs_ref->rx_delay_base;
++  out->direct_tx_delay = mod_prefs_ref->direct_tx_delay_factor;
 +  out->agc_reset_interval = mod_prefs_ref->agc_reset_interval;
 +  return true;
 +}
@@ -549,6 +553,23 @@ index da4c776c..5cff3cc6 100644
 +    return true;
 +  }
 +  return false;
++}
++
++bool modDirectResend(const mesh::Packet* packet) {
++  if (mod_mesh_ref == nullptr) return false;
++  mesh::Packet* copy = mod_mesh_ref->obtainNewPacket();
++  if (copy == nullptr) return false;
++  *copy = *packet;
++  mod_mesh_ref->sendPacket(copy, 0, 0);
++  return true;
++}
++
++bool modDirectReply(const uint8_t* data, size_t len, uint32_t delay_millis) {
++  if (mod_mesh_ref == nullptr) return false;
++  mesh::Packet* packet = mod_mesh_ref->createControlData(data, len);
++  if (packet == nullptr) return false;
++  mod_mesh_ref->sendZeroHop(packet, delay_millis);
++  return true;
 +}
 +
 +bool modPublisherKey(uint8_t out[32]) {
@@ -658,7 +679,7 @@ index da4c776c..5cff3cc6 100644
  #define PUSH_ACK_TIMEOUT_FLOOD      12000
  #define PUSH_TIMEOUT_BASE           4000
  #define PUSH_ACK_TIMEOUT_FACTOR     2000
-@@ -245,6 +436,9 @@ void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
+@@ -245,6 +455,9 @@ void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
    }
  }
  void MyMesh::logTx(mesh::Packet *pkt, int len) {
@@ -668,7 +689,7 @@ index da4c776c..5cff3cc6 100644
    if (_logging) {
      File f = openAppend(PACKET_LOG_FILE);
      if (f) {
-@@ -263,6 +457,9 @@ void MyMesh::logTx(mesh::Packet *pkt, int len) {
+@@ -263,6 +476,9 @@ void MyMesh::logTx(mesh::Packet *pkt, int len) {
    }
  }
  void MyMesh::logTxFail(mesh::Packet *pkt, int len) {
@@ -678,7 +699,7 @@ index da4c776c..5cff3cc6 100644
    if (_logging) {
      File f = openAppend(PACKET_LOG_FILE);
      if (f) {
-@@ -303,12 +500,21 @@ bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
+@@ -303,12 +519,21 @@ bool MyMesh::allowPacketForward(const mesh::Packet *packet) {
        && mesh::isFloodHopLimitExceeded(packet, _prefs.flood_max, _prefs.flood_max_unscoped, _prefs.flood_max_advert)) {
      return false;
    }
@@ -701,7 +722,7 @@ index da4c776c..5cff3cc6 100644
    } else if (pkt->getRouteType() == ROUTE_TYPE_FLOOD) {
      if (region_map.getWildcard().flags & REGION_DENY_FLOOD) {
        recv_pkt_region = NULL;
-@@ -318,6 +524,24 @@ mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
+@@ -318,6 +543,24 @@ mesh::DispatcherAction MyMesh::onRecvPacket(mesh::Packet* pkt) {
    } else {
      recv_pkt_region = NULL;
    }
@@ -726,7 +747,7 @@ index da4c776c..5cff3cc6 100644
    return Mesh::onRecvPacket(pkt);
  }
  
-@@ -641,6 +865,14 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
+@@ -641,6 +884,14 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
    _logging = false;
    region_load_active = false;
    set_radio_at = revert_radio_at = 0;
@@ -741,7 +762,7 @@ index da4c776c..5cff3cc6 100644
    recv_pkt_region = NULL;
  
    // defaults
-@@ -754,6 +986,11 @@ void MyMesh::sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, ui
+@@ -754,6 +1005,11 @@ void MyMesh::sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, ui
    bool is_wildcard = recv_pkt_region != NULL && recv_pkt_region->isWildcard();
    bool req_scope_known = recv_pkt_region != NULL && !is_wildcard
                        && region_map.getTransportKeysFor(*recv_pkt_region, &req_scope, 1) > 0;
@@ -753,7 +774,7 @@ index da4c776c..5cff3cc6 100644
  
    switch (mesh::chooseReplyScope(req_scope_known, is_wildcard, !default_scope.isNull())) {
      case mesh::REPLY_SCOPE_REQUEST:
-@@ -903,6 +1140,8 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -903,6 +1159,8 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
        region_load_active = false;
  
        sprintf(reply, "OK - loaded %d regions", region_map.getCount());
@@ -762,7 +783,7 @@ index da4c776c..5cff3cc6 100644
      } else {
        char *np = command;
        while (*np == ' ') np++;   // skip indent
-@@ -986,7 +1225,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
+@@ -986,7 +1244,14 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
    } else if (memcmp(command, "set repeat on", 13) == 0) {
      strcpy(reply, "ERR - repeat now deprecated");
    } else{
@@ -778,7 +799,7 @@ index da4c776c..5cff3cc6 100644
    }
  }
  
-@@ -1066,6 +1312,10 @@ void MyMesh::loop() {
+@@ -1066,6 +1331,10 @@ void MyMesh::loop() {
      MESH_DEBUG_PRINTLN("Radio params restored");
    }
  

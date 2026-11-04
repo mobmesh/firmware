@@ -30,7 +30,11 @@ static const size_t TIME_SAMPLE_SIGNED_LEN = 40;
 static const size_t TIME_SAMPLE_LEN = 104;
 static const uint16_t TIME_TOLERANCE_MAX = 1440;
 static const size_t REGION_DATA_MAX = 1057;
-static const size_t POLICY_DATA_LEN = 15;
+// Later settings go in the unused tail and flag bits, which every reader ignores, so adding one breaks no older node.
+static const size_t POLICY_DATA_LEN = 32;
+static const size_t POLICY_KNOWN_LEN = 24;
+static const uint8_t POLICY_HAS_RX_DELAY = 0x01;
+static const uint8_t POLICY_HAS_DIRECT_TX = 0x02;
 static const uint8_t CHUNK_MAX = 12;
 // High nibble is the payload schema, low nibble the codec; a new schema bumps it and old nodes reject the manifest.
 static const uint8_t FORMAT_RAW = 0x01;
@@ -157,9 +161,14 @@ struct PolicyProfile {
   uint8_t loop_detect;
   bool multi_acks;
   bool repeat_gate;
+  uint8_t auto_route;
   float airtime_factor;
   float tx_delay_factor;
   uint8_t agc_ticks;
+  bool has_rx_delay;
+  bool has_direct_tx;
+  float rx_delay;
+  float direct_tx_delay;
 };
 
 WireResult classify(const uint8_t* frame, size_t len, uint8_t& type);

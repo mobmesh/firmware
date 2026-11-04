@@ -88,13 +88,22 @@ bool validPolicyPayload(const uint8_t* data, size_t len) {
       data[0] > 64 || data[1] > 64 || data[2] > 64 ||
       (data[3] != 0 && (data[3] < 30 || data[3] > 120)) ||
       (data[4] != 0 && (data[4] < 3 || data[4] > 168)) ||
-      (data[5] & 0xc0) != 0 || (data[5] & 3) > 2) return false;
+      (data[5] & 3) > 2) return false;
   uint32_t duty_bits = read32(data + 6);
   uint32_t delay_bits = read32(data + 10);
   float duty = policyFloat(data + 6);
   float delay = policyFloat(data + 10);
-  return (duty_bits & 0x80000000u) == 0 && (delay_bits & 0x80000000u) == 0 &&
-         isfinite(duty) && isfinite(delay) && duty <= 9.0f && delay <= 2.0f;
+  if ((duty_bits & 0x80000000u) != 0 || (delay_bits & 0x80000000u) != 0 ||
+      !isfinite(duty) || !isfinite(delay) || duty > 9.0f || delay > 2.0f) return false;
+  if ((data[15] & POLICY_HAS_RX_DELAY) != 0) {
+    float rx = policyFloat(data + 16);
+    if ((read32(data + 16) & 0x80000000u) != 0 || !isfinite(rx) || rx > 20.0f) return false;
+  }
+  if ((data[15] & POLICY_HAS_DIRECT_TX) != 0) {
+    float direct = policyFloat(data + 20);
+    if ((read32(data + 20) & 0x80000000u) != 0 || !isfinite(direct) || direct > 2.0f) return false;
+  }
+  return true;
 }
 
 bool readPolicyPayload(const uint8_t data[POLICY_DATA_LEN], PolicyProfile& out) {
@@ -109,9 +118,14 @@ bool readPolicyPayload(const uint8_t data[POLICY_DATA_LEN], PolicyProfile& out) 
   value.loop_detect = (data[5] >> 2) & 3;
   value.multi_acks = (data[5] & 0x10) != 0;
   value.repeat_gate = (data[5] & 0x20) != 0;
+  value.auto_route = data[5] >> 6;
   value.airtime_factor = policyFloat(data + 6);
   value.tx_delay_factor = policyFloat(data + 10);
   value.agc_ticks = data[14];
+  value.has_rx_delay = (data[15] & POLICY_HAS_RX_DELAY) != 0;
+  value.has_direct_tx = (data[15] & POLICY_HAS_DIRECT_TX) != 0;
+  value.rx_delay = policyFloat(data + 16);
+  value.direct_tx_delay = policyFloat(data + 20);
   out = value;
   return true;
 }
@@ -119,7 +133,7 @@ bool readPolicyPayload(const uint8_t data[POLICY_DATA_LEN], PolicyProfile& out) 
 bool writePolicyPayload(const PolicyProfile& profile,
                         uint8_t out[POLICY_DATA_LEN]) {
   if (out == nullptr || sizeof(float) != 4 || profile.path_mode > 2 ||
-      profile.loop_detect > 3) return false;
+      profile.loop_detect > 3 || profile.auto_route > 3) return false;
   memset(out, 0, POLICY_DATA_LEN);
   out[0] = profile.flood_max;
   out[1] = profile.flood_unscoped;
@@ -127,13 +141,24 @@ bool writePolicyPayload(const PolicyProfile& profile,
   out[3] = profile.advert_ticks;
   out[4] = profile.flood_advert_hours;
   out[5] = (uint8_t)(profile.path_mode | (profile.loop_detect << 2) |
-                     (profile.multi_acks ? 0x10 : 0) | (profile.repeat_gate ? 0x20 : 0));
+                     (profile.multi_acks ? 0x10 : 0) | (profile.repeat_gate ? 0x20 : 0) |
+                     (profile.auto_route << 6));
   uint32_t bits;
   memcpy(&bits, &profile.airtime_factor, sizeof(bits));
   write32(out + 6, bits);
   memcpy(&bits, &profile.tx_delay_factor, sizeof(bits));
   write32(out + 10, bits);
   out[14] = profile.agc_ticks;
+  if (profile.has_rx_delay) {
+    out[15] |= POLICY_HAS_RX_DELAY;
+    memcpy(&bits, &profile.rx_delay, sizeof(bits));
+    write32(out + 16, bits);
+  }
+  if (profile.has_direct_tx) {
+    out[15] |= POLICY_HAS_DIRECT_TX;
+    memcpy(&bits, &profile.direct_tx_delay, sizeof(bits));
+    write32(out + 20, bits);
+  }
   return validPolicyPayload(out, POLICY_DATA_LEN);
 }
 

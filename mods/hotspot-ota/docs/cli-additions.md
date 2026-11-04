@@ -548,7 +548,7 @@ ver
 **Response format:**
 
 ```text
-<upstream-version> (<upstream-build-date>) + ota (<OTA-build-date> - <commit>)
+<upstream-version> (<upstream-build-date>) + MobMesh (<build-date> - <commit>)
 ```
 
 [↩ Back to hotspot-ota readme](../README.md)

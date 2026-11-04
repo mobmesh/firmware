@@ -924,6 +924,7 @@ static bool loadRecovery(uint8_t* scratch) {
 
 #if SYNC_SETTINGS_WITH_POLICY
 static bool readNativePolicy(uint8_t out[POLICY_DATA_LEN]);
+static bool policySame(const uint8_t current[POLICY_DATA_LEN], const uint8_t wanted[POLICY_DATA_LEN]);
 #endif
 
 static bool acceptsCampaign(uint8_t dataset, const char* channel, void*) {
@@ -1280,6 +1281,38 @@ static bool validateDataset(uint8_t dataset, const uint8_t* data,
 #if SYNC_SETTINGS_WITH_POLICY
 static bool setRepeatGate(bool on, char* reply);
 
+// Top bits of this policy byte carry a ModDirectSetting; MOD_ROUTE_KEEP is what a node without the mod publishes.
+#define POLICY_ROUTE_BYTE 5
+#define POLICY_ROUTE_SHIFT 6
+
+static uint8_t readRoute() {
+  if (!modDirectEvent(MOD_DIRECT_PRESENT, nullptr, 0)) return MOD_ROUTE_KEEP;
+  if (!modDirectEvent(MOD_DIRECT_ENABLED, nullptr, 0)) return MOD_ROUTE_OFF;
+  return modDirectEvent(MOD_DIRECT_DETOUR, nullptr, 0) ? MOD_ROUTE_ON : MOD_ROUTE_ON_NO_DETOUR;
+}
+
+// A node that does not forward, or lacks the mod, takes the rest of a campaign and leaves this setting alone.
+static bool routeApplies() {
+  char command[] = "get repeat";
+  char reply[160] = "";
+  modCliDispatch(0, command, reply);
+  return strcmp(reply, "> on") == 0 && modDirectEvent(MOD_DIRECT_PRESENT, nullptr, 0);
+}
+
+static bool policySame(const uint8_t current[POLICY_DATA_LEN], const uint8_t wanted[POLICY_DATA_LEN]) {
+  uint8_t a[POLICY_KNOWN_LEN], b[POLICY_KNOWN_LEN];
+  memcpy(a, current, sizeof(a));
+  memcpy(b, wanted, sizeof(b));
+  uint8_t want = b[POLICY_ROUTE_BYTE] >> POLICY_ROUTE_SHIFT;
+  if ((wanted[15] & POLICY_HAS_RX_DELAY) == 0) memset(a + 16, 0, 4), memset(b + 16, 0, 4);
+  if ((wanted[15] & POLICY_HAS_DIRECT_TX) == 0) memset(a + 20, 0, 4), memset(b + 20, 0, 4);
+  a[15] = b[15] = 0;
+  a[POLICY_ROUTE_BYTE] &= (1 << POLICY_ROUTE_SHIFT) - 1;
+  b[POLICY_ROUTE_BYTE] &= (1 << POLICY_ROUTE_SHIFT) - 1;
+  if (memcmp(a, b, sizeof(a)) != 0) return false;
+  return want == MOD_ROUTE_KEEP || !routeApplies() || current[POLICY_ROUTE_BYTE] >> POLICY_ROUTE_SHIFT == want;
+}
+
 static bool readNativePolicy(uint8_t out[POLICY_DATA_LEN]) {
   ModPolicyValues native;
   if (!modPolicyRead(&native) || native.multi_acks > 1) return false;
@@ -1293,9 +1326,14 @@ static bool readNativePolicy(uint8_t out[POLICY_DATA_LEN]) {
   profile.loop_detect = native.loop_detect;
   profile.multi_acks = native.multi_acks != 0;
   profile.repeat_gate = config.repeat_gate != 0;
+  profile.auto_route = readRoute();
   profile.airtime_factor = native.airtime_factor;
   profile.tx_delay_factor = native.tx_delay_factor;
   profile.agc_ticks = native.agc_reset_interval;
+  profile.has_rx_delay = true;
+  profile.has_direct_tx = true;
+  profile.rx_delay = native.rx_delay;
+  profile.direct_tx_delay = native.direct_tx_delay;
   return writePolicyPayload(profile, out);
 }
 
@@ -1329,10 +1367,14 @@ static bool applyNativePolicy(const uint8_t data[POLICY_DATA_LEN]) {
       !nativeSet("set agc.reset.interval %u", (unsigned)value.agc_ticks * 4u)) {
     return false;
   }
+  if ((value.has_rx_delay && !nativeSet("set rxdelay %.9g", (double)value.rx_delay)) ||
+      (value.has_direct_tx && !nativeSet("set direct.txdelay %.9g", (double)value.direct_tx_delay))) return false;
   char gate_reply[161];
   if (!setRepeatGate(value.repeat_gate, gate_reply) || gate_reply[0] != 'O') return false;
+  if (value.auto_route != MOD_ROUTE_KEEP && routeApplies() &&
+      !modDirectEvent(MOD_DIRECT_APPLY, nullptr, value.auto_route)) return false;
   uint8_t actual[POLICY_DATA_LEN];
-  return readNativePolicy(actual) && memcmp(actual, data, sizeof(actual)) == 0;
+  return readNativePolicy(actual) && policySame(actual, data);
 }
 
 static bool settlePolicy(bool applied, uint8_t* scratch) {
@@ -1356,7 +1398,7 @@ static bool restorePolicy(uint8_t* scratch) {
   }
   uint8_t current[POLICY_DATA_LEN];
   if ((!readNativePolicy(current) ||
-       memcmp(current, policy_recovery.prior, sizeof(current)) != 0) &&
+       !policySame(current, policy_recovery.prior)) &&
       !applyNativePolicy(policy_recovery.prior)) return false;
   return settlePolicy(false, scratch);
 }
@@ -1365,8 +1407,8 @@ static bool recoverPolicy(uint8_t* scratch) {
   if (policy_recovery.phase == RECOVERY_IDLE) return true;
   uint8_t current[POLICY_DATA_LEN];
   if (!readNativePolicy(current)) return restorePolicy(scratch);
-  bool target = memcmp(current, policy_recovery.target, sizeof(current)) == 0;
-  bool prior = memcmp(current, policy_recovery.prior, sizeof(current)) == 0;
+  bool target = policySame(current, policy_recovery.target);
+  bool prior = policySame(current, policy_recovery.prior);
 
   if (policy_recovery.phase == RECOVERY_PREPARED) {
     if (!target && prior && !applyNativePolicy(policy_recovery.target)) {
@@ -1445,7 +1487,7 @@ static bool applyCampaign(uint8_t dataset, const Campaign& campaign,
     if (!saveRecovery(recovery, scratch) || !recoverPolicy(scratch)) return false;
     uint8_t actual[POLICY_DATA_LEN];
     if (!readNativePolicy(actual) ||
-        memcmp(actual, campaign.data, sizeof(actual)) != 0) {
+        !policySame(actual, campaign.data)) {
       reportFor(dataset) = {campaign.generation, REPORT_RESTORED};
     } else {
       reportFor(dataset) = {campaign.generation, REPORT_APPLIED};
@@ -3307,11 +3349,12 @@ overflow:
 #if SYNC_SETTINGS_WITH_POLICY
 static bool policyLine(const ModPolicyValues& value, char* reply, size_t& at) {
   return append(reply, at,
-                "flood:%u/%u/%u adv:%um/%uh path:%u loop:%u ack:%u gate:%u af:%.6g tx:%.6g agc:%us",
+                "flood:%u/%u/%u adv:%um/%uh path:%u loop:%u ack:%u gate:%u route:%u af:%.6g tx:%.6g rx:%.6g dtx:%.6g agc:%us",
                 value.flood_max, value.flood_max_unscoped, value.flood_max_advert,
                 (unsigned)value.advert_interval * 2u, value.flood_advert_interval,
-                value.path_hash_mode, value.loop_detect, value.multi_acks, config.repeat_gate,
+                value.path_hash_mode, value.loop_detect, value.multi_acks, config.repeat_gate, readRoute(),
                 (double)value.airtime_factor, (double)value.tx_delay_factor,
+                (double)value.rx_delay, (double)value.direct_tx_delay,
                 (unsigned)value.agc_reset_interval * 4u);
 }
 

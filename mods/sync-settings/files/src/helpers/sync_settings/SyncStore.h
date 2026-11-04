@@ -9,6 +9,9 @@ static const size_t STORE_HEADER_LEN = 12;
 static const size_t STORE_DIGEST_LEN = 32;
 static const size_t STORE_OVERHEAD = STORE_HEADER_LEN + STORE_DIGEST_LEN;
 static const size_t STORE_MAX = 1146;
+static const size_t POLICY_RECOVERY_OLD_LEN = 74;
+static const size_t POLICY_RECOVERY_TARGET = 44 + POLICY_DATA_LEN;
+static const size_t POLICY_RECOVERY_LEN = POLICY_RECOVERY_TARGET + POLICY_DATA_LEN;
 static const uint8_t STORE_VERSION = 0x01;
 static const uint8_t PUBLISHER_MAX = 16;
 

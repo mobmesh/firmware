@@ -177,8 +177,22 @@ static bool received(const mesh::Packet* packet) {
   return false;
 }
 
+static bool apply(uint32_t setting) {
+  enabled = setting != MOD_ROUTE_OFF;
+  if (setting != MOD_ROUTE_OFF) detour_on = setting == MOD_ROUTE_ON;
+  if (!enabled) {
+    memset(slots, 0, sizeof(slots));
+    active = 0;
+  }
+  return saveSettings();
+}
+
 bool autoRouteDirect(ModDirectEvent event, const mesh::Packet* packet, uint32_t delay_millis) {
   if (!booted) boot();
+  if (event == MOD_DIRECT_PRESENT) return true;
+  if (event == MOD_DIRECT_ENABLED) return enabled;
+  if (event == MOD_DIRECT_DETOUR) return detour_on;
+  if (event == MOD_DIRECT_APPLY) return apply(delay_millis);
   if (!enabled) return false;
   switch (event) {
     case MOD_DIRECT_RECV: return received(packet);
@@ -186,6 +200,7 @@ bool autoRouteDirect(ModDirectEvent event, const mesh::Packet* packet, uint32_t 
     case MOD_DIRECT_FORWARD_MULTI_ACK: track(packet, delay_millis, true); return false;
     case MOD_DIRECT_SENT: sent(packet); return false;
     case MOD_DIRECT_BUSY: return active > 0;
+    default: return false;
   }
   return false;
 }
@@ -299,6 +314,16 @@ bool autoRouteHandleCli(const ModCliContext& context, char* command, char* reply
     memset(slots, 0, sizeof(slots));
     active = 0;
   }
-  strcpy(reply, saveSettings() ? "OK" : "ERR: could not save");
+  if (!saveSettings()) {
+    strcpy(reply, "ERR: could not save");
+    return true;
+  }
+  strcpy(reply, "OK");
+  if (target == &enabled && on) {
+    char get_repeat[] = "get repeat";
+    char state[160] = "";
+    modCliDispatch(0, get_repeat, state);
+    if (strcmp(state, "> off") == 0) strcpy(reply, "OK - but repeat is off");
+  }
   return true;
 }

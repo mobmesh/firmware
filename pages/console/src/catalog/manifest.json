@@ -3,17 +3,21 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "e1aa29f843b92eb7a3de5496b465477bed88e93e",
-  "sourceRows": 269,
-  "effectiveSignatures": 255,
+  "mobmeshCommit": "cce974a423ef4009ca7b92fa590d6d312cf0ffec",
+  "sourceRows": 274,
+  "effectiveSignatures": 260,
   "cliAdditionFiles": [
+    {
+      "path": "mods/auto-route/docs/cli-additions.md",
+      "sha256": "1bca02e5b0e5c7c62ec49bf6594318fdf26bb3f649de62390c4cbf30f1b79891"
+    },
     {
       "path": "mods/flood-gate/docs/cli-additions.md",
       "sha256": "77482526cf6577357673857ac6d169a4d41b521b5f1db51db4ba8d9c0d4dd933"
     },
     {
       "path": "mods/hotspot-ota/docs/cli-additions.md",
-      "sha256": "8e5d5dd946eaa1e09d75543ceaedbbd0fe2e2d437760fef8f92f21b1a6f65b7a"
+      "sha256": "daac5920f9cef57f23a19cdb7a360336763cd7e533bf624199cb4134d4377a2c"
     },
     {
       "path": "mods/power-guard/docs/cli-additions.md",
@@ -25,7 +29,7 @@
     },
     {
       "path": "mods/sync-settings/docs/cli-additions.md",
-      "sha256": "7603fd8569df3139ff190adc039ed7995cb68a10313882a03429fa75ff2c929e"
+      "sha256": "73e76ef205b352fffc2ca26d580b778e3d0ed45452163fc88f7cafd4288b7bc4"
     },
     {
       "path": "mods/try-settings/docs/cli-additions.md",
@@ -271,12 +275,84 @@
       "2026-10-25"
     ],
     [
-      "e1aa29f",
-      "2026-10-27"
+      "b8e07a2",
+      "2026-10-26"
+    ],
+    [
+      "cb5c281",
+      "2026-10-29"
+    ],
+    [
+      "afd1ae0",
+      "2026-10-29"
+    ],
+    [
+      "d5bca06",
+      "2026-10-29"
+    ],
+    [
+      "9768d5d",
+      "2026-10-29"
+    ],
+    [
+      "3c743fe",
+      "2026-10-30"
+    ],
+    [
+      "36171ae",
+      "2026-10-30"
+    ],
+    [
+      "07a15b1",
+      "2026-10-31"
+    ],
+    [
+      "bdbb2bd",
+      "2026-10-31"
+    ],
+    [
+      "0f0abcf",
+      "2026-11-02"
+    ],
+    [
+      "0b2f8ad",
+      "2026-11-02"
+    ],
+    [
+      "ca498c4",
+      "2026-11-02"
+    ],
+    [
+      "826ebc4",
+      "2026-11-02"
     ],
     [
       "0dd099f",
       "2026-11-02"
+    ],
+    [
+      "69970cb",
+      "2026-11-02"
+    ],
+    [
+      "f17564a",
+      "2026-11-02"
+    ],
+    [
+      "beb8ee8",
+      "2026-11-02"
+    ],
+    [
+      "fb650be",
+      "2026-11-02"
+    ],
+    [
+      "e0bc4c1",
+      "2026-11-03"
+    ],
+    [
+      "cce974a",
+      "2026-11-04"
     ]
   ]
 }
