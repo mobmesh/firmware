@@ -234,12 +234,14 @@ async function firstUsableGrantedPort(preferredPort, options) {
 }
 
 // Escalates strictly: held port, then every grant, then one re-entry into programming
-// mode if the caller supplied one. Injected so this stays MCU-agnostic.
+// mode if the caller supplied one. Injected so this stays MCU-agnostic. `anyGranted: false`
+// stops after the held port, for the step where the person has to choose the device.
 export async function acquireUsableSerialPort({
   preferredPort = null,
   prompt = 'Select the serial port to continue.',
   onStatus,
   reenterProgrammingMode = null,
+  anyGranted = true,
 } = {}) {
   const options = { prompt, onStatus };
 
@@ -247,6 +249,7 @@ export async function acquireUsableSerialPort({
     const held = await tryUsableSerialPort(preferredPort, options);
     if (held) return held;
   }
+  if (!anyGranted) throw new PortSelectionRequiredError(prompt);
 
   const granted = await firstUsableGrantedPort(preferredPort, options);
   if (granted) return granted;

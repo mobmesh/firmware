@@ -305,11 +305,13 @@ export const STEPS = [
       if (copy) throw new FlowBlockedError(`${copy.title} — ${copy.body} ${copy.suggestion}`);
 
       const s = flow.state;
-      // A port the user picked at the checkpoint arrives here as the preferred one.
+      // Only a port the person picked at the checkpoint counts: with two boards attached, an
+      // earlier grant could be the wrong one. Later steps follow this choice by themselves.
       s.port = await acquireUsableSerialPort({
         preferredPort: s.port,
         prompt: 'Select the device you want to flash.',
         onStatus,
+        anyGranted: false,
       });
       s.family = deviceFamily(s.port);
       onStatus(`USB vendor says: ${s.family}`);
