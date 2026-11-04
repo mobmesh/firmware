@@ -7,7 +7,7 @@
 #include <helpers/sync_settings/SyncIntegration.h>
 #include <helpers/esp32/FloodGateIntegration.h>
 #include <helpers/radio_diag/RadioDiagIntegration.h>
-#include <helpers/auto_route/AutoRouteIntegration.h>
+#include <helpers/direct_retry/DirectRetryIntegration.h>
 
 bool modRadioInit(const char* build_id) {
   hotspotOtaBeforeRadioInit();
@@ -22,7 +22,7 @@ void modLoop() {
   syncLoop();
   floodGateLoop();
   radioDiagLoop();
-  autoRouteLoop();
+  directRetryLoop();
 }
 
 bool modResolveRegion(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out) {
@@ -47,7 +47,7 @@ size_t modOwnerInfoMarker(uint8_t out[4]) {
 }
 
 bool modDirectEvent(ModDirectEvent event, const mesh::Packet* packet, uint32_t delay_millis) {
-  return autoRouteDirect(event, packet, delay_millis);
+  return directRetryDirect(event, packet, delay_millis);
 }
 
 void modObserveRecv(const mesh::Packet* packet, bool accepted,

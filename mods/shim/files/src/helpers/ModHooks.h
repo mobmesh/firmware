@@ -54,11 +54,10 @@ enum ModDirectEvent {
   MOD_DIRECT_SENT,
   MOD_DIRECT_PRESENT,
   MOD_DIRECT_ENABLED,
-  MOD_DIRECT_DETOUR,
   MOD_DIRECT_APPLY,
 };
 // The value MOD_DIRECT_APPLY takes in delay_millis.
-enum ModDirectSetting { MOD_ROUTE_KEEP, MOD_ROUTE_OFF, MOD_ROUTE_ON, MOD_ROUTE_ON_NO_DETOUR };
+enum ModDirectSetting { MOD_ROUTE_KEEP, MOD_ROUTE_OFF, MOD_ROUTE_ON };
 bool modDirectEvent(ModDirectEvent event, const mesh::Packet* packet, uint32_t delay_millis);
 bool modDirectResend(const mesh::Packet* packet);
 bool modDirectReply(const uint8_t* data, size_t len, uint32_t delay_millis);

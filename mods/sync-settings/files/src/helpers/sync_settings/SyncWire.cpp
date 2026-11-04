@@ -118,7 +118,7 @@ bool readPolicyPayload(const uint8_t data[POLICY_DATA_LEN], PolicyProfile& out) 
   value.loop_detect = (data[5] >> 2) & 3;
   value.multi_acks = (data[5] & 0x10) != 0;
   value.repeat_gate = (data[5] & 0x20) != 0;
-  value.auto_route = data[5] >> 6;
+  value.direct_retry = data[5] >> 6;
   value.airtime_factor = policyFloat(data + 6);
   value.tx_delay_factor = policyFloat(data + 10);
   value.agc_ticks = data[14];
@@ -133,7 +133,7 @@ bool readPolicyPayload(const uint8_t data[POLICY_DATA_LEN], PolicyProfile& out) 
 bool writePolicyPayload(const PolicyProfile& profile,
                         uint8_t out[POLICY_DATA_LEN]) {
   if (out == nullptr || sizeof(float) != 4 || profile.path_mode > 2 ||
-      profile.loop_detect > 3 || profile.auto_route > 3) return false;
+      profile.loop_detect > 3 || profile.direct_retry > 3) return false;
   memset(out, 0, POLICY_DATA_LEN);
   out[0] = profile.flood_max;
   out[1] = profile.flood_unscoped;
@@ -142,7 +142,7 @@ bool writePolicyPayload(const PolicyProfile& profile,
   out[4] = profile.flood_advert_hours;
   out[5] = (uint8_t)(profile.path_mode | (profile.loop_detect << 2) |
                      (profile.multi_acks ? 0x10 : 0) | (profile.repeat_gate ? 0x20 : 0) |
-                     (profile.auto_route << 6));
+                     (profile.direct_retry << 6));
   uint32_t bits;
   memcpy(&bits, &profile.airtime_factor, sizeof(bits));
   write32(out + 6, bits);

@@ -3,13 +3,13 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "450cf125f5066f38b3781abcc560d9193078b58d",
-  "sourceRows": 274,
-  "effectiveSignatures": 260,
+  "mobmeshCommit": "7ffb3d55fee676d8589d936d40a5f9f22268f0e9",
+  "sourceRows": 272,
+  "effectiveSignatures": 263,
   "cliAdditionFiles": [
     {
-      "path": "mods/auto-route/docs/cli-additions.md",
-      "sha256": "5ec19ca7289a8d15b8728c521b8c251cefa0256ea159a53891cc3dd655f79de5"
+      "path": "mods/direct-retry/docs/cli-additions.md",
+      "sha256": "103fbe84dfbd9af37ac2a9f3d391e62c4b485c81de1c7519c88f45d6ec0597e5"
     },
     {
       "path": "mods/flood-gate/docs/cli-additions.md",
@@ -29,7 +29,7 @@
     },
     {
       "path": "mods/sync-settings/docs/cli-additions.md",
-      "sha256": "73e76ef205b352fffc2ca26d580b778e3d0ed45452163fc88f7cafd4288b7bc4"
+      "sha256": "3ab63797bba2e8f4b05437357ba2ef14680f6880353c865f4d9ca9a042b187ca"
     },
     {
       "path": "mods/try-settings/docs/cli-additions.md",
@@ -380,6 +380,18 @@
     ],
     [
       "450cf12",
+      "2026-11-04"
+    ],
+    [
+      "3945da0",
+      "2026-11-04"
+    ],
+    [
+      "f88b0b8",
+      "2026-11-04"
+    ],
+    [
+      "7ffb3d5",
       "2026-11-04"
     ]
   ]

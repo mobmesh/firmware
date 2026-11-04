@@ -1287,8 +1287,7 @@ static bool setRepeatGate(bool on, char* reply);
 
 static uint8_t readRoute() {
   if (!modDirectEvent(MOD_DIRECT_PRESENT, nullptr, 0)) return MOD_ROUTE_KEEP;
-  if (!modDirectEvent(MOD_DIRECT_ENABLED, nullptr, 0)) return MOD_ROUTE_OFF;
-  return modDirectEvent(MOD_DIRECT_DETOUR, nullptr, 0) ? MOD_ROUTE_ON : MOD_ROUTE_ON_NO_DETOUR;
+  return modDirectEvent(MOD_DIRECT_ENABLED, nullptr, 0) ? MOD_ROUTE_ON : MOD_ROUTE_OFF;
 }
 
 // A node that does not forward, or lacks the mod, takes the rest of a campaign and leaves this setting alone.
@@ -1304,6 +1303,8 @@ static bool policySame(const uint8_t current[POLICY_DATA_LEN], const uint8_t wan
   memcpy(a, current, sizeof(a));
   memcpy(b, wanted, sizeof(b));
   uint8_t want = b[POLICY_ROUTE_BYTE] >> POLICY_ROUTE_SHIFT;
+  // Older publishers can send 3, which means on here.
+  if (want > MOD_ROUTE_ON) want = MOD_ROUTE_ON;
   if ((wanted[15] & POLICY_HAS_RX_DELAY) == 0) memset(a + 16, 0, 4), memset(b + 16, 0, 4);
   if ((wanted[15] & POLICY_HAS_DIRECT_TX) == 0) memset(a + 20, 0, 4), memset(b + 20, 0, 4);
   a[15] = b[15] = 0;
@@ -1326,7 +1327,7 @@ static bool readNativePolicy(uint8_t out[POLICY_DATA_LEN]) {
   profile.loop_detect = native.loop_detect;
   profile.multi_acks = native.multi_acks != 0;
   profile.repeat_gate = config.repeat_gate != 0;
-  profile.auto_route = readRoute();
+  profile.direct_retry = readRoute();
   profile.airtime_factor = native.airtime_factor;
   profile.tx_delay_factor = native.tx_delay_factor;
   profile.agc_ticks = native.agc_reset_interval;
@@ -1371,8 +1372,8 @@ static bool applyNativePolicy(const uint8_t data[POLICY_DATA_LEN]) {
       (value.has_direct_tx && !nativeSet("set direct.txdelay %.9g", (double)value.direct_tx_delay))) return false;
   char gate_reply[161];
   if (!setRepeatGate(value.repeat_gate, gate_reply) || gate_reply[0] != 'O') return false;
-  if (value.auto_route != MOD_ROUTE_KEEP && routeApplies() &&
-      !modDirectEvent(MOD_DIRECT_APPLY, nullptr, value.auto_route)) return false;
+  if (value.direct_retry != MOD_ROUTE_KEEP && routeApplies() &&
+      !modDirectEvent(MOD_DIRECT_APPLY, nullptr, value.direct_retry)) return false;
   uint8_t actual[POLICY_DATA_LEN];
   return readNativePolicy(actual) && policySame(actual, data);
 }

@@ -1,15 +1,15 @@
 # Mod-level facts. build_src_filter is derived from what is under files/, so the two
 # cannot drift apart.
-name: auto-route
+name: direct-retry
 
-env_flags: [WITH_AUTO_ROUTE]
+env_flags: [WITH_DIRECT_RETRY]
 
 integration:
-  header: helpers/auto_route/AutoRouteIntegration.h
+  header: helpers/direct_retry/DirectRetryIntegration.h
   hooks:
-    loop: autoRouteLoop
-    direct: autoRouteDirect
+    loop: directRetryLoop
+    direct: directRetryDirect
     cli:
-      handler: autoRouteHandleCli
+      handler: directRetryHandleCli
       # Claims only its own keys, below radio-diag's 150.
       priority: 170

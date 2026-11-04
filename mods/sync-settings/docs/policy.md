@@ -14,13 +14,12 @@ flood.max              flood.max.unscoped     flood.max.advert
 advert.interval        flood.advert.interval  path.hash.mode
 loop.detect            multi.acks             af
 txdelay                agc.reset.interval     repeat.gate
-autoroute              autoroute.detour       rxdelay
-direct.txdelay
+direct.retry           rxdelay                direct.txdelay
 ```
 
 Radio settings and credentials are never carried by policy.
 
-`autoroute` and `autoroute.detour` go only to a node with `auto-route` and with `repeat` on. Any other node takes the rest of the campaign and leaves them as they are, so a node that later turns `repeat` on keeps its old setting until the next campaign. A publisher without `auto-route` leaves them alone everywhere.
+`direct.retry` goes only to a node with `direct-retry` and with `repeat` on. Any other node takes the rest of the campaign and leaves it as it is, so a node that later turns `repeat` on keeps its old setting until the next campaign. A publisher without `direct-retry` leaves it alone everywhere.
 
 Update nodes before publishing: firmware before this format refuses every policy campaign and stays as it was, and it shows no error. From this format on, a node ignores any setting it does not know and takes the rest.
 

@@ -161,7 +161,7 @@ struct PolicyProfile {
   uint8_t loop_detect;
   bool multi_acks;
   bool repeat_gate;
-  uint8_t auto_route;
+  uint8_t direct_retry;
   float airtime_factor;
   float tx_delay_factor;
   uint8_t agc_ticks;
