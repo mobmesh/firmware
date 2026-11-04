@@ -15,7 +15,7 @@ get direct.retry.stats
 
 - Off by default.
 - **Resends:** after sending a direct packet, a repeater listens for the next hop to repeat it, and resends up to twice if it hears nothing. A last hop gets one resend, because a stock client cannot answer.
-- **Hop replies:** a repeater that receives a direct packet addressed to it sends one short zero-hop reply, which stops the last relay's resend.
+- **Hop replies:** a repeater that forwards a packet needs no reply, because the sender hears it repeat the packet. The destination repeater has nothing to repeat, so it sends one short zero-hop reply, which stops the last relay's resend.
 
 ## CLI Commands
 
