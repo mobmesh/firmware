@@ -21,15 +21,6 @@ get autoroute.stats
 - **Hop replies:** a repeater that receives a direct packet addressed to it sends one short zero-hop reply, which stops the last relay's resend.
 - **Learning:** flood packets name the repeaters they passed through, which shows a repeater who can reach whom. It detours only through a neighbour it has heard directly and seen linked to the hop after the failing one. Until then, it only resends.
 
-## What it costs
-
-- **Airtime:** only after a miss, plus hop replies.
-- **Power:** nothing measurable at idle on a heltec_v4.
-- **Memory:** about 3 KB of RAM.
-- **Stock neighbours:** they relay and receive these packets normally, and a detour can go through one. A stock destination sends no hop reply, so the last relay always spends its one resend.
-
-Hop replies use control packet type `0xA0`. Stock repeaters ignore it; a stock companion passes it to its connected app.
-
 ## CLI Commands
 
 Detailed syntax and responses are in the [auto-route CLI reference](docs/cli-additions.md).
