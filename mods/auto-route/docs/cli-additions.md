@@ -26,7 +26,7 @@ set autoroute.detour <on|off>
 
 **Response:** `> <on|off>, detour <on|off>` for `get`. `OK` for `set`, or `OK - but repeat is off`, `Error: use on or off`, `ERR: could not save`.
 
-**Effect:** saved and applied at once. Off by default, with detours on once it is turned on. Turning it off drops pending resends. With `repeat` off the node relays nothing, so only its own direct sends are protected.
+**Effect:** saved and applied at once. Off by default, with detours on once it is turned on. Turning it off drops pending resends and turns detours back on, so `set autoroute on` always gives the full mod. With `repeat` off the node relays nothing, so only its own direct sends are protected.
 
 ## autoroute.stats
 

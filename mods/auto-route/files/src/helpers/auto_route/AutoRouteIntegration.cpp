@@ -177,13 +177,15 @@ static bool received(const mesh::Packet* packet) {
   return false;
 }
 
+static void clearSlots() {
+  memset(slots, 0, sizeof(slots));
+  active = 0;
+}
+
 static bool apply(uint32_t setting) {
   enabled = setting != MOD_ROUTE_OFF;
-  if (setting != MOD_ROUTE_OFF) detour_on = setting == MOD_ROUTE_ON;
-  if (!enabled) {
-    memset(slots, 0, sizeof(slots));
-    active = 0;
-  }
+  detour_on = setting != MOD_ROUTE_ON_NO_DETOUR;
+  if (!enabled) clearSlots();
   return saveSettings();
 }
 
@@ -311,8 +313,8 @@ bool autoRouteHandleCli(const ModCliContext& context, char* command, char* reply
   }
   *target = on;
   if (!enabled) {
-    memset(slots, 0, sizeof(slots));
-    active = 0;
+    detour_on = 1;
+    clearSlots();
   }
   if (!saveSettings()) {
     strcpy(reply, "ERR: could not save");
