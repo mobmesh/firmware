@@ -2,12 +2,16 @@
 
 [↩ Back to firmware readme](../../README.md)
 
-Keeps direct traffic moving when a hop misses. Remote logins, CLI commands and direct messages all rely on the direct path holding, and a stock repeater forwards a packet once and forgets it.
+**MeshCore:** direct traffic follows one fixed path, so one missed hop loses the packet.
+
+**Auto-Route:** repeaters resend a missed hop, and detour around a dead relay through a neighbour known to reach the next hop beyond.
 
 ```text
 set autoroute on
 get autoroute.stats
 ```
+
+<img src="assets/detour-flow.svg" width="700" alt="A repeater resends a missed direct packet, and its first resend detours through a neighbour known to reach the next hop beyond">
 
 ## What it does
 

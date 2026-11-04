@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 420" role="img" aria-labelledby="title desc">
+  <title id="title">Direct traffic around a failing hop</title>
+  <desc id="desc">A client sends direct traffic through relay A towards relay B, which stays silent. Relay A resends, and the first resend goes through a neighbour known to reach relay D. Relay D forwards to the destination, whose short hop reply stops the last resend.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#7e9eac"/></marker>
+    <marker id="arrow-good" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#4fa88a"/></marker>
+    <marker id="arrow-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#e3a078"/></marker>
+    <style>
+      .bg{fill:#18212b}.card{fill:#222f3c;stroke:#3d5262;stroke-width:1.5}.head{font:700 24px system-ui,sans-serif;fill:#e1ebf2}.sub{font:15px system-ui,sans-serif;fill:#b0c1cd}.label{font:700 18px system-ui,sans-serif;fill:#e1ebf2}.body{font:14px system-ui,sans-serif;fill:#b0c1cd}.tag{font:700 13px system-ui,sans-serif}.line{fill:none;stroke:#7e9eac;stroke-width:2;marker-end:url(#arrow)}.good{fill:none;stroke:#4fa88a;stroke-width:2.5;marker-end:url(#arrow-good)}.bad{fill:none;stroke:#e3a078;stroke-width:2;stroke-dasharray:6 6;marker-end:url(#arrow-bad)}
+    </style>
+  </defs>
+  <rect class="bg" width="1000" height="420" rx="28"/>
+  <text class="head" x="42" y="48">Direct traffic around a failing hop</text>
+  <text class="sub" x="42" y="75">Repeaters resend a missed hop, and detour around a dead relay.</text>
+
+  <rect class="card" x="42" y="112" width="148" height="88" rx="22"/>
+  <text class="label" x="60" y="150">Client</text><text class="body" x="60" y="175">Login, CLI, DM</text>
+  <path class="line" d="M190 156H234"/>
+
+  <rect x="234" y="112" width="148" height="88" rx="22" fill="#263c49" stroke="#4e788d" stroke-width="1.5"/>
+  <text class="label" x="252" y="150">Relay A</text><text class="body" x="252" y="175">Listens for echo</text>
+  <path class="bad" d="M382 156H426"/>
+  <text class="tag" x="404" y="142" text-anchor="middle" fill="#e3a078">MISS</text>
+
+  <rect x="426" y="112" width="148" height="88" rx="22" fill="#3d302a" stroke="#86634f" stroke-width="1.5"/>
+  <text class="label" x="444" y="150">Relay B</text><text class="body" x="444" y="175">Silent</text>
+  <path class="bad" d="M574 156H618"/>
+
+  <rect x="618" y="112" width="148" height="88" rx="22" fill="#263c49" stroke="#4e788d" stroke-width="1.5"/>
+  <text class="label" x="636" y="150">Relay D</text><text class="body" x="636" y="175">Next on the path</text>
+  <path class="good" d="M766 156H810"/>
+
+  <rect x="810" y="112" width="148" height="88" rx="22" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
+  <text class="label" x="828" y="150">Destination</text><text class="body" x="828" y="175">Delivered</text>
+
+  <path class="good" d="M308 200V306H426"/>
+  <text class="tag" x="322" y="290" fill="#4fa88a">FIRST RESEND</text>
+  <rect x="426" y="262" width="148" height="88" rx="22" fill="#203d38" stroke="#477f6d" stroke-width="1.5"/>
+  <text class="label" x="444" y="300">Neighbour</text><text class="body" x="444" y="325">Known to reach D</text>
+  <path class="good" d="M574 306H668V200"/>
+  <text class="tag" x="586" y="328" fill="#4fa88a">SAME PATH LENGTH</text>
+
+  <path class="line" d="M884 200V246H734V200"/>
+  <text class="tag" x="809" y="268" text-anchor="middle" fill="#7e9eac">HOP REPLY STOPS THE RESEND</text>
+
+  <text class="sub" x="42" y="392">Only the repeater making the swap needs this mod. The neighbour can be stock.</text>
+</svg>
