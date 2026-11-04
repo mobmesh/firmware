@@ -20,6 +20,12 @@ static bool chosen(const ArTables& t, const ArHash& failing, const ArHash& next,
   return true;
 }
 
+static int links(const ArTables& t) {
+  int n = 0;
+  for (int i = 0; i < AR_LINKS; i++) n += t.links[i].at != 0;
+  return n;
+}
+
 int main() {
   static ArTables t;
   uint8_t via = 0;
@@ -33,39 +39,54 @@ int main() {
   // No evidence: no detour
   CHECK(!chosen(t, bad, next, self, &via));
 
-  // One reverse sighting is not enough, and a neighbour must have been heard
+  // A pair with no neighbour in it is not kept
   arSawHop(t, next, a, NOW);
-  CHECK(!chosen(t, bad, next, self, &via));
-  arSawHop(t, next, a, NOW);
-  CHECK(!chosen(t, bad, next, self, &via));
+  CHECK(links(t) == 0);
+
+  // One reverse sighting is not enough
   arHeard(t, a, 20, NOW);
+  arSawHop(t, next, a, NOW);
+  CHECK(!chosen(t, bad, next, self, &via));
+  arSawHop(t, next, a, NOW);
   CHECK(chosen(t, bad, next, self, &via) && via == 0x40);
 
   // Best signal wins among armed candidates
-  arSawHop(t, b, next, NOW);
   arHeard(t, b, 40, NOW);
+  arSawHop(t, b, next, NOW);
   CHECK(chosen(t, bad, next, self, &via) && via == 0x50);
 
-  // Never the failing hop, self or the target
+  // Each side of a neighbour is kept once, and the far side of a pair is not
   static ArTables u;
-  arSawHop(u, bad, next, NOW);
+  arHeard(u, a, 20, NOW);
+  arSawHop(u, bad, a, NOW);
+  arSawHop(u, a, next, NOW);
+  CHECK(links(u) == 2);
+
+  // A path and its return feed the same entries
+  arSawHop(u, next, a, NOW);
+  arSawHop(u, a, bad, NOW);
+  CHECK(links(u) == 2);
+
+  // Never the failing hop, self or the target
+  memset(&u, 0, sizeof(u));
   arHeard(u, bad, 40, NOW);
+  arSawHop(u, bad, next, NOW);
   CHECK(!chosen(u, bad, next, self, &via));
   memset(&u, 0, sizeof(u));
-  arSawHop(u, self, next, NOW);
   arHeard(u, self, 40, NOW);
+  arSawHop(u, self, next, NOW);
   CHECK(!chosen(u, bad, next, self, &via));
 
   // A one-byte via cannot fill a two-byte path entry
   memset(&u, 0, sizeof(u));
-  arSawHop(u, h(0x60, 0, 1), h(0x30, 0, 1), NOW);
   arHeard(u, h(0x60, 0, 1), 40, NOW);
+  arSawHop(u, h(0x60, 0, 1), h(0x30, 0, 1), NOW);
   CHECK(!chosen(u, bad, next, self, &via));
 
   // Three-byte hashes
   memset(&u, 0, sizeof(u));
-  arSawHop(u, h(0x70, 7, 3), h(0x30, 1, 3), NOW);
   arHeard(u, h(0x70, 7, 3), 12, NOW);
+  arSawHop(u, h(0x70, 7, 3), h(0x30, 1, 3), NOW);
   CHECK(chosen(u, h(0x20, 1, 3), h(0x30, 1, 3), h(0x10, 1, 3), &via) && via == 0x70);
 
   // A last hop names its destination in one byte, which still finds a wider entry
@@ -77,10 +98,12 @@ int main() {
 
   // A full table evicts its oldest entry
   memset(&u, 0, sizeof(u));
-  for (int i = 0; i < AR_LINKS + 4; i++) arSawOrigin(u, h((uint8_t)(i + 1)), h(0xEE), NOW + i * 10);
+  arHeard(u, a, 20, NOW);
+  for (int i = 0; i < AR_LINKS + 4; i++) arSawOrigin(u, a, h((uint8_t)(i + 1)), NOW + i * 10);
   bool first_left = false;
-  for (int i = 0; i < AR_LINKS; i++) first_left = first_left || (u.links[i].at != 0 && u.links[i].via.b[0] == 1);
+  for (int i = 0; i < AR_LINKS; i++) first_left = first_left || (u.links[i].at != 0 && u.links[i].hop.b[0] == 1);
   CHECK(!first_left);
+  CHECK(links(u) == AR_LINKS);
 
   CHECK(arWait(100, 0, 0) == 500);
   CHECK(arWait(100, 2, 50) == 750);

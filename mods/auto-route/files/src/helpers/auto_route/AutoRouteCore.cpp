@@ -48,25 +48,26 @@ static ArLink& linkFor(ArTables& t, const ArHash& via, const ArHash& hop, uint32
   return l;
 }
 
+static const ArNeighbour* neighbour(const ArTables& t, const ArHash& id, uint32_t now) {
+  for (int i = 0; i < AR_NEIGHBOURS; i++) {
+    const ArNeighbour& n = t.neighbours[i];
+    if (n.at != 0 && (int32_t)(now - n.at) <= (int32_t)AR_FRESH_MS && arMatch(n.id, id)) return &n;
+  }
+  return nullptr;
+}
+
+// Only a neighbour heard directly can be a detour, so only its own sides of a path are kept.
 void arSawHop(ArTables& t, const ArHash& before, const ArHash& after, uint32_t now) {
-  linkFor(t, before, after, now).forward++;
-  linkFor(t, after, before, now).reverse++;
+  if (neighbour(t, before, now)) linkFor(t, before, after, now).forward++;
+  if (neighbour(t, after, now)) linkFor(t, after, before, now).reverse++;
 }
 
 void arSawOrigin(ArTables& t, const ArHash& via, const ArHash& origin, uint32_t now) {
-  linkFor(t, via, origin, now).reverse++;
+  if (neighbour(t, via, now)) linkFor(t, via, origin, now).reverse++;
 }
 
 bool arArmed(const ArLink& link) {
   return link.forward >= AR_ARM_FORWARD || link.reverse >= AR_ARM_REVERSE;
-}
-
-static const ArNeighbour* neighbour(const ArTables& t, const ArHash& id, uint32_t now) {
-  for (int i = 0; i < AR_NEIGHBOURS; i++) {
-    const ArNeighbour& n = t.neighbours[i];
-    if (n.at != 0 && now - n.at <= AR_FRESH_MS && arMatch(n.id, id)) return &n;
-  }
-  return nullptr;
 }
 
 bool arChoose(const ArTables& t, const ArHash& failing, const ArHash& next, const ArHash& self, uint32_t now, ArHash* out) {
@@ -74,7 +75,7 @@ bool arChoose(const ArTables& t, const ArHash& failing, const ArHash& next, cons
   int8_t best_snr = 0;
   for (int i = 0; i < AR_LINKS; i++) {
     const ArLink& l = t.links[i];
-    if (l.at == 0 || now - l.at > AR_FRESH_MS || !arArmed(l) || !arMatch(l.hop, next)) continue;
+    if (l.at == 0 || (int32_t)(now - l.at) > (int32_t)AR_FRESH_MS || !arArmed(l) || !arMatch(l.hop, next)) continue;
     if (l.via.len < failing.len || arMatch(l.via, failing) || arMatch(l.via, self) || arMatch(l.via, next)) continue;
     const ArNeighbour* n = neighbour(t, l.via, now);
     if (n == nullptr) continue;

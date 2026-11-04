@@ -10,6 +10,7 @@
 #define SETTINGS_PATH "/autoroute.json"
 #define HOP_REPLY     0xA0
 #define HOP_REPLY_LEN (1 + AR_REPLY_KEY)
+#define REPLY_MAX     160
 
 class SettingsFile : public ConfigSerializer {
   uint8_t& _on;
@@ -270,7 +271,7 @@ bool autoRouteHandleCli(const ModCliContext& context, char* command, char* reply
     return true;
   }
   if (strcmp(command, "get autoroute.stats") == 0) {
-    sprintf(reply, "> resent=%lu echo=%lu reply=%lu exhausted=%lu detour=%lu noalt=%lu replied=%lu noslot=%lu stale=%lu", (unsigned long)count_resent, (unsigned long)count_echo, (unsigned long)count_reply,
+    snprintf(reply, REPLY_MAX, "> resent=%lu echo=%lu reply=%lu exhausted=%lu detour=%lu noalt=%lu replied=%lu noslot=%lu stale=%lu", (unsigned long)count_resent, (unsigned long)count_echo, (unsigned long)count_reply,
             (unsigned long)count_exhausted, (unsigned long)count_detour, (unsigned long)count_noalt, (unsigned long)count_replied, (unsigned long)count_noslot, (unsigned long)count_stale);
     return true;
   }
