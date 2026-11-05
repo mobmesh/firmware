@@ -13,7 +13,6 @@ Do not type the brackets. Durations are integer seconds without a unit suffix.
 
 | Command | Purpose |
 | --- | --- |
-| [`powersaving safe.mv`](#powersaving-safemv) | Read the safe-sleep threshold in force, 0 when safe sleep is off |
 | [`powersaving safe.mv <mv>`](#powersaving-safemv) | Save the safe-sleep threshold |
 | [`powersaving safe [on\|off]`](#powersaving-safe) | Inspect or enable safe sleep |
 | [`powersaving auto [on\|off]`](#powersaving-auto) | Inspect or enable automatic power saving |
@@ -26,11 +25,8 @@ Do not type the brackets. Durations are integer seconds without a unit suffix.
 ## powersaving safe.mv
 
 ```text
-powersaving safe.mv
 powersaving safe.mv <mv>
 ```
-
-With no value, replies `> <mv>`, the threshold in force, or `> 0` when safe sleep is off.
 
 | Parameter | Definition |
 | --- | --- |

@@ -153,10 +153,6 @@ static bool parseDecimalU32(const char* text, uint32_t* out) {
 }
 
 bool powerGuardHandleCli(const ModCliContext& context, char* command, char* reply) {
-  if (strcmp(command, "powersaving safe.mv") == 0) {
-    sprintf(reply, "> %u", power_guard.safeEnabled() ? (unsigned)power_guard.sleepMilliVolts() : 0u);
-    return true;
-  }
   if (memcmp(command, "powersaving safe.mv ", 20) == 0) {
     uint32_t mv = 0;
     bool valid = parseDecimalU32(command + 20, &mv)

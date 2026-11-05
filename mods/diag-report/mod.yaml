@@ -1,0 +1,19 @@
+# Mod-level facts. build_src_filter is derived from what is under files/, so the two
+# cannot drift apart.
+name: diag-report
+
+env_flags: [WITH_DIAG_REPORT]
+
+requirements:
+  # diag radio.lna refuses at runtime where the board cannot switch its LNA, so one binary serves every variant.
+  optional: [fem_lna_control]
+
+integration:
+  header: helpers/diag_report/DiagReportIntegration.h
+  hooks:
+    loop: diagReportLoop
+    recv: diagReportRecv
+    cli:
+      handler: diagReportHandleCli
+      # Above try-settings' 100 so an LNA tryset is seen first, below power-guard's 200.
+      priority: 150

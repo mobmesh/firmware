@@ -11,5 +11,5 @@ integration:
     direct: directRetryDirect
     cli:
       handler: directRetryHandleCli
-      # Claims only its own keys, below radio-diag's 150.
+      # Claims only its own keys, below diag-report's 150.
       priority: 170

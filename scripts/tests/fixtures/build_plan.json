@@ -24,7 +24,7 @@
         "power-guard",
         "sync-settings",
         "flood-gate",
-        "radio-diag",
+        "diag-report",
         "direct-retry"
       ],
       "build_flags_append": [
@@ -92,7 +92,7 @@
         "try-settings",
         "sync-settings",
         "flood-gate",
-        "radio-diag",
+        "diag-report",
         "direct-retry"
       ],
       "build_flags_append": [],
@@ -158,7 +158,7 @@
         "try-settings",
         "sync-settings",
         "flood-gate",
-        "radio-diag",
+        "diag-report",
         "direct-retry"
       ],
       "build_flags_append": [],
@@ -224,7 +224,7 @@
         "try-settings",
         "sync-settings",
         "flood-gate",
-        "radio-diag",
+        "diag-report",
         "direct-retry"
       ],
       "build_flags_append": [
@@ -292,7 +292,7 @@
         "try-settings",
         "sync-settings",
         "flood-gate",
-        "radio-diag",
+        "diag-report",
         "direct-retry"
       ],
       "build_flags_append": [],
@@ -358,7 +358,7 @@
         "try-settings",
         "sync-settings",
         "flood-gate",
-        "radio-diag",
+        "diag-report",
         "direct-retry"
       ],
       "build_flags_append": [],
@@ -424,7 +424,7 @@
         "try-settings",
         "sync-settings",
         "flood-gate",
-        "radio-diag",
+        "diag-report",
         "direct-retry"
       ],
       "build_flags_append": [],
@@ -490,7 +490,7 @@
         "try-settings",
         "sync-settings",
         "flood-gate",
-        "radio-diag",
+        "diag-report",
         "direct-retry"
       ],
       "build_flags_append": [],
@@ -556,7 +556,7 @@
         "try-settings",
         "sync-settings",
         "flood-gate",
-        "radio-diag",
+        "diag-report",
         "direct-retry"
       ],
       "build_flags_append": [],
