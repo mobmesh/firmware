@@ -916,7 +916,7 @@ bool diagReportHandleCli(const ModCliContext& context, char* command, char* repl
   static char lines[LINES_MAX][48];
   if (*arg == 0) {
     int n = study.active ? lnaFormatProgress(study, currentSf(), lines, LINES_MAX)
-                         : lnaFormatResult(study, currentSf(), config.tz_offset, lines, LINES_MAX);
+                         : lnaFormatResult(study, lnaNow(), currentSf(), config.tz_offset, lines, LINES_MAX);
     emit(context, reply, lines, n);
     return true;
   }
@@ -932,7 +932,7 @@ bool diagReportHandleCli(const ModCliContext& context, char* command, char* repl
       return true;
     }
     finish(true);
-    emit(context, reply, lines, lnaFormatResult(study, currentSf(), config.tz_offset, lines, LINES_MAX));
+    emit(context, reply, lines, lnaFormatResult(study, lnaNow(), currentSf(), config.tz_offset, lines, LINES_MAX));
     return true;
   }
   strcpy(reply, "ERR: diag radio.lna [start [hours]|stop]");

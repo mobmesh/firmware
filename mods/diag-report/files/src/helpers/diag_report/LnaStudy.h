@@ -77,6 +77,6 @@ LnaVerdict lnaVerdict(const LnaStudy& s, uint8_t sf, bool final_result);
 bool lnaShouldStop(const LnaStudy& s, uint8_t sf);
 LnaRun lnaOppositeRun(const LnaStudy& s, uint8_t overall_state);
 // Report text for a finished study, packed later by the caller; returns lines written.
-int lnaFormatResult(const LnaStudy& s, uint8_t sf, int8_t tz_hours, char lines[][48], int max_lines);
+int lnaFormatResult(const LnaStudy& s, uint8_t live, uint8_t sf, int8_t tz_hours, char lines[][48], int max_lines);
 int lnaFormatProgress(const LnaStudy& s, uint8_t sf, char lines[][48], int max_lines);
 bool lnaParseTz(const char* text, int8_t* hours);

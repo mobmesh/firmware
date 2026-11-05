@@ -64,7 +64,7 @@ Net -108 mV over 23h
 Studied 48h, 288 pairs.
 On hears 38% more packets
 from 6 neighbours.
-Restored: on. No change needed.
+Now: on, as advised. Nothing to change.
 ```
 
 - Switches the LNA on and off in paired blocks of 4-6 minutes, in random order, for up to 48 hours
@@ -84,6 +84,9 @@ Restored: on. No change needed.
 | 🟡 No Benefit Here | No difference; off saves about 9 mA |
 | 🔴 Not Working | Switching it barely moves the noise floor: likely an LNA or FEM fault |
 | ⚪ Not Enough Data | Too little traffic to judge |
+
+The report follows the LNA's current state. Once it matches the advice, an 🔴 Overloaded or 🟡 No Benefit Here
+result turns 🟢 and is marked `(Study)`; a 🟢 Keep It On turns 🟡 while the LNA is off.
 
 A clear daily pattern adds one line, such as `Off better 7am-3pm`. Times are local once `diag.tz`
 is set, and UTC until then.

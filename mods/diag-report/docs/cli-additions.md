@@ -69,12 +69,20 @@ several.
 | Result | Meaning |
 | --- | --- |
 | `📶 LNA: 🟢 Keep It On` | On hears more, or a neighbour is heard only with it on |
+| `📶 LNA: 🟡 Keep It On` | As above, but the LNA is now off |
 | `📶 LNA: 🔴 Overloaded` | Off hears more or decodes clearer |
+| `📶 LNA: 🟢 Overloaded (Study)` | As above, and the LNA is now off |
 | `📶 LNA: 🟡 No Benefit Here` | No significant difference after 60 or more pairs |
+| `📶 LNA: 🟢 No Benefit Here (Study)` | As above, and the LNA is now off |
 | `📶 LNA: 🔴 Not Working` | Floor moved less than 10 dB between on and off |
 | `📶 LNA: ⚪ Not Enough Data` | Fewer than 30 decided pairs or 2 neighbours |
 
-A result that suggests a change ends with `tryset 86400 radio.fem.rxgain <on|off>` and `then: tryset keep`.
+The header and last line follow the LNA's current state:
+
+| LNA now | Header | Ends with |
+| --- | --- | --- |
+| Matches the advice | `🟢 Keep It On`, `🟢 Overloaded (Study)` or `🟢 No Benefit Here (Study)` | `Now: <on\|off>, as advised. Nothing to change.` |
+| Differs from the advice | `🟡 Keep It On`, `🔴 Overloaded` or `🟡 No Benefit Here` | `Now: <on\|off>. To test <on\|off>:`, `tryset 86400 radio.fem.rxgain <on\|off>` and `then: tryset keep` |
 
 ## diag radio.lna start
 

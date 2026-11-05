@@ -225,12 +225,12 @@ static const char* stateName(uint8_t state) {
 
 #define ADD(...) do { if (n < max_lines) snprintf(lines[n++], 48, __VA_ARGS__); } while (0)
 
-static void addAdvice(const LnaStudy& s, uint8_t best, char lines[][48], int max_lines, int& n) {
-  if (s.start_lna == best) {
-    ADD("Restored: %s. No change needed.", stateName(s.start_lna));
+static void addAdvice(uint8_t live, uint8_t best, char lines[][48], int max_lines, int& n) {
+  if (live == best) {
+    ADD("Now: %s, as advised. Nothing to change.", stateName(live));
     return;
   }
-  ADD("Restored: %s. To test %s:", stateName(s.start_lna), stateName(best));
+  ADD("Now: %s. To test %s:", stateName(live), stateName(best));
   ADD("tryset 86400 radio.fem.rxgain %s", stateName(best));
   ADD("then: tryset keep");
 }
@@ -250,7 +250,7 @@ static void addRunNote(const LnaStudy& s, uint8_t overall, int8_t tz_hours, char
   if (tz_hours == 0) ADD("set diag.tz for local times");
 }
 
-int lnaFormatResult(const LnaStudy& s, uint8_t sf, int8_t tz_hours, char lines[][48], int max_lines) {
+int lnaFormatResult(const LnaStudy& s, uint8_t live, uint8_t sf, int8_t tz_hours, char lines[][48], int max_lines) {
   int n = 0;
   uint16_t pairs = s.wins[LNA_ON] + s.wins[LNA_OFF] + s.ties;
   unsigned long hours = s.elapsed_s / 3600;
@@ -260,11 +260,11 @@ int lnaFormatResult(const LnaStudy& s, uint8_t sf, int8_t tz_hours, char lines[]
       ADD("Switching it changed the floor");
       ADD("by %d dB (expect ~20).", (int)lroundf(lnaFloorShift(s)));
       ADD("Likely FEM/LNA fault.");
-      ADD("Study stopped. Restored: %s.", stateName(s.start_lna));
+      ADD("Study stopped. Now: %s.", stateName(live));
       break;
     case LNA_V_KEEP_ON_LOST:
     case LNA_V_HELPS: {
-      ADD("📶 LNA: 🟢 Keep It On");
+      ADD(live == LNA_ON ? "📶 LNA: 🟢 Keep It On" : "📶 LNA: 🟡 Keep It On");
       ADD("Studied %luh, %u pairs.", hours, pairs);
       ADD("On hears %d%% more packets", lnaPercentMore(s, LNA_ON));
       int lost = lnaLostNeighbour(s);
@@ -277,33 +277,33 @@ int lnaFormatResult(const LnaStudy& s, uint8_t sf, int8_t tz_hours, char lines[]
         ADD("from %u neighbours.", lnaHeardNeighbours(s));
       }
       addRunNote(s, LNA_ON, tz_hours, lines, max_lines, n);
-      addAdvice(s, LNA_ON, lines, max_lines, n);
+      addAdvice(live, LNA_ON, lines, max_lines, n);
       break;
     }
     case LNA_V_OVERLOADED: {
       float clarity = 0;
       bool clearer = lnaClarity(s, sf, &clarity) && clarity <= LNA_CLEARER_DB;
-      ADD("📶 LNA: 🔴 Overloaded");
+      ADD(live == LNA_OFF ? "📶 LNA: 🟢 Overloaded (Study)" : "📶 LNA: 🔴 Overloaded");
       ADD("Studied %luh, %u pairs.", hours, pairs);
       ADD(clearer ? "Off hears %d%% more; clearer" : "Off hears %d%% more.", lnaPercentMore(s, LNA_OFF));
       if (clearer) ADD("signals with it off.");
       addRunNote(s, LNA_OFF, tz_hours, lines, max_lines, n);
-      addAdvice(s, LNA_OFF, lines, max_lines, n);
+      addAdvice(live, LNA_OFF, lines, max_lines, n);
       break;
     }
     case LNA_V_NO_BENEFIT:
-      ADD("📶 LNA: 🟡 No Benefit Here");
+      ADD(live == LNA_OFF ? "📶 LNA: 🟢 No Benefit Here (Study)" : "📶 LNA: 🟡 No Benefit Here");
       ADD("Studied %luh, %u pairs.", hours, pairs);
       ADD("On and off hear the same.");
       ADD("Off saves ~9 mA.");
       addRunNote(s, LNA_OFF, tz_hours, lines, max_lines, n);
-      addAdvice(s, LNA_OFF, lines, max_lines, n);
+      addAdvice(live, LNA_OFF, lines, max_lines, n);
       break;
     case LNA_V_NOT_ENOUGH:
       ADD("📶 LNA: ⚪ Not Enough Data");
       ADD("%luh, %u neighbours, %u pairs.", hours, lnaHeardNeighbours(s), pairs);
       ADD("Too quiet to judge.");
-      ADD("Restored: %s. Try again later.", stateName(s.start_lna));
+      ADD("Now: %s. Try again later.", stateName(live));
       break;
     default:
       ADD("📶 LNA: No Study Yet.");

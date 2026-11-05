@@ -139,11 +139,51 @@ static void testFormatting() {
   s.elapsed_s = 48 * 3600;
   s.result = lnaVerdict(s, 7, true);
   char lines[12][48];
-  int n = lnaFormatResult(s, 7, 0, lines, 12);
+  int n = lnaFormatResult(s, LNA_ON, 7, 0, lines, 12);
   CHECK(n >= 5);
-  CHECK(strstr(lines[0], "Overloaded") != nullptr);
+  CHECK(strstr(lines[0], "🔴 Overloaded") != nullptr);
+  CHECK(strstr(lines[n - 3], "Now: on. To test off:") != nullptr);
   CHECK(strstr(lines[n - 2], "radio.fem.rxgain off") != nullptr);
   for (int i = 0; i < n; i++) CHECK(strlen(lines[i]) < 48);
+}
+
+// The header and last line follow the live LNA, whatever state the study began in.
+static void testFollowsLiveState() {
+  char lines[12][48];
+  LnaStudy s = fresh();
+  s.start_lna = LNA_ON;
+  s.elapsed_s = 48 * 3600;
+
+  s.result = LNA_V_OVERLOADED;
+  int n = lnaFormatResult(s, LNA_OFF, 7, 0, lines, 12);
+  CHECK(strstr(lines[0], "🟢 Overloaded (Study)") != nullptr);
+  CHECK(strcmp(lines[n - 1], "Now: off, as advised. Nothing to change.") == 0);
+
+  s.result = LNA_V_NO_BENEFIT;
+  n = lnaFormatResult(s, LNA_OFF, 7, 0, lines, 12);
+  CHECK(strstr(lines[0], "🟢 No Benefit Here (Study)") != nullptr);
+  CHECK(strcmp(lines[n - 1], "Now: off, as advised. Nothing to change.") == 0);
+  n = lnaFormatResult(s, LNA_ON, 7, 0, lines, 12);
+  CHECK(strstr(lines[0], "🟡 No Benefit Here") != nullptr);
+  CHECK(strstr(lines[0], "Study") == nullptr);
+  CHECK(strcmp(lines[n - 1], "then: tryset keep") == 0);
+
+  s.result = LNA_V_HELPS;
+  n = lnaFormatResult(s, LNA_ON, 7, 0, lines, 12);
+  CHECK(strstr(lines[0], "🟢 Keep It On") != nullptr);
+  CHECK(strcmp(lines[n - 1], "Now: on, as advised. Nothing to change.") == 0);
+  n = lnaFormatResult(s, LNA_OFF, 7, 0, lines, 12);
+  CHECK(strstr(lines[0], "🟡 Keep It On") != nullptr);
+  CHECK(strstr(lines[n - 2], "radio.fem.rxgain on") != nullptr);
+
+  s.result = LNA_V_NOT_WORKING;
+  n = lnaFormatResult(s, LNA_OFF, 7, 0, lines, 12);
+  CHECK(strstr(lines[0], "🔴 Not Working") != nullptr);
+  CHECK(strcmp(lines[n - 1], "Study stopped. Now: off.") == 0);
+
+  s.result = LNA_V_NOT_ENOUGH;
+  n = lnaFormatResult(s, LNA_OFF, 7, 0, lines, 12);
+  CHECK(strcmp(lines[n - 1], "Now: off. Try again later.") == 0);
 }
 
 static bool noted(const char* text, int8_t tz) {
@@ -157,7 +197,7 @@ static bool noted(const char* text, int8_t tz) {
     s.hour_wins[1][h][on_hours ? LNA_ON : LNA_OFF] = 8;
   }
   char lines[12][48];
-  int n = lnaFormatResult(s, 7, tz, lines, 12);
+  int n = lnaFormatResult(s, LNA_ON, 7, tz, lines, 12);
   for (int i = 0; i < n; i++) if (strstr(lines[i], text)) return true;
   return false;
 }
@@ -192,6 +232,7 @@ int main() {
   testEarlyStopWaitsADay();
   testOppositeRun();
   testFormatting();
+  testFollowsLiveState();
   testRunFollowsOffset();
   testParseTz();
   printf(failures ? "%d FAILED\n" : "OK\n", failures);
