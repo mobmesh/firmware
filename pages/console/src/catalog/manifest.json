@@ -3,9 +3,9 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "e1bb7f2d9ff547fba160524debbc4530281e9a9c",
+  "mobmeshCommit": "afef0cf8c60ada49a8a96f8fbcccf659ca077125",
   "sourceRows": 274,
-  "effectiveSignatures": 271,
+  "effectiveSignatures": 272,
   "cliAdditionFiles": [
     {
       "path": "mods/diag-report/docs/cli-additions.md",
@@ -416,6 +416,10 @@
     ],
     [
       "e1bb7f2",
+      "2026-11-05"
+    ],
+    [
+      "afef0cf",
       "2026-11-05"
     ]
   ]
