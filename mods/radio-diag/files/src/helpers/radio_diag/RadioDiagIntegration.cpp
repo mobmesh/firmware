@@ -6,6 +6,7 @@
 #include <esp_system.h>
 #include <math.h>
 #include <helpers/ConfigSerializer.h>
+#include <helpers/radio_diag/BattLog.h>
 #include <helpers/radio_diag/DiagSummary.h>
 #include <helpers/radio_diag/LinkReport.h>
 #include <helpers/radio_diag/LnaStudy.h>
@@ -21,6 +22,11 @@
 #define NOISE_SAMPLES     240
 #define NOISE_MIN_SAMPLES 20
 #define NOISE_LINES_MAX   14
+#define BATT_PATH         "/rdiag_batt"
+#define BATT_MAGIC        0x52424131UL   // "RBA1"
+#define BATT_EVERY_MS     300000UL
+#define BATT_LINES_MAX    8
+#define BATT_NO_FLOOR_MV  2500
 #define BLOCK_MIN_MS      240000UL
 #define BLOCK_SPAN_MS     120000UL
 #define START_SPAN_MS     60000UL
@@ -41,7 +47,7 @@
 #define RFSCAN_BW_KHZ     250.0f
 #define RFSCAN_BREAK_MS   1500
 #define LINKS_LINES_MAX   16
-#define DIAG_LINES_MAX    14
+#define DIAG_LINES_MAX    15
 #define SCAN_STALE_MS     86400000UL
 #define STATS_REPLY       200
 
@@ -71,6 +77,9 @@ static bool booted;
 static bool mounted;
 
 static NoiseLog noise_log;
+static BattLog batt_log;
+static uint32_t batt_hour;
+static uint32_t last_batt_ms;
 static int8_t noise_buf[NOISE_SAMPLES];
 static uint8_t noise_count;
 static uint32_t noise_hour;
@@ -140,6 +149,28 @@ static void loadNoise() {
             && f.read((uint8_t*)&noise_log, sizeof(noise_log)) == sizeof(noise_log);
   f.close();
   if (!ok) memset(&noise_log, 0, sizeof(noise_log));
+}
+
+static void saveBatt() {
+  if (!ensureMounted()) return;
+  File f = SPIFFS.open(BATT_PATH, "w", true);
+  if (!f) return;
+  uint32_t magic = BATT_MAGIC;
+  f.write((const uint8_t*)&magic, sizeof(magic));
+  f.write((const uint8_t*)&batt_log, sizeof(batt_log));
+  f.close();
+}
+
+static void loadBatt() {
+  memset(&batt_log, 0, sizeof(batt_log));
+  if (!ensureMounted() || !SPIFFS.exists(BATT_PATH)) return;
+  File f = SPIFFS.open(BATT_PATH, "r");
+  if (!f) return;
+  uint32_t magic = 0;
+  bool ok = f.read((uint8_t*)&magic, sizeof(magic)) == sizeof(magic) && magic == BATT_MAGIC
+            && f.read((uint8_t*)&batt_log, sizeof(batt_log)) == sizeof(batt_log);
+  f.close();
+  if (!ok) memset(&batt_log, 0, sizeof(batt_log));
 }
 
 static void loadConfig() {
@@ -311,11 +342,29 @@ static void noiseTick(uint32_t now) {
   if (lnaNow() == noise_lna && readFloor(&noise_buf[noise_count])) noise_count++;
 }
 
+// One file write an hour; a clock jump only starts another slot.
+static bool battSampleNow() {
+  uint16_t mv = modBoardBattMilliVolts();
+  uint32_t hour = clockHour();
+  if (mv == 0 || hour == 0) return mv != 0;
+  if (batt_hour != 0 && hour != batt_hour) saveBatt();
+  batt_hour = hour;
+  battSample(batt_log, hour, config.tz_offset, mv);
+  return true;
+}
+
+static void battTick(uint32_t now) {
+  if (last_batt_ms != 0 && now - last_batt_ms < BATT_EVERY_MS) return;
+  last_batt_ms = now | 1;
+  battSampleNow();
+}
+
 static void boot() {
   booted = true;
   loadConfig();
   have_key = modPublisherKey(self_key);
   loadNoise();
+  loadBatt();
   loadStudy();
   if (!study.active) return;
   // The saved setting is applied at boot; a different value means the operator changed it meanwhile.
@@ -337,6 +386,7 @@ void radioDiagLoop() {
   if (now - last_run_ms < LOOP_EVERY_MS) return;
   last_run_ms = now;
   noiseTick(now);
+  battTick(now);
   if (!study.active) return;
 
   if (paused) {
@@ -629,6 +679,58 @@ static void runNoise(const ModCliContext& context, char* reply) {
   emitLines(context, reply, &lines[0][0], NOISE_LINE, n);
 }
 
+// Only the board whose divider was bench-measured gets percent and time left; power-guard ships on the same one.
+static BattView battView() {
+#ifdef WITH_POWER_GUARD
+  char command[] = "powersaving safe.mv";
+  char reply[32] = "";
+  modCliDispatch(0, command, reply);
+  int floor_mv = reply[0] == '>' ? atoi(reply + 1) : 0;
+  // Without a floor the node runs on towards brownout.
+  return battAnalyse(batt_log, clockHour(), config.tz_offset, true, floor_mv > 0 ? (uint16_t)floor_mv : BATT_NO_FLOOR_MV);
+#else
+  return battAnalyse(batt_log, clockHour(), config.tz_offset, false, BATT_NO_FLOOR_MV);
+#endif
+}
+
+static void runBatt(const ModCliContext& context, char* reply) {
+  if (clockHour() == 0) {
+    strcpy(reply, "ERR: clock not set (time <epoch>)");
+    return;
+  }
+  if (!battSampleNow()) {
+    strcpy(reply, "🔋 Battery: ⚪ no sensor on this board");
+    return;
+  }
+  // Held only while the report is built; emitLines copies the text out.
+  char (*lines)[BATT_LINE] = (char (*)[BATT_LINE])malloc(BATT_LINES_MAX * BATT_LINE);
+  if (lines == nullptr) {
+    strcpy(reply, "ERR: out of memory");
+    return;
+  }
+  BattView v = battView();
+  int n = battFormat(v, lines, BATT_LINES_MAX);
+  emitLines(context, reply, &lines[0][0], BATT_LINE, n);
+  free(lines);
+}
+
+static void battArea(DiagSummary& sum) {
+  DiagArea* a = diagAdd(sum, "🔋", "Battery");
+  if (clockHour() == 0) {
+    strcpy(a->text, "clock not set");
+    return;
+  }
+  if (!battSampleNow()) {
+    strcpy(a->text, "no sensor");
+    return;
+  }
+  BattView v = battView();
+  a->level = battSummary(v, a->text, sizeof(a->text));
+  a->learning = true;
+  if (v.kind == BATT_K_LOW) fix(a, 0, "low battery", "Charge it now, or it may", "stop soon.", "diag batt");
+  else fix(a, 3, "battery falling", "Check the panel or charger:", "it isn't holding its level.", "diag batt");
+}
+
 static void noiseArea(DiagSummary& sum) {
   DiagArea* a = diagAdd(sum, "\U0001F50A", "Noise");
   if (clockHour() == 0) {
@@ -687,6 +789,7 @@ static void runSummary(const ModCliContext& context, char* reply) {
   if (modFemLnaAvailable()) lnaArea(sum);
   if (modRadioScanAvailable()) nearbyArea(sum);
   noiseArea(sum);
+  battArea(sum);
   errorsArea(sum);
 
   a = diagAdd(sum, "\U0001F4CA", "Load");
@@ -794,6 +897,10 @@ bool radioDiagHandleCli(const ModCliContext& context, char* command, char* reply
   }
   if (strcmp(command, "diag noise") == 0) {
     runNoise(context, reply);
+    return true;
+  }
+  if (strcmp(command, "diag batt") == 0) {
+    runBatt(context, reply);
     return true;
   }
   if (strcmp(command, "diag rfscan") == 0) {

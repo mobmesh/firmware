@@ -3,9 +3,9 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "0a3957424a2c6e8a2391045f734e18ef32226364",
-  "sourceRows": 272,
-  "effectiveSignatures": 263,
+  "mobmeshCommit": "0477465ad5c1ecf52d22923c5f942b9a35f612fd",
+  "sourceRows": 274,
+  "effectiveSignatures": 265,
   "cliAdditionFiles": [
     {
       "path": "mods/direct-retry/docs/cli-additions.md",
@@ -21,11 +21,11 @@
     },
     {
       "path": "mods/power-guard/docs/cli-additions.md",
-      "sha256": "1e77ad6082b51e30e9f2c0e08d5c8dbae8f0e940e23fcb38cc3ca2377df8591b"
+      "sha256": "56787b0f1ffd4670489609230e3bd6a298c990eedda8013b7eb47d29649acfb2"
     },
     {
       "path": "mods/radio-diag/docs/cli-additions.md",
-      "sha256": "ed0104abd9cd36fc28b30ebcd52eebb60b931911e6479d50f64a583c7ddff7a2"
+      "sha256": "2c6483cf3bc4a14a1b314e07b5660f567e70db9675abc53f96140e35b1499bea"
     },
     {
       "path": "mods/sync-settings/docs/cli-additions.md",
@@ -396,6 +396,22 @@
     ],
     [
       "0a39574",
+      "2026-11-04"
+    ],
+    [
+      "85768f6",
+      "2026-11-04"
+    ],
+    [
+      "206cd03",
+      "2026-11-04"
+    ],
+    [
+      "b7b3967",
+      "2026-11-04"
+    ],
+    [
+      "0477465",
       "2026-11-04"
     ]
   ]

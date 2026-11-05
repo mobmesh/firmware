@@ -6,7 +6,7 @@
 // Pure diag-summary text: one line per area, the worst sets the header, one best fix. No radio, clock or storage.
 
 #define DIAG_LINE      72
-#define DIAG_AREAS_MAX 8
+#define DIAG_AREAS_MAX 9
 #define DIAG_GOOD      0
 #define DIAG_CAUTION   1
 #define DIAG_PROBLEM   2

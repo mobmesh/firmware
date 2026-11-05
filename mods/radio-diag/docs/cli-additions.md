@@ -16,6 +16,7 @@ Commands added by `radio-diag`, available over serial and authenticated remote C
 | [`diag lna stop`](#diag-lna-stop) | End the study early |
 | [`diag links`](#diag-links) | How solid each neighbour link is |
 | [`diag noise`](#diag-noise) | The mesh channel's noise over the last 24 h, in 4-hour blocks |
+| [`diag batt`](#diag-batt) | Battery history and verdict over the last 24 h |
 | [`diag rfscan`](#diag-rfscan) | Check the mesh frequency +/-4 MHz for nearby interference |
 | [`get diag.tz`](#diagtz) | Local time offset used in reports |
 | [`set diag.tz <offset>`](#diagtz) | Set the local time offset |
@@ -167,6 +168,26 @@ the LNA moves the floor by 20 dB or more. Never transmits.
 
 **Effect:** none; the watch runs from boot whenever the clock is set and saves its 24 hours to flash each
 hour.
+
+## diag batt
+
+```text
+diag batt
+```
+
+**Response:** a verdict, the current voltage, low and high with times, a 24-hour bar line with the oldest hour on the left and now on the right, night drain and hours charged, the net change, then one action. Arrives as several replies. A gap marks hours with no reading. The hour labels line up in a fixed-width font. The bars scale to the day's low and high, and stay level when those are under 20 mV apart.
+
+| Result | Rule |
+| --- | --- |
+| `🔋 Battery: ⚪ watching, <n> of 24h` | Under 20 hours watched, too short for a full charge and drain cycle |
+| `🔋 Battery: 🟢 steady` | Within 30 mV a day |
+| `🔋 Battery: 🟢 charging fine` | Rising more than 30 mV a day |
+| `🔋 Battery: 🟡 not recovering` | Falling more than 30 mV a day, though some hours charged |
+| `🔋 Battery: 🟡 draining` | Falling more than 30 mV a day, with no hour charging |
+| `🔋 Battery: 🔴 low` | At 10% or less, or under 24 hours left |
+| `🔋 Battery: ⚪ no sensor on this board` | The board reads 0 mV |
+
+Percent is the charge left above the node's floor, its `powersaving safe.mv` (2800 mV by default on a `heltec_v4`), or 2500 mV when that is off. Time left is that charge divided by the average daily charge lost across yesterday and today, so it appears once a whole day is recorded. Percent, time left and the 🔴 level are estimates that assume one lithium cell, and they appear only on the board with a bench-measured battery divider, `heltec_v4`. Other boards show `trend only on this board`, and their verdicts come from the trend. Readings are taken every 5 minutes and saved once an hour, and they need the clock set. `set diag.tz` sets the hours shown.
 
 ## diag rfscan
 
