@@ -3,13 +3,13 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "afef0cf8c60ada49a8a96f8fbcccf659ca077125",
+  "mobmeshCommit": "9f14305d6d8bf2759219d517788b0ff20458a2f5",
   "sourceRows": 274,
   "effectiveSignatures": 272,
   "cliAdditionFiles": [
     {
       "path": "mods/diag-report/docs/cli-additions.md",
-      "sha256": "244ed755ba3f5b7057e6a877f8c629d64d1455b41fa2e449076a22bef5496464"
+      "sha256": "25cf162d033be26653b05fece8db23f9d6e592b742e9b587e8f854a8a4673ba6"
     },
     {
       "path": "mods/direct-retry/docs/cli-additions.md",
@@ -420,6 +420,14 @@
     ],
     [
       "afef0cf",
+      "2026-11-05"
+    ],
+    [
+      "72ba773",
+      "2026-11-05"
+    ],
+    [
+      "9f14305",
       "2026-11-05"
     ]
   ]

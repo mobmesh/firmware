@@ -198,7 +198,7 @@ diag batt
 | `🔋 Battery: 🔴 Low` | At 3.35 V or below, at once; `heltec_v4` only |
 | `🔋 Battery: ⚪ Not Available` | The board reads 0 mV. After 3 timed zero readings in a row, about 10 minutes, checking and logging stop until a reboot |
 
-Only `heltec_v4`, the board with a bench-measured battery divider, gets the 🔴 level. Voltages on other boards are less exact, and their verdicts come from the trend. Readings are taken every 5 minutes and saved once an hour, and they need the clock set. `set diag.tz` sets the hours shown.
+Only `heltec_v4`, the board with a bench-measured battery divider, gets the 🔴 level. Voltages on other boards are less exact, and their verdicts come from the trend. Once the clock is set, readings are taken every 5 minutes and saved once an hour. `set diag.tz` sets the hours shown.
 
 ## diag radio.rfscan
 

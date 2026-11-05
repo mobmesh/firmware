@@ -37,7 +37,9 @@
 #define PAUSE_RETRY_MS    900000UL
 #define PAUSE_LIMIT       4
 #define SEEN_SLOTS        64
-#define CLOCK_VALID_EPOCH 1700000000UL
+// Upstream boots with its clock at a fixed date in 2024, so only a time at or after this build counts as set.
+#define CLOCK_VALID_EPOCH ((uint32_t)MOBMESH_BUILD_EPOCH)
+#define ADVERT_CLOCK_FLOOR 1700000000UL  // an unset local clock must still compare, so the clock-off verdict can report it
 #define HOURS_MIN         6
 #define HOURS_MAX         168
 #define HOURS_DEFAULT     48
@@ -293,7 +295,7 @@ static uint32_t statValue(const char* command, const char* key) {
 
 static uint32_t clockHour() {
   uint32_t now = modClockGet();
-  return now > CLOCK_VALID_EPOCH ? now / 3600 : 0;
+  return now >= CLOCK_VALID_EPOCH ? now / 3600 : 0;
 }
 
 static uint8_t lnaNow() {
@@ -356,7 +358,8 @@ static bool battSampleNow() {
 }
 
 static void battTick(uint32_t now) {
-  if (batt_zeros >= BATT_ABSENT_READS) return;
+  // Nothing can be logged without the clock, so the battery is left alone until it is set.
+  if (batt_zeros >= BATT_ABSENT_READS || clockHour() == 0) return;
   if (last_batt_ms != 0 && now - last_batt_ms < BATT_EVERY_MS) return;
   last_batt_ms = now | 1;
   // Only timed readings count, so asking for a report repeatedly cannot switch the watch off.
@@ -475,7 +478,7 @@ static void observeLinks(const mesh::Packet* packet) {
   if (hops == 0 && advert && !own_advert) {
     uint32_t sent, here = modClockGet();
     memcpy(&sent, &packet->payload[PUB_KEY_SIZE], 4);
-    if (here > CLOCK_VALID_EPOCH && sent > CLOCK_VALID_EPOCH) linkAddClock(links, index, (int32_t)((int64_t)sent - here));
+    if (here > ADVERT_CLOCK_FLOOR && sent > ADVERT_CLOCK_FLOOR) linkAddClock(links, index, (int32_t)((int64_t)sent - here));
   }
 }
 
