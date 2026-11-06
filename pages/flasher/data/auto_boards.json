@@ -425,5 +425,95 @@
         "firmwareFile": "bin/room_server/grumpy_node.bin"
       }
     }
+  },
+  "heltec_t1": {
+    "label": "Heltec Mesh Node T1",
+    "platform": "nrf52",
+    "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
+    "postFlashNote": "The board restarts on its own once flashing finishes.",
+    "stockDevice": "Heltec Mesh Node T1",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "heltec_t1_rep_mobmesh_beta",
+        "version": "v1.18.0",
+        "firmwareFile": "bin/repeater/heltec_t1.zip"
+      }
+    }
+  },
+  "heltec_t114": {
+    "label": "Heltec Mesh Node T114",
+    "platform": "nrf52",
+    "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
+    "postFlashNote": "The board restarts on its own once flashing finishes.",
+    "stockDevice": "Heltec T114",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "heltec_t114_rep_mobmesh_beta",
+        "version": "v1.18.0",
+        "firmwareFile": "bin/repeater/heltec_t114.zip"
+      }
+    }
+  },
+  "rak3401": {
+    "label": "RAK WisBlock RAK3401",
+    "platform": "nrf52",
+    "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
+    "postFlashNote": "The board restarts on its own once flashing finishes.",
+    "stockDevice": "RAK WisMesh 1W Booster (3401 + 13302)",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "rak3401_rep_mobmesh_beta",
+        "version": "v1.18.0",
+        "firmwareFile": "bin/repeater/rak3401.zip"
+      }
+    }
+  },
+  "rak4631": {
+    "label": "RAK WisBlock RAK4631",
+    "platform": "nrf52",
+    "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
+    "postFlashNote": "The board restarts on its own once flashing finishes.",
+    "stockDevice": "RAK WisBlock / WisMesh (RAK 4631)",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "rak4631_rep_mobmesh_beta",
+        "version": "v1.18.0",
+        "firmwareFile": "bin/repeater/rak4631.zip"
+      }
+    }
+  },
+  "sensecap_solar": {
+    "label": "Seeed SenseCAP Solar Node",
+    "platform": "nrf52",
+    "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
+    "postFlashNote": "The board restarts on its own once flashing finishes.",
+    "stockDevice": "Seeed Studio SenseCAP Solar Node P1",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "sensecap_solar_rep_mobmesh_beta",
+        "version": "v1.18.0",
+        "firmwareFile": "bin/repeater/sensecap_solar.zip"
+      }
+    }
+  },
+  "xiao_nrf52": {
+    "label": "Seeed XIAO nRF52840",
+    "platform": "nrf52",
+    "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
+    "postFlashNote": "The board restarts on its own once flashing finishes.",
+    "stockDevice": "Seeed Studio Xiao nRF52 WIO",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "xiao_nrf52_rep_mobmesh_beta",
+        "version": "v1.18.0",
+        "firmwareFile": "bin/repeater/xiao_nrf52.zip"
+      }
+    }
   }
 }
