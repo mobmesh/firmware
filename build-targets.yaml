@@ -165,3 +165,19 @@ targets:
     beta: true
     qemu_boot_check: false
     mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
+
+  - board: rak4631
+    role: repeater
+    build_env: RAK_4631_repeater
+    vendor_flasher_assets: true
+    beta: true
+    qemu_boot_check: false
+    mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
+
+  - board: rak3401
+    role: repeater
+    build_env: RAK_3401_repeater
+    vendor_flasher_assets: true
+    beta: true
+    qemu_boot_check: false
+    mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]

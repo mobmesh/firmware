@@ -653,6 +653,74 @@
         "deep_sleep_rail_shutdown": "absent"
       },
       "platform": "nrf52"
+    },
+    {
+      "id": "repeater",
+      "board_id": "rak4631",
+      "upstream_variant": "rak4631",
+      "role": "repeater",
+      "ota_board_id": 11,
+      "ota_role_id": 1,
+      "build_env": "RAK_4631_repeater",
+      "upstream_tag_prefix": "repeater",
+      "release_title": "Repeater",
+      "asset_basename": "rak4631_rep_mobmesh_beta",
+      "vendor_flasher_assets": true,
+      "make_latest": true,
+      "mods": [
+        "shim",
+        "timing-safety",
+        "try-settings",
+        "sync-settings",
+        "flood-gate",
+        "diag-report",
+        "direct-retry"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": false,
+      "capabilities": {
+        "wifi_station": "absent",
+        "dual_ota": "absent",
+        "battery_measurement": "unverified",
+        "external_power_control": "absent",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      },
+      "platform": "nrf52"
+    },
+    {
+      "id": "repeater",
+      "board_id": "rak3401",
+      "upstream_variant": "rak3401",
+      "role": "repeater",
+      "ota_board_id": 12,
+      "ota_role_id": 1,
+      "build_env": "RAK_3401_repeater",
+      "upstream_tag_prefix": "repeater",
+      "release_title": "Repeater",
+      "asset_basename": "rak3401_rep_mobmesh_beta",
+      "vendor_flasher_assets": true,
+      "make_latest": true,
+      "mods": [
+        "shim",
+        "timing-safety",
+        "try-settings",
+        "sync-settings",
+        "flood-gate",
+        "diag-report",
+        "direct-retry"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": false,
+      "capabilities": {
+        "wifi_station": "absent",
+        "dual_ota": "absent",
+        "battery_measurement": "unverified",
+        "external_power_control": "absent",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      },
+      "platform": "nrf52"
     }
   ]
 }

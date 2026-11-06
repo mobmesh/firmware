@@ -21,3 +21,7 @@ board_ids:
     board: grumpy_node
   - id: 10
     board: heltec_t1
+  - id: 11
+    board: rak4631
+  - id: 12
+    board: rak3401

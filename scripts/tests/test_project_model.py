@@ -39,6 +39,8 @@ class CurrentProjectModelTestCase(unittest.TestCase):
             ("waveshare_esp32s3_lr1121", "repeater"),
             ("waveshare_esp32s3_lr1121", "room_server"),
             ("heltec_t1", "repeater"),
+            ("rak4631", "repeater"),
+            ("rak3401", "repeater"),
         })
         self.assertEqual(rows[("heltec_v4", "repeater")].asset_basename, "heltec_v4_rep_mobmesh")
         self.assertEqual(rows[("xiao_c3", "room_server")].asset_basename, "xiao_c3_room_mobmesh_beta")
@@ -66,10 +68,18 @@ class CurrentProjectModelTestCase(unittest.TestCase):
                          ("shim", "timing-safety", "try-settings", "sync-settings", "flood-gate", "diag-report",
                           "direct-retry"))
         self.assertFalse(rows[("heltec_t1", "repeater")].qemu_boot_check)
+        self.assertEqual(rows[("rak4631", "repeater")].asset_basename, "rak4631_rep_mobmesh_beta")
+        self.assertEqual(rows[("rak4631", "repeater")].ota_board_id, 11)
+        self.assertEqual(rows[("rak4631", "repeater")].mods, rows[("heltec_t1", "repeater")].mods)
+        self.assertEqual(rows[("rak3401", "repeater")].asset_basename, "rak3401_rep_mobmesh_beta")
+        self.assertEqual(rows[("rak3401", "repeater")].ota_board_id, 12)
+        self.assertEqual(rows[("rak3401", "repeater")].mods, rows[("heltec_t1", "repeater")].mods)
 
     def test_platform_defaults_to_esp32_and_marks_nrf52(self):
         platforms = {(t.board_id, t.role): t.platform for t in self.model.build_plan.targets}
         self.assertEqual(platforms.pop(("heltec_t1", "repeater")), "nrf52")
+        self.assertEqual(platforms.pop(("rak4631", "repeater")), "nrf52")
+        self.assertEqual(platforms.pop(("rak3401", "repeater")), "nrf52")
         self.assertEqual(set(platforms.values()), {"esp32"})
 
     def test_build_plan_serialization_is_deterministic(self):
