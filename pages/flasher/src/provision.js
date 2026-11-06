@@ -19,13 +19,17 @@ import { resolveSettings } from './settings.js';
 // only signal available; a false negative shows a warning, it never fails the flash.
 const FAILED_ANSWER = /^(unknown command|err|error|invalid|usage:)/i;
 
+// The channel a live sync setup refused to give up, or null; an Upgrade keeps the operator's channel.
+export function keptSyncChannel(command, answer) {
+  if (!answer || !/^set sync\.channel \S+$/.test(command)) return null;
+  return /^err - sync must be off; channel (\S+)/i.exec(answer)?.[1] ?? null;
+}
+
 // Refusals that mean the node already holds what the command asks for, as on a reflash.
 export function alreadyApplied(command, answer) {
   if (!answer) return false;
   if (command.startsWith('sync.publisher add ')) return /^err - already authorized/i.test(answer);
-  const channel = /^set sync\.channel (\S+)$/.exec(command);
-  const current = /^err - sync must be off; channel (\S+)/i.exec(answer);
-  return channel !== null && current !== null && channel[1].toLowerCase() === current[1].toLowerCase();
+  return keptSyncChannel(command, answer) !== null;
 }
 
 export function answerOk(step, answer) {
@@ -257,6 +261,11 @@ export async function sendProvisionCommands(port, commands, { onStatus, onProgre
       });
       const ok = answerOk(step, answer);
       if (!ok) onStatus?.(`${step.command} → ${answer}`);
+      const kept = keptSyncChannel(step.command, answer);
+      const wanted = step.command.split(' ')[2];
+      if (kept && kept.toLowerCase() !== wanted.toLowerCase()) {
+        onStatus?.(`Sync is on, so the node keeps its channel ${kept} (this zone uses ${wanted}).`);
+      }
       results.push({ command: step.command, answer, ok });
       onProgress?.((index + 1) / commands.length);
       if (!ok && step.stopOnFailure) {
