@@ -7,5 +7,11 @@
   "rak3112": {"label": "RAK3112", "board": "rak3112", "icon": "icons/beta.svg"},
   "ebyte_eora_s3": {"label": "Ebyte EoRa-S3", "board": "ebyte_eora_s3", "icon": "icons/beta.svg"},
   "station_g3_esp32": {"label": "Station G3", "board": "station_g3_esp32", "icon": "icons/beta.svg"},
-  "waveshare_esp32s3_lr1121": {"label": "Waveshare ESP32-S3-LR1121", "board": "waveshare_esp32s3_lr1121", "icon": "icons/beta.svg"}
+  "waveshare_esp32s3_lr1121": {"label": "Waveshare ESP32-S3-LR1121", "board": "waveshare_esp32s3_lr1121", "icon": "icons/beta.svg"},
+  "heltec_t1": {"label": "Heltec Mesh Node T1", "board": "heltec_t1", "icon": "icons/beta.svg"},
+  "heltec_t114": {"label": "Heltec T114", "board": "heltec_t114", "icon": "icons/beta.svg"},
+  "rak4631": {"label": "RAK WisBlock RAK4631", "board": "rak4631", "icon": "icons/beta.svg"},
+  "rak3401": {"label": "RAK WisMesh RAK3401", "board": "rak3401", "icon": "icons/beta.svg"},
+  "sensecap_solar": {"label": "Seeed SenseCAP Solar Node", "board": "sensecap_solar", "icon": "icons/beta.svg"},
+  "xiao_nrf52": {"label": "Seeed Xiao nRF52840 + Wio-SX1262", "board": "xiao_nrf52", "icon": "icons/beta.svg"}
 }

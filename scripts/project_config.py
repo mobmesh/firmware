@@ -219,6 +219,8 @@ class FlasherProfile:
     connect_note: str
     post_flash_note: str
     post_flash_commands: Mapping[str, tuple[str, ...]]
+    # nRF52 only: the stock catalogue's device name, whose erase package and bootloader the flasher reuses.
+    stock_device: str | None = None
 
 
 @dataclass(frozen=True)
@@ -439,7 +441,7 @@ class ProjectModel:
             raise ProjectModelError(f"{path}:qemu.console: expected one of {sorted(QEMU_CONSOLES)}, got '{qemu.console}'")
 
         flasher_raw = _mapping(path, "flasher", data.get("flasher"))
-        _keys(path, "flasher", flasher_raw, {"label", "connect_note", "post_flash_note", "post_flash_commands"})
+        _keys(path, "flasher", flasher_raw, {"label", "connect_note", "post_flash_note", "post_flash_commands", "stock_device"})
         command_raw = _mapping(path, "flasher.post_flash_commands", flasher_raw.get("post_flash_commands"))
         commands = {
             _string(path, "flasher.post_flash_commands", role):
@@ -451,6 +453,7 @@ class ProjectModel:
             connect_note=_string(path, "flasher.connect_note", flasher_raw.get("connect_note")),
             post_flash_note=_string(path, "flasher.post_flash_note", flasher_raw.get("post_flash_note")),
             post_flash_commands=commands,
+            stock_device=_string(path, "flasher.stock_device", flasher_raw["stock_device"]) if "stock_device" in flasher_raw else None,
         )
         partitions = data.get("partitions_override")
         if partitions is not None and (not isinstance(partitions, str) or not partitions):

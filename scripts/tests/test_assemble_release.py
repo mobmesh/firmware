@@ -138,52 +138,90 @@ class AssembleReleaseTests(unittest.TestCase):
             (self.flasher / "bin/boot/boot_app0.bin").read_bytes(), b"new-app0"
         )
 
-    def nrf52_bundle(self, version="v1"):
-        root = self.inputs / "t1-repeater"
+    def nrf52_bundle(self, version="v1", board="t1"):
+        root = self.inputs / f"{board}-repeater"
         root.mkdir(parents=True)
         (root / "app.zip").write_bytes(b"dfu")
         (root / "release-notes.md").write_bytes(b"notes")
+        (root / "board-entry.json").write_text(json.dumps({
+            "label": "T1",
+            "platform": "nrf52",
+            "stockDevice": "Heltec Mesh Node T1",
+            "variants": {"repeater": {"label": "Repeater", "version": version,
+                                      "firmwareFile": f"bin/repeater/{board}.zip"}},
+        }))
         (root / "meta.json").write_text(json.dumps({
             "platform": "nrf52",
-            "board": "t1",
+            "board": board,
             "role": "repeater",
             "version": version,
             "release_tag": f"repeater-{version}-mobmesh",
             "release_title": "repeater",
             "make_latest": True,
-            "app_asset": f"t1-repeater-{version}.zip",
+            "app_asset": f"{board}-repeater-{version}.zip",
+            "firmware_path": f"bin/repeater/{board}.zip",
         }))
 
-    def test_nrf52_ships_its_dfu_package_beside_esp32_builds(self):
+    def test_nrf52_publishes_its_package_and_entry_beside_esp32_builds(self):
         self.write_boards()
         self.bundle("repeater", owner=True)
         self.bundle("room_server")
         self.nrf52_bundle()
-        before = json.loads(self.boards.read_text())
         result = self.assemble()
-        self.assertEqual(len(result["web_published"]), 2)
-        self.assertIn({"board": "t1", "reason": "nRF52: no web-flasher entry yet"}, result["web_skipped"])
+        self.assertIn({"board": "t1", "role": "repeater"}, result["web_published"])
+        self.assertEqual(len(result["web_published"]), 3)
+        self.assertEqual((self.flasher / "bin/repeater/t1.zip").read_bytes(), b"dfu")
         t1 = next(r for r in result["releases"] if r["board"] == "t1")
         self.assertEqual([Path(f).name for f in t1["release_files"]], ["t1-repeater-v1.zip"])
-        self.assertEqual(Path(t1["release_files"][0]).read_bytes(), b"dfu")
         boards = json.loads(self.boards.read_text())
-        self.assertNotIn("t1", boards)
-        self.assertEqual(boards["test"]["variants"].keys(), before["test"]["variants"].keys())
+        self.assertEqual(boards["t1"]["platform"], "nrf52")
+        self.assertEqual(boards["t1"]["variants"]["repeater"]["firmwareFile"], "bin/repeater/t1.zip")
+        self.assertEqual(boards["test"]["variants"]["repeater"]["version"], "v1")
 
-    def test_nrf52_alone_leaves_the_flasher_untouched(self):
+    def test_nrf52_alone_leaves_esp32_entries_and_boot_files_alone(self):
         self.write_boards()
-        before = self.boards.read_text()
+        before = json.loads(self.boards.read_text())
+        boot = (self.flasher / "bin/boot/test_bootloader.bin").read_bytes()
         self.nrf52_bundle()
         result = self.assemble()
-        self.assertEqual(result["web_published"], [])
-        self.assertEqual(self.boards.read_text(), before)
+        self.assertEqual(result["web_published"], [{"board": "t1", "role": "repeater"}])
+        after = json.loads(self.boards.read_text())
+        self.assertEqual(after["test"], before["test"])
+        self.assertEqual((self.flasher / "bin/boot/test_bootloader.bin").read_bytes(), boot)
+
+    def test_nrf52_keeps_roles_it_did_not_rebuild(self):
+        self.write_boards()
+        boards = json.loads(self.boards.read_text())
+        boards["t1"] = {"label": "T1", "platform": "nrf52", "variants": {
+            "room_server": {"label": "Room", "version": "v0", "firmwareFile": "bin/room_server/t1.zip"}}}
+        self.boards.write_text(json.dumps(boards))
+        self.nrf52_bundle()
+        self.assemble()
+        self.assertEqual(set(json.loads(self.boards.read_text())["t1"]["variants"]), {"repeater", "room_server"})
+
+    def test_an_esp32_board_name_cannot_become_nrf52(self):
+        self.write_boards()
+        self.nrf52_bundle(board="test")
+        with self.assertRaises(ValueError):
+            self.assemble()
+
+    def test_nrf52_boards_never_block_a_boot_app0_change(self):
+        self.write_boards()
+        boards = json.loads(self.boards.read_text())
+        boards["t1"] = {"label": "T1", "platform": "nrf52", "variants": {
+            "repeater": {"label": "Repeater", "version": "v0", "firmwareFile": "bin/repeater/t1.zip"}}}
+        self.boards.write_text(json.dumps(boards))
+        self.bundle("repeater", owner=True, app0=b"new-app0")
+        self.bundle("room_server", app0=b"new-app0")
+        result = self.assemble()
+        self.assertEqual(len(result["web_published"]), 2)
+        self.assertEqual((self.flasher / "bin/boot/boot_app0.bin").read_bytes(), b"new-app0")
 
     def test_nrf52_without_its_package_is_refused(self):
         self.nrf52_bundle()
         (self.inputs / "t1-repeater/app.zip").unlink()
         with self.assertRaises(ValueError):
             self.assemble()
-
 
 if __name__ == "__main__":
     unittest.main()

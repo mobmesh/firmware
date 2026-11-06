@@ -39,7 +39,7 @@ are in the [mod README](../README.md).
 | [`start ota wan <url>`](#start-ota-wan) | Download and install an application image |
 | [`start ota wan update`](#start-ota-wan) | Update from the saved URL |
 | [`stop ota`](#stop-ota) | Close the local upload AP |
-| [`ver`](#ver) | Read upstream and OTA build versions |
+| [`ver`](#ver) | Read upstream and MobMesh build versions |
 
 ## set ota.wan.wifi
 
@@ -550,5 +550,7 @@ ver
 ```text
 <upstream-version> (<upstream-build-date>) + MobMesh (<build-date> - <commit>)
 ```
+
+Every MobMesh build answers this, with or without hotspot-ota: the shim's command dispatcher replies before any mod.
 
 [↩ Back to hotspot-ota readme](../README.md)

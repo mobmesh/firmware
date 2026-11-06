@@ -5,6 +5,8 @@ import {
   BOOT_ANNOUNCE_TIMEOUT_MS,
   CLI_BAUD_RATE,
   CLI_FIRST_COMMAND_TIMEOUT_MS,
+  NRF52_BOOT_ANNOUNCE_TIMEOUT_MS,
+  NRF52_CLI_COMMAND_TIMEOUT_MS,
   PORT_DROP_TIMEOUT_MS,
   POST_FLASH_RECONNECT_ATTEMPTS,
   POST_FLASH_RECONNECT_DELAY_MS,
@@ -243,7 +245,7 @@ export async function acquireCliPort({ preferredPort = null, onStatus } = {}) {
  *
  * @returns {{ command: string, answer: string|null, ok: boolean }[]}
  */
-export async function sendProvisionCommands(port, commands, { onStatus, onProgress } = {}) {
+export async function sendProvisionCommands(port, commands, { onStatus, onProgress, commandTimeoutMs } = {}) {
   const session = startCliSession(port);
   const results = [];
   try {
@@ -251,7 +253,7 @@ export async function sendProvisionCommands(port, commands, { onStatus, onProgre
       onStatus?.(`${step.label} (${index + 1} of ${commands.length})…`);
       const answer = await session.runCommand(step.command, {
         awaitReply: step.awaitReply !== false,
-        ...(index === 0 ? { timeoutMs: CLI_FIRST_COMMAND_TIMEOUT_MS } : {}),
+        ...(index === 0 ? { timeoutMs: CLI_FIRST_COMMAND_TIMEOUT_MS } : commandTimeoutMs ? { timeoutMs: commandTimeoutMs } : {}),
       });
       const ok = answerOk(step, answer);
       if (!ok) onStatus?.(`${step.command} → ${answer}`);
@@ -277,13 +279,21 @@ export async function provisionDevice(state, { preferredPort = null, onStatus, o
   if (!commands.length) return null;
 
   const port = await acquireCliPort({ preferredPort, onStatus });
+  const nrf52 = state.family === 'nrf52';
   try {
-    const announced = await waitForBootAnnouncement(port, { onStatus });
+    const announced = await waitForBootAnnouncement(port, {
+      onStatus,
+      ...(nrf52 ? { timeoutMs: NRF52_BOOT_ANNOUNCE_TIMEOUT_MS } : {}),
+    });
     if (announced) onStatus?.(`Device is up — node ${announced.slice(0, 4)}`);
     return {
       port,
       announced,
-      results: await sendProvisionCommands(port, commands, { onStatus, onProgress }),
+      results: await sendProvisionCommands(port, commands, {
+        onStatus,
+        onProgress,
+        ...(nrf52 ? { commandTimeoutMs: NRF52_CLI_COMMAND_TIMEOUT_MS } : {}),
+      }),
     };
   } catch (error) {
     await closeSerialPortQuietly(port);

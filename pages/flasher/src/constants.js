@@ -79,6 +79,12 @@ export const PORT_DROP_TIMEOUT_MS = 10000;
 // A freshly written node announces its public key when its identity is ready — measured
 // at +33.3 s on a Heltec v4. Listening puts nothing on the wire; the ceiling is a fallback.
 export const BOOT_ANNOUNCE_TIMEOUT_MS = 60000;
+// `measured`. A Heltec T1 announces at +1.5 s, before the post-DFU reconnect lands, so the line is
+// usually missed; the wait only has to outlast the key, which exists by the announcement.
+export const NRF52_BOOT_ANNOUNCE_TIMEOUT_MS = 10000;
+// `measured`. Upstream's AGC reset on a T1 occasionally blocks the loop for 6.5 s, stock and
+// MobMesh alike, so a setup command can answer that late on healthy hardware.
+export const NRF52_CLI_COMMAND_TIMEOUT_MS = 10000;
 export const POST_FLASH_RECONNECT_ATTEMPTS = 20;
 export const POST_FLASH_RECONNECT_DELAY_MS = 500;
 

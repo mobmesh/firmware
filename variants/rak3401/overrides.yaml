@@ -17,3 +17,5 @@ flasher:
   label: "RAK WisBlock RAK3401"
   connect_note: "Connect over USB; the flasher puts the board into its bootloader."
   post_flash_note: "The board restarts on its own once flashing finishes."
+  # The stock catalogue entry whose erase package and OTAFIX bootloader this board shares.
+  stock_device: "RAK WisMesh 1W Booster (3401 + 13302)"

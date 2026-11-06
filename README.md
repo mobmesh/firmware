@@ -94,5 +94,5 @@ Each role uses an upstream version in its release title and tag. For an upstream
 Each built target provides an app image for an OTA slot or existing installation and a
 merged image for flashing a blank board at offset 0. The merged image includes the app,
 bootloader, partition table and OTA data. Beta targets add `_beta` to the asset basename.
-nRF52 targets ship one DFU package instead, for the board's OTAFIX bootloader; they are not in
-the web flasher catalogue yet.
+nRF52 targets ship one DFU package instead, for the board's OTAFIX bootloader; the web flasher
+offers them under MeshCore Enhanced+ (beta) when an nRF52 board is connected.

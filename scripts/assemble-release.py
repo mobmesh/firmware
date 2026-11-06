@@ -19,8 +19,8 @@ REQUIRED_FILES = (
     "board-entry.json",
     "release-notes.md",
 )
-# nRF52 builds ship only their DFU package; they have no boot files and no web-flasher entry yet.
-NRF52_REQUIRED_FILES = ("app.zip", "release-notes.md")
+# nRF52 builds ship a DFU package and their flasher entry; they have no boot files.
+NRF52_REQUIRED_FILES = ("app.zip", "board-entry.json", "release-notes.md")
 
 
 def digest(path: Path) -> str:
@@ -53,9 +53,6 @@ def load_bundles(inputs: Path) -> list[dict]:
         if missing:
             raise ValueError(f"{root} is missing {', '.join(missing)}")
         meta["root"] = root
-        if meta["platform"] == "nrf52":
-            bundles.append(meta)
-            continue
         board_entry = json.loads((root / "board-entry.json").read_text())
         if not isinstance(board_entry, dict):
             raise ValueError(f"{root}/board-entry.json is not an object")
@@ -123,19 +120,7 @@ def copy_release_assets(bundle: dict, output: Path) -> dict:
     return {**public_meta(bundle), "release_files": copied, "notes_file": str(notes)}
 
 
-def assemble(inputs: Path, flasher: Path, boards_path: Path, output: Path) -> dict:
-    bundles = load_bundles(inputs)
-    check_release_groups(bundles)
-    output.mkdir(parents=True, exist_ok=True)
-    release_records = [copy_release_assets(bundle, output) for bundle in bundles]
-    summary = {"releases": release_records, "web_published": [], "web_skipped": []}
-    for board in sorted({bundle["board"] for bundle in bundles if bundle["platform"] == "nrf52"}):
-        summary["web_skipped"].append({"board": board, "reason": "nRF52: no web-flasher entry yet"})
-    bundles = [bundle for bundle in bundles if bundle["platform"] != "nrf52"]
-    if not bundles:
-        return summary
-
-    boards = json.loads(boards_path.read_text())
+def publish_esp32(bundles: list[dict], boards: dict, flasher: Path, summary: dict) -> None:
     grouped = defaultdict(list)
     for bundle in bundles:
         grouped[bundle["board"]].append(bundle)
@@ -145,10 +130,11 @@ def assemble(inputs: Path, flasher: Path, boards_path: Path, output: Path) -> di
         raise ValueError("successful builds produced different boot_app0.bin files")
     built_app0 = bundles[0]["root"] / "boot_app0.bin"
     app0_path = flasher / "bin/boot/boot_app0.bin"
+    # nRF52 boards carry no boot files, so a boot_app0 change never needs them rebuilt.
     all_existing = {
         (board, role)
         for board, entry in boards.items()
-        if not board.startswith("_")
+        if not board.startswith("_") and entry.get("platform") != "nrf52"
         for role in entry.get("variants", {})
     }
     plans = []
@@ -227,6 +213,46 @@ def assemble(inputs: Path, flasher: Path, boards_path: Path, output: Path) -> di
             shutil.copy2(bundle["root"] / "app.bin", firmware)
             summary["web_published"].append({"board": board, "role": role})
         boards[board] = new_entry
+
+
+def publish_nrf52(bundles: list[dict], boards: dict, flasher: Path, summary: dict) -> None:
+    """An nRF52 board has no boot files: its DFU package goes to the flasher and its entry into the catalogue."""
+    grouped = defaultdict(list)
+    for bundle in bundles:
+        grouped[bundle["board"]].append(bundle)
+    for board, board_bundles in sorted(grouped.items()):
+        check_board_entries(board, board_bundles)
+        if board_bundles[0]["board_entry"].get("platform") != "nrf52":
+            raise ValueError(f"{board} ships an nRF52 package but its flasher entry is not nRF52")
+        existing = boards.get(board)
+        if existing and existing.get("platform") != "nrf52":
+            raise ValueError(f"{board} is already an ESP32 board in the flasher catalogue")
+        new_entry = dict(common_board_fields(board_bundles[0]["board_entry"]))
+        new_entry["variants"] = dict(existing.get("variants", {})) if existing else {}
+        for bundle in board_bundles:
+            role = bundle["role"]
+            new_entry["variants"][role] = bundle["board_entry"]["variants"][role]
+            firmware = flasher / bundle["firmware_path"]
+            firmware.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(bundle["root"] / "app.zip", firmware)
+            summary["web_published"].append({"board": board, "role": role})
+        boards[board] = new_entry
+
+
+def assemble(inputs: Path, flasher: Path, boards_path: Path, output: Path) -> dict:
+    bundles = load_bundles(inputs)
+    check_release_groups(bundles)
+    output.mkdir(parents=True, exist_ok=True)
+    release_records = [copy_release_assets(bundle, output) for bundle in bundles]
+    summary = {"releases": release_records, "web_published": [], "web_skipped": []}
+    if not bundles:
+        return summary
+
+    boards = json.loads(boards_path.read_text())
+    esp32 = [bundle for bundle in bundles if bundle["platform"] != "nrf52"]
+    if esp32:
+        publish_esp32(esp32, boards, flasher, summary)
+    publish_nrf52([bundle for bundle in bundles if bundle["platform"] == "nrf52"], boards, flasher, summary)
 
     latest_versions = {bundle["version"] for bundle in bundles if bundle["make_latest"]}
     if len(latest_versions) > 1:

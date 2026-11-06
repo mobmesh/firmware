@@ -478,13 +478,29 @@ jobs:
               make_latest:$make_latest, vendor_flasher_assets:$vendor_flasher_assets}' \
             > release-input/meta.json
 
+      - name: Write this nRF52 board's flasher entry into the workspace auto_boards.json
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'nrf52'
+        run: |
+          # No partition table: the entry names the DFU package, and the stock device whose erase package and bootloader it shares.
+          pip install --quiet pyyaml==6.0.3
+          python3 scripts/generate-board-config.py boards-json \
+            --board ${{ matrix.board_id }} \
+            --upstream-dir upstream-src \
+            --variant-id ${{ matrix.id }} \
+            --variant-label "${{ matrix.release_title }}" \
+            --asset-basename ${{ matrix.asset_basename }} \
+            --version "${{ steps.pick.outputs.version }}" \
+            --output pages/flasher/data/auto_boards.json
+
       - name: Package this successful nRF52 build for the single publisher
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'nrf52'
         run: |
-          # No boot files, merged image or web-flasher entry yet: the release carries the DFU package only.
+          # No boot files or merged image: the release and the flasher both carry the DFU package.
           mkdir -p release-input
+          eval "$(python3 scripts/generate-board-config.py flasher-paths --board ${{ matrix.board_id }} --variant-id ${{ matrix.id }})"
           cp "${{ steps.artifact.outputs.name }}" release-input/app.zip
           cp release-notes.md release-input/release-notes.md
+          jq '."${{ matrix.board_id }}"' pages/flasher/data/auto_boards.json > release-input/board-entry.json
           jq -n \
             --arg board "${{ matrix.board_id }}" \
             --arg role "${{ matrix.id }}" \
@@ -492,9 +508,11 @@ jobs:
             --arg release_tag "${{ steps.pick.outputs.release_tag }}" \
             --arg release_title "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - mobmesh" \
             --arg app_asset "${{ steps.artifact.outputs.name }}" \
+            --arg firmware_path "$FIRMWARE" \
             --argjson make_latest '${{ matrix.make_latest }}' \
             '{platform:"nrf52", board:$board, role:$role, version:$version, release_tag:$release_tag,
-              release_title:$release_title, app_asset:$app_asset, make_latest:$make_latest}' \
+              release_title:$release_title, app_asset:$app_asset, firmware_path:$firmware_path,
+              make_latest:$make_latest}' \
             > release-input/meta.json
 
       - name: Upload this successful build
