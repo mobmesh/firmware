@@ -235,11 +235,13 @@ async function writeDfuPackage(Dfu, port, stage, eraseAll, { onProgress, onStatu
       // `dfu.js` owns the open, so a refused port arrives untyped. Retry on "no byte has
       // moved yet"; a part-written device is never retried silently.
       if (started || attempt === DFU_FLASH_ATTEMPTS) {
+        // An interrupted transfer leaves the bootloader refusing every packet until it is reset.
+        const reset = 'Double-press the reset button so the bootloader starts fresh, then flash again.';
         throw new DfuWriteFailedError(
           started
             ? `Writing the firmware failed (${error.message}). The device is part-written ` +
-              `and needs to be flashed again before it will run.`
-            : `Could not start the DFU transfer (${error.message}).`,
+              `and will not run until it is flashed again. ${reset}`
+            : `Could not start the DFU transfer (${error.message}). ${reset}`,
           { cause: error, phase: started ? 'write' : 'connect' }
         );
       }
