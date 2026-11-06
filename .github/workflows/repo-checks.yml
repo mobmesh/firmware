@@ -56,6 +56,8 @@ jobs:
       # One long-lived tracking issue, closed automatically when the checks pass again --
       # the same shape patch-drift-canary uses, so a fixed failure does not linger.
       - name: Open, update, or close the tracking issue
+        # Work branches report in their own run only; the tracking issue follows main.
+        if: github.ref == 'refs/heads/main'
         uses: actions/github-script@v9
         env:
           FAILED: ${{ steps.run.outputs.failed }}

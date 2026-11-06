@@ -38,7 +38,8 @@
         "external_power_control": "available",
         "fem_lna_control": "available",
         "deep_sleep_rail_shutdown": "available"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "room_server",
@@ -70,7 +71,8 @@
         "external_power_control": "available",
         "fem_lna_control": "available",
         "deep_sleep_rail_shutdown": "available"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "repeater",
@@ -104,7 +106,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "room_server",
@@ -136,7 +139,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "repeater",
@@ -170,7 +174,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "room_server",
@@ -202,7 +207,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "repeater",
@@ -238,7 +244,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "room_server",
@@ -270,7 +277,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "repeater",
@@ -304,7 +312,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "room_server",
@@ -336,7 +345,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "repeater",
@@ -370,7 +380,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "room_server",
@@ -402,7 +413,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "repeater",
@@ -436,7 +448,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "room_server",
@@ -468,7 +481,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "repeater",
@@ -502,7 +516,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "room_server",
@@ -534,7 +549,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "repeater",
@@ -568,7 +584,8 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
     },
     {
       "id": "room_server",
@@ -600,7 +617,42 @@
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
         "deep_sleep_rail_shutdown": "absent"
-      }
+      },
+      "platform": "esp32"
+    },
+    {
+      "id": "repeater",
+      "board_id": "heltec_t1",
+      "upstream_variant": "heltec_t1",
+      "role": "repeater",
+      "ota_board_id": 10,
+      "ota_role_id": 1,
+      "build_env": "Heltec_t1_repeater",
+      "upstream_tag_prefix": "repeater",
+      "release_title": "Repeater",
+      "asset_basename": "heltec_t1_rep_mobmesh_beta",
+      "vendor_flasher_assets": true,
+      "make_latest": true,
+      "mods": [
+        "shim",
+        "timing-safety",
+        "try-settings",
+        "sync-settings",
+        "flood-gate",
+        "diag-report",
+        "direct-retry"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": false,
+      "capabilities": {
+        "wifi_station": "absent",
+        "dual_ota": "absent",
+        "battery_measurement": "unverified",
+        "external_power_control": "absent",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      },
+      "platform": "nrf52"
     }
   ]
 }

@@ -19,3 +19,5 @@ board_ids:
     board: waveshare_esp32s3_lr1121
   - id: 9
     board: grumpy_node
+  - id: 10
+    board: heltec_t1

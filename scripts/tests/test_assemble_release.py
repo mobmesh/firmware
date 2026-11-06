@@ -138,6 +138,52 @@ class AssembleReleaseTests(unittest.TestCase):
             (self.flasher / "bin/boot/boot_app0.bin").read_bytes(), b"new-app0"
         )
 
+    def nrf52_bundle(self, version="v1"):
+        root = self.inputs / "t1-repeater"
+        root.mkdir(parents=True)
+        (root / "app.zip").write_bytes(b"dfu")
+        (root / "release-notes.md").write_bytes(b"notes")
+        (root / "meta.json").write_text(json.dumps({
+            "platform": "nrf52",
+            "board": "t1",
+            "role": "repeater",
+            "version": version,
+            "release_tag": f"repeater-{version}-mobmesh",
+            "release_title": "repeater",
+            "make_latest": True,
+            "app_asset": f"t1-repeater-{version}.zip",
+        }))
+
+    def test_nrf52_ships_its_dfu_package_beside_esp32_builds(self):
+        self.write_boards()
+        self.bundle("repeater", owner=True)
+        self.bundle("room_server")
+        self.nrf52_bundle()
+        before = json.loads(self.boards.read_text())
+        result = self.assemble()
+        self.assertEqual(len(result["web_published"]), 2)
+        self.assertIn({"board": "t1", "reason": "nRF52: no web-flasher entry yet"}, result["web_skipped"])
+        t1 = next(r for r in result["releases"] if r["board"] == "t1")
+        self.assertEqual([Path(f).name for f in t1["release_files"]], ["t1-repeater-v1.zip"])
+        self.assertEqual(Path(t1["release_files"][0]).read_bytes(), b"dfu")
+        boards = json.loads(self.boards.read_text())
+        self.assertNotIn("t1", boards)
+        self.assertEqual(boards["test"]["variants"].keys(), before["test"]["variants"].keys())
+
+    def test_nrf52_alone_leaves_the_flasher_untouched(self):
+        self.write_boards()
+        before = self.boards.read_text()
+        self.nrf52_bundle()
+        result = self.assemble()
+        self.assertEqual(result["web_published"], [])
+        self.assertEqual(self.boards.read_text(), before)
+
+    def test_nrf52_without_its_package_is_refused(self):
+        self.nrf52_bundle()
+        (self.inputs / "t1-repeater/app.zip").unlink()
+        with self.assertRaises(ValueError):
+            self.assemble()
+
 
 if __name__ == "__main__":
     unittest.main()

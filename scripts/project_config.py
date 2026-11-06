@@ -14,6 +14,10 @@ class ProjectModelError(ValueError):
     pass
 
 
+# Chip families a board can build for; ESP32-only release steps run only for esp32.
+PLATFORMS = frozenset({"esp32", "nrf52"})
+
+
 class Capability(str, Enum):
     WIFI_STATION = "wifi_station"
     DUAL_OTA = "dual_ota"
@@ -229,6 +233,7 @@ class PartitionLayout:
 class BoardProfile:
     board_id: str
     upstream_variant: str
+    platform: str
     ota_board_id: int
     source_path: Path
     capabilities: Mapping[Capability, CapabilityState]
@@ -282,6 +287,7 @@ class ResolvedTarget:
     build_flags_append: tuple[str, ...]
     qemu_boot_check: bool
     capabilities: Mapping[str, str]
+    platform: str = "esp32"
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -301,6 +307,7 @@ class ResolvedTarget:
             "build_flags_append": list(self.build_flags_append),
             "qemu_boot_check": self.qemu_boot_check,
             "capabilities": dict(self.capabilities),
+            "platform": self.platform,
         }
 
 
@@ -402,8 +409,11 @@ class ProjectModel:
     def _load_board(root: Path, board_id: str) -> BoardProfile:
         path = root / "variants" / board_id / "overrides.yaml"
         data = _load_yaml(path)
-        _keys(path, "root", data, {"upstream_variant", "ota_board_id", "capabilities", "build_values", "build_flags_append", "partitions_override", "qemu", "flasher"})
+        _keys(path, "root", data, {"upstream_variant", "platform", "ota_board_id", "capabilities", "build_values", "build_flags_append", "partitions_override", "qemu", "flasher"})
         upstream_variant = _string(path, "upstream_variant", data.get("upstream_variant", board_id))
+        platform = _string(path, "platform", data.get("platform", "esp32"))
+        if platform not in PLATFORMS:
+            raise ProjectModelError(f"{path}:platform: expected one of {sorted(PLATFORMS)}, got '{platform}'")
         ota_board_id = _unsigned_id(path, "ota_board_id", data.get("ota_board_id", 0), 65535, 0)
 
         raw_capabilities = _mapping(path, "capabilities", data.get("capabilities"))
@@ -448,6 +458,7 @@ class ProjectModel:
         return BoardProfile(
             board_id=board_id,
             upstream_variant=upstream_variant,
+            platform=platform,
             ota_board_id=ota_board_id,
             source_path=path,
             capabilities=capabilities,
@@ -750,6 +761,7 @@ class ProjectModel:
                 build_flags_append=target.build_flags_append,
                 qemu_boot_check=target.qemu_boot_check,
                 capabilities={capability.value: board.capability(capability).value for capability in Capability},
+                platform=board.platform,
             ))
         return BuildPlan(self.core_mods, tuple(rows))
 

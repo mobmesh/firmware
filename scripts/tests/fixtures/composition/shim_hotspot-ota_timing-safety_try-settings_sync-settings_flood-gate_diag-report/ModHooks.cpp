@@ -72,8 +72,13 @@ void modBeforeDeepSleep() {
 bool     modBoardRadioInit()               { return radio_init(); }
 void     modBoardReboot()                  { board.reboot(); }
 uint16_t modBoardBattMilliVolts()          { return board.getBattMilliVolts(); }
+#if defined(ESP32)
 void     modBoardDeepSleep(uint32_t secs)  { board.enterDeepSleep(secs); }
 void     modBoardInhibitSleep(bool inhibit) { board.setInhibitSleep(inhibit); }
+#else
+void     modBoardDeepSleep(uint32_t secs)  { (void)secs; }
+void     modBoardInhibitSleep(bool inhibit) { (void)inhibit; }
+#endif
 uint32_t modClockGet()                     { return rtc_clock.getCurrentTime(); }
 uint32_t modAirtimeFor(int len)            { return radio_driver.getEstAirtimeFor(len); }
 bool     modRadioRssiNow(float* out) {

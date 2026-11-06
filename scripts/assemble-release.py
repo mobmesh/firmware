@@ -19,6 +19,8 @@ REQUIRED_FILES = (
     "board-entry.json",
     "release-notes.md",
 )
+# nRF52 builds ship only their DFU package; they have no boot files and no web-flasher entry yet.
+NRF52_REQUIRED_FILES = ("app.zip", "release-notes.md")
 
 
 def digest(path: Path) -> str:
@@ -45,13 +47,18 @@ def load_bundles(inputs: Path) -> list[dict]:
         if key in seen:
             raise ValueError(f"duplicate release input for {key[0]}/{key[1]}")
         seen.add(key)
-        missing = [name for name in REQUIRED_FILES if not (root / name).is_file()]
+        meta.setdefault("platform", "esp32")
+        required = NRF52_REQUIRED_FILES if meta["platform"] == "nrf52" else REQUIRED_FILES
+        missing = [name for name in required if not (root / name).is_file()]
         if missing:
             raise ValueError(f"{root} is missing {', '.join(missing)}")
+        meta["root"] = root
+        if meta["platform"] == "nrf52":
+            bundles.append(meta)
+            continue
         board_entry = json.loads((root / "board-entry.json").read_text())
         if not isinstance(board_entry, dict):
             raise ValueError(f"{root}/board-entry.json is not an object")
-        meta["root"] = root
         meta["board_entry"] = board_entry
         bundles.append(meta)
     return bundles
@@ -87,7 +94,8 @@ def check_release_groups(bundles: list[dict]) -> None:
         assets = [
             name
             for member in members
-            for name in (member["app_asset"], member["merged_asset"])
+            for name in (member["app_asset"], member.get("merged_asset"))
+            if name
         ]
         if len(titles) != 1 or len(latest) != 1 or len(notes) != 1:
             raise ValueError(f"inconsistent release metadata for {tag}")
@@ -98,10 +106,13 @@ def check_release_groups(bundles: list[dict]) -> None:
 def copy_release_assets(bundle: dict, output: Path) -> dict:
     bundle_output = output / f"{bundle['board']}-{bundle['role']}"
     bundle_output.mkdir(parents=True, exist_ok=True)
-    name_map = {
-        "app.bin": bundle["app_asset"],
-        "merged.bin": bundle["merged_asset"],
-    }
+    if bundle["platform"] == "nrf52":
+        name_map = {"app.zip": bundle["app_asset"]}
+    else:
+        name_map = {
+            "app.bin": bundle["app_asset"],
+            "merged.bin": bundle["merged_asset"],
+        }
     copied = []
     for source_name, target_name in name_map.items():
         target = bundle_output / target_name
@@ -118,6 +129,9 @@ def assemble(inputs: Path, flasher: Path, boards_path: Path, output: Path) -> di
     output.mkdir(parents=True, exist_ok=True)
     release_records = [copy_release_assets(bundle, output) for bundle in bundles]
     summary = {"releases": release_records, "web_published": [], "web_skipped": []}
+    for board in sorted({bundle["board"] for bundle in bundles if bundle["platform"] == "nrf52"}):
+        summary["web_skipped"].append({"board": board, "reason": "nRF52: no web-flasher entry yet"})
+    bundles = [bundle for bundle in bundles if bundle["platform"] != "nrf52"]
     if not bundles:
         return summary
 

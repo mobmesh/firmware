@@ -1,6 +1,6 @@
 # MobMesh firmware
 
-MeshCore Enhanced+ is custom MeshCore firmware for ESP32 boards by MobMesh, a
+MeshCore Enhanced+ is custom MeshCore firmware for ESP32 and nRF52 boards by MobMesh, a
 GulfCoastMesh member. It is MeshCore with added safety protections and features built in.
 It builds against new upstream MeshCore releases as they occur.
 This repository holds the mods, board configuration, patches and release workflow.
@@ -89,7 +89,10 @@ Each role uses an upstream version in its release title and tag. For an upstream
 | Release tag | `repeater-v1.17.1-mobmesh` |
 | Heltec V4 repeater app | `heltec_v4_rep_mobmesh-v1.17.1.bin` |
 | Heltec V4 repeater merged image | `heltec_v4_rep_mobmesh-v1.17.1-merged.bin` |
+| Heltec T1 repeater DFU package | `heltec_t1_rep_mobmesh_beta-v1.17.1.zip` |
 
 Each built target provides an app image for an OTA slot or existing installation and a
 merged image for flashing a blank board at offset 0. The merged image includes the app,
 bootloader, partition table and OTA data. Beta targets add `_beta` to the asset basename.
+nRF52 targets ship one DFU package instead, for the board's OTAFIX bootloader; they are not in
+the web flasher catalogue yet.

@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <Packet.h>
-#include <SPIFFS.h>
+#include <helpers/ModFS.h>
 #include <Utils.h>
 #include <helpers/ConfigSerializer.h>
 #include <helpers/direct_retry/DirectRetryCore.h>
@@ -35,8 +35,8 @@ static void boot() {
   booted = true;
   uint8_t key[32];
   if (modPublisherKey(key)) self_byte = key[0];
-  if (!SPIFFS.begin(true) || !SPIFFS.exists(SETTINGS_PATH)) return;
-  File f = SPIFFS.open(SETTINGS_PATH, "r");
+  if (!ModFS.begin(true) || !ModFS.exists(SETTINGS_PATH)) return;
+  File f = ModFS.open(SETTINGS_PATH, "r");
   if (!f) return;
   SettingsFile file(enabled);
   file.loadSerial(f);
@@ -44,7 +44,7 @@ static void boot() {
 }
 
 static bool saveSettings() {
-  File f = SPIFFS.open(SETTINGS_PATH, "w", true);
+  File f = ModFS.open(SETTINGS_PATH, "w", true);
   if (!f) return false;
   SettingsFile file(enabled);
   bool ok = file.saveSerial(f);

@@ -156,3 +156,12 @@ targets:
     vendor_flasher_assets: false
     beta: true
     mods: [hotspot-ota, timing-safety, try-settings, sync-settings, direct-retry]
+
+  # nRF52840: no Wi-Fi, so no hotspot-ota; release steps for ESP32 images are skipped for it.
+  - board: heltec_t1
+    role: repeater
+    build_env: Heltec_t1_repeater
+    vendor_flasher_assets: true
+    beta: true
+    qemu_boot_check: false
+    mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]

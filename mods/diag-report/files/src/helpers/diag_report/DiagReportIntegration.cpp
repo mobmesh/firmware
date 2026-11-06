@@ -2,8 +2,8 @@
 
 #include <Arduino.h>
 #include <Packet.h>
-#include <SPIFFS.h>
-#include <esp_system.h>
+#include <helpers/ModFS.h>
+#include <helpers/ModPlatform.h>
 #include <math.h>
 #include <helpers/ConfigSerializer.h>
 #include <helpers/diag_report/BattLog.h>
@@ -106,13 +106,13 @@ static uint8_t pause_count;
 
 // Mounted here rather than assumed, as try-settings does: nothing guarantees another mod mounted it.
 static bool ensureMounted() {
-  if (!mounted) mounted = SPIFFS.begin(true);
+  if (!mounted) mounted = ModFS.begin(true);
   return mounted;
 }
 
 static void saveStudy() {
   if (!ensureMounted()) return;
-  File f = SPIFFS.open(STUDY_PATH, "w", true);
+  File f = ModFS.open(STUDY_PATH, "w", true);
   if (!f) return;
   uint32_t magic = STUDY_MAGIC;
   f.write((const uint8_t*)&magic, sizeof(magic));
@@ -122,8 +122,8 @@ static void saveStudy() {
 
 static void loadStudy() {
   memset(&study, 0, sizeof(study));
-  if (!ensureMounted() || !SPIFFS.exists(STUDY_PATH)) return;
-  File f = SPIFFS.open(STUDY_PATH, "r");
+  if (!ensureMounted() || !ModFS.exists(STUDY_PATH)) return;
+  File f = ModFS.open(STUDY_PATH, "r");
   if (!f) return;
   uint32_t magic = 0;
   bool ok = f.read((uint8_t*)&magic, sizeof(magic)) == sizeof(magic) && magic == STUDY_MAGIC
@@ -134,7 +134,7 @@ static void loadStudy() {
 
 static void saveNoise() {
   if (!ensureMounted()) return;
-  File f = SPIFFS.open(NOISE_PATH, "w", true);
+  File f = ModFS.open(NOISE_PATH, "w", true);
   if (!f) return;
   uint32_t magic = NOISE_MAGIC;
   f.write((const uint8_t*)&magic, sizeof(magic));
@@ -144,8 +144,8 @@ static void saveNoise() {
 
 static void loadNoise() {
   memset(&noise_log, 0, sizeof(noise_log));
-  if (!ensureMounted() || !SPIFFS.exists(NOISE_PATH)) return;
-  File f = SPIFFS.open(NOISE_PATH, "r");
+  if (!ensureMounted() || !ModFS.exists(NOISE_PATH)) return;
+  File f = ModFS.open(NOISE_PATH, "r");
   if (!f) return;
   uint32_t magic = 0;
   bool ok = f.read((uint8_t*)&magic, sizeof(magic)) == sizeof(magic) && magic == NOISE_MAGIC
@@ -156,7 +156,7 @@ static void loadNoise() {
 
 static void saveBatt() {
   if (!ensureMounted()) return;
-  File f = SPIFFS.open(BATT_PATH, "w", true);
+  File f = ModFS.open(BATT_PATH, "w", true);
   if (!f) return;
   uint32_t magic = BATT_MAGIC;
   f.write((const uint8_t*)&magic, sizeof(magic));
@@ -166,8 +166,8 @@ static void saveBatt() {
 
 static void loadBatt() {
   memset(&batt_log, 0, sizeof(batt_log));
-  if (!ensureMounted() || !SPIFFS.exists(BATT_PATH)) return;
-  File f = SPIFFS.open(BATT_PATH, "r");
+  if (!ensureMounted() || !ModFS.exists(BATT_PATH)) return;
+  File f = ModFS.open(BATT_PATH, "r");
   if (!f) return;
   uint32_t magic = 0;
   bool ok = f.read((uint8_t*)&magic, sizeof(magic)) == sizeof(magic) && magic == BATT_MAGIC
@@ -177,8 +177,8 @@ static void loadBatt() {
 }
 
 static void loadConfig() {
-  if (!ensureMounted() || !SPIFFS.exists(CONFIG_PATH)) return;
-  File f = SPIFFS.open(CONFIG_PATH, "r");
+  if (!ensureMounted() || !ModFS.exists(CONFIG_PATH)) return;
+  File f = ModFS.open(CONFIG_PATH, "r");
   if (!f) return;
   config.loadSerial(f);
   f.close();
@@ -187,7 +187,7 @@ static void loadConfig() {
 
 static bool saveConfig() {
   if (!ensureMounted()) return false;
-  File f = SPIFFS.open(CONFIG_PATH, "w", true);
+  File f = ModFS.open(CONFIG_PATH, "w", true);
   if (!f) return false;
   bool ok = config.saveSerial(f);
   f.close();
@@ -209,13 +209,13 @@ static void beginBlock(uint8_t state, uint32_t extra_ms) {
   cur_state = state;
   modFemLnaSet(state == LNA_ON);
   block_started_ms = millis();
-  block_len_ms = BLOCK_MIN_MS + esp_random() % BLOCK_SPAN_MS + extra_ms;
+  block_len_ms = BLOCK_MIN_MS + modRandom() % BLOCK_SPAN_MS + extra_ms;
   floor_count = 0;
 }
 
 static void beginPair(uint32_t extra_ms) {
   memset(blocks, 0, sizeof(blocks));
-  first_state = esp_random() & 1;
+  first_state = modRandom() & 1;
   pair_pos = 0;
   beginBlock(first_state, extra_ms);
 }
@@ -844,7 +844,7 @@ static void startStudy(const ModCliContext& context, const char* arg, char* repl
   last_tick_ms = millis();
   tick_rem_ms = 0;
   last_save_s = 0;
-  beginPair(esp_random() % START_SPAN_MS);
+  beginPair(modRandom() % START_SPAN_MS);
   saveStudy();
 
   static char lines[LINES_MAX][48];
