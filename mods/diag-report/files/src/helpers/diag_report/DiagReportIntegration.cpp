@@ -685,9 +685,9 @@ static void runNoise(const ModCliContext& context, char* reply) {
   emitLines(context, reply, &lines[0][0], NOISE_LINE, n);
 }
 
-// Only the board whose divider was bench-measured gets the low warning; power-guard ships on the same one.
+// Only a board whose profile marks its battery reading as measured gets the low warning.
 static BattView battView() {
-#ifdef WITH_POWER_GUARD
+#ifdef MOBMESH_HAS_BATTERY_MEASUREMENT
   return battAnalyse(batt_log, clockHour(), config.tz_offset, true);
 #else
   return battAnalyse(batt_log, clockHour(), config.tz_offset, false);

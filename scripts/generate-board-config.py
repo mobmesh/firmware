@@ -870,6 +870,8 @@ def cmd_inject_env(args):
         build_values["MOBMESH_HAS_FEM_LNA"] = 1
     if board_profile.capability(Capability.EXTERNAL_POWER_CONTROL).satisfies_requirement:
         build_values["MOBMESH_HAS_EXTERNAL_POWER"] = 1
+    if board_profile.capability(Capability.BATTERY_MEASUREMENT).satisfies_requirement:
+        build_values["MOBMESH_HAS_BATTERY_MEASUREMENT"] = 1
     for key, value in build_values.items():
         if isinstance(value, str):
             override_flag_lines.append(f'-D {key}=\'"{value}"\'')
