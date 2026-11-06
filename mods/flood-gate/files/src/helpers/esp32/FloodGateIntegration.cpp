@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <Packet.h>
-#include <SPIFFS.h>
+#include <helpers/ModFS.h>
 #include <Utils.h>
 
 #define SINKHOLE_MAX         16
@@ -50,9 +50,9 @@ static uint32_t stat_minbytes = 0;
 static uint32_t stat_watched = 0;
 static uint8_t active_count = 0;   // lets the forward hook return at once when no entry is live
 
-// Mounted here rather than assumed: this mod does not require hotspot-ota, which otherwise calls SPIFFS.begin() first.
+// Mounted here rather than assumed: this mod does not require hotspot-ota, which otherwise calls ModFS.begin() first.
 static bool ensureMounted() {
-  if (!mounted) mounted = SPIFFS.begin(true);
+  if (!mounted) mounted = ModFS.begin(true);
   return mounted;
 }
 
@@ -64,8 +64,8 @@ static void recount() {
 static void load() {
   memset(entries, 0, sizeof(entries));
   memset(counts, 0, sizeof(counts));
-  if (!ensureMounted() || !SPIFFS.exists(SINKHOLE_PATH)) return;
-  File f = SPIFFS.open(SINKHOLE_PATH, "r");
+  if (!ensureMounted() || !ModFS.exists(SINKHOLE_PATH)) return;
+  File f = ModFS.open(SINKHOLE_PATH, "r");
   if (!f) return;
   uint32_t magic = 0;
   bool ok = f.read((uint8_t*)&magic, sizeof(magic)) == sizeof(magic) && magic == SINKHOLE_MAGIC
@@ -88,10 +88,10 @@ static void save() {
   bool any = false;
   for (auto& e : entries) any |= e.active != 0;
   if (!any) {
-    if (SPIFFS.exists(SINKHOLE_PATH)) SPIFFS.remove(SINKHOLE_PATH);
+    if (ModFS.exists(SINKHOLE_PATH)) ModFS.remove(SINKHOLE_PATH);
     return;
   }
-  File f = SPIFFS.open(SINKHOLE_PATH, "w", true);
+  File f = ModFS.open(SINKHOLE_PATH, "w", true);
   if (!f) return;
   uint32_t magic = SINKHOLE_MAGIC;
   f.write((const uint8_t*)&magic, sizeof(magic));

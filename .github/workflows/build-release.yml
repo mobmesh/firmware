@@ -113,7 +113,7 @@ jobs:
             exit 0
           fi
           # Release existence alone does not mean THIS board's asset is in it.
-          ASSET_NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}.bin"
+          ASSET_NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}.${{ matrix.platform == 'nrf52' && 'zip' || 'bin' }}"
           STATUS=$(curl -s -o /tmp/release.json -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.pick.outputs.release_tag }}")
@@ -259,7 +259,7 @@ jobs:
 
       - id: rollback_check
         name: Verify RollbackGuard's core hook still exists and is called (catches silent drift before it ships)
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'esp32'
         run: |
           FRAMEWORK_DIR=$(find "$HOME/.platformio/packages" -maxdepth 1 -iname 'framework-arduinoespressif32*' | head -1)
           HITS=$([ -n "$FRAMEWORK_DIR" ] && grep -ro "verifyRollbackLater" "$FRAMEWORK_DIR" | wc -l || echo 0)
@@ -273,7 +273,7 @@ jobs:
           fi
 
       - name: Notify on rollback-guard hook drift
-        if: failure() && steps.rollback_check.outputs.failed == 'true'
+        if: failure() && steps.rollback_check.outputs.failed == 'true' && github.event.inputs.dry_run != 'true'
         uses: actions/github-script@v9
         with:
           script: |
@@ -294,7 +294,7 @@ jobs:
             });
 
       - name: Stage this build's own boot files for merged-image and QEMU checks
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'esp32'
         run: |
           BOOT="upstream-src/.pio/build/${{ matrix.build_env }}/bootloader.bin"
           PART="upstream-src/.pio/build/${{ matrix.build_env }}/partitions.bin"
@@ -316,14 +316,16 @@ jobs:
         id: artifact
         run: |
           cd upstream-src
-          BIN=".pio/build/${{ matrix.build_env }}/firmware.bin"
+          # nRF52 ships the DFU package the OTAFIX bootloader takes; ESP32 ships the app-only image.
+          EXT=${{ matrix.platform == 'nrf52' && 'zip' || 'bin' }}
+          BIN=".pio/build/${{ matrix.build_env }}/firmware.$EXT"
           test -f "$BIN"
-          NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}.bin"
+          NAME="${{ matrix.asset_basename }}-${{ steps.pick.outputs.version }}.$EXT"
           cp "$BIN" "../$NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
       - name: Write OTA metadata into the image's reserved app-descriptor field
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'esp32'
         run: |
           python3 scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" \
             --upstream-version "${{ steps.pick.outputs.version }}" \
@@ -334,7 +336,7 @@ jobs:
             --show
 
       - name: Regenerate pages/flasher/data/auto_boards.json from overrides.yaml + upstream + this build's real partitions.bin
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'esp32'
         run: |
           pip install --quiet pyyaml==6.0.3
           python3 scripts/generate-board-config.py boards-json \
@@ -348,7 +350,7 @@ jobs:
             --output pages/flasher/data/auto_boards.json
 
       - name: Verify firmware.bin fits within its OTA app partition
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'esp32'
         run: |
           MAX_HEX=$(jq -r '.["${{ matrix.board_id }}"].offsets.appMaxSize' pages/flasher/data/auto_boards.json)
           MAX=$((MAX_HEX))
@@ -364,14 +366,14 @@ jobs:
           fi
 
       - name: Verify the image reports its own metadata back
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'esp32'
         run: |
           python3 scripts/patch_ota_metadata.py "${{ steps.artifact.outputs.name }}" --check
 
       # Pinned rather than taking PlatformIO's bundled copy: esptool 4.x spells this
       # merge_bin/--flash_size and 5.x merge-bin/--flash-size.
       - name: Build the whole-flash -merged.bin
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'esp32'
         id: merged
         run: |
           pip install --quiet esptool==5.3.1
@@ -387,7 +389,7 @@ jobs:
 
 
       - name: Stage this app for merged-image and QEMU checks
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'esp32'
         run: |
           eval "$(python3 scripts/generate-board-config.py flasher-paths --board ${{ matrix.board_id }} --variant-id ${{ matrix.id }})"
           mkdir -p "$(dirname "pages/flasher/$FIRMWARE")"
@@ -446,7 +448,7 @@ jobs:
           retention-days: 14
 
       - name: Package this successful build for the single publisher
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'esp32'
         run: |
           mkdir -p release-input
           eval "$(python3 scripts/generate-board-config.py flasher-paths --board ${{ matrix.board_id }} --variant-id ${{ matrix.id }})"
@@ -476,6 +478,43 @@ jobs:
               make_latest:$make_latest, vendor_flasher_assets:$vendor_flasher_assets}' \
             > release-input/meta.json
 
+      - name: Write this nRF52 board's flasher entry into the workspace auto_boards.json
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'nrf52'
+        run: |
+          # No partition table: the entry names the DFU package, and the stock device whose erase package and bootloader it shares.
+          pip install --quiet pyyaml==6.0.3
+          python3 scripts/generate-board-config.py boards-json \
+            --board ${{ matrix.board_id }} \
+            --upstream-dir upstream-src \
+            --variant-id ${{ matrix.id }} \
+            --variant-label "${{ matrix.release_title }}" \
+            --asset-basename ${{ matrix.asset_basename }} \
+            --version "${{ steps.pick.outputs.version }}" \
+            --output pages/flasher/data/auto_boards.json
+
+      - name: Package this successful nRF52 build for the single publisher
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'nrf52'
+        run: |
+          # No boot files or merged image: the release and the flasher both carry the DFU package.
+          mkdir -p release-input
+          eval "$(python3 scripts/generate-board-config.py flasher-paths --board ${{ matrix.board_id }} --variant-id ${{ matrix.id }})"
+          cp "${{ steps.artifact.outputs.name }}" release-input/app.zip
+          cp release-notes.md release-input/release-notes.md
+          jq '."${{ matrix.board_id }}"' pages/flasher/data/auto_boards.json > release-input/board-entry.json
+          jq -n \
+            --arg board "${{ matrix.board_id }}" \
+            --arg role "${{ matrix.id }}" \
+            --arg version "${{ steps.pick.outputs.version }}" \
+            --arg release_tag "${{ steps.pick.outputs.release_tag }}" \
+            --arg release_title "${{ matrix.release_title }} ${{ steps.pick.outputs.version }} - mobmesh" \
+            --arg app_asset "${{ steps.artifact.outputs.name }}" \
+            --arg firmware_path "$FIRMWARE" \
+            --argjson make_latest '${{ matrix.make_latest }}' \
+            '{platform:"nrf52", board:$board, role:$role, version:$version, release_tag:$release_tag,
+              release_title:$release_title, app_asset:$app_asset, firmware_path:$firmware_path,
+              make_latest:$make_latest}' \
+            > release-input/meta.json
+
       - name: Upload this successful build
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
         uses: actions/upload-artifact@v7
@@ -485,7 +524,7 @@ jobs:
           retention-days: 7
 
       - name: Close this target's stale build issues
-        if: success() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false'
+        if: success() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && github.event.inputs.dry_run != 'true'
         uses: actions/github-script@v9
         env:
           BOARD_ID: ${{ matrix.board_id }}
@@ -506,7 +545,7 @@ jobs:
             }
 
       - name: Notify on patch/build failure
-        if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && steps.rollback_check.outputs.failed != 'true'
+        if: failure() && steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && steps.rollback_check.outputs.failed != 'true' && github.event.inputs.dry_run != 'true'
         uses: actions/github-script@v9
         env:
           BOARD_ID: ${{ matrix.board_id }}
@@ -643,7 +682,8 @@ jobs:
   # One issue per run, filed from a single job so parallel matrix jobs cannot open duplicates.
   boot-check-report:
     needs: build
-    if: always()
+    # A dry run leaves the tracking issue alone; its boot logs stay in the run's artifacts.
+    if: always() && github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

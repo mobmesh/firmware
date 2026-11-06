@@ -14,6 +14,7 @@ import {
   STOCK_IMAGE_BASE,
   STOCK_RELAY_BASE,
 } from './constants.js';
+import { modBitsFromImage } from './settings.js';
 
 /**
  * @typedef {{ data: ArrayBuffer, address: number }} FlashFile
@@ -47,8 +48,8 @@ export function createFlashPlan(fields) {
 }
 
 // --- the custom manifest ------------------------------------------------------------
-// `auto_boards.json` normalises here and is never written back to. Generated from each build's
-// real `partitions.bin`, so ESP32-only.
+// `auto_boards.json` normalises here and is never written back to. ESP32 entries are generated
+// from each build's real `partitions.bin`; nRF52 entries (`"platform": "nrf52"`) list DFU packages.
 
 // The tool's own directory, where the build pipeline commits the vendored builds. The dev
 // rig overrides it: until cutover those still live under `/pages/flasher/`.
@@ -95,7 +96,41 @@ function requirePath(value, boardKey, field) {
   return value;
 }
 
+// An nRF52 board has no partition table or boot files: each role is one DFU package. `stockDevice`
+// names the stock catalogue entry whose erase package and OTAFIX bootloader it shares.
+function normaliseNrf52Board(key, raw) {
+  const variants = {};
+  for (const [variantKey, variant] of Object.entries(raw.variants ?? {})) {
+    const firmwareFile = requirePath(variant.firmwareFile, key, `variants.${variantKey}.firmwareFile`);
+    if (!/\.zip$/i.test(firmwareFile)) {
+      throw new ManifestError(`Board '${key}' lists '${firmwareFile}', which is not a DFU package (.zip).`);
+    }
+    variants[variantKey] = {
+      key: variantKey,
+      label: variant.label ?? variantKey,
+      version: variant.version ?? null,
+      firmwareFile,
+      postFlashCommands: Array.isArray(variant.postFlashCommands) ? variant.postFlashCommands.slice() : null,
+    };
+  }
+  return {
+    key,
+    platform: 'nrf52',
+    label: raw.label ?? key,
+    connectNote: raw.connectNote ?? null,
+    postFlashNote: raw.postFlashNote ?? null,
+    stockDevice: typeof raw.stockDevice === 'string' && raw.stockDevice ? raw.stockDevice : null,
+    // Beta targets carry `_beta` in their release asset name, so the badge follows the build list.
+    beta: Object.values(raw.variants ?? {}).some((variant) => /_beta$/.test(variant.assetBasename ?? '')),
+    variants,
+  };
+}
+
 function normaliseBoard(key, raw) {
+  if (raw.platform === 'nrf52') return normaliseNrf52Board(key, raw);
+  if (raw.platform != null && raw.platform !== 'esp32') {
+    throw new ManifestError(`Board '${key}' has unknown platform '${raw.platform}'.`);
+  }
   const offsets = {};
   for (const name of ['bootloader', 'partitions', 'otadata', 'app0', 'app1', 'appMaxSize']) {
     offsets[name] = requireOffset(raw.offsets, key, name);
@@ -117,6 +152,7 @@ function normaliseBoard(key, raw) {
 
   return {
     key,
+    platform: 'esp32',
     label: raw.label ?? key,
     connectNote: raw.connectNote ?? null,
     postFlashNote: raw.postFlashNote ?? null,
@@ -283,6 +319,63 @@ export function buildCustomFlashPlan(source, scope) {
     verify: sha256 ? { sha256 } : null,
     postFlash: variant.postFlashCommands ? { commands: variant.postFlashCommands } : null,
   });
+}
+
+// --- the custom manifest, nRF52 -------------------------------------------------------
+
+// Stage one for an nRF52 board: the package, its parsed section, and the stock erase package when
+// the install wipes. Everything is fetched and checked before the device enters DFU.
+export async function loadCustomDfuSource(
+  manifest,
+  boardKey,
+  variantKey,
+  { wipe = false, stockManifest = null, relayBase = STOCK_RELAY_BASE, onStatus } = {}
+) {
+  const board = manifest.boards[boardKey];
+  if (!board) throw new ManifestError(`auto_boards.json has no board '${boardKey}'.`);
+  if (board.platform !== 'nrf52') throw new ManifestError(`Board '${boardKey}' is not an nRF52 board.`);
+  const variant = board.variants[variantKey];
+  if (!variant) throw new ManifestError(`Board '${boardKey}' has no variant '${variantKey}'.`);
+
+  onStatus?.('Loading firmware…');
+  const bytes = await fetchAsset(manifest.baseUrl, variant.firmwareFile, 'the firmware');
+  const blob = new Blob([bytes]);
+  const section = await validateDfuPackage(blob, { withBytes: true });
+  if (section.kind !== 'application') {
+    throw new ManifestError(`${variant.firmwareFile} is a ${section.kind} package, not an application.`);
+  }
+
+  let eraseBytes = null;
+  if (wipe) {
+    const stock = board.stockDevice ? stockManifest?.devices.find((d) => d.name === board.stockDevice) : null;
+    if (!stock?.erase) {
+      throw new ManifestError(
+        `No erase package is known for '${board.label}', so New Device cannot be honoured. Choose Upgrade Existing.`
+      );
+    }
+    onStatus?.('Downloading the erase package…');
+    const res = await fetch(new URL(stock.erase, relayBase), { cache: 'no-store' });
+    if (!res.ok) throw new ManifestError(`Could not download ${stock.erase} from the relay: HTTP ${res.status}.`);
+    eraseBytes = new Uint8Array(await res.arrayBuffer());
+  }
+
+  return { board, variant, wipe, blob, eraseBytes, modBits: modBitsFromImage(section.bin) };
+}
+
+// Stage two, pure. DFU checks the package's own CRC, so there is no separate digest to verify.
+export function buildCustomDfuPlan(source) {
+  const { variant, blob, eraseBytes, modBits } = source;
+  return {
+    ...createFlashPlan({
+      engine: 'dfu',
+      package: blob,
+      erasePackage: eraseBytes ? new Blob([eraseBytes]) : null,
+      preserveFs: false,
+      verify: null,
+      postFlash: variant.postFlashCommands ? { commands: variant.postFlashCommands } : null,
+    }),
+    modBits,
+  };
 }
 
 // --- the stock manifest -------------------------------------------------------------

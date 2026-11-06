@@ -159,8 +159,18 @@ function placeholderArt() {
 
 // Upstream's SPA host answers 200 with index.html for a file it does not have, so a
 // missing image only ever announces itself by failing to decode — never by status.
-function tileArt(image, filter, dim = true, plate = true) {
+function tileArt(image, filter, dim = true, plate = true, badge = null) {
   if (!image) return placeholderArt();
+  if (badge) {
+    // The picture and its label share one frame, so the label rides the picture's hover lift.
+    const framed = document.createElement('span');
+    framed.className = 'board-tile-badged';
+    const label = document.createElement('span');
+    label.className = 'board-tile-badge';
+    label.textContent = badge;
+    framed.append(tileArt(image, filter, dim, plate), label);
+    return framed;
+  }
   const picture = document.createElement('img');
   picture.src = image;
   picture.alt = '';
@@ -256,7 +266,7 @@ function renderChoice(step, options) {
       const name = document.createElement('strong');
       name.textContent = option.label;
       cell.append(
-        tileArt(option.image, option.imageFilter, option.imageDim, option.imagePlate), name);
+        tileArt(option.image, option.imageFilter, option.imageDim, option.imagePlate, option.badge ?? null), name);
     } else if (layout === 'row') {
       // Either a real picture (the custom path's PNGs) or a named glyph, never both.
       const glyph = option.icon

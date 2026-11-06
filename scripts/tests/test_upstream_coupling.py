@@ -212,7 +212,9 @@ class UpstreamCouplingTestCase(unittest.TestCase):
             REPO_ROOT,
             "mods/sync-settings/files/src/helpers/esp32/SyncIntegration.cpp",
         ).read_text()
-        self.assertIn("esp_fill_random(&plan.payload.migration_id", integration)
+        self.assertIn("modFillRandom(&plan.payload.migration_id", integration)
+        platform = Path(REPO_ROOT, "mods/shim/files/src/helpers/ModPlatform.h").read_text()
+        self.assertIn("#define modFillRandom esp_fill_random", platform)
 
     def test_owner_marker_is_a_bounded_repeater_reply_hook(self):
         header = Path(REPO_ROOT, "mods/shim/files/src/helpers/ModHooks.h").read_text()

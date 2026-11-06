@@ -9,7 +9,7 @@
 #include <helpers/sync_settings/SyncTime.h>
 
 #include <Arduino.h>
-#include <esp_system.h>
+#include <helpers/ModPlatform.h>
 #if CONFIG_IDF_TARGET_ESP32C3
 #include "esp32c3/rom/miniz.h"
 #elif CONFIG_IDF_TARGET_ESP32S3
@@ -17,14 +17,21 @@
 #else
 #define SYNC_SETTINGS_NO_ROM_MINIZ 1
 #endif
+#if defined(SYNC_SETTINGS_NO_ROM_MINIZ) && defined(NRF52_PLATFORM)
+// Decompress only: nRF52 receives compressed campaigns through the vendored tinfl and publishes uncompressed.
+#include <helpers/sync_settings/miniz/miniz_tinfl.h>
+#define SYNC_SETTINGS_PORTABLE_TINFL 1
+#endif
 #include <Identity.h>
 #include <Packet.h>
 #include <SHA256.h>
 #include <Utils.h>
 #include <helpers/ModHooks.h>
 #include <helpers/RegionMap.h>
-#include <SPIFFS.h>
+#include <helpers/ModFS.h>
+#if defined(ESP32)
 #include <dirent.h>
+#endif
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -238,6 +245,7 @@ struct BootListing {
 static BootListing* boot_listing = nullptr;
 
 static bool readBootListing(BootListing& listing) {
+#if defined(ESP32)
   DIR* dir = opendir("/spiffs");
   if (dir == nullptr) return false;
   listing.count = 0;
@@ -255,6 +263,11 @@ static bool readBootListing(BootListing& listing) {
   if (errno != 0) complete = false;
   closedir(dir);
   return complete;
+#else
+  // No directory listing without the ESP32 VFS; each file is checked on its own instead.
+  (void)listing;
+  return false;
+#endif
 }
 
 static bool absentFromBootListing(const char* path) {
@@ -268,7 +281,7 @@ static bool absentFromBootListing(const char* path) {
 static bool fileExists(uint8_t slot, void* context) {
   PairPaths* paths = static_cast<PairPaths*>(context);
   if (absentFromBootListing(paths->path[slot])) return false;
-  return SPIFFS.exists(paths->path[slot]);
+  return ModFS.exists(paths->path[slot]);
 }
 
 static bool fileRead(uint8_t slot, uint8_t* out, size_t capacity,
@@ -276,7 +289,7 @@ static bool fileRead(uint8_t slot, uint8_t* out, size_t capacity,
   PairPaths* paths = static_cast<PairPaths*>(context);
   len = 0;
   if (!fileExists(slot, context)) return false;
-  File file = SPIFFS.open(paths->path[slot], "r");
+  File file = ModFS.open(paths->path[slot], "r");
   if (!file) return false;
   len = file.size();
   bool ok = len <= capacity && file.read(out, len) == len;
@@ -288,7 +301,7 @@ static bool fileWrite(uint8_t slot, const uint8_t* data, size_t len, void* conte
   PairPaths* paths = static_cast<PairPaths*>(context);
   bool present = fileExists(slot, context);
   boot_listing = nullptr;
-  File file = SPIFFS.open(paths->path[slot], "w", !present);
+  File file = ModFS.open(paths->path[slot], "w", !present);
   if (!file) return false;
   bool ok = file.write(data, len) == len;
   file.close();
@@ -402,13 +415,13 @@ static PairResult loadPair(PairPaths& paths, uint8_t type, PairView& pair,
   PairResult result = readPair(pairIO(paths), type, pair, scratch, STORE_MAX,
                                hash, validate, nullptr);
   if (result == PAIR_OK && pair.degraded &&
-      SPIFFS.remove(paths.path[pair.slot ^ 1])) pair.degraded = false;
+      ModFS.remove(paths.path[pair.slot ^ 1])) pair.degraded = false;
   return result;
 }
 
 static void discardPair(PairPaths& paths) {
-  SPIFFS.remove(paths.path[0]);
-  SPIFFS.remove(paths.path[1]);
+  ModFS.remove(paths.path[0]);
+  ModFS.remove(paths.path[1]);
 }
 
 static bool loadConfig(uint8_t* scratch) {
@@ -1537,8 +1550,8 @@ static bool applyCampaign(uint8_t dataset, const Campaign& campaign,
 #endif
 }
 
-#ifndef SYNC_SETTINGS_NO_ROM_MINIZ
-// Raw deflate through the mask-ROM tinfl; the decompressor state is heap, not static.
+#if !defined(SYNC_SETTINGS_NO_ROM_MINIZ) || defined(SYNC_SETTINGS_PORTABLE_TINFL)
+// Raw deflate through tinfl, from mask ROM or the vendored copy; the decompressor state is heap, not static.
 static bool inflatePayload(const uint8_t* in, size_t in_len, uint8_t* out,
                            size_t out_cap, size_t& out_len, void*) {
   if (in == nullptr || out == nullptr || in_len == 0 || out_cap == 0) return false;
@@ -1639,7 +1652,7 @@ static uint8_t* deflatePayload(const uint8_t* in, uint16_t in_len, uint16_t& out
 static ReceiveOps receive_ops = {
   acceptsCampaign, verifyFrame, hash, allocateFrame, releaseFrame,
   persistReplay, validateDataset, applyCampaign,
-#ifdef SYNC_SETTINGS_NO_ROM_MINIZ
+#if defined(SYNC_SETTINGS_NO_ROM_MINIZ) && !defined(SYNC_SETTINGS_PORTABLE_TINFL)
   nullptr,
 #else
   inflatePayload,
@@ -3689,7 +3702,7 @@ static bool radioPublishPlanCommand(char* command, bool arm, char* reply) {
   plan.payload.schedule = parsed.schedule;
   plan.prior = prior;
   do {
-    esp_fill_random(&plan.payload.migration_id, sizeof(plan.payload.migration_id));
+    modFillRandom(&plan.payload.migration_id, sizeof(plan.payload.migration_id));
   } while (plan.payload.migration_id == 0);
   uint8_t encoded[RADIO_PAYLOAD_LEN];
   if (writeRadioPayload(plan.payload, MOBMESH_BUILD_EPOCH, encoded,

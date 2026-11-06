@@ -170,6 +170,12 @@ async function stockManifest(flow) {
   return flow.state.stockManifest;
 }
 
+/** The stock catalogue device an Enhanced+ board names, or null for ESP32 boards and unloaded catalogues. */
+function stockDeviceForBoard(flow, boardKey) {
+  const name = flow.state.customManifest?.boards?.[boardKey]?.stockDevice;
+  return name ? flow.state.stockManifest?.devices.find((d) => d.name === name) ?? null : null;
+}
+
 function selectedStockDevice(flow) {
   const { stockManifest: manifest, deviceName } = flow.state;
   return manifest?.devices.find((device) => device.name === deviceName) ?? null;
@@ -177,6 +183,16 @@ function selectedStockDevice(flow) {
 
 /** The device and firmware entry the bootloader gate reads, or null before both are chosen. */
 function bootloaderTarget(flow) {
+  if (flow.state.source === SOURCE.ENHANCED) {
+    // An Enhanced+ nRF52 board shares the stock entry it names, and that entry's role notice.
+    const board = flow.state.customManifest?.boards?.[flow.state.boardKey];
+    const device = board?.stockDevice
+      ? flow.state.stockManifest?.devices.find((d) => d.name === board.stockDevice) ?? null
+      : null;
+    const stockRole = flow.state.variantKey === 'room_server' ? 'roomServer' : flow.state.variantKey;
+    const entry = device?.firmware?.find((f) => f.role === stockRole) ?? null;
+    return device && entry ? { device, entry } : null;
+  }
   const device = selectedStockDevice(flow);
   const entry = device?.firmware?.[flow.state.firmwareIndex] ?? null;
   return device && entry ? { device, entry } : null;
@@ -237,7 +253,17 @@ async function buildPlan(flow, onStatus) {
   const wipe = s.install === INSTALL.NEW;
   s.planNotes = [];
 
-  if (s.source === SOURCE.ENHANCED) {
+  if (s.source === SOURCE.ENHANCED && s.family === 'nrf52') {
+    const manifest = await customManifest(flow);
+    const source = await plans.loadCustomDfuSource(manifest, s.boardKey, s.variantKey, {
+      wipe,
+      stockManifest: wipe ? await stockManifest(flow) : null,
+      relayBase: flow.relayBase,
+      onStatus,
+    });
+    s.planNotes.push(`file: ${source.variant.firmwareFile}`);
+    s.plan = plans.buildCustomDfuPlan(source);
+  } else if (s.source === SOURCE.ENHANCED) {
     const manifest = await customManifest(flow);
     const source = await plans.loadCustomFirmwareSource(manifest, s.boardKey, s.variantKey, { onStatus });
     // The restore is sized against the layout being *written*, not the one read
@@ -483,12 +509,27 @@ export const STEPS = [
     async options(flow) {
       if (flow.state.source === SOURCE.ENHANCED) {
         const manifest = await customManifest(flow);
-        // Value is the display id, not the board: two tiles can share one board.
-        return manifest.displays.map((entry) => ({
-          value: entry.id,
-          label: entry.label,
-          image: entry.icon,
-        }));
+        // The OTAFIX gate and New Device's erase package both come from the stock catalogue.
+        if (flow.state.family === 'nrf52') await stockManifest(flow);
+        // Value is the display id, not the board: two tiles can share one board. Only boards of the
+        // connected chip family are offered, so an nRF52 device never sees an ESP32 image.
+        return manifest.displays
+          .filter((entry) => manifest.boards[entry.board]?.platform === flow.state.family)
+          .map((entry) => {
+            // An nRF52 board shows its stock catalogue picture, the same one the Standard path shows.
+            const stock = stockDeviceForBoard(flow, entry.board);
+            return stock?.image
+              ? {
+                  value: entry.id,
+                  label: entry.label,
+                  image: stock.image,
+                  imageFilter: stock.imageFilter ?? null,
+                  imageDim: stock.imageDim !== false,
+                  imagePlate: stock.imagePlate !== false,
+                  badge: manifest.boards[entry.board].beta ? 'BETA' : null,
+                }
+              : { value: entry.id, label: entry.label, image: entry.icon };
+          });
       }
       const manifest = await stockManifest(flow);
       return manifest.devices
@@ -520,8 +561,9 @@ export const STEPS = [
       const entry = flow.state.customManifest.displays.find((d) => d.id === value);
       flow.state.boardDisplayKey = value;
       flow.state.boardKey = entry?.board ?? value;
-      flow.state.deviceIcon = entry?.icon ?? null;
-      flow.state.deviceIcon2 = entry?.icon2 ?? null;
+      const stockImage = stockDeviceForBoard(flow, flow.state.boardKey)?.image ?? null;
+      flow.state.deviceIcon = stockImage ?? entry?.icon ?? null;
+      flow.state.deviceIcon2 = stockImage ?? entry?.icon2 ?? null;
     },
   },
 
@@ -650,7 +692,7 @@ export const STEPS = [
       if (flow.dryRun) return false;
       if (flow.state.install !== INSTALL.NEW) return false;
       if (flow.state.family !== 'nrf52') return false;
-      if (flow.state.source !== SOURCE.STOCK) return false;
+      if (flow.state.source !== SOURCE.STOCK && flow.state.source !== SOURCE.ENHANCED) return false;
       if (plans.bootloaderAlreadyCurrent(flow.state.bootloaderVersion)) return false;
       const target = bootloaderTarget(flow);
       if (!target) return false;
@@ -768,6 +810,7 @@ export const STEPS = [
       const exit = await nrf52.returnToApplication(written.port ?? s.port, { onStatus });
       s.port = exit.port;
       s.result = { bytesWritten: written.bytesWritten, exit: exit.method };
+      s.flashedMods = enhanced ? modBits : null;
       // With no setup pass to follow, nothing else would release the port.
       if (!provisionApplies(flow)) await disposeFlow(flow);
     },
@@ -854,8 +897,8 @@ export async function disposeFlow(flow) {
 }
 
 /**
- * Where firmware can come from. The enhanced build is ESP32-and-infrastructure-only, so it
- * is absent rather than disabled; upload is an escape hatch, so the step can vanish.
+ * Where firmware can come from. The enhanced build is infrastructure-only, so it is absent
+ * rather than disabled for clients; upload is an escape hatch, so the step can vanish.
  */
 function sourceChoices(flow) {
   const choices = [];
@@ -864,6 +907,15 @@ function sourceChoices(flow) {
       value: SOURCE.ENHANCED,
       label: 'MeshCore Enhanced+',
       note: 'Adds advanced features like fully remote firmware updates, added reliability and more. The one you want if your device is supported.',
+      icon: 'enhanced',
+    });
+  }
+  // nRF52 boards have no Wi-Fi, so their Enhanced+ build has no remote firmware updates.
+  if (flow.state.family === 'nrf52' && flow.state.usage !== USAGE.CLIENT) {
+    choices.push({
+      value: SOURCE.ENHANCED,
+      label: 'MeshCore Enhanced+ (beta)',
+      note: 'Adds settings campaigns, diagnostics, added reliability and more. Beta on nRF52 boards.',
       icon: 'enhanced',
     });
   }
