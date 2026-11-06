@@ -120,6 +120,8 @@ function normaliseNrf52Board(key, raw) {
     connectNote: raw.connectNote ?? null,
     postFlashNote: raw.postFlashNote ?? null,
     stockDevice: typeof raw.stockDevice === 'string' && raw.stockDevice ? raw.stockDevice : null,
+    // Beta targets carry `_beta` in their release asset name, so the badge follows the build list.
+    beta: Object.values(raw.variants ?? {}).some((variant) => /_beta$/.test(variant.assetBasename ?? '')),
     variants,
   };
 }

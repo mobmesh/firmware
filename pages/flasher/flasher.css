@@ -791,3 +791,28 @@
   .board-tiles > .board-tile,
   .choice-grid > .choice { animation: none; }
 }
+
+/* A beta board's real picture with the label icons/beta.svg draws, so the photo stays and BETA does too. */
+.board-tile-badged {
+  position: relative;
+  display: inline-block;
+}
+
+.board-tile-badge {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #06121f;
+  color: #e2e8f0;
+  font: 600 10px/1.4 "JetBrains Mono", ui-monospace, monospace;
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+
+.board-tile:hover .board-tile-badged .board-tile-badge {
+  transform: translate(-50%, -6px);
+  transition: transform 0.4s ease;
+}

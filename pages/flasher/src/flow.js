@@ -170,6 +170,12 @@ async function stockManifest(flow) {
   return flow.state.stockManifest;
 }
 
+/** The stock catalogue device an Enhanced+ board names, or null for ESP32 boards and unloaded catalogues. */
+function stockDeviceForBoard(flow, boardKey) {
+  const name = flow.state.customManifest?.boards?.[boardKey]?.stockDevice;
+  return name ? flow.state.stockManifest?.devices.find((d) => d.name === name) ?? null : null;
+}
+
 function selectedStockDevice(flow) {
   const { stockManifest: manifest, deviceName } = flow.state;
   return manifest?.devices.find((device) => device.name === deviceName) ?? null;
@@ -509,11 +515,21 @@ export const STEPS = [
         // connected chip family are offered, so an nRF52 device never sees an ESP32 image.
         return manifest.displays
           .filter((entry) => manifest.boards[entry.board]?.platform === flow.state.family)
-          .map((entry) => ({
-          value: entry.id,
-          label: entry.label,
-          image: entry.icon,
-        }));
+          .map((entry) => {
+            // An nRF52 board shows its stock catalogue picture, the same one the Standard path shows.
+            const stock = stockDeviceForBoard(flow, entry.board);
+            return stock?.image
+              ? {
+                  value: entry.id,
+                  label: entry.label,
+                  image: stock.image,
+                  imageFilter: stock.imageFilter ?? null,
+                  imageDim: stock.imageDim !== false,
+                  imagePlate: stock.imagePlate !== false,
+                  badge: manifest.boards[entry.board].beta ? 'BETA' : null,
+                }
+              : { value: entry.id, label: entry.label, image: entry.icon };
+          });
       }
       const manifest = await stockManifest(flow);
       return manifest.devices
@@ -545,8 +561,9 @@ export const STEPS = [
       const entry = flow.state.customManifest.displays.find((d) => d.id === value);
       flow.state.boardDisplayKey = value;
       flow.state.boardKey = entry?.board ?? value;
-      flow.state.deviceIcon = entry?.icon ?? null;
-      flow.state.deviceIcon2 = entry?.icon2 ?? null;
+      const stockImage = stockDeviceForBoard(flow, flow.state.boardKey)?.image ?? null;
+      flow.state.deviceIcon = stockImage ?? entry?.icon ?? null;
+      flow.state.deviceIcon2 = stockImage ?? entry?.icon2 ?? null;
     },
   },
 
