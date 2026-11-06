@@ -181,3 +181,28 @@ targets:
     beta: true
     qemu_boot_check: false
     mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
+
+  # Headless: upstream's without-display repeater build.
+  - board: heltec_t114
+    role: repeater
+    build_env: Heltec_t114_without_display_repeater
+    vendor_flasher_assets: true
+    beta: true
+    qemu_boot_check: false
+    mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
+
+  - board: sensecap_solar
+    role: repeater
+    build_env: SenseCap_Solar_repeater
+    vendor_flasher_assets: true
+    beta: true
+    qemu_boot_check: false
+    mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
+
+  - board: xiao_nrf52
+    role: repeater
+    build_env: Xiao_nrf52_repeater
+    vendor_flasher_assets: true
+    beta: true
+    qemu_boot_check: false
+    mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]

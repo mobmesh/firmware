@@ -25,3 +25,9 @@ board_ids:
     board: rak4631
   - id: 12
     board: rak3401
+  - id: 13
+    board: heltec_t114
+  - id: 14
+    board: sensecap_solar
+  - id: 15
+    board: xiao_nrf52

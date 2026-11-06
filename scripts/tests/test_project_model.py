@@ -41,6 +41,9 @@ class CurrentProjectModelTestCase(unittest.TestCase):
             ("heltec_t1", "repeater"),
             ("rak4631", "repeater"),
             ("rak3401", "repeater"),
+            ("heltec_t114", "repeater"),
+            ("sensecap_solar", "repeater"),
+            ("xiao_nrf52", "repeater"),
         })
         self.assertEqual(rows[("heltec_v4", "repeater")].asset_basename, "heltec_v4_rep_mobmesh")
         self.assertEqual(rows[("xiao_c3", "room_server")].asset_basename, "xiao_c3_room_mobmesh_beta")
@@ -74,12 +77,18 @@ class CurrentProjectModelTestCase(unittest.TestCase):
         self.assertEqual(rows[("rak3401", "repeater")].asset_basename, "rak3401_rep_mobmesh_beta")
         self.assertEqual(rows[("rak3401", "repeater")].ota_board_id, 12)
         self.assertEqual(rows[("rak3401", "repeater")].mods, rows[("heltec_t1", "repeater")].mods)
+        for board, board_id in (("heltec_t114", 13), ("sensecap_solar", 14), ("xiao_nrf52", 15)):
+            self.assertEqual(rows[(board, "repeater")].asset_basename, f"{board}_rep_mobmesh_beta")
+            self.assertEqual(rows[(board, "repeater")].ota_board_id, board_id)
+            self.assertEqual(rows[(board, "repeater")].mods, rows[("heltec_t1", "repeater")].mods)
 
     def test_platform_defaults_to_esp32_and_marks_nrf52(self):
         platforms = {(t.board_id, t.role): t.platform for t in self.model.build_plan.targets}
         self.assertEqual(platforms.pop(("heltec_t1", "repeater")), "nrf52")
         self.assertEqual(platforms.pop(("rak4631", "repeater")), "nrf52")
         self.assertEqual(platforms.pop(("rak3401", "repeater")), "nrf52")
+        for board in ("heltec_t114", "sensecap_solar", "xiao_nrf52"):
+            self.assertEqual(platforms.pop((board, "repeater")), "nrf52")
         self.assertEqual(set(platforms.values()), {"esp32"})
 
     def test_build_plan_serialization_is_deterministic(self):

@@ -1,0 +1,19 @@
+ota_board_id: 13
+platform: nrf52
+
+# Override-only board config for heltec_t114 (Heltec Mesh Node T114, nRF52840 + SX1262); the board itself comes from upstream.
+
+# No Wi-Fi and no ESP32 OTA slots, so hotspot-ota cannot be selected; updates go through the OTAFIX bootloader.
+capabilities:
+  wifi_station: false
+  dual_ota: false
+  battery_measurement: unverified
+  external_power_control: false
+  fem_lna_control: false
+  deep_sleep_rail_shutdown: false
+
+# Facts needed by the web flasher that aren't derivable from upstream.
+flasher:
+  label: "Heltec Mesh Node T114"
+  connect_note: "Connect over USB; the flasher puts the board into its bootloader."
+  post_flash_note: "The board restarts on its own once flashing finishes."
