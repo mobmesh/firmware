@@ -17,6 +17,11 @@
 #else
 #define SYNC_SETTINGS_NO_ROM_MINIZ 1
 #endif
+#if defined(SYNC_SETTINGS_NO_ROM_MINIZ) && defined(NRF52_PLATFORM)
+// Decompress only: nRF52 receives compressed campaigns through the vendored tinfl and publishes uncompressed.
+#include <helpers/sync_settings/miniz/miniz_tinfl.h>
+#define SYNC_SETTINGS_PORTABLE_TINFL 1
+#endif
 #include <Identity.h>
 #include <Packet.h>
 #include <SHA256.h>
@@ -1545,8 +1550,8 @@ static bool applyCampaign(uint8_t dataset, const Campaign& campaign,
 #endif
 }
 
-#ifndef SYNC_SETTINGS_NO_ROM_MINIZ
-// Raw deflate through the mask-ROM tinfl; the decompressor state is heap, not static.
+#if !defined(SYNC_SETTINGS_NO_ROM_MINIZ) || defined(SYNC_SETTINGS_PORTABLE_TINFL)
+// Raw deflate through tinfl, from mask ROM or the vendored copy; the decompressor state is heap, not static.
 static bool inflatePayload(const uint8_t* in, size_t in_len, uint8_t* out,
                            size_t out_cap, size_t& out_len, void*) {
   if (in == nullptr || out == nullptr || in_len == 0 || out_cap == 0) return false;
@@ -1647,7 +1652,7 @@ static uint8_t* deflatePayload(const uint8_t* in, uint16_t in_len, uint16_t& out
 static ReceiveOps receive_ops = {
   acceptsCampaign, verifyFrame, hash, allocateFrame, releaseFrame,
   persistReplay, validateDataset, applyCampaign,
-#ifdef SYNC_SETTINGS_NO_ROM_MINIZ
+#if defined(SYNC_SETTINGS_NO_ROM_MINIZ) && !defined(SYNC_SETTINGS_PORTABLE_TINFL)
   nullptr,
 #else
   inflatePayload,

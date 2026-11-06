@@ -399,7 +399,7 @@ index 61b6c149..2032eb39 100644
    if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
      acl.save(_fs);
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
-index d475b13d..d94067e0 100644
+index d475b13d..1fc7b8f2 100644
 --- a/examples/simple_repeater/main.cpp
 +++ b/examples/simple_repeater/main.cpp
 @@ -2,6 +2,7 @@
@@ -430,15 +430,45 @@ index d475b13d..d94067e0 100644
      MESH_DEBUG_PRINTLN("Radio init failed!");
      halt();
    }
-@@ -123,6 +128,7 @@ void setup() {
+@@ -122,7 +127,37 @@ void setup() {
+   board.onBootComplete();
  }
  
++#if defined(NRF52_PLATFORM)
++// The core's loop task has 4 KB of stack, and receiving a sync campaign needs about 4.4 KB; the loop body gets ESP32's 8 KB.
++#define MOD_LOOP_STACK_BYTES 8192
++
++static void modLoopBody();
++
++static void modLoopTask(void*) {
++  for (;;) {
++    modLoopBody();
++    yield();
++  }
++}
++
  void loop() {
++  static bool started = false;
++  if (!started) {
++    started = true;
++    if (xTaskCreate(modLoopTask, "mesh", MOD_LOOP_STACK_BYTES / 4, nullptr, TASK_PRIO_LOW, nullptr) != pdPASS) {
++      modLoopBody();   // no memory for the task: run on the core's loop task as upstream does
++      started = false;
++      return;
++    }
++  }
++  vTaskDelay(portMAX_DELAY);
++}
++
++static void modLoopBody() {
++#else
++void loop() {
++#endif
 +  modLoop();
    // Handle Serial CLI
    int len = strlen(command);
    // `command` must stay NUL-terminated within its bounds. If it ever isn't,
-@@ -205,13 +211,18 @@ void loop() {
+@@ -205,13 +240,18 @@ void loop() {
  #ifdef HAS_EXTERNAL_WATCHDOG
    external_watchdog.loop();
  #endif
@@ -811,7 +841,7 @@ index da4c776c..e8fc8f9a 100644
    if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
      acl.save(_fs, MyMesh::saveFilter);
 diff --git a/examples/simple_room_server/main.cpp b/examples/simple_room_server/main.cpp
-index 65fc55ef..320fe880 100644
+index 65fc55ef..5307e8e6 100644
 --- a/examples/simple_room_server/main.cpp
 +++ b/examples/simple_room_server/main.cpp
 @@ -2,6 +2,7 @@
@@ -842,10 +872,40 @@ index 65fc55ef..320fe880 100644
  
    fast_rng.begin(radio_driver.getRngSeed());
  
-@@ -104,6 +109,7 @@ void setup() {
+@@ -103,7 +108,37 @@ void setup() {
+   board.onBootComplete();
  }
  
++#if defined(NRF52_PLATFORM)
++// The core's loop task has 4 KB of stack, and receiving a sync campaign needs about 4.4 KB; the loop body gets ESP32's 8 KB.
++#define MOD_LOOP_STACK_BYTES 8192
++
++static void modLoopBody();
++
++static void modLoopTask(void*) {
++  for (;;) {
++    modLoopBody();
++    yield();
++  }
++}
++
  void loop() {
++  static bool started = false;
++  if (!started) {
++    started = true;
++    if (xTaskCreate(modLoopTask, "mesh", MOD_LOOP_STACK_BYTES / 4, nullptr, TASK_PRIO_LOW, nullptr) != pdPASS) {
++      modLoopBody();   // no memory for the task: run on the core's loop task as upstream does
++      started = false;
++      return;
++    }
++  }
++  vTaskDelay(portMAX_DELAY);
++}
++
++static void modLoopBody() {
++#else
++void loop() {
++#endif
 +  modLoop();
    int len = strlen(command);
    // `command` must stay NUL-terminated within its bounds. If it ever isn't,
