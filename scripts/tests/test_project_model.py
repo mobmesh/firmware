@@ -44,6 +44,8 @@ class CurrentProjectModelTestCase(unittest.TestCase):
             ("heltec_t114", "repeater"),
             ("sensecap_solar", "repeater"),
             ("xiao_nrf52", "repeater"),
+            ("heltec_mesh_solar", "repeater"),
+            ("heltec_tower_v2", "repeater"),
         })
         self.assertEqual(rows[("heltec_v4", "repeater")].asset_basename, "heltec_v4_rep_mobmesh")
         self.assertEqual(rows[("xiao_c3", "room_server")].asset_basename, "xiao_c3_room_mobmesh_beta")
@@ -77,7 +79,7 @@ class CurrentProjectModelTestCase(unittest.TestCase):
         self.assertEqual(rows[("rak3401", "repeater")].asset_basename, "rak3401_rep_mobmesh_beta")
         self.assertEqual(rows[("rak3401", "repeater")].ota_board_id, 12)
         self.assertEqual(rows[("rak3401", "repeater")].mods, rows[("heltec_t1", "repeater")].mods)
-        for board, board_id in (("heltec_t114", 13), ("sensecap_solar", 14), ("xiao_nrf52", 15)):
+        for board, board_id in (("heltec_t114", 13), ("sensecap_solar", 14), ("xiao_nrf52", 15), ("heltec_mesh_solar", 16), ("heltec_tower_v2", 17)):
             self.assertEqual(rows[(board, "repeater")].asset_basename, f"{board}_rep_mobmesh_beta")
             self.assertEqual(rows[(board, "repeater")].ota_board_id, board_id)
             self.assertEqual(rows[(board, "repeater")].mods, rows[("heltec_t1", "repeater")].mods)
@@ -87,7 +89,7 @@ class CurrentProjectModelTestCase(unittest.TestCase):
         self.assertEqual(platforms.pop(("heltec_t1", "repeater")), "nrf52")
         self.assertEqual(platforms.pop(("rak4631", "repeater")), "nrf52")
         self.assertEqual(platforms.pop(("rak3401", "repeater")), "nrf52")
-        for board in ("heltec_t114", "sensecap_solar", "xiao_nrf52"):
+        for board in ("heltec_t114", "sensecap_solar", "xiao_nrf52", "heltec_mesh_solar", "heltec_tower_v2"):
             self.assertEqual(platforms.pop((board, "repeater")), "nrf52")
         self.assertEqual(set(platforms.values()), {"esp32"})
 

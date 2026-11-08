@@ -206,3 +206,19 @@ targets:
     beta: true
     qemu_boot_check: false
     mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
+
+  - board: heltec_mesh_solar
+    role: repeater
+    build_env: Heltec_mesh_solar_repeater
+    vendor_flasher_assets: true
+    beta: true
+    qemu_boot_check: false
+    mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
+
+  - board: heltec_tower_v2
+    role: repeater
+    build_env: Heltec_tower_v2_repeater
+    vendor_flasher_assets: true
+    beta: true
+    qemu_boot_check: false
+    mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]

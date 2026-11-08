@@ -31,3 +31,7 @@ board_ids:
     board: sensecap_solar
   - id: 15
     board: xiao_nrf52
+  - id: 16
+    board: heltec_mesh_solar
+  - id: 17
+    board: heltec_tower_v2

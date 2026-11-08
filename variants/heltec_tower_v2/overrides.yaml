@@ -1,0 +1,21 @@
+ota_board_id: 17
+platform: nrf52
+
+# Override-only board config for heltec_tower_v2 (Heltec MeshTower V2, nRF52840 + SX1262); the board itself comes from upstream.
+
+# No Wi-Fi and no ESP32 OTA slots, so hotspot-ota cannot be selected; updates go through the board's DFU bootloader.
+capabilities:
+  wifi_station: false
+  dual_ota: false
+  battery_measurement: unverified
+  external_power_control: false
+  fem_lna_control: false
+  deep_sleep_rail_shutdown: false
+
+# Facts needed by the web flasher that aren't derivable from upstream.
+flasher:
+  label: "Heltec MeshTower V2"
+  connect_note: "Connect over USB; the flasher puts the board into its bootloader."
+  post_flash_note: "The board restarts on its own once flashing finishes."
+  # The stock catalogue entry whose erase package this board shares; it ships no OTAFIX bootloader.
+  stock_device: "Heltec MeshTower V2"

@@ -823,6 +823,74 @@
         "deep_sleep_rail_shutdown": "absent"
       },
       "platform": "nrf52"
+    },
+    {
+      "id": "repeater",
+      "board_id": "heltec_mesh_solar",
+      "upstream_variant": "heltec_mesh_solar",
+      "role": "repeater",
+      "ota_board_id": 16,
+      "ota_role_id": 1,
+      "build_env": "Heltec_mesh_solar_repeater",
+      "upstream_tag_prefix": "repeater",
+      "release_title": "Repeater",
+      "asset_basename": "heltec_mesh_solar_rep_mobmesh_beta",
+      "vendor_flasher_assets": true,
+      "make_latest": true,
+      "mods": [
+        "shim",
+        "timing-safety",
+        "try-settings",
+        "sync-settings",
+        "flood-gate",
+        "diag-report",
+        "direct-retry"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": false,
+      "capabilities": {
+        "wifi_station": "absent",
+        "dual_ota": "absent",
+        "battery_measurement": "unverified",
+        "external_power_control": "absent",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      },
+      "platform": "nrf52"
+    },
+    {
+      "id": "repeater",
+      "board_id": "heltec_tower_v2",
+      "upstream_variant": "heltec_tower_v2",
+      "role": "repeater",
+      "ota_board_id": 17,
+      "ota_role_id": 1,
+      "build_env": "Heltec_tower_v2_repeater",
+      "upstream_tag_prefix": "repeater",
+      "release_title": "Repeater",
+      "asset_basename": "heltec_tower_v2_rep_mobmesh_beta",
+      "vendor_flasher_assets": true,
+      "make_latest": true,
+      "mods": [
+        "shim",
+        "timing-safety",
+        "try-settings",
+        "sync-settings",
+        "flood-gate",
+        "diag-report",
+        "direct-retry"
+      ],
+      "build_flags_append": [],
+      "qemu_boot_check": false,
+      "capabilities": {
+        "wifi_station": "absent",
+        "dual_ota": "absent",
+        "battery_measurement": "unverified",
+        "external_power_control": "absent",
+        "fem_lna_control": "absent",
+        "deep_sleep_rail_shutdown": "absent"
+      },
+      "platform": "nrf52"
     }
   ]
 }

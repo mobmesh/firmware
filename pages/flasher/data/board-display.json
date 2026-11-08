@@ -13,5 +13,7 @@
   "rak4631": {"label": "RAK WisBlock RAK4631", "board": "rak4631", "icon": "icons/beta.svg"},
   "rak3401": {"label": "RAK WisMesh RAK3401", "board": "rak3401", "icon": "icons/beta.svg"},
   "sensecap_solar": {"label": "Seeed SenseCAP Solar Node", "board": "sensecap_solar", "icon": "icons/beta.svg"},
-  "xiao_nrf52": {"label": "Seeed Xiao nRF52840 + Wio-SX1262", "board": "xiao_nrf52", "icon": "icons/beta.svg"}
+  "xiao_nrf52": {"label": "Seeed Xiao nRF52840 + Wio-SX1262", "board": "xiao_nrf52", "icon": "icons/beta.svg"},
+  "heltec_mesh_solar": {"label": "Heltec MeshSolar / MeshTower", "board": "heltec_mesh_solar", "icon": "icons/beta.svg"},
+  "heltec_tower_v2": {"label": "Heltec MeshTower V2", "board": "heltec_tower_v2", "icon": "icons/beta.svg"}
 }
