@@ -515,5 +515,35 @@
         "firmwareFile": "bin/repeater/xiao_nrf52.zip"
       }
     }
+  },
+  "heltec_mesh_solar": {
+    "label": "Heltec MeshSolar / MeshTower",
+    "platform": "nrf52",
+    "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
+    "postFlashNote": "The board restarts on its own once flashing finishes.",
+    "stockDevice": "Heltec MeshSolar / MeshTower",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "heltec_mesh_solar_rep_mobmesh_beta",
+        "version": "v1.18.0",
+        "firmwareFile": "bin/repeater/heltec_mesh_solar.zip"
+      }
+    }
+  },
+  "heltec_tower_v2": {
+    "label": "Heltec MeshTower V2",
+    "platform": "nrf52",
+    "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
+    "postFlashNote": "The board restarts on its own once flashing finishes.",
+    "stockDevice": "Heltec MeshTower V2",
+    "variants": {
+      "repeater": {
+        "label": "Repeater",
+        "assetBasename": "heltec_tower_v2_rep_mobmesh_beta",
+        "version": "v1.18.0",
+        "firmwareFile": "bin/repeater/heltec_tower_v2.zip"
+      }
+    }
   }
 }
