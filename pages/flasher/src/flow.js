@@ -684,13 +684,11 @@ export const STEPS = [
           'it now is strongly recommended.'
         : "This device's factory bootloader updates over Bluetooth unreliably.",
     kind: 'action',
-    // New Device only: needs a double-tap and a Chromium file picker, and a half-finished
-    // write costs nothing only because the next stages erase and reflash anyway.
+    // New and Upgrade: OTAFIX stages the new bootloader below the settings area and copies it only once complete, so settings survive.
     applies: (flow) => {
       // The dry-run harness calls an action step's run() with no hardware or window
       // present; this step needs both, so it never applies there — same as connect/arm.
       if (flow.dryRun) return false;
-      if (flow.state.install !== INSTALL.NEW) return false;
       if (flow.state.family !== 'nrf52') return false;
       if (flow.state.source !== SOURCE.STOCK && flow.state.source !== SOURCE.ENHANCED) return false;
       if (plans.bootloaderAlreadyCurrent(flow.state.bootloaderVersion)) return false;

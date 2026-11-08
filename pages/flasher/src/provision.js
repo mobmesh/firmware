@@ -253,7 +253,10 @@ export async function sendProvisionCommands(port, commands, { onStatus, onProgre
   const session = startCliSession(port);
   const results = [];
   try {
+    let regionalStopped = false;
     for (const [index, step] of commands.entries()) {
+      // A rejected regional command ends the regional block only; the operator's own settings still go.
+      if (regionalStopped && step.stopOnFailure) continue;
       onStatus?.(`${step.label} (${index + 1} of ${commands.length})…`);
       const answer = await session.runCommand(step.command, {
         awaitReply: step.awaitReply !== false,
@@ -270,7 +273,7 @@ export async function sendProvisionCommands(port, commands, { onStatus, onProgre
       onProgress?.((index + 1) / commands.length);
       if (!ok && step.stopOnFailure) {
         onStatus?.('Regional setup stopped after a rejected command.');
-        break;
+        regionalStopped = true;
       }
     }
   } finally {
