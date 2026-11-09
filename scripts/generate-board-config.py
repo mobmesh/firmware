@@ -532,6 +532,18 @@ def cmd_flasher_paths(args):
     print(f"BOOT_APP0={FLASHER_BOOT_APP0}")
 
 
+def qemu_entry(board) -> dict:
+    """How the boot check emulates a board, carried into auto_boards.json."""
+    return {
+        "enabled": board.qemu.enabled,
+        "machine": board.qemu.machine,
+        "binary": board.qemu.binary,
+        "mcu": board.qemu.mcu,
+        "mem": board.qemu.mem,
+        "globals": dict(board.qemu.globals),
+    }
+
+
 def make_nrf52_board_entry(board_id: str) -> dict:
     """An nRF52 board's flasher entry: no partition table or boot files, only DFU packages per role."""
     board = load_board_profile(board_id)
@@ -543,6 +555,7 @@ def make_nrf52_board_entry(board_id: str) -> dict:
     }
     if board.flasher.stock_device:
         entry["stockDevice"] = board.flasher.stock_device
+    entry["qemu"] = qemu_entry(board)
     entry["variants"] = {}
     return entry
 
@@ -569,14 +582,7 @@ def make_board_entry(board_id: str, upstream_dir: Path, partitions_bin: Path | N
         "partitionsOverridden": bool(board.partitions_override),
         # Absent, or enabled: false, means the QEMU boot check skips this board rather
         # than failing it -- for hardware there is no device model for.
-        "qemu": {
-            "enabled": board.qemu.enabled,
-            "machine": board.qemu.machine,
-            "binary": board.qemu.binary,
-            "mcu": board.qemu.mcu,
-            "mem": board.qemu.mem,
-            "globals": dict(board.qemu.globals),
-        },
+        "qemu": qemu_entry(board),
         "offsets": {
             "bootloader": bootloader_offset_for_mcu(mcu),
             "partitions": PARTITION_TABLE_OFFSET,

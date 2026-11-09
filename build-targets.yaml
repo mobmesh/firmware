@@ -163,7 +163,6 @@ targets:
     build_env: Heltec_t1_repeater
     vendor_flasher_assets: true
     beta: true
-    qemu_boot_check: false
     mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
 
   - board: rak4631
@@ -171,7 +170,6 @@ targets:
     build_env: RAK_4631_repeater
     vendor_flasher_assets: true
     beta: true
-    qemu_boot_check: false
     mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
 
   - board: rak3401
@@ -179,7 +177,6 @@ targets:
     build_env: RAK_3401_repeater
     vendor_flasher_assets: true
     beta: true
-    qemu_boot_check: false
     mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
 
   # Headless: upstream's without-display repeater build.
@@ -188,7 +185,6 @@ targets:
     build_env: Heltec_t114_without_display_repeater
     vendor_flasher_assets: true
     beta: true
-    qemu_boot_check: false
     mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
 
   - board: sensecap_solar
@@ -212,7 +208,6 @@ targets:
     build_env: Heltec_mesh_solar_repeater
     vendor_flasher_assets: true
     beta: true
-    qemu_boot_check: false
     mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
 
   - board: heltec_tower_v2
@@ -220,5 +215,4 @@ targets:
     build_env: Heltec_tower_v2_repeater
     vendor_flasher_assets: true
     beta: true
-    qemu_boot_check: false
     mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]

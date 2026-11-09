@@ -12,6 +12,14 @@ capabilities:
   fem_lna_control: false
   deep_sleep_rail_shutdown: false
 
+# Pin numbers are the nRF52840's own; the radio is emulated, so these must match upstream's wiring.
+qemu:
+  enabled: true
+  machine: "nrf52840-mobmesh,radio-cs=43,radio-dio1=31,radio-busy=29"
+  binary: qemu-system-arm
+  mcu: nrf52840
+  mem: ""
+
 # Facts needed by the web flasher that aren't derivable from upstream.
 flasher:
   label: "Heltec Mesh Node T1"

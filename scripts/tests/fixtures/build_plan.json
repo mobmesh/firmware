@@ -643,7 +643,7 @@
         "direct-retry"
       ],
       "build_flags_append": [],
-      "qemu_boot_check": false,
+      "qemu_boot_check": true,
       "capabilities": {
         "wifi_station": "absent",
         "dual_ota": "absent",
@@ -677,7 +677,7 @@
         "direct-retry"
       ],
       "build_flags_append": [],
-      "qemu_boot_check": false,
+      "qemu_boot_check": true,
       "capabilities": {
         "wifi_station": "absent",
         "dual_ota": "absent",
@@ -711,7 +711,7 @@
         "direct-retry"
       ],
       "build_flags_append": [],
-      "qemu_boot_check": false,
+      "qemu_boot_check": true,
       "capabilities": {
         "wifi_station": "absent",
         "dual_ota": "absent",
@@ -745,7 +745,7 @@
         "direct-retry"
       ],
       "build_flags_append": [],
-      "qemu_boot_check": false,
+      "qemu_boot_check": true,
       "capabilities": {
         "wifi_station": "absent",
         "dual_ota": "absent",
@@ -847,7 +847,7 @@
         "direct-retry"
       ],
       "build_flags_append": [],
-      "qemu_boot_check": false,
+      "qemu_boot_check": true,
       "capabilities": {
         "wifi_station": "absent",
         "dual_ota": "absent",
@@ -881,7 +881,7 @@
         "direct-retry"
       ],
       "build_flags_append": [],
-      "qemu_boot_check": false,
+      "qemu_boot_check": true,
       "capabilities": {
         "wifi_station": "absent",
         "dual_ota": "absent",

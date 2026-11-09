@@ -14,6 +14,7 @@ import socket
 import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 BOOT_TIMEOUT_SECONDS = 120     # generous: an emulated boot is a few seconds, a stall is not
@@ -48,6 +49,22 @@ def merge_flash_image(board, variant, flasher_dir, out_path):
     load_at(variant["firmwareFile"], offsets["app0"])
     out_path.write_bytes(img)
     return sources
+
+
+def extract_nrf52_app(variant, flasher_dir, out_path):
+    """Copy the app image out of a DFU package. Never modifies its input."""
+    path = flasher_dir / variant["firmwareFile"]
+    with zipfile.ZipFile(path) as package:
+        out_path.write_bytes(package.read("firmware.bin"))
+    return {path: hashlib.sha256(path.read_bytes()).hexdigest()}
+
+
+def nrf52_command(qemu_bin, machine, app_image, uart_log):
+    """Serial 0 is UART0 and 1 the USB CDC console; the machine takes the app image directly."""
+    return [str(qemu_bin), "-nographic", "-monitor", "none", "-machine", machine,
+            "-serial", f"file:{uart_log}",
+            "-serial", f"tcp:127.0.0.1:{CONSOLE_PORT},server=on,wait=off",
+            "-kernel", str(app_image)]
 
 
 def read_mod_bits(flasher_dir, variant):
@@ -263,21 +280,28 @@ def main():
 
     args.workdir.mkdir(parents=True, exist_ok=True)
     flash_image = args.workdir / "flash_image.bin"
-    sources = merge_flash_image(board, variant, args.flasher_dir, flash_image)
-    mod_bits = read_mod_bits(args.flasher_dir, variant)
     uart_log = args.workdir / "uart0.log"
+    nrf52 = board.get("platform") == "nrf52"
 
-    cmd = [
-        str(qemu_bin), "-display", "none", "-monitor", "none",
-        "-machine", machine,
-        "-L", str(rom_dir),
-        "-drive", f"file={flash_image},if=mtd,format=raw",
-    ] + serial_args(emu.get("console", "usb"), uart_log)
-    if mem:
-        cmd += ["-m", mem]
-    for prop, value in (emu.get("globals") or {}).items():
-        driver, _, name = prop.rpartition(".")
-        cmd += ["-global", f"driver={driver},property={name},value={value}"]
+    if nrf52:
+        # The emulated flash lives in memory, so every run starts blank and the image needs no recomposing.
+        sources = extract_nrf52_app(variant, args.flasher_dir, flash_image)
+        mod_bits = 0
+        cmd = nrf52_command(qemu_bin, machine, flash_image, uart_log)
+    else:
+        sources = merge_flash_image(board, variant, args.flasher_dir, flash_image)
+        mod_bits = read_mod_bits(args.flasher_dir, variant)
+        cmd = [
+            str(qemu_bin), "-display", "none", "-monitor", "none",
+            "-machine", machine,
+            "-L", str(rom_dir),
+            "-drive", f"file={flash_image},if=mtd,format=raw",
+        ] + serial_args(emu.get("console", "usb"), uart_log)
+        if mem:
+            cmd += ["-m", mem]
+        for prop, value in (emu.get("globals") or {}).items():
+            driver, _, name = prop.rpartition(".")
+            cmd += ["-global", f"driver={driver},property={name},value={value}"]
 
     # A first-boot SPIFFS mount failure and stack-canary panic appears about one run in
     # twelve and does not reproduce; two failures in a row is real.
@@ -286,7 +310,8 @@ def main():
     if failures:
         print(f"attempt 1 failed ({len(failures)} problem(s)) -- retrying once")
         # A fresh image: the previous attempt booted and wrote to this copy.
-        merge_flash_image(board, variant, args.flasher_dir, flash_image)
+        if not nrf52:
+            merge_flash_image(board, variant, args.flasher_dir, flash_image)
         failures = run_once(cmd, variant, mod_bits, uart_log)
 
     # A boot writes to flash. Prove the run touched only its own copy.

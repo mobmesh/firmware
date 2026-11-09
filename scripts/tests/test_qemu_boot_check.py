@@ -20,6 +20,15 @@ class WaitForCliTestCase(unittest.TestCase):
         console.ask.assert_called_once_with("ver", timeout=30, quiet=True)
 
 
+class Nrf52CommandTestCase(unittest.TestCase):
+    def test_cli_rides_serial_one(self):
+        cmd = qbc.nrf52_command(Path("q"), "m", Path("a.bin"), Path("u.log"))
+        serials = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "-serial"]
+        self.assertEqual(serials[0], "file:u.log")
+        self.assertIn("tcp:", serials[1])
+        self.assertEqual(cmd[cmd.index("-kernel") + 1], "a.bin")
+
+
 class SerialArgsTestCase(unittest.TestCase):
     def test_usb_console_is_serial_two(self):
         args = qbc.serial_args("usb", Path("u.log"))

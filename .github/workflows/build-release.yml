@@ -397,6 +397,27 @@ jobs:
 
       # Everything downstream sits behind this, so an image that cannot reach its command
       # loop is never shipped.
+      - name: Write this nRF52 board's flasher entry into the workspace auto_boards.json
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'nrf52'
+        run: |
+          # No partition table: the entry names the DFU package, and the stock device whose erase package and bootloader it shares.
+          pip install --quiet pyyaml==6.0.3
+          python3 scripts/generate-board-config.py boards-json \
+            --board ${{ matrix.board_id }} \
+            --upstream-dir upstream-src \
+            --variant-id ${{ matrix.id }} \
+            --variant-label "${{ matrix.release_title }}" \
+            --asset-basename ${{ matrix.asset_basename }} \
+            --version "${{ steps.pick.outputs.version }}" \
+            --output pages/flasher/data/auto_boards.json
+
+      - name: Stage this nRF52 package for the QEMU check
+        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'nrf52'
+        run: |
+          eval "$(python3 scripts/generate-board-config.py flasher-paths --board ${{ matrix.board_id }} --variant-id ${{ matrix.id }})"
+          mkdir -p "$(dirname "pages/flasher/$FIRMWARE")"
+          cp "${{ steps.artifact.outputs.name }}" "pages/flasher/$FIRMWARE"
+
       - name: Fetch the emulator
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.qemu_boot_check
         env:
@@ -477,20 +498,6 @@ jobs:
               merged_asset:$merged_asset, firmware_path:$firmware_path,
               make_latest:$make_latest, vendor_flasher_assets:$vendor_flasher_assets}' \
             > release-input/meta.json
-
-      - name: Write this nRF52 board's flasher entry into the workspace auto_boards.json
-        if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'nrf52'
-        run: |
-          # No partition table: the entry names the DFU package, and the stock device whose erase package and bootloader it shares.
-          pip install --quiet pyyaml==6.0.3
-          python3 scripts/generate-board-config.py boards-json \
-            --board ${{ matrix.board_id }} \
-            --upstream-dir upstream-src \
-            --variant-id ${{ matrix.id }} \
-            --variant-label "${{ matrix.release_title }}" \
-            --asset-basename ${{ matrix.asset_basename }} \
-            --version "${{ steps.pick.outputs.version }}" \
-            --output pages/flasher/data/auto_boards.json
 
       - name: Package this successful nRF52 build for the single publisher
         if: steps.filter.outputs.skip == 'false' && steps.check.outputs.exists == 'false' && matrix.platform == 'nrf52'
