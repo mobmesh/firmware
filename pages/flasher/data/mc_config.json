@@ -5215,7 +5215,7 @@
 		},
 		{
 			"maker": "raspberry",
-			"name": "RPI Pico 2040 + WaveShare SX1262",
+			"name": "RPI Pico W (rp2040) + WaveShare SX1262",
 			"icon": "/img/lora.svg",
 			"type": "noflash",
 			"tooltip": "<img class='device' src='/img/rpi_picow.svg'>",
@@ -5270,6 +5270,71 @@
 								{
 									"type": "download",
 									"name": "PicoW_kiss_modem-1.17.1-45c0c323.uf2",
+									"title": "Firmware uf2"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"maker": "raspberry",
+			"name": "RPI Pico W (rp2350) + WaveShare SX1262",
+			"icon": "/img/lora.svg",
+			"type": "noflash",
+			"tooltip": "<img class='device' src='/img/rpi_picow2.svg'>",
+			"firmware": [
+				{
+					"class": "community",
+					"role": "companionBle",
+					"github": {
+						"type": "companion",
+						"files": {
+							"download": "PicoW2_companion_radio_ble.*?\\.uf2"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "companionUsb",
+					"github": {
+						"type": "companion",
+						"files": {
+							"download": "PicoW2_companion_radio_usb.*?\\.uf2"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "repeater",
+					"github": {
+						"type": "repeater",
+						"files": {
+							"download": "PicoW2_[rR]epeater.*?\\.uf2"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "roomServer",
+					"github": {
+						"type": "room-server",
+						"files": {
+							"download": "PicoW2_room_server.*?\\.uf2"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "kissRadio",
+					"notice": "kissRadioNotice",
+					"version": {
+						"1.17.1": {
+							"files": [
+								{
+									"type": "download",
+									"name": "PicoW2_kiss_modem-1.17.1-45c0c323.uf2",
 									"title": "Firmware uf2"
 								}
 							]
