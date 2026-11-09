@@ -183,6 +183,17 @@ export function buildProvisionCommands(state) {
     steps.push({ command, label: 'Applying regional settings', stopOnFailure: state.flashedMods != null });
   }
 
+  // On an upgrade, sync.region takes over any region it also lists; the native copy is what goes.
+  const zoneEnablesSync = resolveSettings(state.zoneCommands ?? [], state.flashedMods ?? 0).includes('sync.region on');
+  if (state.install !== 'new' && (zoneEnablesSync || existing?.syncRegionOn === true)) {
+    steps.push({
+      command: 'sync.region publish.status',
+      label: 'Handing duplicate regions to sync.region',
+      removeDuplicateRegions: true,
+      stopOnFailure: state.flashedMods != null,
+    });
+  }
+
   const name = trimmed(state.nodeName);
   const lat = degrees(state.latitude);
   const lon = degrees(state.longitude);
@@ -243,6 +254,94 @@ export async function acquireCliPort({ preferredPort = null, onStatus } = {}) {
   throw lastError;
 }
 
+/** One page of `sync.region`: an indented tree, then `next <offset>` when more remains. */
+export function parseOverlayPage(text) {
+  const names = [];
+  let next = null;
+  for (const raw of (text ?? '').split(/\r?\n/)) {
+    const line = raw.trim();
+    const more = /^next (\d+)$/.exec(line);
+    if (more) next = Number(more[1]);
+    else if (line && line !== 'empty') names.push(line.split(/\s+/)[0].replace(/[\^~]$/, '').replace(/^#/, ''));
+  }
+  return { names: names.filter((name) => name !== '*'), next };
+}
+
+const OVERLAY_PAGE_LIMIT = 16;
+const OVERLAY_REPLY_SETTLE_MS = 400;
+
+async function readOverlayNames(session) {
+  const names = [];
+  let offset = 0;
+  for (let page = 0; page < OVERLAY_PAGE_LIMIT; page += 1) {
+    const command = offset ? `sync.region ${offset}` : 'sync.region';
+    const { names: found, next } = parseOverlayPage(await session.runCommand(command, { settleMs: OVERLAY_REPLY_SETTLE_MS }));
+    names.push(...found);
+    if (next === null || next <= offset) break;
+    offset = next;
+  }
+  return [...new Set(names)];
+}
+
+/**
+ * Removes native regions that sync.region also lists, then saves. The native list can be
+ * too long to read whole, so each overlay name is simply tried: the firmware's answer says
+ * whether it was a duplicate. Home and default regions stay, since removing one would
+ * silently change where this node's own traffic is scoped.
+ */
+export async function removeDuplicateNativeRegions(session) {
+  const results = [];
+  const removed = [];
+  const kept = [];
+  const status = await session.runCommand('sync.region publish.status');
+  // Only once sync is really on: otherwise nothing would be managing what gets removed.
+  if (!/^sync:on\b/.test(status ?? '')) return { removed, kept, results };
+  const names = await readOverlayNames(session);
+  if (!names.length) return { removed, kept, results };
+
+  const pinnedTokens = async (command) => (await session.runCommand(command) ?? '').split(/\s+/).map((token) => token.replace(/^#/, ''));
+  const pinned = new Set([...(await pinnedTokens('region home')), ...(await pinnedTokens('region default'))]);
+
+  const remove = async (name) => {
+    for (const stored of [name, `#${name}`]) {
+      const command = `region remove ${stored}`;
+      const answer = await session.runCommand(command);
+      if (/not found/i.test(answer ?? '')) continue;
+      results.push({ command, answer, ok: true });
+      return answer;
+    }
+    return null;
+  };
+
+  // A parent cannot go before its children; retrying until nothing changes handles any tree order.
+  let pending = names.filter((name) => {
+    if (pinned.has(name)) kept.push(name);
+    return !pinned.has(name);
+  });
+  for (let progress = true; progress && pending.length;) {
+    progress = false;
+    const blocked = [];
+    for (const name of [...pending].reverse()) {
+      const answer = await remove(name);
+      if (answer === null) continue;
+      if (/^OK/i.test(answer)) {
+        removed.push(name);
+        progress = true;
+      } else {
+        blocked.push(name);
+      }
+    }
+    pending = blocked.reverse();
+  }
+  kept.push(...pending);
+
+  if (removed.length) {
+    const answer = await session.runCommand('region save');
+    results.push({ command: 'region save', answer, ok: !FAILED_ANSWER.test(answer ?? '') });
+  }
+  return { removed, kept, results };
+}
+
 /**
  * Send the command set; the port must already be open at CLI baud. The first command
  * carries the longer timeout, since a freshly erased device is still generating its key.
@@ -258,6 +357,14 @@ export async function sendProvisionCommands(port, commands, { onStatus, onProgre
       // A rejected regional command ends the regional block only; the operator's own settings still go.
       if (regionalStopped && step.stopOnFailure) continue;
       onStatus?.(`${step.label} (${index + 1} of ${commands.length})…`);
+      if (step.removeDuplicateRegions) {
+        const outcome = await removeDuplicateNativeRegions(session);
+        if (outcome.removed.length) onStatus?.(`Now managed by sync.region: ${outcome.removed.join(', ')}.`);
+        if (outcome.kept.length) onStatus?.(`Left in the native list: ${outcome.kept.join(', ')}.`);
+        results.push(...outcome.results);
+        onProgress?.((index + 1) / commands.length);
+        continue;
+      }
       const answer = await session.runCommand(step.command, {
         awaitReply: step.awaitReply !== false,
         ...(index === 0 ? { timeoutMs: CLI_FIRST_COMMAND_TIMEOUT_MS } : commandTimeoutMs ? { timeoutMs: commandTimeoutMs } : {}),

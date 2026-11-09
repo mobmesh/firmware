@@ -62,8 +62,26 @@ export function startCliSession(port) {
     const lineEnd = buffer.indexOf(CLI_LINE_ENDING, markerAt);
     if (lineEnd === -1) return;
 
+    if (pending.settleMs) {
+      // A multi-line reply has no terminator, so it ends when the device stops sending.
+      clearTimeout(pending.quiet);
+      pending.quiet = setTimeout(finishMultiLine, pending.settleMs);
+      return;
+    }
+
     const answer = buffer.slice(markerAt + CLI_RESPONSE_MARKER.length, lineEnd).trim();
     buffer = buffer.slice(lineEnd + CLI_LINE_ENDING.length);
+    const { resolve, timer } = pending;
+    clearTimeout(timer);
+    pending = null;
+    resolve(answer);
+  }
+
+  function finishMultiLine() {
+    if (!pending) return;
+    const markerAt = buffer.indexOf(CLI_RESPONSE_MARKER);
+    const answer = buffer.slice(markerAt + CLI_RESPONSE_MARKER.length).trim();
+    buffer = '';
     const { resolve, timer } = pending;
     clearTimeout(timer);
     pending = null;
@@ -84,6 +102,7 @@ export function startCliSession(port) {
     } finally {
       if (pending) {
         clearTimeout(pending.timer);
+        clearTimeout(pending.quiet);
         const { reject } = pending;
         pending = null;
         reject(new CliConnectionLostError());
@@ -93,7 +112,7 @@ export function startCliSession(port) {
 
   // `awaitReply: false` is for commands the firmware answers nothing to (`reboot`,
   // `poweroff`); waiting reports a failure for a command that worked.
-  async function runCommand(command, { timeoutMs = CLI_COMMAND_TIMEOUT_MS, awaitReply = true } = {}) {
+  async function runCommand(command, { timeoutMs = CLI_COMMAND_TIMEOUT_MS, awaitReply = true, settleMs = 0 } = {}) {
     if (pending) throw new Error('runCommand called while a command is still in flight');
 
     // A response cannot precede its command, so anything buffered is residue. The echo
@@ -117,13 +136,14 @@ export function startCliSession(port) {
 
     const answer = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
+        clearTimeout(pending?.quiet);
         pending = null;
         // A late answer left in place pairs with the *next* command and shifts every
         // response by one. Losing it is the cheaper error.
         buffer = '';
         reject(new CliTimeoutError(command, timeoutMs));
       }, timeoutMs);
-      pending = { command, resolve, reject, timer, echoSeen: false };
+      pending = { command, resolve, reject, timer, echoSeen: false, settleMs };
       // The answer may already be sitting in the buffer from before this call.
       deliverIfComplete();
     });
