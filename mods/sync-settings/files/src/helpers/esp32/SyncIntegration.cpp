@@ -3614,6 +3614,13 @@ static bool radioStatusCommand(char* reply) {
   return true;
 }
 
+// nRF52's C library has no %llx; the text matches it, with no leading zeros.
+static void formatHex64(char out[17], uint64_t value) {
+  uint32_t high = (uint32_t)(value >> 32);
+  if (high != 0) snprintf(out, 17, "%lx%08lx", (unsigned long)high, (unsigned long)(uint32_t)value);
+  else snprintf(out, 17, "%lx", (unsigned long)(uint32_t)value);
+}
+
 static bool radioReportCommand(const char* page, char* reply) {
   uint8_t parsed;
   if (!parseOffset(page, parsed) || parsed > 1) {
@@ -3625,9 +3632,9 @@ static bool radioReportCommand(const char* page, char* reply) {
   else {
     static const char* result[] = {"none", "committed", "identical", "cr-only",
                                    "fallback", "aborted", "fault"};
-    snprintf(reply, 160, "1/1 migration %llx %s",
-             (unsigned long long)radio_record.migration_id,
-             result[radio_record.result]);
+    char id[17];
+    formatHex64(id, radio_record.migration_id);
+    snprintf(reply, 160, "1/1 migration %s %s", id, result[radio_record.result]);
   }
   return true;
 }
@@ -3726,9 +3733,9 @@ static bool radioPublishPlanCommand(char* command, bool arm, char* reply) {
     return true;
   }
   memset(&radio_arm, 0, sizeof(radio_arm));
-  snprintf(reply, 160, "OK - migration %llx T %lu",
-           (unsigned long long)plan.payload.migration_id,
-           (unsigned long)cutover);
+  char id[17];
+  formatHex64(id, plan.payload.migration_id);
+  snprintf(reply, 160, "OK - migration %s T %lu", id, (unsigned long)cutover);
   return true;
 }
 
@@ -3943,8 +3950,10 @@ static bool timeStatus(char* reply) {
   if (time_rx_outcome == TIME_RX_NONE) {
     snprintf(reply + used, 160 - used, "\nlast:-");
   } else if (time_rx_outcome == TIME_RX_CORRECTED || time_rx_outcome == TIME_RX_WITHIN) {
-    snprintf(reply + used, 160 - used, "\nlast:%s %llds", outcome[time_rx_outcome],
-             (long long)time_rx_delta);
+    // nRF52's C library has no %lld, so the delta is clamped and printed as a long.
+    long delta = time_rx_delta > INT32_MAX ? INT32_MAX
+               : time_rx_delta < INT32_MIN ? INT32_MIN : (long)time_rx_delta;
+    snprintf(reply + used, 160 - used, "\nlast:%s %lds", outcome[time_rx_outcome], delta);
   } else {
     snprintf(reply + used, 160 - used, "\nlast:%s", outcome[time_rx_outcome]);
   }
