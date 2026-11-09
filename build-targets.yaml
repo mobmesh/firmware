@@ -192,7 +192,6 @@ targets:
     build_env: SenseCap_Solar_repeater
     vendor_flasher_assets: true
     beta: true
-    qemu_boot_check: false
     mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
 
   - board: xiao_nrf52
@@ -200,7 +199,6 @@ targets:
     build_env: Xiao_nrf52_repeater
     vendor_flasher_assets: true
     beta: true
-    qemu_boot_check: false
     mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
 
   - board: heltec_mesh_solar

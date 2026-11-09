@@ -12,6 +12,14 @@ capabilities:
   fem_lna_control: false
   deep_sleep_rail_shutdown: false
 
+# Pin numbers are the nRF52840's own; this board's app links after S140 7.x, at 0x27000.
+qemu:
+  enabled: true
+  machine: "nrf52840-mobmesh,app-base=0x27000,radio-cs=4,radio-dio1=3,radio-busy=29"
+  binary: qemu-system-arm
+  mcu: nrf52840
+  mem: ""
+
 # Facts needed by the web flasher that aren't derivable from upstream.
 flasher:
   label: "Seeed XIAO nRF52840"
