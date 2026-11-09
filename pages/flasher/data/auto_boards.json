@@ -432,6 +432,14 @@
     "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
     "postFlashNote": "The board restarts on its own once flashing finishes.",
     "stockDevice": "Heltec Mesh Node T1",
+    "qemu": {
+      "enabled": true,
+      "machine": "nrf52840-mobmesh,radio-cs=43,radio-dio1=31,radio-busy=29",
+      "binary": "qemu-system-arm",
+      "mcu": "nrf52840",
+      "mem": "",
+      "globals": {}
+    },
     "variants": {
       "repeater": {
         "label": "Repeater",
@@ -447,6 +455,14 @@
     "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
     "postFlashNote": "The board restarts on its own once flashing finishes.",
     "stockDevice": "Heltec T114",
+    "qemu": {
+      "enabled": true,
+      "machine": "nrf52840-mobmesh,radio-cs=24,radio-dio1=20,radio-busy=17",
+      "binary": "qemu-system-arm",
+      "mcu": "nrf52840",
+      "mem": "",
+      "globals": {}
+    },
     "variants": {
       "repeater": {
         "label": "Repeater",
@@ -462,6 +478,14 @@
     "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
     "postFlashNote": "The board restarts on its own once flashing finishes.",
     "stockDevice": "RAK WisMesh 1W Booster (3401 + 13302)",
+    "qemu": {
+      "enabled": true,
+      "machine": "nrf52840-mobmesh,radio-cs=26,radio-dio1=10,radio-busy=9",
+      "binary": "qemu-system-arm",
+      "mcu": "nrf52840",
+      "mem": "",
+      "globals": {}
+    },
     "variants": {
       "repeater": {
         "label": "Repeater",
@@ -477,6 +501,14 @@
     "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
     "postFlashNote": "The board restarts on its own once flashing finishes.",
     "stockDevice": "RAK WisBlock / WisMesh (RAK 4631)",
+    "qemu": {
+      "enabled": true,
+      "machine": "nrf52840-mobmesh,radio-cs=42,radio-dio1=47,radio-busy=46",
+      "binary": "qemu-system-arm",
+      "mcu": "nrf52840",
+      "mem": "",
+      "globals": {}
+    },
     "variants": {
       "repeater": {
         "label": "Repeater",
@@ -492,6 +524,14 @@
     "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
     "postFlashNote": "The board restarts on its own once flashing finishes.",
     "stockDevice": "Seeed Studio SenseCAP Solar Node P1",
+    "qemu": {
+      "enabled": false,
+      "machine": null,
+      "binary": null,
+      "mcu": null,
+      "mem": "",
+      "globals": {}
+    },
     "variants": {
       "repeater": {
         "label": "Repeater",
@@ -507,6 +547,14 @@
     "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
     "postFlashNote": "The board restarts on its own once flashing finishes.",
     "stockDevice": "Seeed Studio Xiao nRF52 WIO",
+    "qemu": {
+      "enabled": false,
+      "machine": null,
+      "binary": null,
+      "mcu": null,
+      "mem": "",
+      "globals": {}
+    },
     "variants": {
       "repeater": {
         "label": "Repeater",
@@ -522,6 +570,14 @@
     "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
     "postFlashNote": "The board restarts on its own once flashing finishes.",
     "stockDevice": "Heltec MeshSolar / MeshTower",
+    "qemu": {
+      "enabled": true,
+      "machine": "nrf52840-mobmesh,radio-cs=24,radio-dio1=20,radio-busy=17",
+      "binary": "qemu-system-arm",
+      "mcu": "nrf52840",
+      "mem": "",
+      "globals": {}
+    },
     "variants": {
       "repeater": {
         "label": "Repeater",
@@ -537,6 +593,14 @@
     "connectNote": "Connect over USB; the flasher puts the board into its bootloader.",
     "postFlashNote": "The board restarts on its own once flashing finishes.",
     "stockDevice": "Heltec MeshTower V2",
+    "qemu": {
+      "enabled": true,
+      "machine": "nrf52840-mobmesh,radio-cs=24,radio-dio1=20,radio-busy=17",
+      "binary": "qemu-system-arm",
+      "mcu": "nrf52840",
+      "mem": "",
+      "globals": {}
+    },
     "variants": {
       "repeater": {
         "label": "Repeater",
