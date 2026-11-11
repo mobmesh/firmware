@@ -162,11 +162,9 @@
     <section class="home-section">
       <h2>MeshCore: stock vs Enhanced+</h2>
       <p>
-        Stock MeshCore is great, but updates can be a pain. Its <code>start ota</code>
-        turns the node into an access point and waits for a person standing nearby to
-        upload a file. These builds add a second path over an existing WiFi or cell
-        hotspot, with remote power control for the hotspot itself, driven by ordinary CLI
-        commands that travel over LoRa like everything else in the mesh.
+        MeshCore Enhanced+ builds on upstream MeshCore with remote maintenance, signed
+        settings updates, spam flood control and practical diagnostics. The comparison
+        below highlights the added capabilities.
       </p>
       <div class="home-compare-scroll">
         <table class="home-compare">
@@ -179,38 +177,54 @@
           </thead>
           <tbody>
             <tr>
-              <th scope="row">Updating a remote node</th>
-              <td>Take a trip</td>
-              <td>Send a command over the mesh</td>
+              <th scope="row">Updating a remote node<sup>*</sup></th>
+              <td>Local upload through the node's WiFi access point</td>
+              <td>Trigger a download over an existing WiFi connection or hotspot with a mesh command</td>
             </tr>
             <tr>
-              <th scope="row">A bad firmware image</th>
-              <td>Node halts and stays down</td>
-              <td>Recovers itself and reboots</td>
+              <th scope="row">New firmware fails during startup<sup>*</sup></th>
+              <td>May require manual recovery</td>
+              <td>Boots the previous image automatically if the startup trial fails</td>
             </tr>
             <tr>
-              <th scope="row">Region lists change</th>
-              <td>Read up and reconfigure each node</td>
-              <td>Published over the mesh, applied on arrival</td>
+              <th scope="row">Region or operating settings change</th>
+              <td>Configure each node individually</td>
+              <td>The repeater can stay current with regional settings by responding to updates via the mesh</td>
             </tr>
             <tr>
               <th scope="row">Trying a risky setting</th>
-              <td>Drive back out to undo it</td>
-              <td>Reverts on a timer unless you keep it</td>
+              <td>Temporary trials for radio parameters</td>
+              <td>Timed trials for radio parameters, transmit power and other supported settings; reverts unless confirmed</td>
             </tr>
             <tr>
-              <th scope="row">A battery running flat</th>
-              <td>Browns out and resets in a loop</td>
-              <td>Leaves service, returns once charged</td>
+              <th scope="row">Low battery</th>
+              <td>May brown out as the battery runs flat</td>
+              <td>Configurable safe sleep and automatic return after the battery recovers</td>
             </tr>
             <tr>
-              <th scope="row">Clock after a reboot</th>
-              <td>Best guess timestamp</td>
-              <td>Uses NTP set from atomic clocks</td>
+              <th scope="row">An unset or drifting clock</th>
+              <td>May need the clock set again after a reboot</td>
+              <td>Timer fixes and signed mesh time updates repair substantially incorrect clocks</td>
+            </tr>
+            <tr>
+              <th scope="row">Spam floods</th>
+              <td>Standard region and forwarding controls</td>
+              <td>Block forwarding of identified spam floods to protect the repeater's transmit airtime</td>
+            </tr>
+            <tr>
+              <th scope="row">Diagnosing a problem</th>
+              <td>Inspect individual statistics and counters</td>
+              <td>Plain-language findings for battery, links, noise and interference, with a suggested next action</td>
+            </tr>
+            <tr>
+              <th scope="row">Direct-message delivery</th>
+              <td>A missed hop can interrupt delivery</td>
+              <td>35% higher delivery with Direct Packet Retries enabled</td>
             </tr>
           </tbody>
         </table>
       </div>
+      <p class="home-feature-note"><small>* WiFi updates and firmware rollback require supported ESP32 builds.</small></p>
     </section>
     </details>
 
