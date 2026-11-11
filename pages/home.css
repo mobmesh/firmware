@@ -22,6 +22,10 @@
   margin-bottom: 2.5rem;
 }
 
+.home-wrap > .home-section:first-of-type {
+  margin-bottom: 1.25rem;
+}
+
 .home-section h2 {
   font-size: 1.1rem;
   margin: 0 0 0.9rem;
@@ -106,6 +110,10 @@
   color: var(--fg-muted);
   font-size: 0.87rem;
   line-height: 1.55;
+}
+
+.home-section .home-feature-note {
+  margin-top: 0.9rem;
 }
 
 .home-panel {
@@ -304,9 +312,45 @@
 .home-float .home-section:last-child {
   margin-bottom: 1.2rem;
 }
+.home-disclosure {
+  margin-top: 1.25rem;
+  margin-bottom: 4.5rem;
+  padding-bottom: 1.1rem;
+}
+.home-disclosure:not([open]) {
+  opacity: 0.7;
+}
+.home-disclosure::before {
+  content: none;
+}
+.home-disclosure > summary {
+  cursor: pointer;
+  border-radius: 0.25rem;
+}
+.home-disclosure > summary::marker {
+  color: var(--accent);
+}
+.home-disclosure > summary h2 {
+  display: inline;
+  margin: 0;
+  font-size: 1rem;
+}
+.home-disclosure > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 5px;
+}
+.home-disclosure[open] {
+  padding-bottom: 0.4rem;
+}
+.home-disclosure[open] > summary {
+  margin-bottom: 0.9rem;
+}
 @media (max-width: 640px) {
   .home-float {
     padding: 0.9rem 1rem 0.2rem;
+  }
+  .home-disclosure:not([open]) {
+    padding-bottom: 0.9rem;
   }
 }
 .home-float .home-section-spaced {
