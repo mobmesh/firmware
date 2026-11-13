@@ -6,7 +6,7 @@
 # and boot_app0.bin are partition-table specific and never shared between boards.
 
 # Applied before each target's ordered mod list.
-core_mods: [shim]
+core_mods: [shim, core]
 
 roles:
   repeater:

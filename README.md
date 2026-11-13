@@ -25,6 +25,7 @@ Select a mod link below for its own README, including behavior and requirements.
 | [direct‑retry](mods/direct-retry/README.md) | Keeps direct traffic moving: resends a direct packet and listens for the next hop's repeat. Off by default. |
 | [timing‑safety](mods/timing-safety/README.md) | Timer rollover and post-reboot clock fixes. |
 | [shim](mods/shim/README.md) | Shared upstream hooks that connect selected mods to MeshCore. |
+| [core](mods/core/README.md) | Shared code every target carries. |
 
 The mod set varies by build target. `build-targets.yaml` shows which
 mods each board and role receives.

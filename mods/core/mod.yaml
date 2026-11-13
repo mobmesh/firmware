@@ -1,0 +1,2 @@
+# Shared MobMesh code carried by every target; reaches upstream only through shim's hooks.
+name: core

@@ -59,18 +59,18 @@ class CurrentProjectModelTestCase(unittest.TestCase):
                          "waveshare_esp32s3_lr1121_rep_mobmesh_beta")
         self.assertEqual(rows[("heltec_v4", "room_server")].ota_role_id, 2)
         self.assertEqual(rows[("heltec_v4", "repeater")].mods,
-                         ("shim", "hotspot-ota", "timing-safety", "try-settings", "power-guard", "sync-settings",
+                         ("shim", "core", "hotspot-ota", "timing-safety", "try-settings", "power-guard", "sync-settings",
                           "flood-gate", "diag-report", "direct-retry"))
         self.assertEqual(rows[("xiao_c3", "repeater")].mods,
-                         ("shim", "hotspot-ota", "timing-safety", "try-settings", "sync-settings", "flood-gate",
+                         ("shim", "core", "hotspot-ota", "timing-safety", "try-settings", "sync-settings", "flood-gate",
                           "diag-report", "direct-retry"))
         for board in ("heltec_v4", "xiao_c3"):
             self.assertEqual(rows[(board, "room_server")].mods,
-                             ("shim", "hotspot-ota", "timing-safety", "try-settings", "sync-settings", "direct-retry"))
+                             ("shim", "core", "hotspot-ota", "timing-safety", "try-settings", "sync-settings", "direct-retry"))
         self.assertEqual(rows[("heltec_t1", "repeater")].asset_basename, "heltec_t1_rep_mobmesh_beta")
         self.assertEqual(rows[("heltec_t1", "repeater")].ota_board_id, 10)
         self.assertEqual(rows[("heltec_t1", "repeater")].mods,
-                         ("shim", "timing-safety", "try-settings", "sync-settings", "flood-gate", "diag-report",
+                         ("shim", "core", "timing-safety", "try-settings", "sync-settings", "flood-gate", "diag-report",
                           "direct-retry"))
         self.assertTrue(rows[("heltec_t1", "repeater")].qemu_boot_check)
         self.assertEqual(rows[("rak4631", "repeater")].asset_basename, "rak4631_rep_mobmesh_beta")

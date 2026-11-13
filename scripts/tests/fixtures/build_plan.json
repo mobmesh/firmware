@@ -1,6 +1,7 @@
 {
   "core_mods": [
-    "shim"
+    "shim",
+    "core"
   ],
   "targets": [
     {
@@ -18,6 +19,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -56,6 +58,7 @@
       "make_latest": false,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -89,6 +92,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -124,6 +128,7 @@
       "make_latest": false,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -157,6 +162,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -192,6 +198,7 @@
       "make_latest": false,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -225,6 +232,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -262,6 +270,7 @@
       "make_latest": false,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -295,6 +304,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -330,6 +340,7 @@
       "make_latest": false,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -363,6 +374,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -398,6 +410,7 @@
       "make_latest": false,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -431,6 +444,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -466,6 +480,7 @@
       "make_latest": false,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -499,6 +514,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -534,6 +550,7 @@
       "make_latest": false,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -567,6 +584,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -602,6 +620,7 @@
       "make_latest": false,
       "mods": [
         "shim",
+        "core",
         "hotspot-ota",
         "timing-safety",
         "try-settings",
@@ -635,6 +654,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "timing-safety",
         "try-settings",
         "sync-settings",
@@ -669,6 +689,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "timing-safety",
         "try-settings",
         "sync-settings",
@@ -703,6 +724,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "timing-safety",
         "try-settings",
         "sync-settings",
@@ -737,6 +759,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "timing-safety",
         "try-settings",
         "sync-settings",
@@ -771,6 +794,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "timing-safety",
         "try-settings",
         "sync-settings",
@@ -805,6 +829,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "timing-safety",
         "try-settings",
         "sync-settings",
@@ -839,6 +864,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "timing-safety",
         "try-settings",
         "sync-settings",
@@ -873,6 +899,7 @@
       "make_latest": true,
       "mods": [
         "shim",
+        "core",
         "timing-safety",
         "try-settings",
         "sync-settings",
