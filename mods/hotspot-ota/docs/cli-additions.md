@@ -551,6 +551,6 @@ ver
 <upstream-version> (<upstream-build-date>) + MobMesh (<build-date> - <commit>)
 ```
 
-Every MobMesh build answers this, with or without hotspot-ota: the shim's command dispatcher replies before any mod.
+Every MobMesh build answers this, with or without hotspot-ota: `core` replies after every mod.
 
 [↩ Back to hotspot-ota readme](../README.md)

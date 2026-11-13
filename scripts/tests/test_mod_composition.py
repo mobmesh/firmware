@@ -1,5 +1,6 @@
 import argparse
 import importlib.util
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -56,12 +57,24 @@ class RealCompositionTestCase(unittest.TestCase):
                 self.assertIn("void modBeforeDeepSleep() {\n" + body + "}\n", hooks)
 
     def test_poweroff_falls_back_to_a_refusal_after_every_mod(self):
-        for mods in ("shim,timing-safety", "shim,hotspot-ota,timing-safety,power-guard"):
+        root = SCRIPT_PATH.parent.parent
+        for mods in ("shim,core,timing-safety", "shim,core,hotspot-ota,timing-safety,power-guard"):
             with self.subTest(mods=mods):
                 _, cli = self.compose(mods)
-                refusal = cli.index('"ERR: poweroff not available in this build"')
-                self.assertLess(cli.rfind("HandleCli(context, command, reply)"), refusal)
-                self.assertLess(refusal, cli.index("  return false;\n}"))
+                last = cli.rfind("HandleCli(context, command, reply)")
+                self.assertEqual(cli.rfind("if (coreHandleCli(context, command, reply)) return true;"),
+                                 last - len("if (core"))
+                self.assertLess(last, cli.index("  return false;\n}"))
+        core = (root / "mods/core/files/src/helpers/CoreCli.cpp").read_text()
+        self.assertIn('"ERR: poweroff not available in this build"', core)
+        self.assertIn('"%s (%s) + MobMesh (%s)"', core)
+        # Core answers after every mod, so its priority stays below all of theirs.
+        priorities = {}
+        for path in (root / "mods").glob("*/mod.yaml"):
+            match = re.search(r"cli:\s*\n\s*handler: \S+\n(?:\s*#.*\n)*\s*priority: (-?\d+)", path.read_text())
+            if match:
+                priorities[path.parent.name] = int(match.group(1))
+        self.assertEqual(min(priorities, key=priorities.get), "core", priorities)
 
     def test_generation_is_byte_deterministic(self):
         first = self.compose("shim,hotspot-ota,timing-safety,power-guard")

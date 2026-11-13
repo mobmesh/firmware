@@ -1,2 +1,10 @@
 # Shared MobMesh code carried by every target; reaches upstream only through shim's hooks.
 name: core
+
+integration:
+  header: helpers/CoreIntegration.h
+  hooks:
+    cli:
+      handler: coreHandleCli
+      # Last: mods that wake from poweroff answer it first; no mod command starts with "ver".
+      priority: 0

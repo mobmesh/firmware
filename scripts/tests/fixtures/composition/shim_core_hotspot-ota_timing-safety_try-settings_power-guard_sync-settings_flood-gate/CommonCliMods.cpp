@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <helpers/ModHooks.h>
+#include <helpers/CoreIntegration.h>
 #include <helpers/esp32/HotspotOtaIntegration.h>
 #include <helpers/esp32/TrySetIntegration.h>
 #include <helpers/esp32/PowerGuardIntegration.h>
@@ -12,20 +13,11 @@ bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
                          const char* fw_version, const char* fw_build_date) {
   const ModCliContext context = {sender_timestamp, fw_version, fw_build_date};
   modCliBegin(sender_timestamp);
-  // Every MobMesh build names its own build after upstream's, whichever mods it carries.
-  if (memcmp(command, "ver", 3) == 0) {
-    sprintf(reply, "%s (%s) + MobMesh (%s)", fw_version, fw_build_date, OTA_MOD_BUILD_DATE);
-    return true;
-  }
   if (hotspotOtaHandleCli(context, command, reply)) return true;
   if (powerGuardHandleCli(context, command, reply)) return true;
   if (floodGateHandleCli(context, command, reply)) return true;
   if (trySetHandleCli(context, command, reply)) return true;
   if (syncCli(context, command, reply)) return true;
-  // Upstream's poweroff never wakes, so it is never reachable; a mod that can wake handles it above.
-  if (memcmp(command, "poweroff", 8) == 0 || memcmp(command, "shutdown", 8) == 0) {
-    strcpy(reply, "ERR: poweroff not available in this build");
-    return true;
-  }
+  if (coreHandleCli(context, command, reply)) return true;
   return false;
 }
