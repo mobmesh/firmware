@@ -13,6 +13,7 @@ target includes it, as it includes `shim`.
 | `ModPlatform.h` | Chip-family mapping for mod code |
 | `ModCliRows.cpp` | Commands that answer with up to 6 replies, each sent as its own message over LoRa |
 | `CoreCli.cpp` | `ver`, the `stats-` commands over the remote CLI, and the refusal of a `poweroff` that would never wake ([CLI reference](docs/cli-additions.md)) |
+| `ModTemperature.h` | The CPU die temperature for mods (not ambient or battery), averaged as floats so readings below 0 °C hold |
 | `ModIdle.h` | The ESP32 1 ms idle rest, inlined into the main loop |
 | `ModServices.cpp` | What mods ask of MeshCore: read settings and regions, send group and direct packets, sign, follow a tempradio trial. One copy serves the repeater and the room server, acting on what MyMesh hands over at startup. |
 

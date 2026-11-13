@@ -68,6 +68,7 @@ void modBeforeDeepSleep() {
 bool     modBoardRadioInit()               { return radio_init(); }
 void     modBoardReboot()                  { board.reboot(); }
 uint16_t modBoardBattMilliVolts()          { return board.getBattMilliVolts(); }
+float    modBoardMcuTemperature()          { return board.getMCUTemperature(); }
 #if defined(ESP32)
 void     modBoardDeepSleep(uint32_t secs)  { board.enterDeepSleep(secs); }
 void     modBoardInhibitSleep(bool inhibit) { board.setInhibitSleep(inhibit); }

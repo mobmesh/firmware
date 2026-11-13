@@ -6,12 +6,15 @@
 #include <helpers/ModPlatform.h>
 #include <math.h>
 #include <helpers/ConfigSerializer.h>
+#include <helpers/ModTemperature.h>
+#include <helpers/diag_report/BattHistory.h>
 #include <helpers/diag_report/BattLog.h>
 #include <helpers/diag_report/DiagSummary.h>
 #include <helpers/diag_report/LinkReport.h>
 #include <helpers/diag_report/LnaStudy.h>
 #include <helpers/diag_report/NoiseLog.h>
 #include <helpers/diag_report/RfScan.h>
+#include <helpers/diag_report/TempReport.h>
 
 #define STUDY_PATH        "/rdiag_lna"
 #define CONFIG_PATH       "/rdiag.json"
@@ -27,6 +30,12 @@
 #define BATT_EVERY_MS     300000UL
 #define BATT_ABSENT_READS 3
 #define BATT_LINES_MAX    8
+#define HIST_PATH         "/rdiag_hist"
+#define HIST_MAGIC        0x52424831UL   // "RBH1"
+#define TODAY_PATH        "/rdiag_today"
+#define HIST_LINES_MAX    10
+#define TEMP_LINES_MAX    12
+#define RESET_WINDOW_MS   60000UL
 #define BLOCK_MIN_MS      240000UL
 #define BLOCK_SPAN_MS     120000UL
 #define START_SPAN_MS     60000UL
@@ -83,6 +92,8 @@ static BattLog batt_log;
 static uint32_t batt_hour;
 static uint32_t last_batt_ms;
 static uint8_t batt_zeros;              // zero readings in a row; at the limit the battery is absent until reboot
+static HistToday hist_today;            // the 30-day history itself stays in its file
+static uint32_t reset_armed_ms;         // when `clear diag` was asked; `clear diag confirm` must follow within the window
 static int8_t noise_buf[NOISE_SAMPLES];
 static uint8_t noise_count;
 static uint32_t noise_hour;
@@ -174,6 +185,51 @@ static void loadBatt() {
             && f.read((uint8_t*)&batt_log, sizeof(batt_log)) == sizeof(batt_log);
   f.close();
   if (!ok) memset(&batt_log, 0, sizeof(batt_log));
+}
+
+// The history file is read only to file a finished day or to answer `diag batt.history`.
+static bool loadHistory(BattHistory& h) {
+  histInit(h);
+  if (!ensureMounted() || !ModFS.exists(HIST_PATH)) return false;
+  File f = ModFS.open(HIST_PATH, "r");
+  if (!f) return false;
+  uint32_t magic = 0;
+  bool ok = f.read((uint8_t*)&magic, sizeof(magic)) == sizeof(magic) && magic == HIST_MAGIC
+            && f.read((uint8_t*)&h, sizeof(h)) == sizeof(h);
+  f.close();
+  if (!ok) histInit(h);
+  return ok;
+}
+
+static void fileDay(const HistToday& finished) {
+  BattHistory h;
+  loadHistory(h);
+  histClose(h, finished);
+  if (!ensureMounted()) return;
+  File f = ModFS.open(HIST_PATH, "w", true);
+  if (!f) return;
+  uint32_t magic = HIST_MAGIC;
+  f.write((const uint8_t*)&magic, sizeof(magic));
+  f.write((const uint8_t*)&h, sizeof(h));
+  f.close();
+}
+
+// Today's running values ride along with the hourly battery save, so a reboot keeps the morning low.
+static void saveToday() {
+  if (!ensureMounted()) return;
+  File f = ModFS.open(TODAY_PATH, "w", true);
+  if (!f) return;
+  f.write((const uint8_t*)&hist_today, sizeof(hist_today));
+  f.close();
+}
+
+static void loadToday() {
+  memset(&hist_today, 0, sizeof(hist_today));
+  if (!ensureMounted() || !ModFS.exists(TODAY_PATH)) return;
+  File f = ModFS.open(TODAY_PATH, "r");
+  if (!f) return;
+  if (f.read((uint8_t*)&hist_today, sizeof(hist_today)) != sizeof(hist_today)) memset(&hist_today, 0, sizeof(hist_today));
+  f.close();
 }
 
 static void loadConfig() {
@@ -345,23 +401,42 @@ static void noiseTick(uint32_t now) {
   if (lnaNow() == noise_lna && readFloor(&noise_buf[noise_count])) noise_count++;
 }
 
+// Today's history: the morning low when there is a battery reading, and the CPU temperature either way.
+static void historySample(uint32_t hour, uint16_t mv) {
+  uint32_t local = hour + 24 + config.tz_offset;
+  HistToday finished;
+  if (histSample(hist_today, finished, local / 24, (uint8_t)(local % 24), mv, modMcuTemperature())) fileDay(finished);
+}
+
 // One file write an hour; a clock jump only starts another slot.
 static bool battSampleNow() {
   if (batt_zeros >= BATT_ABSENT_READS) return false;
   uint16_t mv = modBoardBattMilliVolts();
   uint32_t hour = clockHour();
   if (mv == 0 || hour == 0) return mv != 0;
-  if (batt_hour != 0 && hour != batt_hour) saveBatt();
+  if (batt_hour != 0 && hour != batt_hour) {
+    saveBatt();
+    saveToday();
+  }
   batt_hour = hour;
   battSample(batt_log, hour, config.tz_offset, mv);
+  historySample(hour, mv);
   return true;
 }
 
 static void battTick(uint32_t now) {
   // Nothing can be logged without the clock, so the battery is left alone until it is set.
-  if (batt_zeros >= BATT_ABSENT_READS || clockHour() == 0) return;
+  if (clockHour() == 0) return;
   if (last_batt_ms != 0 && now - last_batt_ms < BATT_EVERY_MS) return;
   last_batt_ms = now | 1;
+  if (batt_zeros >= BATT_ABSENT_READS) {
+    // No battery to read, but the CPU temperature still goes into today's history.
+    uint32_t hour = clockHour();
+    if (batt_hour != 0 && hour != batt_hour) saveToday();
+    batt_hour = hour;
+    historySample(hour, 0);
+    return;
+  }
   // Only timed readings count, so asking for a report repeatedly cannot switch the watch off.
   batt_zeros = battSampleNow() ? 0 : batt_zeros + 1;
 }
@@ -372,6 +447,7 @@ static void boot() {
   have_key = modPublisherKey(self_key);
   loadNoise();
   loadBatt();
+  loadToday();
   loadStudy();
   if (!study.active) return;
   // The saved setting is applied at boot; a different value means the operator changed it meanwhile.
@@ -715,6 +791,101 @@ static void runBatt(const ModCliContext& context, char* reply) {
   free(lines);
 }
 
+static void runHistory(const ModCliContext& context, char* reply) {
+  if (!battSampleNow()) {
+    strcpy(reply, "🔋 30 Days: ⚪ Not Available");
+    return;
+  }
+  if (clockHour() == 0) {
+    strcpy(reply, "ERR: clock not set (time <epoch>)");
+    return;
+  }
+  // Held only while the report is built, like the battery report's lines.
+  BattHistory* h = (BattHistory*)malloc(sizeof(BattHistory));
+  char (*lines)[HIST_LINE] = (char (*)[HIST_LINE])malloc(HIST_LINES_MAX * HIST_LINE);
+  if (h == nullptr || lines == nullptr) {
+    free(h);
+    free(lines);
+    strcpy(reply, "ERR: out of memory");
+    return;
+  }
+  loadHistory(*h);
+#ifdef MOBMESH_HAS_BATTERY_MEASUREMENT
+  HistView v = histAnalyse(*h, hist_today, true);
+#else
+  HistView v = histAnalyse(*h, hist_today, false);
+#endif
+  int n = histFormat(v, lines, HIST_LINES_MAX);
+  emitLines(context, reply, &lines[0][0], HIST_LINE, n);
+  free(lines);
+  free(h);
+}
+
+static void runTemp(const ModCliContext& context, char* reply) {
+  float now_c = modMcuTemperature();
+  BattHistory* h = (BattHistory*)malloc(sizeof(BattHistory));
+  char (*lines)[TEMP_LINE] = (char (*)[TEMP_LINE])malloc(TEMP_LINES_MAX * TEMP_LINE);
+  if (h == nullptr || lines == nullptr) {
+    free(h);
+    free(lines);
+    strcpy(reply, "ERR: out of memory");
+    return;
+  }
+  loadHistory(*h);
+  // Without the clock no day can be filed, so only the reading now is shown.
+  HistToday none;
+  memset(&none, 0, sizeof(none));
+  TempView v = tempAnalyse(*h, clockHour() == 0 ? none : hist_today, now_c);
+  int n = tempFormat(v, lines, TEMP_LINES_MAX);
+  emitLines(context, reply, &lines[0][0], TEMP_LINE, n);
+  free(lines);
+  free(h);
+}
+
+// Every history diag keeps, in memory and on file; diag.tz is a setting and stays.
+static void resetHistory() {
+  if (study.active) finish(true);
+  memset(&study, 0, sizeof(study));
+  memset(&noise_log, 0, sizeof(noise_log));
+  noise_hour = 0;
+  noise_count = 0;
+  memset(&batt_log, 0, sizeof(batt_log));
+  batt_hour = 0;
+  batt_zeros = 0;
+  last_batt_ms = 0;
+  memset(&hist_today, 0, sizeof(hist_today));
+  memset(&links, 0, sizeof(links));
+  memset(seen, 0, sizeof(seen));
+  have_scan = false;
+  scan_ms = 0;
+  if (!ensureMounted()) return;
+  const char* const files[] = {STUDY_PATH, NOISE_PATH, BATT_PATH, HIST_PATH, TODAY_PATH};
+  for (const char* path : files) {
+    if (ModFS.exists(path)) ModFS.remove(path);
+  }
+}
+
+static void runReset(const char* arg, char* reply) {
+  if (*arg == 0) {
+    reset_armed_ms = millis() | 1;
+    strcpy(reply, "Clears battery (24h, 30 days), CPU temperature, noise, LNA study, links and scan history; keeps diag.tz. "
+                  "Send clear diag confirm within 60 s.");
+    return;
+  }
+  if (strcmp(arg, "confirm") != 0) {
+    strcpy(reply, "ERR: clear diag [confirm]");
+    return;
+  }
+  if (reset_armed_ms == 0 || millis() - reset_armed_ms > RESET_WINDOW_MS) {
+    reset_armed_ms = 0;
+    strcpy(reply, "ERR: send clear diag first, then confirm within 60 s");
+    return;
+  }
+  reset_armed_ms = 0;
+  resetHistory();
+  strcpy(reply, "OK - diag history cleared");
+}
+
 static void battArea(DiagSummary& sum) {
   DiagArea* a = diagAdd(sum, "🔋", "Battery");
   if (!battSampleNow()) {
@@ -903,6 +1074,20 @@ bool diagReportHandleCli(const ModCliContext& context, char* command, char* repl
   }
   if (strcmp(command, "diag batt") == 0) {
     runBatt(context, reply);
+    return true;
+  }
+  if (strcmp(command, "diag batt.history") == 0) {
+    runHistory(context, reply);
+    return true;
+  }
+  if (strcmp(command, "diag temp") == 0) {
+    runTemp(context, reply);
+    return true;
+  }
+  if (isWord(command, "clear diag")) {
+    const char* arg = command + strlen("clear diag");
+    while (*arg == ' ') arg++;
+    runReset(arg, reply);
     return true;
   }
   if (strcmp(command, "diag radio.rfscan") == 0) {

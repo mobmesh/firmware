@@ -3,13 +3,15 @@
 [↩ Back to firmware readme](../../README.md)
 
 Diagnostics that answer with a verdict and one action instead of raw readings: a one-screen summary,
-a 24-hour battery report, a link check, a 24-hour noise watch, a nearby-interference scan and an LNA
+24-hour and 30-day battery reports, a CPU temperature report, a link check, a 24-hour noise watch, a nearby-interference scan and an LNA
 study (does this site hear better with the board's external LNA on or off?).
 
 ```text
 diag
 diag radio
 diag batt
+diag batt.history
+diag temp
 diag radio.links
 diag radio.noise
 diag radio.rfscan
@@ -17,6 +19,7 @@ diag radio.lna start
 diag radio.lna
 diag radio.lna stop
 set diag.tz -5h
+clear diag
 ```
 
 ## Summary

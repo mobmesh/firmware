@@ -18,9 +18,12 @@ Commands added by `diag-report`, available over serial and authenticated remote 
 | [`diag radio.links`](#diag-radiolinks) | How solid each neighbour link is |
 | [`diag radio.noise`](#diag-radionoise) | The mesh channel's noise over the last 24 h, in 4-hour blocks |
 | [`diag batt`](#diag-batt) | Battery history and verdict over the last 24 h |
+| [`diag batt.history`](#diag-batthistory) | Morning battery low over 30 days |
+| [`diag temp`](#diag-temp) | CPU temperature now and over 30 days |
 | [`diag radio.rfscan`](#diag-radiorfscan) | Check the mesh frequency +/-4 MHz for nearby interference |
 | [`get diag.tz`](#diagtz) | Local time offset used in reports |
 | [`set diag.tz <offset>`](#diagtz) | Set the local time offset |
+| [`clear diag`](#clear-diag) | Clear every diag history and start over |
 
 ## diag
 
@@ -207,6 +210,59 @@ diag batt
 | `🔋 Battery: ⚪ Not Available` | The board reads 0 mV. After 3 timed zero readings in a row, about 10 minutes, checking and logging stop until a reboot |
 
 Only `heltec_v4`, the board with a bench-measured battery divider, gets the 🔴 level. Voltages on other boards are less exact, and their verdicts come from the trend. Once the clock is set, readings are taken every 5 minutes and saved once an hour. `set diag.tz` sets the hours shown.
+
+## diag batt.history
+
+```text
+diag batt.history
+```
+
+**Response:** a verdict, a 30-day bar line of each day's morning low (the lowest reading before local noon, oldest on the left, ending today), a date every week, days held, the lowest morning and its date, the net change, then one action. Arrives as several replies.
+
+| Result | Rule |
+| --- | --- |
+| `🔋 30 Days: ⚪ Watching, <n> of 7 days` | Under 7 mornings recorded |
+| `🔋 30 Days: 🟢 Holding` | The newest morning is within 30 mV of the latest one at least 6 days before it |
+| `🔋 30 Days: 🟡 Losing Ground` | The newest morning is more than 30 mV below that one |
+| `🔋 30 Days: 🔴 Low` | The newest morning is at 3.35 V or below; `heltec_v4` only, as in `diag batt` |
+| `🔋 30 Days: ⚪ Not Available` | The board reads 0 mV |
+
+| Line | Meaning |
+| --- | --- |
+| `Held <h> of <p> days, <m> missing` | Day-to-day pairs whose morning stayed within 30 mV or rose; days without a reading since the watch began |
+
+Recorded from the same 5-minute readings as `diag batt`, once the clock is set; each day's CPU temperature range is filed alongside for `diag temp`. Each finished day is filed once, at the first reading of the next local day; only today's running values stay in memory and are saved with the hourly battery save. `set diag.tz` sets where the day turns.
+
+## diag temp
+
+```text
+diag temp
+```
+
+**Response:** a verdict, the CPU temperature now, a table of each calendar week's low and high (Monday start, up to 5 weeks, oldest first), the month's coldest and warmest with their dates, counts of freezing and hot days, then one action. Arrives as several replies.
+
+This is the CPU's own die temperature, not ambient or battery temperature; it runs a few degrees above its surroundings. The CPU runs warmer than the pack, so a CPU below freezing means the battery is too.
+
+| Result | Rule |
+| --- | --- |
+| `🌡️ CPU: 🟢 Normal` | No day in the last 7 below 0 °C or at 65 °C or more |
+| `🌡️ CPU: 🟡 Below Freezing` | A day in the last 7 went below 0 °C: most lithium chargers pause there |
+| `🌡️ CPU: 🟡 Running Hot` | A day in the last 7 reached 65 °C: the enclosure is baking. Takes precedence over the cold |
+| `🌡️ CPU: ⚪ Watching` | A reading now, but no day filed yet (the clock must be set) |
+| `🌡️ CPU: ⚪ Not Available` | The CPU has no temperature sensor |
+
+Sampled every 5 minutes with the battery readings, and on boards with no battery reading as well; the daily low and high are kept in the same 30-day file as `diag batt.history`, so this report adds no storage.
+
+## clear diag
+
+```text
+clear diag
+clear diag confirm
+```
+
+**Response:** `clear diag` names what will be cleared and arms the reset for 60 seconds; `clear diag confirm` within that time clears it and replies `OK - diag history cleared`. Without a recent `clear diag`: `ERR: send clear diag first, then confirm within 60 s`.
+
+Clears the 24-hour battery log, the 30-day battery and CPU temperature history, the noise watch, the LNA study and its result (a running study is stopped and the LNA restored), the link table and the cached interference scan. Keeps `diag.tz`. Every area then shows ⚪ until it has watched long enough again.
 
 ## diag radio.rfscan
 

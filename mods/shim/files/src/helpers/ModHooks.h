@@ -82,6 +82,7 @@ bool modCliNextRow(uint32_t sender_timestamp, uint8_t* frame, size_t* len, uint3
 bool     modBoardRadioInit();
 void     modBoardReboot();                     // does not return
 uint16_t modBoardBattMilliVolts();
+float    modBoardMcuTemperature();             // upstream's own MCU reading, NAN where the board has none
 void     modBoardDeepSleep(uint32_t secs);     // does not return
 void     modBoardInhibitSleep(bool inhibit);
 uint32_t modClockGet();

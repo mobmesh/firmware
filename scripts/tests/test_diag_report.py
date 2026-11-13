@@ -1,6 +1,6 @@
 """Compile and run diag-report's host tests.
 
-LnaStudy.cpp, RfScan.cpp, LinkReport.cpp, NoiseLog.cpp, BattLog.cpp and DiagSummary.cpp are pure
+LnaStudy.cpp, RfScan.cpp, LinkReport.cpp, NoiseLog.cpp, BattLog.cpp, BattHistory.cpp, TempReport.cpp and DiagSummary.cpp are pure
 arithmetic and text, with no radio, clock or storage, so the shipping sources compile on
 the host unchanged and the verdict and finding rules are checked against what ships.
 """
@@ -47,6 +47,12 @@ class DiagReportHostTestCase(unittest.TestCase):
 
     def test_batt_log_host_cases(self):
         self.run_case("test_batt_log", "BattLog.cpp", "NoiseLog.cpp")
+
+    def test_batt_history_host_cases(self):
+        self.run_case("test_batt_history", "BattHistory.cpp")
+
+    def test_temp_report_host_cases(self):
+        self.run_case("test_temp_report", "TempReport.cpp", "BattHistory.cpp")
 
 if __name__ == "__main__":
     unittest.main()
