@@ -35,15 +35,21 @@ bool modCliAddRow(uint32_t sender_timestamp, const char* text) {
   return true;
 }
 
+// A reply timestamp after the command's and every earlier reply's, as the CLI view needs.
+uint32_t modCliStamp(uint32_t sender_timestamp) {
+  uint32_t stamp = modClockGet();
+  if (stamp <= sender_timestamp) stamp = sender_timestamp + 1;
+  if (stamp <= last_stamp) stamp = last_stamp + 1;
+  last_stamp = stamp;
+  return stamp;
+}
+
 bool modCliNextRow(uint32_t sender_timestamp, uint8_t* frame, size_t* len, uint32_t* delay_millis) {
   if (sender_timestamp != rows_for || row_next >= row_count) {
     row_count = row_next = 0;
     return false;
   }
-  uint32_t stamp = modClockGet();
-  if (stamp <= sender_timestamp) stamp = sender_timestamp + 1;
-  if (stamp <= last_stamp) stamp = last_stamp + 1;
-  last_stamp = stamp;
+  uint32_t stamp = modCliStamp(sender_timestamp);
   size_t text_len = strlen(rows[row_next]);
   memcpy(frame, &stamp, 4);
   frame[4] = TXT_TYPE_CLI_DATA << 2;

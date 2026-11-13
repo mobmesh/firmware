@@ -15,6 +15,7 @@ target includes it, as it includes `shim`.
 | `CoreCli.cpp` | `ver`, the `stats-` commands over the remote CLI, and the refusal of a `poweroff` that would never wake ([CLI reference](docs/cli-additions.md)) |
 | `ModTemperature.h` | The CPU die temperature for mods (not ambient or battery), averaged as floats so readings below 0 °C hold |
 | `ModIdle.h` | The ESP32 1 ms idle rest, inlined into the main loop |
+| `ModProbe.cpp`, `CoreProbe.cpp` | `ping` and `trace` over MeshCore TRACE: one probe at a time, results sent to serial or as a late reply to the admin who asked ([CLI reference](docs/cli-additions.md#ping)) |
 | `ModServices.cpp` | What mods ask of MeshCore: read settings and regions, send group and direct packets, sign, follow a tempradio trial. One copy serves the repeater and the room server, acting on what MyMesh hands over at startup. |
 
 ## Where code goes

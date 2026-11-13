@@ -6,6 +6,7 @@
 class RegionMap;
 class CommonCLI;
 class NodePrefs;
+class ClientACL;
 struct TransportKey;
 namespace mesh { class Packet; class Mesh; class PacketManager; class Radio; }
 
@@ -147,6 +148,7 @@ struct ModBindings {
   mesh::Radio* radio;
   // MyMesh::sendFloodScoped is not virtual, so the call site supplies a forwarder.
   void (*flood_scoped)(const TransportKey& scope, mesh::Packet* packet, uint32_t delay_millis, uint8_t path_hash_size);
+  ClientACL* acl;                      // admins, for a CLI reply sent after the command returns
 };
 void modBind(const ModBindings* bindings);
 void modTempRadioSet(float freq, float bw, uint8_t sf, uint8_t cr, bool live);   // snapshot after each command and loop pass

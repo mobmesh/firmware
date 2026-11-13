@@ -8,3 +8,5 @@ integration:
       handler: coreHandleCli
       # Last: mods that wake from poweroff answer it first; no mod command starts with "ver".
       priority: 0
+    loop: coreLoop
+    recv: coreRecv

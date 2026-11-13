@@ -14,6 +14,8 @@ Commands answered by `core` on every MobMesh build, over serial and authenticate
 | [`stats-core`](#stats-core) | Read battery and system statistics |
 | [`stats-radio`](#stats-radio) | Read radio statistics |
 | [`stats-packets`](#stats-packets) | Read packet counters |
+| [`ping`](#ping) | Is a repeater reachable: time, hops and the weakest link SNR with its hop |
+| [`trace`](#trace) | The same probe with each link's SNR both ways |
 
 ## ver
 
@@ -74,3 +76,58 @@ stats-packets
 Read-only; response fields follow the upstream firmware version.
 
 [↩ Back to core readme](../README.md)
+
+## ping
+
+```text
+ping <hash>
+ping <hash> via <hash>,<hash>,...
+ping last
+```
+
+| Parameter | Definition |
+| --- | --- |
+| `<hash>` | A repeater's path hash as `neighbors` shows it, at the node's hash width (4 hex digits at 2 bytes) |
+| `via` | The repeaters between this node and the destination, in order, up to 5 (6 hops in all) |
+| `last` | Reprint the most recent `ping` or `trace` result with its age; nothing is sent |
+
+**Response:** one line, a few seconds after the command (a late reply over the remote CLI):
+
+```text
+Reply from c5fb: time=1334ms hops=2 weakest=+11.50 at hop 2
+```
+
+`time` is the round trip measured here, `hops` the hops to the destination one way, `weakest` the lowest link SNR on the path in either direction, in dB, and the hop it sits on (`trace` shows that hop's two directions). No reply: `Request timed out.`, after a wait that grows with the hop count and the radio's airtime.
+
+Over the remote CLI nothing is sent until the result is in, so no reply crosses the mesh while the trace does; a not-in-neighbours note arrives as the first line of the result.
+
+**Effect:** sends one MeshCore TRACE out along the path and back the same way; stock repeaters forward it with no login. Repeaters not in the neighbour table are tried anyway, with a note: `c5fb not in neighbours, trying direct`.
+
+| Response | Meaning |
+| --- | --- |
+| `ERR: <text> is not a hash, use <n> hex digits` | Not a full-width hex hash |
+| `ERR: <hash> is the destination, leave it out of via` | The destination repeated in the path |
+| `ERR: path too long (max 6 hops)` | More than 5 `via` hops |
+| `ERR: ping already running` | One probe at a time |
+| `ERR: no ping result yet` | `ping last` before any probe |
+
+## trace
+
+```text
+trace <hash>
+trace <hash> via <hash>,<hash>,...
+trace last
+```
+
+Parameters, effect and errors as [`ping`](#ping).
+
+**Response:** a header line, then one numbered line per hop, as `tracert` lists them. `out` is how well that hop heard the one before it, `back` how well the one before heard it on the way back, in dB.
+
+```text
+Trace to 4ea1 over 2 hops, 1334ms:
+  1  c5fb  out +11.50  back +11.50
+  2  4ea1  out +12.25  back +11.75
+```
+
+A long trace that needs two replies ends the second with `Summary: time=<ms>ms hops=<n> weakest=<dB> at hop <n>`. No reply: `Trace to 4ea1 over 2 hops: no reply in 7s`.
+

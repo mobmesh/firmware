@@ -17,6 +17,7 @@ bool modRadioInit(const char* build_id) {
 }
 
 void modLoop() {
+  coreLoop();
   hotspotOtaLoop();
   trySetLoop();
   powerGuardLoop();
@@ -53,6 +54,7 @@ bool modDirectEvent(ModDirectEvent event, const mesh::Packet* packet, uint32_t d
 
 void modObserveRecv(const mesh::Packet* packet, bool accepted,
                     const uint8_t scope_key[16]) {
+  coreRecv(packet, accepted, scope_key);
   syncRecv(packet, accepted, scope_key);
   diagReportRecv(packet, accepted, scope_key);
 }

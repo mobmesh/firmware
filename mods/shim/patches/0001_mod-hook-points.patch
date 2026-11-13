@@ -1,5 +1,5 @@
 diff --git a/examples/simple_repeater/MyMesh.cpp b/examples/simple_repeater/MyMesh.cpp
-index 61b6c149..2c6ee6ec 100644
+index 61b6c149..90b5dabd 100644
 --- a/examples/simple_repeater/MyMesh.cpp
 +++ b/examples/simple_repeater/MyMesh.cpp
 @@ -1,6 +1,16 @@
@@ -153,7 +153,7 @@ index 61b6c149..2c6ee6ec 100644
    dirty_contacts_expiry = 0;
    set_radio_at = revert_radio_at = 0;
 +  mod_mesh_ref = this;
-+  const ModBindings mod_bindings = { &_cli, &_prefs, this, &region_map, _mgr, &radio, modFloodScoped };
++  const ModBindings mod_bindings = { &_cli, &_prefs, this, &region_map, _mgr, &radio, modFloodScoped, &acl };
 +  modBind(&mod_bindings);
    _logging = false;
    region_load_active = false;
@@ -283,7 +283,7 @@ index d475b13d..238df83c 100644
 +  modIdleRest([] { return the_mesh.hasPendingWork(); });
  }
 diff --git a/examples/simple_room_server/MyMesh.cpp b/examples/simple_room_server/MyMesh.cpp
-index da4c776c..fb5367bf 100644
+index da4c776c..32c46502 100644
 --- a/examples/simple_room_server/MyMesh.cpp
 +++ b/examples/simple_room_server/MyMesh.cpp
 @@ -4,6 +4,17 @@
@@ -377,7 +377,7 @@ index da4c776c..fb5367bf 100644
    region_load_active = false;
    set_radio_at = revert_radio_at = 0;
 +  mod_mesh_ref = this;
-+  const ModBindings mod_bindings = { &_cli, &_prefs, this, &region_map, _mgr, &radio, modFloodScoped };
++  const ModBindings mod_bindings = { &_cli, &_prefs, this, &region_map, _mgr, &radio, modFloodScoped, &acl };
 +  modBind(&mod_bindings);
    recv_pkt_region = NULL;
  

@@ -13,6 +13,10 @@ void modBind(const ModBindings* bindings) {
   if (bindings != nullptr) bound = *bindings;
 }
 
+const ModBindings* modBindings() {
+  return &bound;
+}
+
 void modCliDispatch(uint32_t sender_timestamp, char* command, char* reply) {
   if (bound.cli) bound.cli->handleCommand(sender_timestamp, command, reply);
 }
