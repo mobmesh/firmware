@@ -154,31 +154,34 @@ class UpstreamCouplingTestCase(unittest.TestCase):
             r"modSendGroup\([^;]+uint32_t\* packet_id, uint32_t\* airtime_ms\);",
         )
 
+        services = Path(REPO_ROOT, "mods/core/files/src/helpers/ModServices.cpp").read_text()
+        self.assertRegex(
+            services,
+            re.compile(
+                r"bool modSendGroup\(.*?uint32_t\* packet_id, uint32_t\* airtime_ms\)"
+                r".*?(?:sendFlood|flood_scoped)\([^;]+;.*?"
+                r"\*airtime_ms = bound\.radio->getEstAirtimeFor"
+                r"\(packet->getRawLength\(\)\);",
+                re.DOTALL,
+            ),
+            "modSendGroup no longer returns the configured packet's upstream airtime",
+        )
         patch = Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
         source = added_source(patch)
         for role in ("simple_repeater", "simple_room_server"):
             target = f"examples/{role}/MyMesh.cpp"
             self.assertIn(target, source)
-            self.assertRegex(
-                source[target],
-                re.compile(
-                    r"bool modSendGroup\(.*?uint32_t\* packet_id, uint32_t\* airtime_ms\)"
-                    r".*?sendFlood(?:Scoped)?\([^;]+;.*?"
-                    r"\*airtime_ms = radio_driver\.getEstAirtimeFor"
-                    r"\(packet->getRawLength\(\)\);",
-                    re.DOTALL,
-                ),
-                f"{target} no longer returns the configured packet's upstream airtime",
-            )
+            # The radio MyMesh was constructed with is the one airtime is estimated on.
+            self.assertRegex(source[target], r"ModBindings mod_bindings = \{[^}]*&radio,", target)
 
     def test_tempradio_snapshot_tracks_cli_and_loop_transitions(self):
         patch = Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
         source = added_source(patch)
         snapshot = re.compile(
-            r"mod_temp_radio\s*=\s*\{\s*pending_freq,\s*pending_bw,\s*"
+            r"modTempRadioSet\(\s*pending_freq,\s*pending_bw,\s*"
             r"pending_sf,\s*pending_cr,\s*set_radio_at\s*==\s*0\s*&&\s*"
             r"revert_radio_at\s*!=\s*0\s*&&\s*"
-            r"!millisHasNowPassed\(revert_radio_at\)\s*\};",
+            r"!millisHasNowPassed\(revert_radio_at\)\s*\);",
             re.DOTALL,
         )
         for role in ("simple_repeater", "simple_room_server"):
@@ -191,7 +194,7 @@ class UpstreamCouplingTestCase(unittest.TestCase):
 
         patch_text = patch.read_text()
         self.assertEqual(
-            patch_text.count('MESH_DEBUG_PRINTLN("Radio params restored");\n   }\n \n+  mod_temp_radio'),
+            patch_text.count('MESH_DEBUG_PRINTLN("Radio params restored");\n   }\n \n+  modTempRadioSet'),
             2,
             "both role loops refresh only after the revert timer is processed",
         )
@@ -203,10 +206,13 @@ class UpstreamCouplingTestCase(unittest.TestCase):
         source = added_source(
             Path(REPO_ROOT, "mods/shim/patches/0001_mod-hook-points.patch")
         )
+        services = Path(REPO_ROOT, "mods/core/files/src/helpers/ModServices.cpp").read_text()
+        self.assertIn("bool modRadioPrefsGet(ModRadioValues* out)", services)
+        self.assertNotIn("modRandomFill", services)
         for role in ("simple_repeater", "simple_room_server"):
             body = source[f"examples/{role}/MyMesh.cpp"]
-            self.assertIn("bool modRadioPrefsGet(ModRadioValues* out)", body)
-            self.assertNotIn("modRandomFill", body)
+            self.assertIn("modBind(&mod_bindings);", body)
+            self.assertNotIn("modRadioPrefsGet", body)
 
         integration = Path(
             REPO_ROOT,

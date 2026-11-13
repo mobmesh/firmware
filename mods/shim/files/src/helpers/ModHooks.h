@@ -4,7 +4,10 @@
 #include <stdint.h>
 
 class RegionMap;
-namespace mesh { class Packet; }
+class CommonCLI;
+class NodePrefs;
+struct TransportKey;
+namespace mesh { class Packet; class Mesh; class PacketManager; class Radio; }
 
 // One hook surface for every mod, so upstream's main.cpp carries one-line calls instead
 // of each mod's code inline, and two mods never edit the same region of it.
@@ -132,6 +135,21 @@ bool modSendGroup(const uint8_t* secret, uint8_t hash, const uint8_t* data,
 // The live tempradio trial, or false when none runs. Both timers are consulted: pending_*
 // are untested before the 2s apply and stale after the revert, which clears only the timer.
 bool modTempRadioGet(float* freq, float* bw, uint8_t* sf, uint8_t* cr);
+
+// What core's services act on, handed over once by MyMesh's constructor.
+struct ModBindings {
+  CommonCLI* cli;
+  NodePrefs* prefs;
+  mesh::Mesh* mesh;
+  RegionMap* regions;
+  mesh::PacketManager* packets;
+  mesh::Radio* radio;
+  // MyMesh::sendFloodScoped is not virtual, so the call site supplies a forwarder.
+  void (*flood_scoped)(const TransportKey& scope, mesh::Packet* packet, uint32_t delay_millis, uint8_t path_hash_size);
+};
+void modBind(const ModBindings* bindings);
+void modTempRadioSet(float freq, float bw, uint8_t sf, uint8_t cr, bool live);   // snapshot after each command and loop pass
+uint32_t modTxDone(const mesh::Packet* packet);   // the id modSendGroup gave this packet, or 0
 
 // Zero-hop only: upstream schedules a flood advert every 47 hours, so it is not a caller's
 // to spend. The delay lets a reply go out before the radio transmits.
