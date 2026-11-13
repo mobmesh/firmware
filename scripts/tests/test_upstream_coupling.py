@@ -264,9 +264,9 @@ class UpstreamCouplingTestCase(unittest.TestCase):
             self.assertIn("MOBMESH_BUILD_EPOCH", workflow, name)
 
     def test_drift_canary_probes_the_stats_serial_gate(self):
-        """power-guard's remote stats forward breaks silently; only the canary grep sees it."""
+        """core's remote stats forward breaks silently; only the canary grep sees it."""
         workflow = Path(REPO_ROOT, ".github/workflows/patch-drift-canary.yml").read_text()
-        source = Path(REPO_ROOT, "mods/power-guard/files/src/helpers/esp32/PowerGuardIntegration.cpp").read_text()
+        source = Path(REPO_ROOT, "mods/core/files/src/helpers/CoreCli.cpp").read_text()
         for cmd in ("stats-core", "stats-radio", "stats-packets"):
             self.assertIn(f'"{cmd}"', source)
             self.assertIn(cmd, workflow)

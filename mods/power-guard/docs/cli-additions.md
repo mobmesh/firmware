@@ -18,9 +18,6 @@ Do not type the brackets. Durations are integer seconds without a unit suffix.
 | [`powersaving auto [on\|off]`](#powersaving-auto) | Inspect or enable automatic power saving |
 | [`poweroff <seconds>`](#poweroff--shutdown) | Sleep for a specified duration |
 | [`shutdown <seconds>`](#poweroff--shutdown) | Alias for timed power-off |
-| [`stats-core`](#stats-core) | Read battery and system statistics |
-| [`stats-radio`](#stats-radio) | Read radio statistics |
-| [`stats-packets`](#stats-packets) | Read packet counters |
 
 ## powersaving safe.mv
 
@@ -110,38 +107,5 @@ printing the reply. Remote invocation waits five seconds so the reply can be tra
 **Restrictions:** A duration is required. When hotspot-ota is installed, active OTA
 work or rollback probation can refuse sleep. On wake, the board's resume-voltage check
 may return the node to sleep until the battery recovers.
-
-## stats-core
-
-```text
-stats-core
-```
-
-**Response:** Native MeshCore system statistics: battery, uptime, errors, and queue state.
-
-**Extension:** Allows the existing serial command over authenticated remote CLI.
-Read-only; response fields follow the upstream firmware version.
-
-## stats-radio
-
-```text
-stats-radio
-```
-
-**Response:** Native MeshCore radio statistics: noise floor, RSSI/SNR, and airtime.
-
-**Extension:** Allows the existing serial command over authenticated remote CLI.
-Read-only; response fields follow the upstream firmware version.
-
-## stats-packets
-
-```text
-stats-packets
-```
-
-**Response:** Native MeshCore packet counters.
-
-**Extension:** Allows the existing serial command over authenticated remote CLI.
-Read-only; response fields follow the upstream firmware version.
 
 [↩ Back to power-guard readme](../README.md)

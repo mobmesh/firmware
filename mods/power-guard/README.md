@@ -43,19 +43,12 @@ Detailed syntax, responses, and restrictions are in the
 <tr><td><code>powersaving auto</code></td><td>Show state, active flag, and transition count.</td></tr>
 <tr><td><code>powersaving auto on|off</code></td><td>Toggle automatic power saving.</td></tr>
 <tr><td><code>poweroff &lt;secs&gt;</code></td><td>Deep sleep for 60 to 86400 seconds, then wake. Works over the mesh too.</td></tr>
-<tr><td><code>stats-core</code></td><td>Battery, uptime, errors, queue length.</td></tr>
-<tr><td><code>stats-radio</code></td><td>Noise floor, RSSI/SNR, airtime.</td></tr>
-<tr><td><code>stats-packets</code></td><td>Packet counters.</td></tr>
 </tbody>
 </table>
 
 Upstream's `poweroff` never wakes. This replaces it with a version that requires a wake time
 and refuses a bare `poweroff`. Over the mesh, the reply goes out first and the node sleeps
 5 seconds later. Builds without this mod refuse `poweroff` altogether.
-
-The three `stats-` commands are upstream's own, gated to serial there. This mod forwards
-them when they arrive over the mesh, so a remote operator can read a battery level without
-a site visit. The remote CLI path is already authenticated and the replies only read state.
 
 It also rebases the clock after a brownout, which upstream leaves scrambled until NTP
 or a battery pull corrects it.

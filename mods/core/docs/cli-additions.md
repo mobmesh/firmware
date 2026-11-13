@@ -11,6 +11,9 @@ Commands answered by `core` on every MobMesh build, over serial and authenticate
 | [`ver`](#ver) | Upstream version and build, plus the MobMesh build |
 | [`poweroff`](#poweroff--shutdown) | Refused unless a mod provides a power-off that wakes |
 | [`shutdown`](#poweroff--shutdown) | Same as `poweroff` |
+| [`stats-core`](#stats-core) | Read battery and system statistics |
+| [`stats-radio`](#stats-radio) | Read radio statistics |
+| [`stats-packets`](#stats-packets) | Read packet counters |
 
 ## ver
 
@@ -36,5 +39,38 @@ Upstream's power-off never wakes, so a remote node would stay off until someone 
 | Response | Meaning |
 | --- | --- |
 | `ERR: poweroff not available in this build` | No mod in this build can power off and wake again |
+
+## stats-core
+
+```text
+stats-core
+```
+
+**Response:** Native MeshCore system statistics: battery, uptime, errors, and queue state.
+
+**Extension:** Allows the existing serial command over authenticated remote CLI.
+Read-only; response fields follow the upstream firmware version.
+
+## stats-radio
+
+```text
+stats-radio
+```
+
+**Response:** Native MeshCore radio statistics: noise floor, RSSI/SNR, and airtime.
+
+**Extension:** Allows the existing serial command over authenticated remote CLI.
+Read-only; response fields follow the upstream firmware version.
+
+## stats-packets
+
+```text
+stats-packets
+```
+
+**Response:** Native MeshCore packet counters.
+
+**Extension:** Allows the existing serial command over authenticated remote CLI.
+Read-only; response fields follow the upstream firmware version.
 
 [↩ Back to core readme](../README.md)
