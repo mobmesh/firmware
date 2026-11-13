@@ -105,7 +105,7 @@ bool probeFillLinks(ProbeResult& r, const int8_t* forwarder_q, uint8_t forwarder
   int n = r.hops;
   if (forwarder_count != 2 * n - 1) return false;
   for (int i = 0; i < n; i++) r.out_q[i] = forwarder_q[i];
-  // Return legs run destination to us: forwarder entries n..2n-2, then our own reading on link 0.
+  // Return legs run from the destination back: forwarder entries n..2n-2, then the sender's own reading on link 0.
   for (int i = 0; i < n; i++) r.back_q[i] = i == 0 ? own_q : forwarder_q[2 * n - 1 - i];
   return true;
 }
@@ -151,10 +151,12 @@ static int lowHop(const ProbeResult& r) {
   return r.hops;
 }
 
+// The weakest reading, named by the hop it sits on as trace lists it.
 static void weakestText(const ProbeResult& r, char* out, size_t len) {
-  char low[8];
+  char low[8], hop[2 * PROBE_HASH_MAX + 1];
   snrText(probeLowQ(r), low, sizeof(low));
-  snprintf(out, len, "weakest=%s at hop %d", low, lowHop(r));
+  probeHashText(r.hash[lowHop(r) - 1], r.width, hop);
+  snprintf(out, len, "weakest(%s)=%s", hop, low);
 }
 
 int probeFormat(const ProbeResult& r, bool trace, uint32_t age_s, char lines[][PROBE_LINE], int max_lines) {
@@ -168,7 +170,7 @@ int probeFormat(const ProbeResult& r, bool trace, uint32_t age_s, char lines[][P
       return n;
     }
     weakestText(r, weakest, sizeof(weakest));
-    ADD("Reply from %s: time=%lums hops=%u %s%s", dest, (unsigned long)r.rtt_ms, r.hops, weakest, age);
+    ADD("Reply %s: time=%lums hops=%u %s%s", dest, (unsigned long)r.rtt_ms, r.hops, weakest, age);
     return n;
   }
   const char* plural = r.hops == 1 ? "" : "s";

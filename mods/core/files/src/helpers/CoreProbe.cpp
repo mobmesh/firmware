@@ -234,7 +234,7 @@ void coreRecv(const mesh::Packet* pkt, bool, const uint8_t*) {
   if (tag != pending.tag) return;
   uint8_t path_sz = pkt->payload[8] & 0x03;
   uint16_t hashes_len = pkt->payload_len - 9;
-  // Upstream's own end-of-path test: the path has run out, so this copy is addressed to us.
+  // Upstream's own end-of-path test: the path has run out, so this copy has come back to the sender.
   if (((uint16_t)pkt->path_len << path_sz) < hashes_len) return;
   finish(true, (const int8_t*)pkt->path, pkt->path_len, pkt->_snr);
 }

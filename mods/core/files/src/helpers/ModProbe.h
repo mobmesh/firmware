@@ -31,7 +31,7 @@ struct ProbeResult {
   uint8_t hash[PROBE_MAX_HOPS][PROBE_HASH_MAX];
   uint32_t rtt_ms;
   uint32_t timeout_ms;
-  int8_t out_q[PROBE_MAX_HOPS];        // quarter-dB SNR, link i outbound (node i heard by node i+1; node 0 is us)
+  int8_t out_q[PROBE_MAX_HOPS];        // quarter-dB SNR, link i outbound (node i heard by node i+1; node 0 is the sender)
   int8_t back_q[PROBE_MAX_HOPS];       // quarter-dB SNR, link i on the way back
 };
 
@@ -39,7 +39,7 @@ struct ProbeResult {
 ProbeParse probeParse(const char* command, uint8_t width, ProbeRequest* out, char* err, size_t err_len);
 // The TRACE path, via hops then destination then via hops reversed, each cut to trace_width bytes; returns bytes written.
 size_t probeTracePath(const ProbeRequest& r, uint8_t trace_width, uint8_t* out);
-// Forwarder SNRs (2N-1, in travel order) and our own last-leg SNR, split into per-link out/back.
+// Forwarder SNRs (2N-1, in travel order) and the sender's own last-leg SNR, split into per-link out/back.
 bool probeFillLinks(ProbeResult& r, const int8_t* forwarder_q, uint8_t forwarder_count, int8_t own_q);
 int8_t probeLowQ(const ProbeResult& r);
 void probeHashText(const uint8_t* hash, uint8_t width, char* out);

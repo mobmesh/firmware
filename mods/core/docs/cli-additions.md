@@ -14,7 +14,7 @@ Commands answered by `core` on every MobMesh build, over serial and authenticate
 | [`stats-core`](#stats-core) | Read battery and system statistics |
 | [`stats-radio`](#stats-radio) | Read radio statistics |
 | [`stats-packets`](#stats-packets) | Read packet counters |
-| [`ping`](#ping) | Is a repeater reachable: time, hops and the weakest link SNR with its hop |
+| [`ping`](#ping) | Is a repeater reachable: time, hops and the weakest link SNR, named by its hop |
 | [`trace`](#trace) | The same probe with each link's SNR both ways |
 
 ## ver
@@ -94,10 +94,10 @@ ping last
 **Response:** one line, a few seconds after the command (a late reply over the remote CLI):
 
 ```text
-Reply from c5fb: time=1334ms hops=2 weakest=+11.50 at hop 2
+Reply 4ea1: time=1334ms hops=2 weakest(c5fb)=+10.50
 ```
 
-`time` is the round trip measured here, `hops` the hops to the destination one way, `weakest` the lowest link SNR on the path in either direction, in dB, and the hop it sits on (`trace` shows that hop's two directions). No reply: `Request timed out.`, after a wait that grows with the hop count and the radio's airtime.
+`time` is the round trip measured here, `hops` the hops to the destination one way, `weakest(<hash>)` the lowest link SNR on the path in either direction, in dB, named by the hop it sits on (`trace` lists that hop's two directions). No reply: `Request timed out.`, after a wait that grows with the hop count and the radio's airtime.
 
 Over the remote CLI nothing is sent until the result is in, so no reply crosses the mesh while the trace does; a not-in-neighbours note arrives as the first line of the result.
 
@@ -129,5 +129,5 @@ Trace to 4ea1 over 2 hops, 1334ms:
   2  4ea1  out +12.25  back +11.75
 ```
 
-A long trace that needs two replies ends the second with `Summary: time=<ms>ms hops=<n> weakest=<dB> at hop <n>`. No reply: `Trace to 4ea1 over 2 hops: no reply in 7s`.
+A long trace that needs two replies ends the second with `Summary: time=<ms>ms hops=<n> weakest(<hash>)=<dB>`. No reply: `Trace to 4ea1 over 2 hops: no reply in 7s`.
 

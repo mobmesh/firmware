@@ -29,7 +29,7 @@ int main() {
   static char lines[PROBE_LINES_MAX][PROBE_LINE];
   static char msgs[PROBE_MSGS_MAX][PROBE_MSG_MAX + 1];
 
-  // Not ours, usage, last.
+  // Other commands, usage, last.
   CHECK(probeParse("pingx c5fb", 2, &r, err, sizeof(err)) == PROBE_NOT_OURS);
   CHECK(probeParse("tracert c5fb", 2, &r, err, sizeof(err)) == PROBE_NOT_OURS);
   CHECK(probeParse("ping", 2, &r, err, sizeof(err)) == PROBE_ERROR && strstr(err, "ping <hash>"));
@@ -55,20 +55,20 @@ int main() {
   CHECK(probeParse("ping c5fb via 0001,0002,0003,0004,0005", 2, &r, err, sizeof(err)) == PROBE_OK && r.hops == 6);
   CHECK(probeParse("ping c5fb via 0001,0002,0003,0004,0005,0006", 2, &r, err, sizeof(err)) == PROBE_ERROR && strstr(err, "max 6 hops"));
 
-  // Neighbour ping: one forwarder SNR (the destination hearing us), ours for the way back.
+  // Neighbour ping: one forwarder SNR (the destination hearing the sender), the sender's own for the way back.
   probeParse("ping c5fb", 2, &r, err, sizeof(err));
   ProbeResult x = made(r, true);
   const int8_t one[] = {29};
   CHECK(probeFillLinks(x, one, 1, 26));
   x.rtt_ms = 412;
   int n = probeFormat(x, false, PROBE_AGE_NONE, lines, PROBE_LINES_MAX);
-  CHECK(n == 1 && strcmp(lines[0], "Reply from c5fb: time=412ms hops=1 weakest=+6.50 at hop 1") == 0);
+  CHECK(n == 1 && strcmp(lines[0], "Reply c5fb: time=412ms hops=1 weakest(c5fb)=+6.50") == 0);
   n = probeFormat(x, true, PROBE_AGE_NONE, lines, PROBE_LINES_MAX);
   CHECK(n == 2 && strcmp(lines[0], "Trace to c5fb over 1 hop, 412ms:") == 0);
   CHECK(strcmp(lines[1], "  1  c5fb  out  +7.25  back  +6.50") == 0);
   CHECK(!probeFillLinks(x, one, 2, 26));
 
-  // Three hops: out legs then return legs, ours last; snr(lo) is the lowest either way.
+  // Three hops: out legs then return legs, the sender's own last; the weakest is the lowest either way.
   probeParse("trace c5fb via a1b2,a2c4", 2, &r, err, sizeof(err));
   x = made(r, true);
   const int8_t five[] = {37, 20, 14, 16, 22};
@@ -82,10 +82,10 @@ int main() {
   CHECK(strcmp(lines[3], "  3  c5fb  out  +3.50  back  +4.00") == 0);
   CHECK(probePack(x, true, lines, n, msgs) == 1);
   n = probeFormat(x, false, 125, lines, PROBE_LINES_MAX);
-  CHECK(strcmp(lines[0], "Reply from c5fb: time=2105ms hops=3 weakest=+3.50 at hop 3 (2m ago)") == 0);
+  CHECK(strcmp(lines[0], "Reply c5fb: time=2105ms hops=3 weakest(c5fb)=+3.50 (2m ago)") == 0);
   CHECK(x.out_q[0] == 37);
 
-  // At 1-byte hashes "me" already fills the width.
+  // At 1-byte hashes the hop column is two digits wide.
   CHECK(probeParse("trace c5", 1, &r, err, sizeof(err)) == PROBE_OK);
   x = made(r, true);
   probeFillLinks(x, one, 1, 26);
@@ -99,7 +99,7 @@ int main() {
   probeFillLinks(x, back_low, 5, 35);
   CHECK(probeLowQ(x) == 9);
   n = probeFormat(x, false, PROBE_AGE_NONE, lines, PROBE_LINES_MAX);
-  CHECK(any(lines, n, "weakest=+2.25 at hop 2"));
+  CHECK(any(lines, n, "weakest(a2c4)=+2.25"));
 
   // Negative SNR prints with its sign; quarter steps are exact.
   probeParse("ping c5fb", 2, &r, err, sizeof(err));
@@ -107,7 +107,7 @@ int main() {
   const int8_t weak[] = {-30};
   probeFillLinks(x, weak, 1, -1);
   n = probeFormat(x, false, PROBE_AGE_NONE, lines, PROBE_LINES_MAX);
-  CHECK(any(lines, n, "weakest=-7.50 at hop 1"));
+  CHECK(any(lines, n, "weakest(c5fb)=-7.50"));
   n = probeFormat(x, true, PROBE_AGE_NONE, lines, PROBE_LINES_MAX);
   CHECK(any(lines, n, "out  -7.50  back  -0.25"));
 
@@ -121,7 +121,7 @@ int main() {
   CHECK(n == 7);
   int m = probePack(x, true, lines, n, msgs);
   CHECK(m == 2);
-  CHECK(strstr(msgs[1], "Summary: time=4210ms hops=6 weakest=+3.50 at hop 6") != NULL);
+  CHECK(strstr(msgs[1], "Summary: time=4210ms hops=6 weakest(c5fb)=+3.50") != NULL);
   CHECK(strstr(msgs[0], "Summary") == NULL);
   for (int i = 0; i < m; i++) CHECK(strlen(msgs[i]) <= PROBE_MSG_MAX);
 
