@@ -5,7 +5,7 @@
   "display": "standalone",
   "background_color": "#03080f",
   "theme_color": "#03080f",
-  "description": "The MeshCore Companion App",
+  "description": "MobMesh companion client: messages, channels, map and repeater admin",
   "orientation": "portrait-primary",
   "prefer_related_applications": false,
   "icons": [
