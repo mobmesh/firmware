@@ -1,10 +1,6 @@
 {
 	"staticPath": "/firmware",
 	"role": {
-		"meshos": {
-			"icon": "dashboard",
-			"title": "MeshOS"
-		},
 		"gui": {
 			"icon": "gradient",
 			"title": "Ripple GUI",
@@ -1448,48 +1444,6 @@
 						"files": {
 							"flash": "LilyGo_T-Echo_Card_[rR]epeater.*?\\.zip",
 							"download": "LilyGo_T-Echo_Card_[rR]epeater.*?\\.uf2"
-						}
-					}
-				}
-			]
-		},
-		{
-			"maker": "lilygo",
-			"class": "meshos",
-			"name": "LilyGo T-Lora Pager",
-			"tooltip": "<img class='device' src='/img/lilygo_pager.svg'>",
-			"icon": "/img/lora.svg",
-			"type": "esp32",
-			"firmware": [
-				{
-					"class": "community",
-					"role": "roomServer",
-					"github": {
-						"type": "room-server",
-						"files": {
-							"flash": "LilyGo_T-Echo_Card_room_server.*?\\.zip",
-							"download": "LilyGo_T-Echo_Card_room_server.*?\\.uf2"
-						}
-					}
-				},
-				{
-					"class": "community",
-					"role": "kissRadio",
-					"notice": "kissRadioNotice",
-					"version": {
-						"1.17.1": {
-							"files": [
-								{
-									"type": "flash",
-									"name": "LilyGo_T-Echo_Card_kiss_modem-1.17.1-45c0c323.zip",
-									"title": "Firmware OTA zip"
-								},
-								{
-									"type": "download",
-									"name": "LilyGo_T-Echo_Card_kiss_modem-1.17.1-45c0c323.uf2",
-									"title": "Firmware uf2"
-								}
-							]
 						}
 					}
 				}
