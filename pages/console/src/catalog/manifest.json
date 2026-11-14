@@ -3,13 +3,17 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "0f69733ec9f901c4ee5b30eb7af1c18cda6878ba",
-  "sourceRows": 274,
-  "effectiveSignatures": 272,
+  "mobmeshCommit": "1e6ac22ad9c2672973e73c8c22e10aa33941e0be",
+  "sourceRows": 285,
+  "effectiveSignatures": 282,
   "cliAdditionFiles": [
     {
+      "path": "mods/core/docs/cli-additions.md",
+      "sha256": "8fb55e5cb29694e1235f916f396a34c0c1808f90cf3d50da410456d67c7fa86f"
+    },
+    {
       "path": "mods/diag-report/docs/cli-additions.md",
-      "sha256": "53da1fb8a3f954b95ab13f180b061e1911ff126c674fae353b229e6ad2708729"
+      "sha256": "4add91b3ee0573fd37986a16e5d61e274398d359b7186589058b76efac3cdc13"
     },
     {
       "path": "mods/direct-retry/docs/cli-additions.md",
@@ -21,11 +25,11 @@
     },
     {
       "path": "mods/hotspot-ota/docs/cli-additions.md",
-      "sha256": "daac5920f9cef57f23a19cdb7a360336763cd7e533bf624199cb4134d4377a2c"
+      "sha256": "ee9a626d3b3b8c3a880446ec62569589ce31b371f3dbba32183f49bd4ef36cb7"
     },
     {
       "path": "mods/power-guard/docs/cli-additions.md",
-      "sha256": "1e77ad6082b51e30e9f2c0e08d5c8dbae8f0e940e23fcb38cc3ca2377df8591b"
+      "sha256": "c0c639b5285f86e0fad315f80c6e4ad4601aa55b52a4d3771816f662763f72d6"
     },
     {
       "path": "mods/sync-settings/docs/cli-additions.md",
@@ -433,6 +437,126 @@
     [
       "0f69733",
       "2026-11-05"
+    ],
+    [
+      "2b3f4fc",
+      "2026-11-05"
+    ],
+    [
+      "442b2c5",
+      "2026-11-05"
+    ],
+    [
+      "daa7beb",
+      "2026-11-05"
+    ],
+    [
+      "1bbb13a",
+      "2026-11-06"
+    ],
+    [
+      "51b0a8d",
+      "2026-11-06"
+    ],
+    [
+      "b001cd9",
+      "2026-11-06"
+    ],
+    [
+      "4822573",
+      "2026-11-06"
+    ],
+    [
+      "396a254",
+      "2026-11-08"
+    ],
+    [
+      "4c49757",
+      "2026-11-08"
+    ],
+    [
+      "44deed4",
+      "2026-11-08"
+    ],
+    [
+      "a1efd9b",
+      "2026-11-09"
+    ],
+    [
+      "c8d3d67",
+      "2026-11-09"
+    ],
+    [
+      "959304a",
+      "2026-11-09"
+    ],
+    [
+      "aa2eb6e",
+      "2026-11-09"
+    ],
+    [
+      "02b6dcd",
+      "2026-11-09"
+    ],
+    [
+      "3206194",
+      "2026-11-09"
+    ],
+    [
+      "5ecde29",
+      "2026-11-10"
+    ],
+    [
+      "34410a5",
+      "2026-11-11"
+    ],
+    [
+      "8fd40f1",
+      "2026-11-11"
+    ],
+    [
+      "19dba9b",
+      "2026-11-11"
+    ],
+    [
+      "4ac0967",
+      "2026-11-11"
+    ],
+    [
+      "89927d0",
+      "2026-11-12"
+    ],
+    [
+      "0eddb08",
+      "2026-11-13"
+    ],
+    [
+      "d218730",
+      "2026-11-13"
+    ],
+    [
+      "dfc1145",
+      "2026-11-13"
+    ],
+    [
+      "ac43d67",
+      "2026-11-13"
+    ],
+    [
+      "6198285",
+      "2026-11-13"
+    ],
+    [
+      "4a7ac0b",
+      "2026-11-13"
+    ],
+    [
+      "dcdbd04",
+      "2026-11-13"
+    ],
+    [
+      "1e6ac22",
+      "2026-11-13"
     ]
   ]
 }

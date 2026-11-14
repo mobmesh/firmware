@@ -31,7 +31,7 @@ ver
 
 ## poweroff / shutdown
 
-```text
+```
 poweroff
 shutdown
 ```
@@ -93,7 +93,7 @@ ping last
 
 **Response:** one line, a few seconds after the command (a late reply over the remote CLI):
 
-```text
+```
 Reply 4ea1: time=1334ms hops=2 weakest(c5fb)=+10.50
 ```
 
@@ -123,7 +123,7 @@ Parameters, effect and errors as [`ping`](#ping).
 
 **Response:** a header line, then one numbered line per hop, as `tracert` lists them. `out` is how well that hop heard the one before it, `back` how well the one before heard it on the way back, in dB.
 
-```text
+```
 Trace to 4ea1 over 2 hops, 1334ms:
   1  c5fb  out +11.50  back +11.50
   2  4ea1  out +12.25  back +11.75
