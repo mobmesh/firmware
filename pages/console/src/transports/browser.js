@@ -72,5 +72,9 @@ async function bleTransport(device,session){
     return transport;
   }catch(e){cancelled=true;if(transport)await transport.close();device.removeEventListener('gattserverdisconnected',lost);device.gatt?.disconnect();throw e;}
 }
-return {async serial(port,mode){const candidate=await serialTransport(port,mode,epoch);current=candidate;try{if(mode==='auto')await detectUsb(candidate);return candidate;}catch(error){await candidate.close();if(current===candidate)current=null;throw error;}},async ble(device){current=await bleTransport(device,epoch);return current;},async close(){epoch++;await current?.close();current=null;}};
+// The MobMesh App's open link: frames come from its tap and writes join its queue; closing here leaves the app's port open.
+function sharedTransport(tap){const transport={mode:tap.mode==='ble'?'ble':'usb',shared:true,get connected(){return open&&tap.connected;},async close(){open=false;off();transport.protocol.dispose();}};let open=true;
+  transport.protocol=new DiagnosticConnection(bytes=>{if(!open||!tap.connected||!tap.send)throw Error('App companion link closed');return tap.send(bytes);});
+  const off=tap.onFrame(frame=>transport.protocol.frame(frame));return transport;}
+return {shared(tap){current=sharedTransport(tap);return current;},async serial(port,mode){const candidate=await serialTransport(port,mode,epoch);current=candidate;try{if(mode==='auto')await detectUsb(candidate);return candidate;}catch(error){await candidate.close();if(current===candidate)current=null;throw error;}},async ble(device){current=await bleTransport(device,epoch);return current;},async close(){epoch++;await current?.close();current=null;}};
 }

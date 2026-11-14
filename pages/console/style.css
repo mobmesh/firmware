@@ -1474,3 +1474,10 @@ body[data-login] #admin-led {
 .command-menu button:active,.command-menu button:focus-visible {
   background:#232b38
 }
+/* Embedded in the MobMesh App's Command Line tab: the app supplies the bars and companion link; the panel stays opaque over the app's own tab. */
+body[data-embed] .app-shell {
+  grid-template-rows:minmax(0,1fr) 42px
+}
+body[data-embed] .app-bar,body[data-embed] .workspace-strip {
+  display:none
+}

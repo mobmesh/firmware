@@ -1,0 +1,62 @@
+# Opens one issue when a newer MeshCore web app build is published than the one vendored at pages/app, and closes it once pages/app catches up.
+name: app-release
+on:
+  schedule:
+    - cron: "50 6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+env:
+  RELEASES_URL: https://files.liamcottle.net/MeshCore/
+  ISSUE_TITLE: "MeshCore web app update available"
+  ISSUE_LABEL: app
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: pages/app/version.json
+          sparse-checkout-cone-mode: false
+
+      - name: Compare the vendored app with the newest published build
+        id: check
+        run: |
+          python3 - <<'EOF'
+          import json, os, re, urllib.request
+          vendored = json.load(open('pages/app/version.json'))['version']
+          listing = urllib.request.urlopen(os.environ['RELEASES_URL'], timeout=60).read().decode()
+          versions = sorted({tuple(map(int, v)) for v in re.findall(r'href="\./v(\d+)\.(\d+)\.(\d+)/"', listing)})
+          if not versions:
+              raise SystemExit('no release folders found in the listing')
+          newest = '.'.join(map(str, versions[-1]))
+          ahead = tuple(map(int, newest.split('.'))) > tuple(map(int, vendored.split('.')))
+          print(f'vendored {vendored}, newest published {newest}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f'vendored={vendored}\nnewest={newest}\nahead={str(ahead).lower()}\n')
+          EOF
+
+      - name: Open, update or close the issue
+        uses: actions/github-script@v9
+        env:
+          AHEAD: ${{ steps.check.outputs.ahead }}
+          VENDORED: ${{ steps.check.outputs.vendored }}
+          NEWEST: ${{ steps.check.outputs.newest }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const title = process.env.ISSUE_TITLE, label = process.env.ISSUE_LABEL;
+            const open = await github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: label });
+            const existing = open.data.find(i => i.title === title);
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            // The label may not exist yet in a fresh repo; creating it twice is harmless.
+            await github.rest.issues.createLabel({ owner, repo, name: label, color: '2dd1bd', description: 'MeshCore web app at pages/app' }).catch(() => {});
+            if (process.env.AHEAD === 'true') {
+              const body = `MeshCore web app v${process.env.NEWEST} is published at ${process.env.RELEASES_URL}v${process.env.NEWEST}/; pages/app has v${process.env.VENDORED}.\n\nChecked ${new Date().toISOString().slice(0,10)} by [app-release](${runUrl}).`;
+              if (existing) await github.rest.issues.update({ owner, repo, issue_number: existing.number, body });
+              else await github.rest.issues.create({ owner, repo, title, body, labels: [label] });
+            } else if (existing) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: existing.number, body: `pages/app is on the newest build again ([run](${runUrl})).` });
+              await github.rest.issues.update({ owner, repo, issue_number: existing.number, state: 'closed' });
+            }

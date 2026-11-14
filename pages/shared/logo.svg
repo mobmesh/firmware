@@ -7,8 +7,14 @@
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#g)"/>
-  <!-- Glyph widened 1.14x about the frame centre: at 1.0 it filled 54% of the
-       width against 78% of the height, which read as narrow in the header. -->
+  <!-- Two outward-facing signal bands on each side of the glyph, in the glyph's colour. -->
+  <g fill="none" stroke="#03080f" stroke-width="2.5" stroke-linecap="round">
+    <path d="M6 17 A18 18 0 0 0 6 39"/>
+    <path d="M11 21 A11 11 0 0 0 11 35"/>
+    <path d="M58 17 A18 18 0 0 1 58 39"/>
+    <path d="M53 21 A11 11 0 0 1 53 35"/>
+  </g>
+  <!-- Glyph widened 1.14x about the frame centre, so it does not read as narrow in the header. -->
   <g transform="translate(32,0) scale(1.14,1) translate(-32,0)">
     <g transform="translate(5.7929,5.8457) scale(0.13143)">
       <g transform="translate(0.000000,400.000000) scale(0.100000,-0.100000)"

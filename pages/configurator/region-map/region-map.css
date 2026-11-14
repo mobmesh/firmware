@@ -7,10 +7,16 @@ body.region-map-body {
   overflow: hidden;
 }
 
+/* The site header takes the top; the map layout fills the rest of the viewport. */
+body.region-map-body {
+  display: flex;
+  flex-direction: column;
+}
+
 .region-map-layout {
   display: flex;
-  height: 100vh;
-  height: 100dvh;
+  flex: 1;
+  min-height: 0;
 }
 
 

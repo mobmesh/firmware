@@ -502,5 +502,28 @@ document.addEventListener?.('click',e=>{
 $('leave-new-tab').onclick=()=>{window.open(leaveTarget,'_blank','noopener');$('leave-dialog').close();};
 $('leave-anyway').onclick=async()=>{$('leave-dialog').close();leaving=true;await close();location.href=leaveTarget;};
 $('leave-cancel').onclick=()=>$('leave-dialog').close();
-try{catalog=await loadCatalog();$('catalog-status').textContent=`${catalog.entries.length} effective signatures from upstream and all four CLI-additions docs. Full parameter verification gate: pending.`;update();$('command').focus();}catch(e){$('status').textContent='Console initialization failed: '+e.message;}
+// Embedded in the MobMesh App: the console rides the app's open companion link and the repeater it logged in to.
+const EMBED=typeof location!=='undefined'&&new URLSearchParams(location.search).get('embed')==='app'&&globalThis.parent!==globalThis;
+if(EMBED)document.body.dataset.embed='app';
+function appContacts(tap,protocol){const found=[],take=c=>found.push(c);protocol.on(3,take);try{for(const f of tap.contacts.values())protocol.frame(f);}finally{protocol.off(3,take);}return found;}
+async function adoptAppTarget(tap){
+ const key=tap.loginKey;if(!key){auth=false;session=null;writable=false;add('status','Log in to a repeater in the app, then open Command Line again.');update();return;}
+ if(key===targetKey&&auth)return;
+ contacts=appContacts(tap,transport.protocol);renderContacts();targetKey=key;$('target').value=key;
+ if(records.length)add('boundary','── '+(contacts.find(c=>fullKey(c.publicKey)===key)?.advName||key.slice(0,12))+' ──');
+ auth=true;blocked=false;session=null;await chooseSession();
+ add('status','Using the app’s companion link and its login to '+(contacts.find(c=>fullKey(c.publicKey)===key)?.advName||key.slice(0,12))+'.');
+ busy=true;update();
+ try{applyBuild(await new RemoteProbe(transport.protocol,()=>{}).cli(key,'ver').then(r=>r.text,e=>{add('transport','Build · ver not read: '+e.message);return '';}));}finally{busy=false;update();focusCommand();}
+}
+async function openShared(){
+ const tap=parent.mmTap;if(transport?.connected){await adoptAppTarget(tap);return;}
+ if(!tap?.connected||!tap.send){add('status','No companion link in the app yet. Connect there, then open Command Line again.');return;}
+ epoch++;temporaryTargets=new TemporaryTargets();records=[];history=new History();applyBuild(null);
+ factory=transportFactory({frame:(direction,bytes)=>live(frameSummary(direction,bytes)),log:()=>{},activity});
+ transport=factory.shared(tap);mode=transport.mode;transport.selfInfo=null;
+ await adoptAppTarget(tap);
+}
+if(EMBED)self.mmEmbedShown=errorAction(openShared);
+try{catalog=await loadCatalog();$('catalog-status').textContent=`${catalog.entries.length} effective signatures from upstream and all four CLI-additions docs. Full parameter verification gate: pending.`;update();$('command').focus();if(EMBED)await errorAction(openShared)();}catch(e){$('status').textContent='Console initialization failed: '+e.message;}
 if(document.modelContext?.registerTool){const lifecycle=new AbortController();try{Promise.resolve(document.modelContext.registerTool({name:'read_meshcore_console_status',description:'Read connection status without querying hardware.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:true},execute(input){if(!input||Object.keys(input).length)throw Error('Expected empty object');return {...status.getSnapshot(),catalogEntries:catalog?.entries.length,regionMode:region};}},{signal:lifecycle.signal})).catch(()=>{});}catch{}window.addEventListener('pagehide',()=>lifecycle.abort(),{once:true});}

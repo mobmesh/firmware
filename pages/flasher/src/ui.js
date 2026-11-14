@@ -1005,6 +1005,8 @@ function renderDone(step) {
     ? 'Dry run complete — nothing was written.'
     : 'Firmware written successfully.';
   body.append(success);
+  // A real flash unlocks the site header's Open App pill on this and later visits.
+  if (!s.result?.dryRun) globalThis.mmMarkFlashed?.();
 
   const art = s.deviceIcon;
   if (art) {
