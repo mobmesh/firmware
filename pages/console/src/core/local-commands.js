@@ -2,7 +2,7 @@ export const LOCAL_COMMANDS=Object.freeze({
   connect:'Open the connection dialog, or connect directly: connect usb|bluetooth [companion | "repeater name" | public_key]. companion stays on the companion; login reaches a repeater from there.',
   exit:'Disconnect the console. Aliases: quit, disconnect, close.',
   reconnect:'Reopen the last device without a chooser, keep the transcript, and log back in to the same repeater.',
-  login:'Log in to a repeater through the connected companion: login "name" | public_key. A key outside the contact list gets a temporary entry. Asks for the password if none is saved.',
+  login:'Log in to a repeater through the connected companion: login "name" | public_key. A key outside the contact list gets a temporary entry. Asks for the password if none is saved; Enter alone sends a blank one, which works where this companion is already admin.',
   logout:'Log out of the repeater and return to the companion.',
   clear:'Clear the console output. Alias: cls.',
   background:'Show or switch the animated mesh background: background on | off.',

@@ -1439,3 +1439,38 @@ body[data-login] #admin-led {
   body[data-login] .workspace-strip::after { animation:none; background-size:100% 100% }
   body[data-login] #admin-led { animation:none }
 }
+
+/* Touch-and-hold menu on a past command line. */
+.command-menu {
+  position:fixed;
+  z-index:50;
+  display:flex;
+  flex-direction:column;
+  min-width:11rem;
+  max-width:min(22rem,calc(100vw - 16px));
+  padding:4px;
+  background:#151a22;
+  border:1px solid #2c3442;
+  border-radius:8px;
+  box-shadow:0 8px 24px rgba(0,0,0,.45);
+  font:.9375rem/1.4 var(--mono)
+}
+.command-menu-title {
+  padding:6px 10px;
+  color:#858d9b;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis
+}
+.command-menu button {
+  padding:10px;
+  text-align:left;
+  color:#e6e9ef;
+  background:none;
+  border:0;
+  border-radius:6px;
+  font:inherit
+}
+.command-menu button:active,.command-menu button:focus-visible {
+  background:#232b38
+}

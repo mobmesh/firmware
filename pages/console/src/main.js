@@ -27,7 +27,7 @@ document.querySelector?.('.welcome-title')?.addEventListener('animationend',e=>e
 const narrowScreen=globalThis.matchMedia?.('(max-width: 700px)')||{matches:false};
 narrowScreen.addEventListener?.('change',()=>update());
 function promptHost(selected){
- if(passwordPrompt)return 'Password for '+passwordPrompt.name;
+ if(passwordPrompt)return 'Password for '+passwordPrompt.name+' (Enter alone for none)';
  if(transport?.protocol&&transport.selfInfo?.name&&companionCommand($('command')?.value||''))return transport.selfInfo.name;
  if(transport?.protocol&&!auth&&transport.selfInfo?.name)return transport.selfInfo.name;
  return auth?(selected?.advName||directName||'repeater'):'mobmesh';
@@ -54,7 +54,9 @@ function update(){status.update({deviceConnected:!!transport?.connected,linkStat
 status.subscribe(s=>{$('status').textContent=s.deviceConnected?(busy?'Working…':blocked?'Console paused':auth?'Ready':'Connected · select a repeater'):'Disconnected';$('status').dataset.connected=String(s.deviceConnected);$('storage').textContent='Session data: memory only';});
 function resizePrompt(){const input=$('command');if(input?.style){input.style.height='auto';input.style.height=Math.max(29,input.scrollHeight)+'px';}}
 function showConnection(){const dialog=$('connection-dialog');if(!dialog.open){dialog.showModal?.();if(!$('mode-usb').disabled)$('mode-usb').focus();}}
-function closeConnection(){ $('connection-dialog').close?.();$('command').focus();}
+// Deferred a frame: closing a dialog or the browser's device chooser hands focus back to the button that opened it, often now disabled.
+function focusCommand(){(globalThis.requestAnimationFrame||setTimeout)(()=>{if(!$('connection-dialog').open)$('command').focus();});}
+function closeConnection(){ $('connection-dialog').close?.();focusCommand();}
 const commandPrefix=record=>record.kind==='command'?(record.promptHost||'mobmesh')+' ❯ ':'';
 function display(){const scroll=$('terminal-scroll'),atBottom=scroll.scrollTop+scroll.clientHeight>=scroll.scrollHeight-70;const visible=records.filter(r=>!['transport','pending'].includes(r.kind));$('pending').hidden=!records.some(r=>r.kind==='pending');$('output').textContent=visible.map(r=>commandPrefix(r)+r.safeText).join('\n');highlightTranscript(visible);$('diagnostic-log').replaceChildren(...records.filter(r=>r.kind==='transport').flatMap(r=>r.safeText.split('\n')).map(line=>{const row=document.createElement('span');row.className='diagnostic-line';row.textContent=line;return row;}));$('welcome').hidden=visible.length>0;if(atBottom)scroll.scrollTop=scroll.scrollHeight;resizePrompt();}
 function highlightTranscript(visible){
@@ -75,11 +77,11 @@ function highlightTranscript(visible){
  }
  for(const name of ['cli-prompt-host','cli-prompt-symbol','cli-help-prose','cli-command','cli-argument','cli-number','cli-help','cli-error','cli-key','cli-success','cli-unavailable'])CSS.highlights.set(name,new Highlight(...(groups.get(name)||[])));
 }
-async function restorePassword(){const key=targetKey,revision=++passwordRevision;$('password').value='';$('credential-status').textContent='Saved on this browser only.';if(!key||mode==='direct')return;const password=await credentials.read(key);if(targetKey!==key||passwordRevision!==revision)return;if(password){$('password').value=password;$('credential-status').textContent='Saved password recalled for this repeater.';}else if(credentials.error)$('credential-status').textContent='Password storage unavailable in this browser.';}
+async function restorePassword(){const key=targetKey,revision=++passwordRevision;$('password').value='';$('credential-status').textContent='Saved on this browser only.';if(!key||mode==='direct')return;const password=await credentials.read(key);if(targetKey!==key||passwordRevision!==revision)return;if(password!==null){$('password').value=password;$('credential-status').textContent=password?'Saved password recalled for this repeater.':'Saved: this repeater accepts a blank password.';}else if(credentials.error)$('credential-status').textContent='Password storage unavailable in this browser.';}
 function add(kind,text,secret=false){const r={eventId:crypto.randomUUID(),sessionId:session?.sessionId||'provisional',writerId,sequence:sequence++,timestamp:Date.now(),kind,safeText:recordText(text,secret),promptHost:kind==='command'?$('prompt-host').textContent:null,targetKey,route:route(),redacted:secret};records.push(r);const keep=retained(records);records=keep.records;if(keep.truncated)$('assistance').textContent='Oldest output records truncated at 2 MiB.';display();return r;}
 function live(text){$('live').textContent=($('live').textContent+text).slice(-65536);}
 async function release(){writable=false;}
-async function chooseSession(){session={sessionId:crypto.randomUUID(),targetKey};writable=true;history=keptHistory||new History();keptHistory=null;update();$('command').focus();}
+async function chooseSession(){session={sessionId:crypto.randomUUID(),targetKey};writable=true;history=keptHistory||new History();keptHistory=null;update();focusCommand();}
 async function offerSessions(){session=null;writable=false;history=new History();if(mode==='direct')await chooseSession();else{await restorePassword();update();}}
 // Direct serial has no contact list, so the prompt name comes from the repeater itself.
 // Theme is a per-viewer preference; storage may be unavailable, so the default always works.
@@ -88,7 +90,9 @@ function currentTheme(){return document.documentElement.dataset?.theme||'default
 // The mesh background is a per-viewer preference; it is on unless turned off.
 const meshBackground=startMeshBackground($('mesh-canvas'));
 function setBackground(on){on?meshBackground?.start():meshBackground?.stop();}
-let backgroundOn=true;try{backgroundOn=localStorage.getItem('console-background')!=='off';}catch{}
+// Phones (touch and narrow) start with the animated background off, sparing battery; a saved choice wins either way.
+const phone=!!globalThis.matchMedia?.('(pointer: coarse)').matches&&narrowScreen.matches;
+let backgroundOn=!phone;try{const saved=localStorage.getItem('console-background');if(saved==='on'||saved==='off')backgroundOn=saved==='on';}catch{}
 setBackground(backgroundOn);
 try{const saved=localStorage.getItem('console-theme');if(THEMES.includes(saved))applyTheme(saved);}catch{}
 // F1 shows the owner's manual command reference from the copy kept beside the page.
@@ -162,7 +166,7 @@ async function openTarget(spec){
  }
  // With a saved password there is no dialog: the companion status line tracks the login instead.
  const saved=await credentials.read(targetKey);
- if(saved){const name=contacts.find(c=>fullKey(c.publicKey)===targetKey)?.advName||targetKey.slice(0,12);if(stepLine&&records.includes(stepLine)){stepLine.safeText=recordText('Logging in to '+name+' . . .');display();}await login(saved);}
+ if(saved!==null){const name=contacts.find(c=>fullKey(c.publicKey)===targetKey)?.advName||targetKey.slice(0,12);if(stepLine&&records.includes(stepLine)){stepLine.safeText=recordText('Logging in to '+name+' . . .');display();}await login(saved);}
  else askPassword(contacts.find(c=>fullKey(c.publicKey)===targetKey)?.advName||targetKey.slice(0,12));
 }
 // Companion queries are binary requests answered by the companion alone; nothing goes over the radio.
@@ -277,12 +281,12 @@ async function open(reuse=null,quiet=false){if(busy||transport)return;busy=true;
     else{const initialized=await initializeCompanion(transport.protocol,transport.deviceInfo);transport.gatewayKey=initialized.gatewayKey;transport.selfInfo=initialized.selfInfo;contacts=initialized.contacts;renderContacts();routeNote=null;routeStale=false;watchRoute(transport.protocol);await readRadioTotals().catch(e=>add('transport','Companion radio totals unavailable: '+e.message));startRadioPoll();if(reuse?.targetKey&&contacts.some(c=>c.type===2&&fullKey(c.publicKey)===reuse.targetKey))$('target').value=reuse.targetKey;targetKey=$('target').value||null;auth=false;$('remote').hidden=false;
       // Reconnect logs back in to the same repeater with its saved password; without one the dialog asks.
       const back=reuse?.targetKey||null,saved=back?await credentials.read(back):null;
-      if(saved){settle('Reconnected to companion. Logging back in . . .');stepLine=connecting;busy=false;await relogin(back,saved);}
+      if(saved!==null){settle('Reconnected to companion. Logging back in . . .');stepLine=connecting;busy=false;await relogin(back,saved);}
       else{if(!quiet)showConnection();settle(reuse?'Reconnected to companion. Log in to continue.':quiet?'Connected to companion '+(transport.selfInfo?.name||'')+'. Use login <repeater>, or /? for companion commands.':'Connected to companion. Select a repeater and log in.');stepLine=connecting;if(targetKey)await offerSessions();else add('status','No repeater contacts available in this companion.');
       // The clicked transport button is now disabled, so focus would otherwise land nowhere; applied once controls re-enable.
       if(!quiet)focusAfter=targetKey?'password':'target';}}
   }catch(e){settle('Connection failed: '+e.message);await factory?.close();transport=null;targetKey=null;auth=false;}
-  finally{busy=false;update();if(focusAfter)$(focusAfter).focus();}}
+  finally{busy=false;update();if(focusAfter)$(focusAfter).focus();else if(auth)focusCommand();}}
 async function readContacts(){const c=transport.protocol,next=[];await c.rpc(4,()=>c.sendCommandGetContacts(),15000,x=>{if(next.length>=2048)throw Error('Contact limit exceeded');next.push(x);});contacts=next;renderContacts();}
 // The last repeater chosen is a per-viewer preference; the list opens on it when nothing else is selected.
 function lastRepeater(){try{return localStorage.getItem('console-last-repeater');}catch{return null;}}
@@ -300,8 +304,8 @@ async function relogin(key=lastLink?.targetKey||targetKey,saved=null){
  const name=contacts.find(c=>fullKey(c.publicKey)===key)?.advName||key.slice(0,12);
  try{await selectRepeater(key);}catch(e){add('status','Could not select '+name+' again: '+e.message);showConnection();return;}
  if(targetKey!==key){showConnection();return;}
- saved=saved||await credentials.read(key);
- if(saved)await login(saved);else askPassword(name);
+ saved=saved??await credentials.read(key);
+ if(saved!==null)await login(saved);else askPassword(name);
 }
 async function cleanupTemporary(){if(!temporaryTargets.created.size)return;if(!transport?.connected||transport.protocol?.closed){add('status','Temporary companion entries may remain; device disconnected before cleanup.');return;}try{await readContacts();await temporaryTargets.cleanup(transport.protocol,contacts,note=>add('status',note));}catch(e){add('status','Temporary entries may remain; cleanup unavailable: '+e.message);}}
 async function close(){stopRadioPoll();epoch++;abort?.abort();for(const cancel of [...transport?.protocol?.pending||[]])cancel();await cleanupTemporary();await factory?.close();transport=null;auth=false;blocked=false;region=false;busy=false;$('remote').hidden=true;history.reset();add('boundary','Disconnected.');await release();update();}
@@ -332,7 +336,8 @@ async function login(providedPassword=null){
 function clearChoices(){$('completion-choices').textContent='';$('completion-choices').hidden=true;}
 function clearTerminal(){records=[];display();$('command').focus();}
 async function submit(){clearChoices();tabState=null;
-  if(passwordPrompt){const password=$('command').value;endPasswordPrompt();if(password)await login(password);else add('status','Login cancelled.');return;}
+  // Enter alone sends a blank password: a repeater that already holds this companion's key as admin accepts it. Escape cancels.
+  if(passwordPrompt){const password=$('command').value;endPasswordPrompt();await login(password);return;}
   const raw=$('command').value;const help=companionCommand(raw)?null:helpRequest(raw,catalog);if(help!==null){add('command',raw,help.trim()&&!localCommand(help)?sensitive(raw,catalog):false);if(help.trim())add('local-help',helpText(help,catalog,mode));else add('help-overview',helpOverview());$('command').value='';tabState=null;return;}// A blank Enter echoes an empty prompt line, as a shell does; nothing is sent.
   if(!raw.trim()&&!region){add('command','');$('command').value='';resizePrompt();return;}
   const local=localCommand(raw);
@@ -395,6 +400,7 @@ $('reauthenticate').onclick=errorAction(()=>relogin());
 function selectTransport(value){if(transport||busy)return;$('mode').value=value;$('mode-usb').setAttribute?.('aria-pressed',String(value==='auto'));$('mode-bluetooth').setAttribute?.('aria-pressed',String(value==='ble'));}
 // Choosing a transport is the connect action; there is no separate Connect button.
 // Before connecting, Tab and Shift+Tab only alternate between the two transport choices.
+$('connection-dialog').addEventListener?.('close',()=>{if(transport?.connected&&!passwordPrompt)focusCommand();});
 $('connection-dialog').addEventListener?.('keydown',e=>{if(e.key!=='Tab'||transport||busy)return;e.preventDefault();$(document.activeElement?.id==='mode-usb'?'mode-bluetooth':'mode-usb').focus();});
 $('mode-usb').onclick=errorAction(()=>{selectTransport('auto');return open();});$('mode-bluetooth').onclick=errorAction(()=>{selectTransport('ble');return open();});
 $('connection-panel').onclick=showConnection;$('connection-close').onclick=closeConnection;
@@ -409,7 +415,41 @@ $('terminal-scroll').addEventListener?.('touchmove',e=>{if(!swipe||e.touches.len
 $('terminal-scroll').addEventListener?.('touchend',()=>{if(!swipe)return;const dy=swipe.last.y-swipe.y,pinch=Math.abs(swipe.last.spread-swipe.spread);swipe=null;
  // A pinch changes the finger spread; a swipe keeps it, so only steady two-finger moves recall.
  if(Math.abs(dy)>=30&&pinch<Math.abs(dy)*.5){recall(dy<0?-1:1);$('command').focus();}});
-$('command-form').addEventListener?.('touchend',e=>{if(!swipe)return;const t=e.changedTouches[0],dx=t.clientX-swipe.x,dy=t.clientY-swipe.y;swipe=null;if(Math.abs(dy)>=24&&Math.abs(dy)>Math.abs(dx)*1.5)recall(dy<0?-1:1);});$('manual-close').onclick=()=>{$('manual').hidden=true;};
+// One finger on the command line: a vertical swipe walks history too. It keeps its own start, separate from the terminal's two-finger swipe.
+let promptSwipe=null;
+$('command-form').addEventListener?.('touchstart',e=>{promptSwipe=e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY}:null;},{passive:true});
+$('command-form').addEventListener?.('touchend',e=>{if(!promptSwipe||e.touches.length)return;const t=e.changedTouches[0],dx=t.clientX-promptSwipe.x,dy=t.clientY-promptSwipe.y;promptSwipe=null;if(Math.abs(dy)>=24&&Math.abs(dy)>Math.abs(dx)*1.5)recall(dy<0?-1:1);});$('manual-close').onclick=()=>{$('manual').hidden=true;};
+// Phones have no Tab key: a two-finger double tap anywhere in the console completes like Tab.
+let tap=null,lastTap=0;
+document.addEventListener?.('touchstart',e=>{if(e.touches.length===2)tap={at:Date.now(),start:new Map([...e.touches].map(f=>[f.identifier,[f.clientX,f.clientY]])),still:true};else if(e.touches.length>2)tap=null;},{passive:true});
+document.addEventListener?.('touchmove',e=>{if(!tap)return;for(const f of e.changedTouches){const s=tap.start.get(f.identifier);if(s&&Math.hypot(f.clientX-s[0],f.clientY-s[1])>20)tap.still=false;}},{passive:true});
+document.addEventListener?.('touchend',e=>{if(!tap||e.touches.length)return;const ok=tap.still&&Date.now()-tap.at<300;tap=null;if(!ok)return;
+ const now=Date.now();if(now-lastTap<400){lastTap=0;const input=$('command');input.focus();escapeTab=false;input.onkeydown({key:'Tab',shiftKey:false,ctrlKey:false,preventDefault(){}});}else lastTap=now;},{passive:true});
+// Touch and hold a past command line for a small menu: run it again, or put it on the command line to edit.
+function commandAtPoint(x,y){
+ const caret=document.caretRangeFromPoint?.(x,y)||document.caretPositionFromPoint?.(x,y),node=caret?.startContainer||caret?.offsetNode,offset=caret?.startOffset??caret?.offset;
+ if(!node||!$('output').contains(node)||offset==null)return null;
+ let at=0;for(const r of records.filter(r=>!['transport','pending'].includes(r.kind))){const len=(commandPrefix(r)+r.safeText).length;if(offset<=at+len)return r.kind==='command'&&!r.redacted&&r.safeText.trim()?r.safeText:null;at+=len+1;}
+ return null;
+}
+function closeCommandMenu(){$('command-menu')?.remove();}
+function openCommandMenu(command,x,y){
+ closeCommandMenu();globalThis.getSelection?.()?.removeAllRanges();
+ const menu=document.createElement('div');menu.id='command-menu';menu.className='command-menu';menu.setAttribute('role','menu');
+ const item=(label,act)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.setAttribute('role','menuitem');b.onclick=()=>{closeCommandMenu();act();};return b;};
+ const title=document.createElement('div');title.className='command-menu-title';title.textContent=command;
+ menu.append(title,item('Run again',()=>{$('command').value=command;resizePrompt();submit().catch(e=>add('status',e.message));}),item('Edit',()=>{const input=$('command');input.value=command;input.focus();input.setSelectionRange(command.length,command.length);resizePrompt();}));
+ document.body.append(menu);const w=menu.offsetWidth,h=menu.offsetHeight;
+ menu.style.left=Math.max(8,Math.min(x,innerWidth-w-8))+'px';menu.style.top=Math.max(8,Math.min(y-h-12,innerHeight-h-8))+'px';
+}
+let hold=null;
+$('output').addEventListener?.('touchstart',e=>{clearTimeout(hold?.timer);if(e.touches.length!==1){hold=null;return;}const f=e.touches[0];hold={x:f.clientX,y:f.clientY,timer:setTimeout(()=>{const command=commandAtPoint(hold.x,hold.y);if(command){hold.fired=true;openCommandMenu(command,hold.x,hold.y);}},550)};},{passive:true});
+$('output').addEventListener?.('touchmove',e=>{if(hold&&Math.hypot(e.touches[0].clientX-hold.x,e.touches[0].clientY-hold.y)>10)clearTimeout(hold.timer);},{passive:true});
+$('output').addEventListener?.('touchend',e=>{if(!hold)return;clearTimeout(hold.timer);if(hold.fired)e.preventDefault();hold=null;});
+// A held command line opens this menu, not the browser's own; other lines keep native selection.
+$('output').addEventListener?.('contextmenu',e=>{if(commandAtPoint(e.clientX,e.clientY)&&(hold||e.pointerType==='touch'||$('command-menu')))e.preventDefault();});
+document.addEventListener?.('pointerdown',e=>{if($('command-menu')&&!$('command-menu').contains(e.target))closeCommandMenu();});
+$('terminal-scroll').addEventListener?.('scroll',closeCommandMenu,{passive:true});
 $('clear-terminal').onclick=clearTerminal;
 $('brand-back').onclick=e=>{if(history.length>1&&document.referrer.startsWith(location.origin)){e.preventDefault();history.back();}};
 $('fullscreen').onclick=()=>{const action=document.fullscreenElement?document.exitFullscreen?.():document.documentElement?.requestFullscreen?.();Promise.resolve(action).catch(()=>{$('assistance').textContent='Full screen is unavailable in this browser.';});};
@@ -440,6 +480,7 @@ $('command-form').onsubmit=e=>{e.preventDefault();submit().catch(e=>add('status'
 $('cancel').onclick=()=>{if(!busy){$('command').value='';return;}const command=!!abort;abort?.abort();for(const cancel of [...transport?.protocol?.pending||[]])cancel();if(mode==='direct'){blocked=true;add('status','Local wait cancelled; no firmware cancellation sent.');}else add('status',command?'Stopped waiting for the reply. You can send another command.':'Stopped waiting.');update();};
 $('command').onfocus=()=>escapeTab=false;$('command').oninput=()=>{tabState=null;clearChoices();resizePrompt();$('prompt-host').textContent=promptHost(contacts.find(c=>fullKey(c.publicKey)===targetKey));};
 $('command').onkeydown=e=>{if(e.isComposing)return;const input=$('command'),text=input.value,cursor=input.selectionStart;
+  if(e.key==='Escape'&&$('command-menu')){closeCommandMenu();return;}
   if(e.key==='Escape'&&passwordPrompt){e.preventDefault();endPasswordPrompt();add('status','Login cancelled.');return;}
   if(e.key==='Escape'){escapeTab=true;tabState=null;clearChoices();$('assistance').textContent='Tab will leave the editor.';return;}
   if(e.ctrlKey&&e.key.toLowerCase()==='l'){e.preventDefault();$('clear-terminal').click();return;}

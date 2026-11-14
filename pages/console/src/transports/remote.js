@@ -35,7 +35,8 @@ export class RemoteProbe {
   }
   async login(key,password){
     const bytes=new TextEncoder().encode(password);
-    if(!bytes.length||bytes.length>15||/[\0\r\n]/.test(password))throw Error('Admin password must be 1–15 UTF-8 bytes without line breaks');
+    // Blank is valid: upstream logs in a sender whose key is already in the admin list.
+    if(bytes.length>15||/[\0\r\n]/.test(password))throw Error('Admin password must be 0–15 UTF-8 bytes without line breaks');
     const c=this.c;keyBytes(key);
     return new Promise((resolve,reject)=>{
       // One listener spans every attempt, so a late reply to an earlier attempt still completes the login.

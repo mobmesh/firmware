@@ -2,8 +2,12 @@ const MONTHS=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov',
 // A `ver` reply: "v1.18.0 (15 Oct 2026) + MobMesh (21 Oct 2026 - 75a1ec6)", or "+ ota" from older builds; only MobMesh ESP32 builds add that part, bench builds omit its hash.
 export function parseBuild(text){
   const version=/v?(\d+\.\d+\.\d+)/.exec(text||'');if(!version)return null;
-  const ota=/\+ (?:ota|MobMesh) \((\d{1,2}) (\w{3}) (\d{4})(?: - ([0-9a-f]{7,40}))?\)/.exec(text),month=ota?MONTHS.indexOf(ota[2].toLowerCase()):-1;
-  return {upstream:version[1],ota:!!ota,sha:ota?.[4]||null,date:month<0?null:`${ota[3]}-${String(month+1).padStart(2,'0')}-${ota[1].padStart(2,'0')}`};
+  // Any "+ MobMesh (...)" is a MobMesh build: release tags carry a hex commit, local and bench builds may carry another tag or an ISO date.
+  const tag=/\+ (?:ota|MobMesh) \(([^)]*)\)/.exec(text||'');if(!tag)return {upstream:version[1],ota:false,sha:null,date:null};
+  const long=/(\d{1,2}) (\w{3}) (\d{4})/.exec(tag[1]),iso=/(\d{4})-(\d{2})-(\d{2})/.exec(tag[1]),month=long?MONTHS.indexOf(long[2].toLowerCase()):-1;
+  const date=long&&month>=0?`${long[3]}-${String(month+1).padStart(2,'0')}-${long[1].padStart(2,'0')}`:iso?`${iso[1]}-${iso[2]}-${iso[3]}`:null;
+  const sha=/ - ([0-9a-f]{7,40})$/.exec(tag[1])?.[1]||null;
+  return {upstream:version[1],ota:true,sha,date};
 }
 const older=(a,b)=>{const x=a.split('.').map(Number),y=b.split('.').map(Number);for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]<y[i];return false;};
 export class Catalog {
