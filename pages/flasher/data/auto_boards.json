@@ -35,7 +35,8 @@
         "firmwareFile": "bin/repeater/heltec_v4.bin",
         "postFlashCommands": [
           "set ota.fw.url https://tools.mobmesh.org/flasher/bin/repeater/heltec_v4.bin",
-          "set tx 20"
+          "set tx 20",
+          "set radio.fem.rxgain off"
         ]
       },
       "room_server": {
@@ -525,10 +526,10 @@
     "postFlashNote": "The board restarts on its own once flashing finishes.",
     "stockDevice": "Seeed Studio SenseCAP Solar Node P1",
     "qemu": {
-      "enabled": false,
-      "machine": null,
-      "binary": null,
-      "mcu": null,
+      "enabled": true,
+      "machine": "nrf52840-mobmesh,app-base=0x27000,radio-cs=4,radio-dio1=3,radio-busy=29",
+      "binary": "qemu-system-arm",
+      "mcu": "nrf52840",
       "mem": "",
       "globals": {}
     },
@@ -548,10 +549,10 @@
     "postFlashNote": "The board restarts on its own once flashing finishes.",
     "stockDevice": "Seeed Studio Xiao nRF52 WIO",
     "qemu": {
-      "enabled": false,
-      "machine": null,
-      "binary": null,
-      "mcu": null,
+      "enabled": true,
+      "machine": "nrf52840-mobmesh,app-base=0x27000,radio-cs=4,radio-dio1=3,radio-busy=29",
+      "binary": "qemu-system-arm",
+      "mcu": "nrf52840",
       "mem": "",
       "globals": {}
     },
