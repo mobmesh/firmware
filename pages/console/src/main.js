@@ -90,9 +90,9 @@ function currentTheme(){return document.documentElement.dataset?.theme||'default
 // The mesh background is a per-viewer preference; it is on unless turned off.
 const meshBackground=startMeshBackground($('mesh-canvas'));
 function setBackground(on){on?meshBackground?.start():meshBackground?.stop();}
-// Phones (touch and narrow) start with the animated background off, sparing battery; a saved choice wins either way.
+// Phones (touch and narrow) never run the animated background, sparing battery; a saved choice applies on desktop only.
 const phone=!!globalThis.matchMedia?.('(pointer: coarse)').matches&&narrowScreen.matches;
-let backgroundOn=!phone;try{const saved=localStorage.getItem('console-background');if(saved==='on'||saved==='off')backgroundOn=saved==='on';}catch{}
+let backgroundOn=!phone;if(!phone)try{const saved=localStorage.getItem('console-background');if(saved==='on'||saved==='off')backgroundOn=saved==='on';}catch{}
 setBackground(backgroundOn);
 try{const saved=localStorage.getItem('console-theme');if(THEMES.includes(saved))applyTheme(saved);}catch{}
 // F1 shows the owner's manual command reference from the copy kept beside the page.
@@ -344,7 +344,7 @@ async function submit(){clearChoices();tabState=null;
   if(local){
     if(!local.valid){add('status','Usage: '+(local.name==='connect'?'connect [usb|bluetooth] ["contact name"|public_key]':local.name));return;}
     $('command').value='';resizePrompt();history.add(raw.trim());
-    if(local.name==='background'){if(local.background){backgroundOn=local.background==='on';setBackground(backgroundOn);try{localStorage.setItem('console-background',local.background);}catch{}}add('status','Background: '+(backgroundOn?'on':'off'));return;}
+    if(local.name==='background'){if(phone){add('status','Background: off (always off on phones)');return;}if(local.background){backgroundOn=local.background==='on';setBackground(backgroundOn);try{localStorage.setItem('console-background',local.background);}catch{}}add('status','Background: '+(backgroundOn?'on':'off'));return;}
     if(local.name==='theme'){if(local.theme){applyTheme(local.theme);try{localStorage.setItem('console-theme',local.theme);}catch{}}add('status','Theme: '+currentTheme()+' · available: '+THEMES.join(', '));return;}
     if(local.name==='clear')clearTerminal();
     else if(local.name==='exit')await close();
