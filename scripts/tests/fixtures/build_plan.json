@@ -684,7 +684,7 @@
       "build_env": "RAK_4631_repeater",
       "upstream_tag_prefix": "repeater",
       "release_title": "Repeater",
-      "asset_basename": "rak4631_rep_mobmesh_beta",
+      "asset_basename": "rak4631_rep_mobmesh",
       "vendor_flasher_assets": true,
       "make_latest": true,
       "mods": [

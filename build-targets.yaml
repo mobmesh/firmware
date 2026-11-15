@@ -169,7 +169,6 @@ targets:
     role: repeater
     build_env: RAK_4631_repeater
     vendor_flasher_assets: true
-    beta: true
     mods: [timing-safety, try-settings, sync-settings, flood-gate, diag-report, direct-retry]
 
   - board: rak3401

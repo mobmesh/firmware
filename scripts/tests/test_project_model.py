@@ -73,7 +73,7 @@ class CurrentProjectModelTestCase(unittest.TestCase):
                          ("shim", "core", "timing-safety", "try-settings", "sync-settings", "flood-gate", "diag-report",
                           "direct-retry"))
         self.assertTrue(rows[("heltec_t1", "repeater")].qemu_boot_check)
-        self.assertEqual(rows[("rak4631", "repeater")].asset_basename, "rak4631_rep_mobmesh_beta")
+        self.assertEqual(rows[("rak4631", "repeater")].asset_basename, "rak4631_rep_mobmesh")
         self.assertEqual(rows[("rak4631", "repeater")].ota_board_id, 11)
         self.assertEqual(rows[("rak4631", "repeater")].mods, rows[("heltec_t1", "repeater")].mods)
         self.assertEqual(rows[("rak3401", "repeater")].asset_basename, "rak3401_rep_mobmesh_beta")
