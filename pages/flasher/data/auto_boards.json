@@ -513,7 +513,7 @@
     "variants": {
       "repeater": {
         "label": "Repeater",
-        "assetBasename": "rak4631_rep_mobmesh_beta",
+        "assetBasename": "rak4631_rep_mobmesh",
         "version": "v1.18.0",
         "firmwareFile": "bin/repeater/rak4631.zip"
       }
