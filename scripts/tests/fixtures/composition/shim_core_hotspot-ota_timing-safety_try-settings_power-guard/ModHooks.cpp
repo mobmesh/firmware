@@ -13,6 +13,7 @@ bool modRadioInit(const char* build_id) {
 }
 
 void modLoop() {
+  coreLoop();
   hotspotOtaLoop();
   trySetLoop();
   powerGuardLoop();
@@ -46,7 +47,10 @@ bool modDirectEvent(ModDirectEvent event, const mesh::Packet* packet, uint32_t d
   return false;
 }
 
-void modObserveRecv(const mesh::Packet*, bool, const uint8_t*) {}
+void modObserveRecv(const mesh::Packet* packet, bool accepted,
+                    const uint8_t scope_key[16]) {
+  coreRecv(packet, accepted, scope_key);
+}
 
 void modObserveTx(uint32_t, bool) {}
 
@@ -80,6 +84,12 @@ bool     modRadioRssiNow(float* out) {
   *out = radio_driver.getCurrentRSSI();
   return true;
 }
+void     modBeforeAgcReset() {
+}
+void     modRadioCounters(uint32_t* recv, uint32_t* errors) {
+  *recv = radio_driver.getPacketsRecv();
+  *errors = radio_driver.getPacketsRecvErrors();
+}
 
 #if defined(USE_SX1262) || defined(USE_SX1268)
 extern RADIO_CLASS radio;
@@ -107,12 +117,18 @@ void  modRadioScanLeave(float freq, float bw, uint8_t sf, uint8_t cr) {
   radio_driver.setParams(freq, bw, sf, cr);
   radio_driver.resetAGC();
 }
+bool  modRadioGuardRead(uint8_t* guard, uint8_t state[2]) {
+  return radio.readRegister(0x08B5, guard, 1) == RADIOLIB_ERR_NONE && radio.readRegister(0x08BF, state, 2) == RADIOLIB_ERR_NONE;
+}
+uint16_t modRadioIrqPeek()               { return (uint16_t)radio.getIrqFlags(); }
 #else
 bool  modRadioScanAvailable()          { return false; }
 void  modRadioScanEnter(float)         { }
 void  modRadioScanCalibrate(float)     { }
 float modRadioScanRead(float)          { return 0; }
 void  modRadioScanLeave(float, float, uint8_t, uint8_t) { }
+bool  modRadioGuardRead(uint8_t*, uint8_t*) { return false; }
+uint16_t modRadioIrqPeek()               { return 0; }
 #endif
 void     modClockSet(uint32_t epoch)       { rtc_clock.setCurrentTime(epoch); }
 

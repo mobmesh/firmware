@@ -600,3 +600,23 @@ index 04199e24..4cfc57bb 100644
      return builder.encodeTo(app_data);
    }
  }
+diff --git a/src/helpers/radiolib/RadioLibWrappers.cpp b/src/helpers/radiolib/RadioLibWrappers.cpp
+index e4d2ba1c..a7190aeb 100644
+--- a/src/helpers/radiolib/RadioLibWrappers.cpp
++++ b/src/helpers/radiolib/RadioLibWrappers.cpp
+@@ -1,6 +1,7 @@
+ 
+ #define RADIOLIB_STATIC_ONLY 1
+ #include "RadioLibWrappers.h"
++#include <helpers/ModHooks.h>
+ 
+ #define STATE_IDLE       0
+ #define STATE_RX         1
+@@ -75,6 +76,7 @@ void RadioLibWrapper::resetAGC() {
+   // make sure we're not mid-receive of packet!
+   if ((state & STATE_INT_READY) != 0 || isReceivingPacket()) return;
+ 
++  modBeforeAgcReset();
+   doResetAGC();
+   state = STATE_IDLE;   // trigger a startReceive()
+ 

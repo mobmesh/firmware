@@ -16,6 +16,8 @@ Commands answered by `core` on every MobMesh build, over serial and authenticate
 | [`stats-packets`](#stats-packets) | Read packet counters |
 | [`ping`](#ping) | Is a repeater reachable: time, hops and the weakest link SNR, named by its hop |
 | [`trace`](#trace) | The same probe with each link's SNR both ways |
+| [`get tz`](#tz) | Local time offset used in reports |
+| [`set tz <offset>`](#tz) | Set the local time offset |
 
 ## ver
 
@@ -130,4 +132,23 @@ Trace to 4ea1 over 2 hops, 1334ms:
 ```
 
 A long trace that needs two replies ends the second with `Summary: time=<ms>ms hops=<n> weakest(<hash>)=<dB>`. No reply: `Trace to 4ea1 over 2 hops: no reply in 7s`.
+
+## tz
+
+```text
+get tz
+set tz <offset>
+get diag.tz
+set diag.tz <offset>
+```
+
+| Parameter | Definition |
+| --- | --- |
+| `offset` | Whole hours from UTC, -12 to +14, with or without `h` (`-5h`, `-5`, `+9`) |
+
+**Response:** `> <hours>` for `get`; `OK` or `Error, must be from -12 to +14` for `set`; `ERR: could not save` when the file cannot be written.
+
+**Storage:** persistent, in core's own file, stored as upstream's companion stores `tz_offset` (whole hours). A fixed offset with no daylight-saving rules: update it when the clocks change. `diag.tz` is the same setting under the name diag-report used; a node upgraded from diag-report keeps the offset it had there.
+
+**Effect:** reports print local times when the offset is not 0, and UTC times when it is 0.
 

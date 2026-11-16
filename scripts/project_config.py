@@ -52,6 +52,7 @@ class IntegrationPhase(str, Enum):
     WANTS_POWER_SAVING = "wants_power_saving"
     LOAD_ALLOWED = "load_allowed"
     BEFORE_DEEP_SLEEP = "before_deep_sleep"
+    AGC_RESET = "agc_reset"
     CLI = "cli"
 
 

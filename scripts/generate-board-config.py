@@ -275,10 +275,13 @@ def render_mod_hooks(integrations: list) -> str:
              for item in integrations if "load_allowed" in item["hooks"]]
     sleeps = [item["hooks"]["before_deep_sleep"]["symbol"]
               for item in integrations if "before_deep_sleep" in item["hooks"]]
+    agc_resets = [item["hooks"]["agc_reset"]["symbol"]
+                  for item in integrations if "agc_reset" in item["hooks"]]
 
     before_calls = "\n".join(f"  {symbol}();" for symbol in before)
     loop_calls = "\n".join(f"  {symbol}();" for symbol in loops)
     sleep_calls = "".join(f"  {symbol}();\n" for symbol in sleeps)
+    agc_reset_calls = "".join(f"  {symbol}();\n" for symbol in agc_resets)
     radio_call = f"{radio[0]}(build_id)" if radio else "modBoardRadioInit()"
     route_call = f"{routes[0]}(packet, base, out)" if routes else "false"
     allow_forward_expr = " && ".join(f"{symbol}(packet, scope_known)" for symbol in allow_forwards) or "true"
@@ -377,6 +380,12 @@ bool     modRadioRssiNow(float* out) {{
   *out = radio_driver.getCurrentRSSI();
   return true;
 }}
+void     modBeforeAgcReset() {{
+{agc_reset_calls}}}
+void     modRadioCounters(uint32_t* recv, uint32_t* errors) {{
+  *recv = radio_driver.getPacketsRecv();
+  *errors = radio_driver.getPacketsRecvErrors();
+}}
 
 #if defined(USE_SX1262) || defined(USE_SX1268)
 extern RADIO_CLASS radio;
@@ -404,12 +413,18 @@ void  modRadioScanLeave(float freq, float bw, uint8_t sf, uint8_t cr) {{
   radio_driver.setParams(freq, bw, sf, cr);
   radio_driver.resetAGC();
 }}
+bool  modRadioGuardRead(uint8_t* guard, uint8_t state[2]) {{
+  return radio.readRegister(0x08B5, guard, 1) == RADIOLIB_ERR_NONE && radio.readRegister(0x08BF, state, 2) == RADIOLIB_ERR_NONE;
+}}
+uint16_t modRadioIrqPeek()               {{ return (uint16_t)radio.getIrqFlags(); }}
 #else
 bool  modRadioScanAvailable()          {{ return false; }}
 void  modRadioScanEnter(float)         {{ }}
 void  modRadioScanCalibrate(float)     {{ }}
 float modRadioScanRead(float)          {{ return 0; }}
 void  modRadioScanLeave(float, float, uint8_t, uint8_t) {{ }}
+bool  modRadioGuardRead(uint8_t*, uint8_t*) {{ return false; }}
+uint16_t modRadioIrqPeek()               {{ return 0; }}
 #endif
 void     modClockSet(uint32_t epoch)       {{ rtc_clock.setCurrentTime(epoch); }}
 

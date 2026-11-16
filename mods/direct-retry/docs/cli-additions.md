@@ -13,6 +13,7 @@ Commands added by `direct-retry`, available over serial and authenticated remote
 | [`get direct.retry`](#directretry) | Whether resends are on |
 | [`set direct.retry <on\|off>`](#directretry) | Turn the mod on or off |
 | [`get direct.retry.stats`](#directretrystats) | Counters since boot |
+| [`get direct.retry.hops`](#directretryhops) | Resends per next hop since boot |
 
 ## direct.retry
 
@@ -31,7 +32,7 @@ set direct.retry <on|off>
 get direct.retry.stats
 ```
 
-**Response:** `> resent=<n> echo=<n> reply=<n> exhausted=<n> replied=<n> noslot=<n> stale=<n>`
+**Response:** `> resent=<n> echo=<n> reply=<n> exhausted=<n> replied=<n> noslot=<n> stale=<n> retried=<n> won=<n>`
 
 | Field | Meaning |
 | --- | --- |
@@ -42,5 +43,17 @@ get direct.retry.stats
 | `replied` | Hop replies sent |
 | `noslot` | Packets not protected because every slot was in use |
 | `stale` | Packets given up on because they sat queued for 10 s without being sent |
+| `retried` | Packets that needed at least one resend |
+| `won` | Of those, packets then confirmed by an echo or a hop reply |
+
+## direct.retry.hops
+
+```text
+get direct.retry.hops
+```
+
+**Response:** `> <hop>:<retried>/<won> ...`, one entry per next hop with at least one resend, up to 8 hops; `> none` before any resend. `<hop>` is the next hop's path hash at the mesh's width (`a6b2`, or `a6` on 1-byte meshes).
+
+**Effect:** none; read only. A packet's next hop is the first hash left in its path; packets on their last hop are not attributed. With all 8 entries in use, a new hop replaces the one with the fewest resends.
 
 [↩ Back to direct-retry readme](../README.md)

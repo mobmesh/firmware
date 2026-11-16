@@ -88,6 +88,9 @@ void     modBoardDeepSleep(uint32_t secs);     // does not return
 void     modBoardInhibitSleep(bool inhibit);
 uint32_t modClockGet();
 bool     modRadioRssiNow(float* out);          // instantaneous RSSI; false while a packet is being received
+void     modBeforeAgcReset();                  // called by the radio wrapper just before each AGC reset
+void     modRadioCounters(uint32_t* recv, uint32_t* errors);   // packets decoded and failed decodes since boot
+uint32_t modAirtimeTotalSecs();                // transmit plus receive airtime since boot
 
 // Raw RSSI sweeps, SX126x only; elsewhere available() is false and the rest do nothing.
 bool  modRadioScanAvailable();
@@ -95,6 +98,9 @@ void  modRadioScanEnter(float bw_khz);
 void  modRadioScanCalibrate(float mhz);
 float modRadioScanRead(float mhz);            // settles 5 ms, averages 16 instantaneous reads
 void  modRadioScanLeave(float freq, float bw, uint8_t sf, uint8_t cr);   // back on the given channel
+// SX126x AGC lock-up guard: register 0x08B5 (bit 0 = protection on) and the two bytes at 0x08BF (08 12 = receiver locked); false elsewhere.
+bool  modRadioGuardRead(uint8_t* guard, uint8_t state[2]);
+uint16_t modRadioIrqPeek();                // SX126x IRQ flags, read without clearing; 0 on other radios
 void     modClockSet(uint32_t epoch);
 
 // Straight into upstream's CLI chain, bypassing mod dispatch, so validation stays in

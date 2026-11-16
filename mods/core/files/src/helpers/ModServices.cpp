@@ -106,6 +106,11 @@ bool modDirectReply(const uint8_t* data, size_t len, uint32_t delay_millis) {
   return true;
 }
 
+uint32_t modAirtimeTotalSecs() {
+  if (bound.mesh == nullptr) return 0;
+  return (uint32_t)((bound.mesh->getTotalAirTime() + bound.mesh->getReceiveAirTime()) / 1000);
+}
+
 bool modPublisherKey(uint8_t out[32]) {
   if (out == nullptr || bound.mesh == nullptr) return false;
   memcpy(out, bound.mesh->self_id.pub_key, 32);

@@ -13,6 +13,7 @@ static bool isStatsCommand(const char* command) {
 
 bool coreHandleCli(const ModCliContext& context, char* command, char* reply) {
   if (coreProbeCli(context, command, reply)) return true;
+  if (coreTzCli(command, reply)) return true;
   // Upstream serial-gates the stats commands; re-dispatching with timestamp 0 clears that gate. Safe remotely: the mesh CLI is authenticated and the replies are read-only.
   if (context.sender_timestamp != 0 && isStatsCommand(command)) {
     modCliDispatch(0, command, reply);

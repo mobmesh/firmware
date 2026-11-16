@@ -30,6 +30,16 @@ static mesh::Packet copies[DR_SLOTS];
 static uint8_t active;
 static uint8_t self_byte;
 static uint32_t count_resent, count_echo, count_reply, count_exhausted, count_replied, count_noslot, count_stale;
+static uint32_t count_retried, count_won;   // packets that needed a resend, and those then confirmed
+static DrHop hops[DR_HOPS];
+
+// Credits the next hop of each slot in the mask with a win.
+static void creditWins(uint8_t mask) {
+  count_won += __builtin_popcount(mask);
+  for (int i = 0; i < DR_SLOTS; i++) {
+    if ((mask & (1 << i)) && slots[i].hop != DR_NO_HOP && hops[slots[i].hop].won < 0xFFFF) hops[slots[i].hop].won++;
+  }
+}
 
 static void boot() {
   booted = true;
@@ -95,6 +105,9 @@ static void track(const mesh::Packet* packet, uint32_t delay_millis, bool ack_co
   s.sent = 0;
   s.limit = pc == 0 ? DR_LAST_RESENDS : DR_RESENDS;
   s.due = millis() + delay_millis + DR_QUEUE_MS;
+  // The next hop is the first hash left in the path; the last hop's destination is not named by a path hash.
+  uint8_t size = copy.getPathHashSize();
+  s.hop = pc > 0 && size > 0 ? (uint8_t)drHopIndex(hops, copy.path, size < 2 ? size : 2) : DR_NO_HOP;
   copies[slot] = copy;
   recount();
 }
@@ -124,7 +137,9 @@ static bool received(const mesh::Packet* packet) {
   uint8_t type = packet->getPayloadType(), pc = packet->getPathHashCount();
   if (type == PAYLOAD_TYPE_CONTROL && packet->payload_len == HOP_REPLY_LEN && packet->payload[0] == HOP_REPLY) {
     if (pc == 0) {
-      count_reply += drClearReply(slots, &packet->payload[1]);
+      uint8_t won = 0;
+      count_reply += drClearReply(slots, &packet->payload[1], &won);
+      creditWins(won);
       recount();
     }
     return true;
@@ -132,9 +147,11 @@ static bool received(const mesh::Packet* packet) {
   if (active > 0) {
     uint8_t key[DR_KEY_LEN];
     keyOf(packet, key);
-    int cleared = drClearEcho(slots, key, pc);
+    uint8_t won = 0;
+    int cleared = drClearEcho(slots, key, pc, &won);
     if (cleared > 0) {
       count_echo += cleared;
+      creditWins(won);
       recount();
     }
   }
@@ -196,6 +213,10 @@ void directRetryLoop() {
       s.due = now + 100;
       continue;
     }
+    if (s.sent == 0) {
+      count_retried++;
+      if (s.hop != DR_NO_HOP && hops[s.hop].retried < 0xFFFF) hops[s.hop].retried++;
+    }
     s.sent++;
     count_resent++;
     s.queued = true;
@@ -209,9 +230,20 @@ bool directRetryHandleCli(const ModCliContext& context, char* command, char* rep
     sprintf(reply, "> %s", enabled ? "on" : "off");
     return true;
   }
+  if (strcmp(command, "get direct.retry.hops") == 0) {
+    int used = snprintf(reply, REPLY_MAX, ">");
+    for (int i = 0; i < DR_HOPS && used < REPLY_MAX - 20; i++) {
+      const DrHop& h = hops[i];
+      if (h.len == 0 || h.retried == 0) continue;
+      used += h.len == 2 ? snprintf(reply + used, REPLY_MAX - used, " %02x%02x:%u/%u", h.id[0], h.id[1], h.retried, h.won)
+                         : snprintf(reply + used, REPLY_MAX - used, " %02x:%u/%u", h.id[0], h.retried, h.won);
+    }
+    if (used == 1) snprintf(reply, REPLY_MAX, "> none");
+    return true;
+  }
   if (strcmp(command, "get direct.retry.stats") == 0) {
-    snprintf(reply, REPLY_MAX, "> resent=%lu echo=%lu reply=%lu exhausted=%lu replied=%lu noslot=%lu stale=%lu", (unsigned long)count_resent, (unsigned long)count_echo, (unsigned long)count_reply,
-            (unsigned long)count_exhausted, (unsigned long)count_replied, (unsigned long)count_noslot, (unsigned long)count_stale);
+    snprintf(reply, REPLY_MAX, "> resent=%lu echo=%lu reply=%lu exhausted=%lu replied=%lu noslot=%lu stale=%lu retried=%lu won=%lu", (unsigned long)count_resent, (unsigned long)count_echo, (unsigned long)count_reply,
+            (unsigned long)count_exhausted, (unsigned long)count_replied, (unsigned long)count_noslot, (unsigned long)count_stale, (unsigned long)count_retried, (unsigned long)count_won);
     return true;
   }
   if (strncmp(command, "set direct.retry ", 17) != 0) return false;

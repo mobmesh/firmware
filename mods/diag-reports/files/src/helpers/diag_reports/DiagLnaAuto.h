@@ -1,0 +1,121 @@
+#pragma once
+
+#include <stddef.h>
+#include <stdint.h>
+
+// LNA auto: the LNA's state per 2-hour local block, learned from paired ping tests. Pure; the integration runs the tests.
+
+#define AUTO_BLOCKS        12
+#define AUTO_LEARN_DAYS    7
+#define AUTO_LEARN_EVERY_S 600         // a test every 10 minutes while learning
+#define AUTO_DAILY_CAP     150         // tests a day (two pings each)
+#define AUTO_MIN_DECIDED   8           // decided tests before a block may leave the default
+#define AUTO_RETIRE_TESTS  30
+#define AUTO_RETIRE_PCT    3
+#define AUTO_RECHECK_DAYS  90
+#define AUTO_FEW_NB_DAYS   14
+#define AUTO_DEAD_DB       10
+#define AUTO_BUSY_PCT      25          // no test when the last hour's load is over this
+#define AUTO_JUMP_DB       6           // a floor shift this far off the usual means noise changed mid-test
+#define AUTO_AUDIT_HOURS   6           // hours in each state before the audit compares them
+#define AUTO_BAN_DAYS      7           // a state the audit or the overload verdict caught stays banned this long
+#define AUTO_REFRESH_DAYS  14          // a block away from its default runs the default one day in this many
+
+enum AutoReason : uint8_t {
+  AUTO_R_NONE,
+  AUTO_R_DECODES,                      // more failed decodes in that state
+  AUTO_R_PACKETS,                      // fewer packets decoded
+  AUTO_R_NEIGHBOURS,                   // fewer neighbours heard
+  AUTO_R_FREEZES,                      // more receiver freezes
+  AUTO_R_OVERLOAD,                     // floor raised beyond the LNA's usual shift, or the engine's overload verdict
+};
+
+// One state's record in one block, from closed hours: halved when it grows, so it follows recent weeks.
+struct AutoStats {
+  uint8_t hours, floor_hours;
+  uint8_t freezes, pad;
+  uint16_t recv, errors;
+  uint16_t heard;                      // neighbours heard, summed over the hours
+  int16_t floor_sum;                   // dBm, summed over floor_hours
+};
+
+enum AutoPark : uint8_t {
+  AUTO_ACTIVE,
+  AUTO_PARK_NO_BENEFIT,
+  AUTO_PARK_DEAD,
+  AUTO_PARK_FEW_NB,
+};
+
+struct AutoBlock {
+  uint16_t on_w, off_w;                // wins for each state, tenths, faded daily
+  uint8_t ties;
+  uint8_t veto_off;                    // days left on a lost-neighbour veto against off
+  uint8_t retired;
+  uint8_t losses;                      // tests in a row lost by the applied state this block
+  uint8_t reverted;                    // reverted to the default for the rest of today's block
+  uint8_t restart;                     // back to the fast test rate after a contradiction
+  uint8_t ban_days;                    // days left on a ban of one state
+  uint8_t ban_on;                      // the banned state: 1 on, 0 off
+  uint8_t ban_reason;                  // AutoReason
+  uint8_t refresh_days;                // days since the block last ran its default
+  uint8_t refresh;                     // running the default today to refresh its record
+  uint8_t pad[3];
+  AutoStats st[2];                     // index 0 = LNA off, 1 = on
+};
+
+struct LnaAutoState {
+  uint8_t enabled;
+  uint8_t default_on;                  // the saved setting auto falls back to
+  uint8_t park;                        // AutoPark
+  uint8_t pad;
+  uint32_t start_day;                  // local day auto was turned on (or re-entered learning)
+  uint32_t park_day;
+  uint32_t last_test;                  // epoch of the last test
+  uint32_t test_day;
+  uint16_t tests_today;
+  uint16_t few_nb_days;                // consecutive days with fewer than 2 pingable neighbours
+  int32_t floor_shift_sum;             // on minus off idle floor, summed over tests
+  uint16_t floor_n;
+  uint16_t gain_tests;                 // paired tests where the applied choice differed from the default
+  int16_t gain_replies;                // replies won minus lost by auto against the fixed default
+  uint16_t tests_total, faded, silent; // all tests, discarded for fading, neither ping answered
+  uint16_t noisy, busy;                // tests discarded for a floor jump, skipped for a busy channel
+  AutoBlock b[AUTO_BLOCKS];
+};
+
+// One paired test: the neighbour pinged in each LNA state.
+struct AutoTest {
+  bool reply[2];                       // index 0 = LNA off, 1 = on
+  float back_db[2];                    // SNR of the reply at this node: the LNA affects it
+  float out_db[2];                     // SNR of our ping at the neighbour: the LNA does not, so a mismatch means fading
+  int8_t floor_dbm[2];                 // idle floor just before each ping
+};
+
+void autoInit(LnaAutoState& a, bool default_on, uint32_t day);
+uint8_t autoBlockOf(uint8_t local_hour);
+// The state the block runs in: the default until a significant score says otherwise; parked or unset clock run the default.
+bool autoApplied(const LnaAutoState& a, uint8_t block);
+bool autoLearning(const LnaAutoState& a, uint32_t day, uint8_t block);
+// Whether a test is due now for the block; respects the daily cap and the rate for the block.
+bool autoTestDue(const LnaAutoState& a, uint32_t epoch, uint32_t day, uint8_t block);
+// Scores a finished test; returns false when it was discarded (fading, or neither ping answered).
+bool autoAddTest(LnaAutoState& a, uint8_t block, const AutoTest& t, uint32_t epoch, uint32_t day);
+// A freeze in a block while the LNA was on counts against on there.
+void autoAddFreeze(LnaAutoState& a, uint8_t block);
+// A closed hour of the block in one LNA state; floor STORE_NO_FLOOR (-128) when unknown.
+void autoAddHour(LnaAutoState& a, uint8_t block, bool lna_on, uint32_t recv, uint32_t errors, uint8_t freezes, uint8_t heard, int8_t floor_dbm);
+// Compares the state the block runs against the other on every observation; bans the running state when it is clearly worse.
+uint8_t autoAudit(LnaAutoState& a, uint8_t block);
+// Bans one state in the blocks of a local-hour mask (bit per hour), for the overload verdict and the like.
+void autoBan(LnaAutoState& a, uint32_t local_hours, bool ban_on, uint8_t reason);
+// Whether a test may run now: not over a busy channel.
+bool autoChannelOk(LnaAutoState& a, uint8_t load_pct);
+const char* autoReasonText(uint8_t reason);
+// The first ban in force: "on 06-08 banned 7d: decodes worse"; false when none.
+bool autoBanText(const LnaAutoState& a, char* out, size_t len);
+// Once a day: fade the scores, retire settled blocks, check the park triggers and the 90-day recheck.
+void autoDayTurn(LnaAutoState& a, uint32_t day, uint8_t pingable_neighbours);
+// "auto (on, off 12-18)", "auto (learning, on)", "auto (parked: LNA not working)".
+void autoStatusText(const LnaAutoState& a, int8_t tz_hours, char* out, size_t len);
+// One character per block, midnight first: + on, - off, . default (undecided), x retired.
+void autoBlockRow(const LnaAutoState& a, char out[AUTO_BLOCKS + 1]);

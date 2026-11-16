@@ -8,7 +8,13 @@ bool coreHandleCli(const ModCliContext& context, char* command, char* reply);
 // ping and trace: CLI, plus the loop and receive hooks that time out and match the one TRACE in flight.
 bool coreProbeCli(const ModCliContext& context, char* command, char* reply);
 void coreLoop();
+struct ProbeResult;
+const ProbeResult* coreProbeLast(uint32_t* age_ms);
+bool coreProbeQuiet(const char* target, char* reply);
 void coreRecv(const mesh::Packet* packet, bool accepted, const uint8_t scope_key[16]);
+
+// get/set tz and its diag.tz alias.
+bool coreTzCli(char* command, char* reply);
 
 const ModBindings* modBindings();
 uint32_t modCliStamp(uint32_t sender_timestamp);

@@ -6,19 +6,19 @@
 #include <helpers/CommonCLI.h>
 #include <helpers/TxtDataHelpers.h>
 #include <helpers/CoreIntegration.h>
+#include <helpers/ModLateReply.h>
 #include <helpers/ModProbe.h>
 
 // One TRACE in flight: sent from the CLI, matched in the receive observer, timed out in the loop. Results go to serial at once, or to the admin who asked as a late CLI reply.
 
 #define PROBE_TIMEOUT_BASE_MS  2000UL
 #define PROBE_TIMEOUT_LEG_MS   250UL   // queue and turnaround margin per transmission
-#define PROBE_ROW_SPACING_MS   1500UL
-#define PROBE_REPLY_DELAY_MS   600UL   // upstream's CLI_REPLY_DELAY_MILLIS
 
 struct ProbePending {
   bool active;
   bool trace;
   bool remote;
+  bool quiet;                          // started by another mod, which reads the result itself
   uint8_t trace_width;
   uint32_t tag;
   uint32_t sent_ms;
@@ -42,46 +42,6 @@ static uint8_t typedWidth() {
 // TRACE matches on a public-key prefix of 1, 2, 4 or 8 bytes; a 3-byte setting traces on the first two.
 static uint8_t traceWidth(uint8_t typed) {
   return typed == 1 ? 1 : 2;
-}
-
-// The admin whose command is running: upstream records its timestamp on the client before dispatch.
-static bool captureAdmin(uint32_t sender_timestamp, uint8_t key[PUB_KEY_SIZE]) {
-  const ModBindings* b = modBindings();
-  if (b == nullptr || b->acl == nullptr) return false;
-  for (int i = 0; i < b->acl->getNumClients(); i++) {
-    ClientInfo* c = b->acl->getClientByIdx(i);
-    if (c->isAdmin() && c->last_timestamp == sender_timestamp) {
-      memcpy(key, c->id.pub_key, PUB_KEY_SIZE);
-      return true;
-    }
-  }
-  return false;
-}
-
-static void sendLateReply(const uint8_t key[PUB_KEY_SIZE], uint32_t sender_timestamp, char msgs[][PROBE_MSG_MAX + 1], int count) {
-  const ModBindings* b = modBindings();
-  if (b == nullptr || b->acl == nullptr || b->mesh == nullptr) return;
-  ClientInfo* c = b->acl->getClient(key, PUB_KEY_SIZE);
-  if (c == nullptr) return;
-  uint8_t hash_size = b->prefs ? b->prefs->path_hash_mode + 1 : 1;
-  bool flood = c->out_path_len == OUT_PATH_UNKNOWN;
-  uint32_t delay = PROBE_REPLY_DELAY_MS;
-  for (int i = 0; i < count; i++) {
-    uint8_t frame[5 + PROBE_MSG_MAX];
-    size_t len = strlen(msgs[i]);
-    uint32_t stamp = modCliStamp(sender_timestamp);
-    memcpy(frame, &stamp, 4);
-    frame[4] = TXT_TYPE_CLI_DATA << 2;
-    memcpy(&frame[5], msgs[i], len);
-    mesh::Packet* pkt = b->mesh->createDatagram(PAYLOAD_TYPE_TXT_MSG, c->id, c->shared_secret, frame, 5 + len);
-    if (pkt == nullptr) return;
-    if (flood) b->mesh->sendFlood(pkt, delay, hash_size);
-    else b->mesh->sendDirect(pkt, c->out_path, c->out_path_len, delay);
-    // A flooded frame is echoed by the first relay after up to 5 x airtime x f_txdelay; the next frame waits that echo out.
-    uint32_t airtime = modAirtimeFor(5 + len + 16);
-    float factor = b->prefs ? b->prefs->tx_delay_factor : 1.0f;
-    delay += flood ? (uint32_t)(airtime * (2.0f + 5.0f * factor)) + 300 : PROBE_ROW_SPACING_MS;
-  }
 }
 
 static void printSerial(char lines[][PROBE_LINE], int n) {
@@ -112,7 +72,11 @@ static void deliver(const ProbeResult& r, bool trace, bool remote, const uint8_t
     if (m > 1) n++;   // the summary line probePack added
     printSerial(lines, n);
   } else if (m > 0) {
-    sendLateReply(key, sender_timestamp, msgs, m);
+    ModReplyTarget target;
+    target.remote = true;
+    target.sender_timestamp = sender_timestamp;
+    memcpy(target.admin_key, key, PUB_KEY_SIZE);
+    modReplyLate(target, &msgs[0][0], PROBE_MSG_MAX + 1, m);
   }
   free(lines);
   free(msgs);
@@ -130,7 +94,7 @@ static void finish(bool received, const int8_t* forwarder_q, uint8_t count, int8
   r.received = received && probeFillLinks(r, forwarder_q, count, own_q);
   last_done_ms = millis();
   pending.active = false;
-  deliver(r, pending.trace, pending.remote, pending.admin_key, pending.sender_timestamp, PROBE_AGE_NONE, pending.note);
+  if (!pending.quiet) deliver(r, pending.trace, pending.remote, pending.admin_key, pending.sender_timestamp, PROBE_AGE_NONE, pending.note);
 }
 
 // A note when the destination (or first via hop) is not in the neighbour table; room servers keep no table and stay silent.
@@ -187,7 +151,9 @@ static void startProbe(const ModCliContext& context, const ProbeRequest& r, char
   uint32_t per_leg = (uint32_t)(modAirtimeFor(longest) * (1.0f + 5.0f * factor)) + PROBE_TIMEOUT_LEG_MS;
   pending.timeout_ms = PROBE_TIMEOUT_BASE_MS + legs * per_leg;
   pending.sender_timestamp = context.sender_timestamp;
-  pending.remote = context.sender_timestamp != 0 && captureAdmin(context.sender_timestamp, pending.admin_key);
+  ModReplyTarget target;
+  pending.remote = context.sender_timestamp != 0 && modReplyCapture(context.sender_timestamp, &target) && target.remote;
+  memcpy(pending.admin_key, target.admin_key, PUB_KEY_SIZE);
   reply[0] = 0;
   neighbourNote(r, reply);
   if (pending.remote) {
@@ -214,11 +180,36 @@ bool coreProbeCli(const ModCliContext& context, char* command, char* reply) {
   }
   uint32_t age_s = (millis() - last_done_ms) / 1000;
   reply[0] = 0;
-  uint8_t key[PUB_KEY_SIZE];
-  bool remote = context.sender_timestamp != 0 && captureAdmin(context.sender_timestamp, key);
+  ModReplyTarget target;
+  bool remote = context.sender_timestamp != 0 && modReplyCapture(context.sender_timestamp, &target) && target.remote;
+  const uint8_t* key = target.admin_key;
   if (context.sender_timestamp != 0 && !remote) return true;
   deliver(last_result, r.trace, remote, key, context.sender_timestamp, age_s, nullptr);
   return true;
+}
+
+// A ping another mod starts and reads through coreProbeLast; nothing is printed or sent back.
+bool coreProbeQuiet(const char* target, char* reply) {
+  char command[24];
+  snprintf(command, sizeof(command), "ping %s", target);
+  ProbeRequest r;
+  ProbeParse parsed = probeParse(command, typedWidth(), &r, reply, 160);
+  if (parsed != PROBE_OK || r.last) {
+    if (parsed != PROBE_ERROR) strcpy(reply, "ERR: bad neighbour id");
+    return false;
+  }
+  ModCliContext context = {0, nullptr, nullptr};
+  startProbe(context, r, reply);
+  if (!pending.active) return false;
+  pending.quiet = true;
+  return true;
+}
+
+// The last finished ping or trace and its age, for mods that act on the result; nullptr before the first.
+const ProbeResult* coreProbeLast(uint32_t* age_ms) {
+  if (!last_result.valid) return nullptr;
+  *age_ms = millis() - last_done_ms;
+  return &last_result;
 }
 
 void coreLoop() {
