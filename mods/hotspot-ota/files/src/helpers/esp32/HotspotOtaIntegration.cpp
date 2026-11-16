@@ -449,14 +449,14 @@ static bool handleCommand(const ModCliContext& context, char* command, char* rep
                                                : "ERR: WiFi shutdown failed; reboot to clear");
     }
   } else if (const char* survey_arg = verbArgument(command, "ota wan survey")) {
-    HotspotOTA::survey(survey_arg, reply);
+    HotspotOTA::survey(survey_arg, context.sender_timestamp, reply);
   } else if (const char* verify_arg = verbArgument(command, "ota wan verify")) {
     if (*verify_arg != 0 && strcmp(verify_arg, "refresh") != 0) {
       strcpy(reply, "ERR: syntax: ota wan verify [refresh]");
       return true;
     }
     if (refuseWhileApUp(reply)) return true;
-    HotspotOTA::verifyCommand(*verify_arg != 0, reply);
+    HotspotOTA::verifyCommand(*verify_arg != 0, context.sender_timestamp, reply);
   } else if (memcmp(command, "ota wan check", 13) == 0) {
     HotspotOTA::checkWan(reply);
   } else if (memcmp(command, "ota slot boot ", 14) == 0) {

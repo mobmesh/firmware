@@ -13,6 +13,7 @@
 #include <time.h>
 #include <helpers/TxtDataHelpers.h>   // StrHelper lives here, no standalone StrHelper.h
 #include <helpers/ModHooks.h>          // modClockSet()
+#include <helpers/ModLateReply.h>      // results sent once the job ends
 #include "RollbackGuard.h"             // probation state -- see start()
 #include "OtaAutoPolicy.h"
 #include "ProbationPolicy.h"
@@ -179,6 +180,9 @@ static uint32_t wan_done_run = 0;
 static WanResult service_wan_result = WanResult::Unknown;
 static WanResult wan_done_result = WanResult::Unknown;
 static uint32_t wan_done_ms = 0;
+// Who started a verify or a survey, to hear its result when the job ends.
+static ModReplyTarget verify_target, survey_target;
+static bool verify_late = false, survey_late = false;
 static char wan_done_text[MAX_TEXT_LEN] = {0};
 #define OTA_VERIFY_RESULT_FRESH_MS 120000
 static WanRuntimeState service_wan_initial;
@@ -1166,8 +1170,10 @@ static SurveyState survey_state = SurveyState::Idle;
 static uint32_t survey_started_ms = 0;
 static uint32_t survey_ready_ms = 0;
 static int16_t survey_count = 0;
+static bool survey_launch = false;   // scan accepted, started on the next loop pass
 
 static void surveyForget() {
+  survey_launch = false;
   WiFi.scanDelete();
   surveyInhibitSleep(false);
   survey_count = 0;
@@ -1195,22 +1201,22 @@ static bool surveyStart(char reply[]) {
   }
   surveyInhibitSleep(true);
   WiFi.scanDelete();
+  survey_state = SurveyState::Scanning;
+  survey_launch = true;
+  survey_count = 0;
+  strcpy(reply, "OK - scanning");
+  return true;
+}
+
+// Started from the loop, never inside a mesh command handler: a scan started there overran the WiFi scan timeout.
+static bool surveyLaunch() {
+  survey_launch = false;
   if (WiFi.getMode() != WIFI_STA) {
     WiFi.mode(WIFI_STA);
     delay(OTA_SURVEY_MODE_SETTLE_MS);
   }
-  if (WiFi.scanNetworks(true) == WIFI_SCAN_FAILED) {
-    WiFi.mode(WIFI_OFF);
-    survey_state = SurveyState::Failed;
-    surveyInhibitSleep(false);
-    strcpy(reply, "ERR: scan did not start");
-    return false;
-  }
-  survey_state = SurveyState::Scanning;
   survey_started_ms = millis();
-  survey_count = 0;
-  strcpy(reply, "OK - scanning");
-  return true;
+  return WiFi.scanNetworks(true) != WIFI_SCAN_FAILED;
 }
 
 // Rows are fitted by byte, never by character: the protected marker is four UTF-8 bytes and a split
@@ -1253,7 +1259,7 @@ static int surveyNext(int offset) {
   return survey_count;
 }
 
-static void surveyPage(uint8_t offset, char reply[]) {
+static void surveyPage(uint8_t offset, char reply[], size_t capacity = MAX_TEXT_LEN) {
   if (surveyNext(offset) >= survey_count) {
     strcpy(reply, "ERR: page range");
     return;
@@ -1266,28 +1272,54 @@ static void surveyPage(uint8_t offset, char reply[]) {
     size_t length = surveyRow(index, row, sizeof(row));
     if (length == 0) continue;
     size_t reserve = surveyNext(index + 1) < survey_count ? 10 : 1;
-    if (used + 1 + length + reserve > MAX_TEXT_LEN) break;
+    if (used + 1 + length + reserve > capacity) break;
     reply[used++] = '\n';
     memcpy(reply + used, row, length + 1);
     used += length;
   }
-  if (index < survey_count) snprintf(reply + used, MAX_TEXT_LEN - used, "\nnext %d", index);
+  if (index < survey_count) snprintf(reply + used, capacity - used, "\nnext %d", index);
   else if (used == 0) strcpy(reply, "ERR: row too long to show");
 }
 
+// The first page, or the failure, to whoever started the scan; a late row holds at most 155 characters.
+static void surveyLate() {
+  if (!survey_late) return;
+  survey_late = false;
+  char text[156];
+  if (survey_state == SurveyState::Failed) {
+    strcpy(text, "ERR: scan failed");
+    survey_state = SurveyState::Idle;
+  } else if (survey_count == 0) {
+    strcpy(text, "No networks found");
+  } else {
+    surveyPage(0, text, sizeof(text));
+  }
+  modReplyLate(survey_target, text, sizeof(text), 1);
+}
+
 void HotspotOTA::surveyPoll() {
+  if (survey_state == SurveyState::Scanning && survey_launch) {
+    if (!surveyLaunch()) {
+      surveyRelease();
+      survey_state = SurveyState::Failed;
+      surveyLate();
+    }
+    return;
+  }
   if (survey_state == SurveyState::Scanning) {
     int16_t result = WiFi.scanComplete();
     if (result == WIFI_SCAN_RUNNING) {
       if (millis() - survey_started_ms >= OTA_SURVEY_TIMEOUT_MS) {
         surveyRelease();
         survey_state = SurveyState::Failed;
+        surveyLate();
       }
       return;
     }
     if (result == WIFI_SCAN_FAILED) {
       surveyRelease();
       survey_state = SurveyState::Failed;
+      surveyLate();
       return;
     }
     survey_count = result;
@@ -1295,6 +1327,7 @@ void HotspotOTA::surveyPoll() {
     survey_state = SurveyState::Ready;
     WiFi.mode(WIFI_OFF);
     surveyInhibitSleep(false);
+    surveyLate();
     return;
   }
   if (survey_state == SurveyState::Ready &&
@@ -1303,11 +1336,18 @@ void HotspotOTA::surveyPoll() {
   }
 }
 
-void HotspotOTA::survey(const char* argument, char reply[]) {
+// A new scan answers at once and sends its first page when it ends.
+static void surveyBegin(uint32_t sender_timestamp, char reply[]) {
+  if (!surveyStart(reply)) return;
+  survey_late = modReplyCapture(sender_timestamp, &survey_target);
+  if (survey_late) strcpy(reply, "ok, scanning ~5s");
+}
+
+void HotspotOTA::survey(const char* argument, uint32_t sender_timestamp, char reply[]) {
   bool refresh = argument != nullptr && strcmp(argument, "refresh") == 0;
   if (refresh) {
     surveyForget();
-    surveyStart(reply);
+    surveyBegin(sender_timestamp, reply);
     return;
   }
   uint8_t offset = 0;
@@ -1334,7 +1374,7 @@ void HotspotOTA::survey(const char* argument, char reply[]) {
       else surveyPage(offset, reply);
       return;
     case SurveyState::Idle:
-      surveyStart(reply);
+      surveyBegin(sender_timestamp, reply);
       return;
   }
 }
@@ -1380,6 +1420,12 @@ void HotspotOTA::poll() {
     memcpy(wan_done_text, service_result, sizeof(wan_done_text));
     portEXIT_CRITICAL(&service_mux);
     wan_done_ms = millis();
+    if (verify_late) {
+      verify_late = false;
+      char text[156];
+      snprintf(text, sizeof(text), "%s%s", wan_done_text, HotspotOTA::wanProven() ? " (proven)" : "");
+      modReplyLate(verify_target, text, sizeof(text), 1);
+    }
   }
   if (release_sleep) session_ended = true;
   bool session_limit = false;
@@ -1547,7 +1593,7 @@ bool HotspotOTA::verifyWan(char reply[]) {
 }
 
 // `ota wan verify [refresh]`: starts a check, or shows a result under two minutes old, as survey does.
-void HotspotOTA::verifyCommand(bool refresh, char reply[]) {
+void HotspotOTA::verifyCommand(bool refresh, uint32_t sender_timestamp, char reply[]) {
   portENTER_CRITICAL(&service_mux);
   bool running = service_kind == ServiceKind::WanVerify && serviceIsActive(service_state);
   portEXIT_CRITICAL(&service_mux);
@@ -1560,7 +1606,10 @@ void HotspotOTA::verifyCommand(bool refresh, char reply[]) {
     snprintf(reply, MAX_TEXT_LEN, "%s%s", wan_done_text, HotspotOTA::wanProven() ? " (proven)" : "");
     return;
   }
-  if (HotspotOTA::verifyWan(reply)) strcpy(reply, "OK - verifying");
+  if (!HotspotOTA::verifyWan(reply)) return;
+  // The result follows as a late reply; a caller that cannot be found reads it with a second run instead.
+  verify_late = modReplyCapture(sender_timestamp, &verify_target);
+  strcpy(reply, verify_late ? "ok, verifying ~30s" : "OK - verifying");
 }
 
 static const char* wanResultName(WanResult result) {

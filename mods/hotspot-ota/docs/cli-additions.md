@@ -33,7 +33,7 @@ are in the [mod README](../README.md).
 | [`ota wan leave`](#ota-wan-leave) | Disconnect WiFi and turn off hotspot power |
 | [`ota wan check`](#ota-wan-check) | Check internet access after a manual join |
 | [`ota wan survey [offset\|refresh]`](#ota-wan-survey) | Scan or page nearby networks |
-| [`ota wan verify [refresh]`](#ota-wan-verify) | Verify WAN/NTP and restore the starting state; run again for the result |
+| [`ota wan verify [refresh]`](#ota-wan-verify) | Verify WAN/NTP and restore the starting state; the result follows when done |
 | [`ota slot boot <A\|B>`](#ota-slot-boot) | Select a valid slot and reboot |
 | [`start ota`](#start-ota) | Open the local upload AP |
 | [`start ota wan <url>`](#start-ota-wan) | Download and install an application image |
@@ -425,14 +425,15 @@ ota wan survey refresh
 
 | Response | Meaning |
 | --- | --- |
-| `OK - scanning` | Scan is running; another call reads its result |
+| `ok, scanning ~5s` | A new scan started; its first page follows as a late reply when it ends |
+| `OK - scanning` | A scan is already running; its result goes to whoever started it |
 | Network list, optionally ending in `next N` | Saved scan results; each page starts with a newline, and a lock marks protected networks |
 | `No networks found` | Scan completed without results |
 | `ERR: ...` | Invalid parameter, scan failure, or operation conflict |
 
 **Results:** Matching SSID names are combined within each open/secured category; the strongest signal is shown. Ties retain the first scan record. Row numbers retain scan indexes and can have gaps; use `next N` for paging.
 
-**Lifetime:** One scan retained for two minutes. An expired result starts a new scan.
+**Lifetime:** One scan retained for two minutes; `ota wan survey <offset>` pages it. An expired result starts a new scan.
 
 **Restrictions:** Refused while WiFi is in use or an OTA/WAN operation is active.
 Never joins or powers the hotspot. Sleep is inhibited during the scan and released
@@ -449,11 +450,13 @@ ota wan verify [refresh]
 | --- | --- |
 | No argument | Starts a check, or shows the last result if it finished within 2 minutes |
 | `refresh` | Always starts a new check |
+| Response when starting | `ok, verifying ~30s`; the result follows as a late reply |
 | Response while checking | `OK - verifying` |
 | Response when done | e.g. `WAN OK; NTP OK; state restored (proven)`, or `ERR: ...` |
 
-Run it once to start, then again for the result, as with `ota wan survey`. A second
-run while a check is going shows `OK - verifying` rather than starting another.
+One call is enough: the result arrives on its own when the check ends, over serial or to the
+admin who asked over LoRa. A second run while a check is going shows `OK - verifying` rather
+than starting another; a run within 2 minutes of the end shows the result again.
 
 **Effect:** Powers and joins as needed, checks WAN twice, and attempts NTP twice.
 Restores WiFi and hotspot power to their starting state. A reboot cancels verification.

@@ -52,7 +52,7 @@ namespace HotspotOTA {
   void radioStatus(char reply[]);
   bool checkWan(char reply[]);
   bool verifyWan(char reply[]);
-  void verifyCommand(bool refresh, char reply[]);   // `ota wan verify [refresh]`
+  void verifyCommand(bool refresh, uint32_t sender_timestamp, char reply[]);   // `ota wan verify [refresh]`; the result follows as a late reply
   void wanHealth(char reply[]);
   bool wanProven();
   bool resetWanHealth();
@@ -62,7 +62,7 @@ namespace HotspotOTA {
   WanRun wanVerifyResult(uint32_t run);
 
   // `ota wan survey`: one asynchronous scan, paged from the scan API's own result set.
-  void survey(const char* argument, char reply[]);
+  void survey(const char* argument, uint32_t sender_timestamp, char reply[]);   // a new scan's first page follows as a late reply
   void surveyPoll();
 
   // Timed automatic updates (`ota.wan.auto`).
