@@ -14,9 +14,6 @@ capabilities:
 build_values:
   PIN_HOTSPOT_PWR: 47
 
-  # A saved `set adc.multiplier` overrides this default.
-  ADC_MULTIPLIER: 5.32
-
   # OTA join retries allow 115 seconds for hotspot startup and connection.
   OTA_WIFI_JOIN_ATTEMPT_TIMEOUT_MS: 15000
   OTA_WIFI_JOIN_RETRY_DELAY_MS: 5000
@@ -31,7 +28,7 @@ build_values:
   OTA_RADIO_FAIL_SLEEP_START_SECS: 60
   OTA_RADIO_FAIL_SLEEP_MAX_SECS: 900
 
-  # Power-guard thresholds use reported battery millivolts.
+  # Power-guard thresholds use reported battery millivolts at upstream's ADC_MULTIPLIER 5.42.
   # Auto hysteresis prevents load changes from repeatedly toggling power saving.
   POWER_GUARD_AUTO_OFF_MV: 3600   # release saving at or above
   POWER_GUARD_AUTO_ON_MV: 3300    # engage saving at or below

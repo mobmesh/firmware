@@ -166,24 +166,7 @@ jobs:
             fi
           done
 
-          # --- 3. has an overridden upstream default changed? ----------------------
-          # ADC_MULTIPLIER is overridden with a bench-measured value, which silently masks
-          # any upstream revision. Worth re-measuring, not worth failing a build over.
-          EXPECTED_ADC_MULT=5.42
-          if [ -d probe-src ]; then
-            found=$(grep -oE '^ *# *define +ADC_MULTIPLIER +[0-9.]+' \
-              probe-src/variants/heltec_v4/HeltecV4Board.h 2>/dev/null \
-              | grep -oE '[0-9.]+$' || echo "")
-            if [ -z "$found" ]; then
-              act "upstream's \`ADC_MULTIPLIER\` default is no longer in HeltecV4Board.h, so our 5.32 override may not apply anymore. Check where it moved."
-            elif [ "$found" != "$EXPECTED_ADC_MULT" ]; then
-              act "upstream changed \`ADC_MULTIPLIER\` from ${EXPECTED_ADC_MULT} to ${found}. Our override stays 5.32 (bench-measured); worth re-measuring."
-            else
-              ok "upstream \`ADC_MULTIPLIER\` still ${found}; overridden with 5.32 (bench-measured)"
-            fi
-          fi
-
-          # --- 4. does upstream still sleep the radio the way power-guard assumes? --
+          # --- 3. does upstream still sleep the radio the way power-guard assumes? --
           # power-guard's poweroff relies on radio_driver.powerOff() reaching the SX1262's
           # sleep. Losing it costs current through a hibernation, not the node: warn only.
           if [ -d probe-src ] && echo " $MODS " | grep -q " power-guard "; then
@@ -195,7 +178,7 @@ jobs:
             fi
           fi
 
-          # --- 5. does upstream still serial-gate the stats commands? ---------------
+          # --- 4. does upstream still serial-gate the stats commands? ---------------
           # core forwards these over the mesh by re-dispatching with timestamp 0.
           # A rename, a removal, or a second gate breaks that silently: no patch conflicts
           # and the tree still compiles, so only a grep catches it.
@@ -211,7 +194,7 @@ jobs:
             done
           fi
 
-          # --- 6. do sync-settings' room-server assumptions still hold? ------------
+          # --- 5. do sync-settings' room-server assumptions still hold? ------------
           # The repeat.gate patch adds one line to the room server's allowPacketForward and
           # reads state upstream owns. None of the four below conflict when they change.
           if [ -d probe-src ] && echo " $MODS " | grep -q " sync-settings "; then
@@ -248,7 +231,7 @@ jobs:
             fi
           fi
 
-          # --- 7. do the upstream commands the mods send or intercept still exist? --
+          # --- 6. do the upstream commands the mods send or intercept still exist? --
           # Moved commands still work, so they count as a pass with the list folded under it;
           # anything else the checker prints besides a pass line is a problem.
           awk '
@@ -258,7 +241,7 @@ jobs:
             /^  - / { print >> dest; next }
           ' "$CONTRACTS"
 
-          # --- 8. did the ESP32 platform change its descriptor's reserved tail? ---
+          # --- 7. did the ESP32 platform change its descriptor's reserved tail? ---
           # Metadata layout 1 uses 252-287; recheck esp_app_desc_t on an unknown platform pin.
           if [ -d probe-src ]; then
             pin=$(awk '/^\[/{s=($0=="[esp32_base]")} s && /^platform *=/{sub(/^platform *= */,""); print; exit}' \
@@ -272,7 +255,7 @@ jobs:
             fi
           fi
 
-          # --- 9. does the name badge still fit, and still reach every advert? ----
+          # --- 8. does the name badge still fit, and still reach every advert? ----
           # NameBadge.h keeps 19 bytes for a 32-byte advert with location; neither change below conflicts.
           if [ -d probe-src ]; then
             if grep -qE '^#define MAX_ADVERT_DATA_SIZE +32$' probe-src/src/MeshCore.h 2>/dev/null; then
