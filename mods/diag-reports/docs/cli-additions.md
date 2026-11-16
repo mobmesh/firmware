@@ -232,7 +232,7 @@ set radio.fem.rxgain auto
 get radio.fem.rxgain
 ```
 
-**Response:** `OK - auto (learning, starts off)`; `get` shows `> auto (off, on 12-18)`, `> auto (on)`, `> auto (off)`, or a parked state, followed by `; on 06-08 banned 7d: decodes worse` while a ban is in force. `ERR: no switchable LNA on this board` where the LNA cannot be switched.
+**Response:** `OK - auto (learning, starts off)`; `get` shows `> auto (off, on 12-18)`, `> auto (on)`, `> auto (off)` (with `; learning, on now` or `; learning, off now` while the current block alternates), or a parked state, followed by `; on 06-08 banned 7d: decodes worse` while a ban is in force. `ERR: no switchable LNA on this board` where the LNA cannot be switched.
 
 **Effect:** each 2-hour local block keeps the state its ping tests last proved best. Until a block is decided it alternates, on in odd local hours and off in even ones, so neighbours heard only with the LNA on are found and the audit gets both records; a decided block switches only when the tests show, with significance, that the other state does better there. A test pings a neighbour (rotating among the 3 weakest heard recently) with the LNA in one state, flips it, pings again and flips back; it scores which state got the reply, or the clearer one. A test whose outbound SNR changed between the pings (fading), or whose idle floor moved more than 6 dB off the LNA's usual shift (noise changed mid-test), is discarded; no test runs while the last hour's load is over 25%.
 

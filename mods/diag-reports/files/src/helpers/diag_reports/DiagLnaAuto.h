@@ -117,7 +117,7 @@ const char* autoReasonText(uint8_t reason);
 bool autoBanText(const LnaAutoState& a, char* out, size_t len);
 // Once a day: fade the scores, retire settled blocks, check the park triggers and the 90-day recheck.
 void autoDayTurn(LnaAutoState& a, uint32_t day, uint8_t pingable_neighbours);
-// "auto (on, off 12-18)", "auto (learning, on)", "auto (parked: LNA not working)".
-void autoStatusText(const LnaAutoState& a, int8_t tz_hours, char* out, size_t len);
+// "auto (off, on 12-18)", "auto (on)", "auto (off; learning, on now)" while the current block alternates; local_hour -1 when unknown.
+void autoStatusText(const LnaAutoState& a, int local_hour, char* out, size_t len);
 // One character per block, midnight first: + on, - off, . undecided (off), x retired.
 void autoBlockRow(const LnaAutoState& a, char out[AUTO_BLOCKS + 1]);

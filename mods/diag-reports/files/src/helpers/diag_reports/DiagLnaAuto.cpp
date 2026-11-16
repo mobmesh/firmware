@@ -291,8 +291,7 @@ void autoBlockRow(const LnaAutoState& a, char out[AUTO_BLOCKS + 1]) {
   out[AUTO_BLOCKS] = 0;
 }
 
-void autoStatusText(const LnaAutoState& a, int8_t tz_hours, char* out, size_t len) {
-  (void)tz_hours;
+void autoStatusText(const LnaAutoState& a, int local_hour, char* out, size_t len) {
   switch (a.park) {
     case AUTO_PARK_DEAD: snprintf(out, len, "auto (parked: LNA not working)"); return;
     case AUTO_PARK_FEW_NB: snprintf(out, len, "auto (parked: too few neighbours)"); return;
@@ -315,9 +314,13 @@ void autoStatusText(const LnaAutoState& a, int8_t tz_hours, char* out, size_t le
     len_used += snprintf(spans + len_used, sizeof(spans) - len_used, "%son %02d-%02d", len_used ? ", " : "", from, to);
     i = j;
   }
-  if (on_blocks == AUTO_BLOCKS) snprintf(out, len, "auto (on)");
-  else if (spans[0]) snprintf(out, len, "auto (off, %s)", spans);
-  else snprintf(out, len, "auto (off)");
+  // The block running now, while it still alternates, says which state this hour has.
+  char now[24] = "";
+  if (local_hour >= 0 && local_hour < 24 && undecided(a.b[autoBlockOf((uint8_t)local_hour)]))
+    snprintf(now, sizeof(now), "; learning, %s now", autoApplied(a, autoBlockOf((uint8_t)local_hour), (uint8_t)local_hour) ? "on" : "off");
+  if (on_blocks == AUTO_BLOCKS) snprintf(out, len, "auto (on%s)", now);
+  else if (spans[0]) snprintf(out, len, "auto (off, %s%s)", spans, now);
+  else snprintf(out, len, "auto (off%s)", now);
 }
 
 bool autoBanText(const LnaAutoState& a, char* out, size_t len) {

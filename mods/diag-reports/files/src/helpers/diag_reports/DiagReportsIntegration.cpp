@@ -394,6 +394,8 @@ static void retrySample(uint32_t day) {
   retry_synced = true;
 }
 
+static int autoLocalHour();
+
 static void buildInput(EngineInput& in, NoiseView& nv, BattView& bv, StoreDay* hist_unused) {
   (void)hist_unused;
   memset(&in, 0, sizeof(in));
@@ -476,7 +478,7 @@ static void buildInput(EngineInput& in, NoiseView& nv, BattView& bv, StoreDay* h
   in.ev = &evidence;
   static char auto_text[48];
   if (in.lna_available && store.lna_auto.enabled) {
-    autoStatusText(store.lna_auto, tz, auto_text, sizeof(auto_text));
+    autoStatusText(store.lna_auto, autoLocalHour(), auto_text, sizeof(auto_text));
     in.lna_auto = auto_text;
     in.lna_auto_dead = store.lna_auto.park == AUTO_PARK_DEAD;
   }
@@ -1147,6 +1149,12 @@ static bool isEcho(const mesh::Packet* packet) {
 
 // ---------------------------------------------------------------- LNA auto
 
+// The local hour auto runs on now; -1 before the clock is set.
+static int autoLocalHour() {
+  uint32_t hour = clockHour();
+  return hour ? storeLocalHour(hour, modTzHours()) : -1;
+}
+
 static void autoSet(bool on) {
   if (modFemLnaGet() != on) modFemLnaSet(on);
   auto_set = on ? 1 : 0;
@@ -1469,8 +1477,8 @@ static void runLnaReport() {
   free(s);
   if (store.lna_auto.enabled) {
     const LnaAutoState& au = store.lna_auto;
-    char text[48], row[AUTO_BLOCKS + 1];
-    autoStatusText(au, modTzHours(), text, sizeof(text));
+    char text[80], row[AUTO_BLOCKS + 1];
+    autoStatusText(au, autoLocalHour(), text, sizeof(text));
     autoBlockRow(au, row);
     outSep(out);
     outLine(out, "%s", text);
@@ -1839,8 +1847,8 @@ bool diagReportsHandleCli(const ModCliContext& context, char* command, char* rep
     return true;
   }
   if (strcmp(command, "get radio.fem.rxgain") == 0 && store.lna_auto.enabled && modFemLnaAvailable()) {
-    char text[48], banned[48];
-    autoStatusText(store.lna_auto, modTzHours(), text, sizeof(text));
+    char text[80], banned[48];
+    autoStatusText(store.lna_auto, autoLocalHour(), text, sizeof(text));
     if (autoBanText(store.lna_auto, banned, sizeof(banned))) sprintf(reply, "> %s; %s", text, banned);
     else sprintf(reply, "> %s", text);
     return true;
