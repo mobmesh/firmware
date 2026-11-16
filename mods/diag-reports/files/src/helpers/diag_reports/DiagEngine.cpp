@@ -691,6 +691,7 @@ static void advise(const EngineInput& in, const Evidence& e, EngineResult& r) {
       SEE("diag radio.lna");
       break;
     case CAUSE_LNA_OVERLOAD:
+      r.cause_hours = e.err | e.freeze;
       HEAD("LNA overload");
       FIX0("turn the LNA off.");
       SEE("tryset 86400 radio.fem.rxgain off");

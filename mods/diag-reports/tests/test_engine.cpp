@@ -314,6 +314,8 @@ int main() {
   rig.in.errors = 73;
   rig.run();
   CAUSE_IS(CAUSE_LNA_OVERLOAD);
+  // No failed-decode or freeze hours named: the ban falls back to the hours the LNA was on.
+  CHECK(rig.r.cause_hours == 0);
   HAS("LNA      \U0001F7E1 on hurts here");
   HAS("Noise    \U0001F7E1 floor +22 dB, from LNA");
   HAS("Decodes  \U0001F7E1 3.0%, from LNA");

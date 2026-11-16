@@ -12,10 +12,9 @@
 #define SIGMA           0.82f
 #define VETO_DAYS       14
 
-void autoInit(LnaAutoState& a, bool default_on, uint32_t day) {
+void autoInit(LnaAutoState& a, uint32_t day) {
   memset(&a, 0, sizeof(a));
   a.enabled = 1;
-  a.default_on = default_on ? 1 : 0;
   a.start_day = day;
 }
 
@@ -31,25 +30,32 @@ static float decided(const AutoBlock& b) {
   return (b.on_w + b.off_w) / 10.0f;
 }
 
-// What the tests alone pick for the block.
-static bool learned(const LnaAutoState& a, const AutoBlock& b) {
-  bool def = a.default_on;
-  if (b.retired || b.reverted || decided(b) < AUTO_MIN_DECIDED) return def;
+// The best state moves only on a significant score for the other one; otherwise the block keeps it.
+static void settle(AutoBlock& b) {
+  if (b.retired) {
+    b.best = 0;
+    return;
+  }
+  if (decided(b) < AUTO_MIN_DECIDED) return;
   float on = b.on_w / 10.0f, off = b.off_w / 10.0f, all = on + off;
-  if (def && significant(off, all) && !b.veto_off) return false;
-  if (!def && significant(on, all)) return true;
-  return def;
+  if (!b.best && significant(on, all)) b.best = 1;
+  else if (b.best && significant(off, all) && !b.veto_off) b.best = 0;
 }
 
-bool autoApplied(const LnaAutoState& a, uint8_t block) {
-  bool def = a.default_on;
-  if (!a.enabled || a.park != AUTO_ACTIVE || block >= AUTO_BLOCKS) return def;
+// No proven best yet: nothing decided and no veto.
+static bool undecided(const AutoBlock& b) {
+  return !b.retired && !b.best && !b.veto_off && decided(b) < AUTO_MIN_DECIDED;
+}
+
+bool autoApplied(const LnaAutoState& a, uint8_t block, uint8_t local_hour) {
+  if (!a.enabled || block >= AUTO_BLOCKS || a.park == AUTO_PARK_DEAD || a.park == AUTO_PARK_NO_BENEFIT) return false;
   const AutoBlock& b = a.b[block];
-  bool pick = learned(a, b);
-  // A banned state is never run, not even as the default.
-  if (b.ban_days && pick == (bool)b.ban_on) return !b.ban_on;
-  if (b.refresh && pick != def && !(b.ban_days && def == (bool)b.ban_on)) return def;
-  return pick;
+  // Alternating hours let neighbours heard only with the LNA on be found, and give the audit both records.
+  bool run = undecided(b) ? (local_hour & 1) != 0 : b.best && !b.retired;
+  // A banned state is never run.
+  if (b.ban_days && run == (bool)b.ban_on) return !b.ban_on;
+  if (b.refresh && run && !(b.ban_days && !b.ban_on)) return false;
+  return run;
 }
 
 static void halve(AutoStats& st) {
@@ -83,6 +89,7 @@ static void ban(AutoBlock& b, bool ban_on, uint8_t reason) {
   b.ban_days = AUTO_BAN_DAYS;
   b.ban_on = ban_on ? 1 : 0;
   b.ban_reason = reason;
+  b.best = ban_on ? 0 : 1;
   // The banned state starts its record again, and has to re-earn the block from the tests.
   memset(&b.st[ban_on ? 1 : 0], 0, sizeof(AutoStats));
   if (ban_on) b.on_w = 0;
@@ -92,7 +99,8 @@ static void ban(AutoBlock& b, bool ban_on, uint8_t reason) {
 uint8_t autoAudit(LnaAutoState& a, uint8_t block) {
   if (!a.enabled || a.park != AUTO_ACTIVE || block >= AUTO_BLOCKS) return AUTO_R_NONE;
   AutoBlock& b = a.b[block];
-  bool run_on = autoApplied(a, block);
+  // An undecided block runs both states: on, the riskier, is the one judged.
+  bool run_on = undecided(b) ? !(b.ban_days && b.ban_on) : autoApplied(a, block);
   const AutoStats& r = b.st[run_on ? 1 : 0];
   const AutoStats& o = b.st[run_on ? 0 : 1];
   if (r.hours < AUTO_AUDIT_HOURS || o.hours < AUTO_AUDIT_HOURS) return AUTO_R_NONE;
@@ -186,6 +194,7 @@ bool autoAddTest(LnaAutoState& a, uint8_t block, const AutoTest& t, uint32_t epo
   if (t.reply[1] && !t.reply[0]) {
     winner = 1;
     b.veto_off = VETO_DAYS;            // heard only with it on: off must not cost this neighbour
+    b.best = 1;
   } else if (t.reply[0] && !t.reply[1]) {
     winner = -1;
   } else if (t.back_db[1] - t.back_db[0] >= CLEARER_DB) {
@@ -200,23 +209,25 @@ bool autoAddTest(LnaAutoState& a, uint8_t block, const AutoTest& t, uint32_t epo
   bool applied = autoApplied(a, block);
   if (winner > 0 && b.on_w < 60000) b.on_w += 10;
   if (winner < 0 && b.off_w < 60000) b.off_w += 10;
-  // Against the default, auto's choice either earned or cost a reply.
-  if (applied != (bool)a.default_on) {
+  // Against fixed off, running on either earned or cost a reply.
+  if (applied) {
     a.gain_tests++;
-    bool won = (winner > 0) == applied;
-    a.gain_replies += won ? 1 : -1;
+    a.gain_replies += winner > 0 ? 1 : -1;
   }
-  // Two losses in a row by the state being run send the block back to the default until tomorrow.
+  // Two losses in a row while on send the block to off and learning again; the old scores no longer hold.
   bool lost = (winner > 0) != applied;
-  if (lost && applied != (bool)a.default_on) {
+  if (lost && applied && b.best && !b.veto_off) {
     if (++b.losses >= 2) {
-      b.reverted = 1;
+      b.best = 0;
+      b.on_w = b.off_w = 0;
+      b.ties = 0;
       b.restart = 1;
       b.losses = 0;
     }
-  } else if (!lost) {
-    b.losses = 0;
+    return true;
   }
+  if (!lost) b.losses = 0;
+  settle(b);
   return true;
 }
 
@@ -229,8 +240,7 @@ void autoDayTurn(LnaAutoState& a, uint32_t day, uint8_t pingable_neighbours) {
   if (a.park != AUTO_ACTIVE) {
     // A parked auto rechecks once a season by learning again.
     if (day >= a.park_day + AUTO_RECHECK_DAYS) {
-      bool def = a.default_on;
-      autoInit(a, def, day);
+      autoInit(a, day);
     }
     return;
   }
@@ -239,13 +249,12 @@ void autoDayTurn(LnaAutoState& a, uint32_t day, uint8_t pingable_neighbours) {
     AutoBlock& b = a.b[i];
     b.on_w = (uint16_t)(b.on_w * FADE_NUM / FADE_DEN);
     b.off_w = (uint16_t)(b.off_w * FADE_NUM / FADE_DEN);
-    b.reverted = 0;
     b.losses = 0;
     if (b.veto_off) b.veto_off--;
     if (b.ban_days && --b.ban_days == 0) b.ban_reason = AUTO_R_NONE;
-    // A block away from its default runs it one day in AUTO_REFRESH_DAYS, so both records stay current.
+    // A block running on runs off one day in AUTO_REFRESH_DAYS, so both records stay current.
     b.refresh = 0;
-    if (learned(a, b) != (bool)a.default_on) {
+    if (b.best && !b.retired) {
       if (++b.refresh_days >= AUTO_REFRESH_DAYS) {
         b.refresh = 1;
         b.refresh_days = 0;
@@ -256,6 +265,7 @@ void autoDayTurn(LnaAutoState& a, uint32_t day, uint8_t pingable_neighbours) {
     float on = b.on_w / 10.0f, off = b.off_w / 10.0f, all = on + off + b.ties;
     if (b.restart && all >= AUTO_MIN_DECIDED && (significant(on, on + off) || significant(off, on + off))) b.restart = 0;
     if (day >= a.start_day + AUTO_LEARN_DAYS && all >= AUTO_RETIRE_TESTS && fabsf(on - off) * 100 < AUTO_RETIRE_PCT * all) b.retired = 1;
+    settle(b);
     all_retired &= b.retired != 0;
   }
   a.few_nb_days = pingable_neighbours < 2 ? a.few_nb_days + 1 : 0;
@@ -275,38 +285,39 @@ void autoBlockRow(const LnaAutoState& a, char out[AUTO_BLOCKS + 1]) {
     const AutoBlock& b = a.b[i];
     bool applied = autoApplied(a, (uint8_t)i);
     if (b.retired) out[i] = 'x';
-    else if (applied != (bool)a.default_on) out[i] = applied ? '+' : '-';
-    else out[i] = decided(b) >= AUTO_MIN_DECIDED ? (applied ? '+' : '-') : '.';
+    else if (applied) out[i] = '+';
+    else out[i] = decided(b) >= AUTO_MIN_DECIDED ? '-' : '.';
   }
   out[AUTO_BLOCKS] = 0;
 }
 
 void autoStatusText(const LnaAutoState& a, int8_t tz_hours, char* out, size_t len) {
   (void)tz_hours;
-  const char* def = a.default_on ? "on" : "off";
   switch (a.park) {
     case AUTO_PARK_DEAD: snprintf(out, len, "auto (parked: LNA not working)"); return;
     case AUTO_PARK_FEW_NB: snprintf(out, len, "auto (parked: too few neighbours)"); return;
-    case AUTO_PARK_NO_BENEFIT: snprintf(out, len, "auto (parked: no benefit, %s)", def); return;
+    case AUTO_PARK_NO_BENEFIT: snprintf(out, len, "auto (parked: no benefit, off)"); return;
     default: break;
   }
-  // The blocks that differ from the default, as local hour ranges.
+  // The blocks running on, as local hour ranges; the rest run off.
   char spans[40] = "";
-  int len_used = 0;
+  int len_used = 0, on_blocks = 0;
   for (int i = 0; i < AUTO_BLOCKS;) {
-    if (autoApplied(a, (uint8_t)i) == (bool)a.default_on) {
+    if (!autoApplied(a, (uint8_t)i)) {
       i++;
       continue;
     }
     int j = i;
-    while (j < AUTO_BLOCKS && autoApplied(a, (uint8_t)j) != (bool)a.default_on) j++;
+    while (j < AUTO_BLOCKS && autoApplied(a, (uint8_t)j)) j++;
+    on_blocks += j - i;
     // Blocks are already local hours: auto aligns them through the time zone when it picks the block.
     int from = i * 2, to = (j * 2) % 24;
-    len_used += snprintf(spans + len_used, sizeof(spans) - len_used, "%s%s %02d-%02d", len_used ? ", " : "", a.default_on ? "off" : "on", from, to);
+    len_used += snprintf(spans + len_used, sizeof(spans) - len_used, "%son %02d-%02d", len_used ? ", " : "", from, to);
     i = j;
   }
-  if (spans[0]) snprintf(out, len, "auto (%s, %s)", def, spans);
-  else snprintf(out, len, "auto (%s)", def);
+  if (on_blocks == AUTO_BLOCKS) snprintf(out, len, "auto (on)");
+  else if (spans[0]) snprintf(out, len, "auto (off, %s)", spans);
+  else snprintf(out, len, "auto (off)");
 }
 
 bool autoBanText(const LnaAutoState& a, char* out, size_t len) {

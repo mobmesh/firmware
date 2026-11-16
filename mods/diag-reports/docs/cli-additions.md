@@ -232,25 +232,25 @@ set radio.fem.rxgain auto
 get radio.fem.rxgain
 ```
 
-**Response:** `OK - auto (learning, default <on|off>)`; `get` shows `> auto (on, off 12-18)`, `> auto (off)`, or a parked state, followed by `; on 06-08 banned 7d: decodes worse` while a ban is in force. `ERR: no switchable LNA on this board` where the LNA cannot be switched.
+**Response:** `OK - auto (learning, starts off)`; `get` shows `> auto (off, on 12-18)`, `> auto (on)`, `> auto (off)`, or a parked state, followed by `; on 06-08 banned 7d: decodes worse` while a ban is in force. `ERR: no switchable LNA on this board` where the LNA cannot be switched.
 
-**Effect:** the saved setting becomes the default. Each 2-hour local block runs the default until its ping tests show, with significance, that the other state does better there. A test pings a neighbour (the weakest heard recently, rotating) with the LNA in one state, flips it, pings again and flips back; it scores which state got the reply, or the clearer one. A test whose outbound SNR changed between the pings (fading), or whose idle floor moved more than 6 dB off the LNA's usual shift (noise changed mid-test), is discarded; no test runs while the last hour's load is over 25%.
+**Effect:** each 2-hour local block keeps the state its ping tests last proved best. Until a block is decided it alternates, on in odd local hours and off in even ones, so neighbours heard only with the LNA on are found and the audit gets both records; a decided block switches only when the tests show, with significance, that the other state does better there. A test pings a neighbour (rotating among the 3 weakest heard recently) with the LNA in one state, flips it, pings again and flips back; it scores which state got the reply, or the clearer one. A test whose outbound SNR changed between the pings (fading), or whose idle floor moved more than 6 dB off the LNA's usual shift (noise changed mid-test), is discarded; no test runs while the last hour's load is over 25%.
 
 | Rule | Value |
 | --- | --- |
 | Test rate | Every 10 minutes for the first 7 days, then one per block; at most 150 tests a day |
-| Switch | A block leaves the default after 8 or more decided tests and a significant score |
-| Revert | Two tests in a row lost by the state a block is running return it to the default for the rest of the day |
-| Lost-neighbour veto | A neighbour that answers only with the LNA on keeps that block on for 14 days |
+| Switch | A block switches state after 8 or more decided tests and a significant score; decided without a winner, it runs off |
+| Revert | Two tests in a row lost while a block runs on send it to off, clear its scores and start its learning again |
+| Lost-neighbour veto | A neighbour that answers only with the LNA on turns that block on at once and keeps it on for 14 days |
 | Fade | Scores fade by 5% a day (half-life about 14 days) |
-| Retire | After the learning week, a block within 3% over 30 or more tests stops testing and runs the default |
-| Park | Floor moving less than 10 dB between states: `auto (parked: LNA not working)`, 🔴 in `diag`. Fewer than 2 pingable neighbours for 14 days: `parked: too few neighbours`. Every block retired: `parked: no benefit, <default>`. A parked auto learns again after 90 days |
+| Retire | After the learning week, a block within 3% over 30 or more tests stops testing and runs off |
+| Park | Floor moving less than 10 dB between states: `auto (parked: LNA not working)`, 🔴 in `diag`. Fewer than 2 pingable neighbours for 14 days: `parked: too few neighbours`. Every block retired: `parked: no benefit, off`, which runs off. A parked auto learns again after 90 days |
 | Freezes | A freeze in a block while the LNA was on counts against on there |
-| Audit | Every closed hour adds to its block's record for the state it ran: packets decoded, failed decodes, neighbours heard, freezes and idle floor. Once both states have 6 hours, a block's running state is banned for 7 days when it is clearly worse than the other: failed-decode rate up 2 points and by half, packets down 30%, a neighbour fewer per hour, twice the freezes, or (LNA on) the floor more than 6 dB above the usual shift. A banned state must re-earn the block from new tests |
-| Refresh | A block away from its default runs the default one day in 14, so both records stay current |
-| Overload | The daily engine run's `LNA overload` verdict bans on in its hours (all day if none are named), even where on is the default |
+| Audit | Every closed hour adds to its block's record for the state it ran: packets decoded, failed decodes, neighbours heard, freezes and idle floor. Once both states have 6 hours, a block's running state (on, for a block still alternating) is banned for 7 days when it is clearly worse than the other: failed-decode rate up 2 points and by half, packets down 30%, a neighbour fewer per hour, twice the freezes, or (LNA on) the floor more than 6 dB above the usual shift. A ban sends the block to the other state, and the banned state must re-earn it from new tests |
+| Refresh | A block running on runs off one day in 14, so both records stay current |
+| Overload | The daily engine run's `LNA overload` verdict bans on for 7 days in the blocks of the hours the LNA was on with failed decodes or freezes; with none named, every hour it was on; with no record, all day |
 
-Tests transmit (two direct pings each) and stop while `diag auto` is off or paused, on a low battery (150 mV above power-guard's engage voltage, 3.45 V on builds without it), while a `diag radio.lna` study runs, and for 15 minutes after another feature (power-guard's low-battery drop) moves the LNA. `set radio.fem.rxgain on|off` (or a `tryset`) leaves auto and keeps its scores for a later `auto`. `clear diag confirm` wipes the scores and leaves auto on. `diag radio.lna` ends with the auto state, a row of the 12 blocks (`+` on, `-` off, `.` undecided, `x` retired), the gain against the fixed default, the ban in force, the floor shift, the test tallies and the tests discarded or skipped; the diag 📶 line shows the auto state.
+Tests transmit (two direct pings each) and stop while `diag auto` is off or paused, on a low battery (150 mV above power-guard's engage voltage, 3.45 V on builds without it), while a `diag radio.lna` study runs, and for 15 minutes after another feature (power-guard's low-battery drop) moves the LNA. `set radio.fem.rxgain on|off` (or a `tryset`) leaves auto and keeps its scores for a later `auto`. `clear diag confirm` wipes the scores and leaves auto on. `diag radio.lna` ends with the auto state, a row of the 12 blocks (`+` on, `-` off, `.` undecided and alternating, `x` retired), the gain against fixed off, the ban in force, the floor shift, the test tallies and the tests discarded or skipped; the diag 📶 line shows the auto state.
 
 ## diag batt
 

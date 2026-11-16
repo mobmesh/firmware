@@ -484,6 +484,16 @@ static void buildInput(EngineInput& in, NoiseView& nv, BattView& bv, StoreDay* h
 
 // ---------------------------------------------------------------- the hour and the day
 
+// Local hours of the last 24 the LNA was on, one bit per hour.
+static uint32_t lnaOnHours() {
+  uint32_t mask = 0, now = clockHour();
+  for (uint32_t h = now - 24; now && h < now; h++) {
+    const StoreHour* s = storeHourAt(store, h);
+    if (s && s->lna == STORE_LNA_ON) mask |= 1UL << storeLocalHour(h, modTzHours());
+  }
+  return mask;
+}
+
 // Yesterday's leading cause goes into the recurrence ring, so a verdict can say how many days it held.
 static void recordDay(uint32_t day) {
   EngineInput in;
@@ -501,8 +511,11 @@ static void recordDay(uint32_t day) {
   if (r == nullptr) return;
   engineRun(in, *r);
   storeRecurSet(store, day, r->cause, r->cause_hours);
-  // The engine's overload verdict bans the LNA in those hours while auto runs; no hours named means all day.
-  if (r->cause == CAUSE_LNA_OVERLOAD && store.lna_auto.enabled) autoBan(store.lna_auto, r->cause_hours ? r->cause_hours : 0xFFFFFFUL, true, AUTO_R_OVERLOAD);
+  // The overload verdict bans the LNA in the hours it was on with failed decodes or freezes; else every hour it was on, else all day.
+  if (r->cause == CAUSE_LNA_OVERLOAD && store.lna_auto.enabled) {
+    uint32_t on = lnaOnHours(), hours = r->cause_hours & on;
+    autoBan(store.lna_auto, hours ? hours : on ? on : 0xFFFFFFUL, true, AUTO_R_OVERLOAD);
+  }
   free(r);
   // LNA auto's daily turn: fade, retire, park; pingable neighbours are the judged ones.
   if (store.lna_auto.enabled) {
@@ -1139,7 +1152,7 @@ static void autoSet(bool on) {
   auto_set = on ? 1 : 0;
 }
 
-// The weakest judged neighbour, rotating so one node does not carry every test.
+// The weakest judged neighbours, rotating among the weakest few so one node does not carry every test.
 static bool autoPickTarget(char* out, size_t len) {
   int order[LINKS_MAX], k = 0;
   uint8_t sf = currentSf();
@@ -1155,7 +1168,7 @@ static bool autoPickTarget(char* out, size_t len) {
     }
     order[j + 1] = v;
   }
-  linkLabel(links, order[auto_rotate++ % k], out, len);
+  linkLabel(links, order[auto_rotate++ % (k < AUTO_TARGETS ? k : AUTO_TARGETS)], out, len);
   for (char* c = out; *c; c++) if (*c >= 'A' && *c <= 'F') *c += 32;
   return true;
 }
@@ -1195,7 +1208,8 @@ static void autoTick(uint32_t now_ms) {
   if (!modFemLnaAvailable() || run) return;
   uint32_t hour = clockHour();
   if (!hour) return;
-  uint8_t block = autoBlockOf(storeLocalHour(hour, modTzHours()));
+  uint8_t local_hour = storeLocalHour(hour, modTzHours());
+  uint8_t block = autoBlockOf(local_hour);
   uint32_t day = storeLocalDay(hour, modTzHours());
   if (auto_step == AUTO_PING_A && autoPingDone(now_ms, auto_first_on ? 1 : 0)) {
     // Second half: the other state, after its floor reading.
@@ -1204,13 +1218,13 @@ static void autoTick(uint32_t now_ms) {
     autoFloor(auto_first_on ? 0 : 1);
     auto_ping_ms = now_ms;
     auto_step = autoPingStart() ? AUTO_PING_B : AUTO_IDLE;
-    if (auto_step == AUTO_IDLE) autoSet(autoApplied(store.lna_auto, auto_block));
+    if (auto_step == AUTO_IDLE) autoSet(autoApplied(store.lna_auto, auto_block, local_hour));
     return;
   }
   if (auto_step == AUTO_PING_B && autoPingDone(now_ms, auto_first_on ? 0 : 1)) {
     autoAddTest(store.lna_auto, auto_block, auto_test, modClockGet(), day);
     auto_step = AUTO_IDLE;
-    autoSet(autoApplied(store.lna_auto, block));
+    autoSet(autoApplied(store.lna_auto, block, local_hour));
     saveStore();
     return;
   }
@@ -1223,7 +1237,7 @@ static void autoTick(uint32_t now_ms) {
   }
   if (auto_hold_until && (int32_t)(now_ms - auto_hold_until) < 0) return;
   auto_hold_until = 0;
-  bool applied = autoApplied(store.lna_auto, block);
+  bool applied = autoApplied(store.lna_auto, block, local_hour);
   if (modFemLnaGet() != applied) autoSet(applied);
   else auto_set = applied ? 1 : 0;
   // Tests transmit, so they stop with the automatic captures and on a low battery.
@@ -1463,7 +1477,7 @@ static void runLnaReport() {
     outLine(out, "Blocks 0-24h: %s", row);
     char banned[48];
     if (autoBanText(au, banned, sizeof(banned))) outLine(out, "%s", banned);
-    if (au.gain_tests) outLine(out, "Auto vs fixed %s: %+d of %u tests", au.default_on ? "on" : "off", au.gain_replies, au.gain_tests);
+    if (au.gain_tests) outLine(out, "Auto vs fixed off: %+d of %u tests", au.gain_replies, au.gain_tests);
     if (au.floor_n) outLine(out, "Floor shift %+d dB over %u tests", (int)(au.floor_shift_sum / au.floor_n), au.floor_n);
     unsigned on = 0, off = 0, ties = 0;
     for (int i = 0; i < AUTO_BLOCKS; i++) {
@@ -1519,9 +1533,9 @@ static void startStudy(const char* arg) {
 // Every history diag keeps; the time zone is a setting and stays.
 static void resetHistory() {
   if (run) finishStudy(true);
-  bool auto_on = store.lna_auto.enabled, auto_def = store.lna_auto.default_on;
+  bool auto_on = store.lna_auto.enabled;
   storeInit(store);
-  if (auto_on) autoInit(store.lna_auto, auto_def, clockHour() ? storeLocalDay(clockHour(), modTzHours()) : 0);
+  if (auto_on) autoInit(store.lna_auto, clockHour() ? storeLocalDay(clockHour(), modTzHours()) : 0);
   linkInit(links);
   have_scan = false;
   scan_ms = 0;
@@ -1816,16 +1830,12 @@ bool diagReportsHandleCli(const ModCliContext& context, char* command, char* rep
       return true;
     }
     uint32_t day = clockHour() ? storeLocalDay(clockHour(), modTzHours()) : 0;
-    char saved[40] = "";
-    modCliDispatch(0, (char*)"get radio.fem.rxgain", saved);
-    // The saved setting is the default; if it cannot be read, the state the LNA is in now.
-    bool default_on = strstr(saved, "on") ? true : strstr(saved, "off") ? false : modFemLnaGet();
     LnaAutoState& a = store.lna_auto;
-    // Back to auto keeps its scores; a parked auto, or the first time, starts a fresh learning week.
-    if (a.default_on == default_on && a.start_day && a.park == AUTO_ACTIVE) a.enabled = 1;
-    else autoInit(a, default_on, day);
+    // Back to auto keeps its scores; a parked auto, or the first time, starts a fresh learning week with every block off.
+    if (a.start_day && a.park == AUTO_ACTIVE) a.enabled = 1;
+    else autoInit(a, day);
     saveStore();
-    sprintf(reply, "OK - auto (learning, default %s)", default_on ? "on" : "off");
+    strcpy(reply, "OK - auto (learning, starts off)");
     return true;
   }
   if (strcmp(command, "get radio.fem.rxgain") == 0 && store.lna_auto.enabled && modFemLnaAvailable()) {

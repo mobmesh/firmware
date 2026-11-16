@@ -25,27 +25,29 @@ int main() {
   // Blocks follow local even hours.
   CHECK(autoBlockOf(0) == 0 && autoBlockOf(13) == 6 && autoBlockOf(23) == 11);
 
-  // Learning starts at the default, tests every 10 minutes, under a daily cap.
-  autoInit(a, true, DAY);
-  CHECK(autoApplied(a, 6) && autoLearning(a, DAY, 6));
+  // Learning starts undecided: odd local hours on, even off; tests every 10 minutes, under a daily cap.
+  autoInit(a, DAY);
+  CHECK(!autoApplied(a, 6, 12) && autoApplied(a, 6, 13) && autoLearning(a, DAY, 6));
   CHECK(autoTestDue(a, T0 + 100, DAY, 6));
   autoAddTest(a, 6, pair(true, true, 3, 3), T0 + 100, DAY);
   CHECK(!autoTestDue(a, T0 + 400, DAY, 6) && autoTestDue(a, T0 + 700, DAY, 6));
   CHECK(!autoTestDue(a, 0, DAY, 6));
 
-  // A block leaves the default only on a significant score: one-sided losses for on in 6 (12-14h) turn it off.
-  for (int i = 0; i < 7; i++) autoAddTest(a, 6, pair(true, true, 6, 3), T0 + 1000 + i * 700, DAY);
-  CHECK(autoApplied(a, 6));   // 7 decided: not yet
-  for (int i = 0; i < 6; i++) autoAddTest(a, 6, pair(true, true, 6, 3), T0 + 6000 + i * 700, DAY);
-  CHECK(!autoApplied(a, 6) && autoApplied(a, 5));
+  // A block takes on only on a significant score: one-sided wins for on in 6 (12-14h) turn it on, in every hour.
+  for (int i = 0; i < 7; i++) autoAddTest(a, 6, pair(true, true, 3, 6), T0 + 1000 + i * 700, DAY);
+  CHECK(!autoApplied(a, 6, 12));   // 7 decided: still alternating
+  for (int i = 0; i < 6; i++) autoAddTest(a, 6, pair(true, true, 3, 6), T0 + 6000 + i * 700, DAY);
+  CHECK(autoApplied(a, 6, 12) && autoApplied(a, 6, 13) && !autoApplied(a, 5, 10));
   autoStatusText(a, -6, text, sizeof(text));
-  CHECK_STR(text, "auto (on, off 12-14)");
+  CHECK_STR(text, "auto (off, on 12-14)");
   autoBlockRow(a, row);
-  CHECK(row[6] == '-' && row[5] == '.');
+  CHECK(row[6] == '+' && row[5] == '.');
 
-  // A mixed block stays at the default.
+  // A mixed block, decided but with no significant winner, settles off and stops alternating.
   for (int i = 0; i < 20; i++) autoAddTest(a, 9, pair(true, true, i % 2 ? 6 : 3, i % 2 ? 3 : 6), T0 + 20000 + i * 700, DAY);
-  CHECK(autoApplied(a, 9));
+  CHECK(!autoApplied(a, 9, 18) && !autoApplied(a, 9, 19));
+  autoBlockRow(a, row);
+  CHECK(row[9] == '-');
 
   // Fading between pings: the outbound SNRs disagree, so the pair is discarded.
   uint16_t before = a.b[3].on_w + a.b[3].off_w;
@@ -53,17 +55,19 @@ int main() {
   CHECK(a.b[3].on_w + a.b[3].off_w == before);
   CHECK(!autoAddTest(a, 3, pair(false, false, 0, 0), T0 + 41000, DAY));
 
-  // Revert fast: two losses in a row by the applied state return the block to the default for the day.
-  for (int i = 0; i < 2; i++) autoAddTest(a, 6, pair(true, true, 3, 6), T0 + 50000 + i * 700, DAY);
-  CHECK(a.b[6].reverted && autoApplied(a, 6) && a.b[6].restart);
-  autoDayTurn(a, DAY + 1, 4);
-  CHECK(!a.b[6].reverted && !autoApplied(a, 6));
-  // A neighbour heard only with the LNA on vetoes off at once, and for two weeks.
-  autoAddTest(a, 6, pair(false, true, 0, 4), T0 + 90000, DAY + 1);
-  CHECK(a.b[6].veto_off == 14 && autoApplied(a, 6));
-
-  // Auto against the fixed default: replies won or lost while it ran the other state.
+  // Auto against fixed off: replies won or lost while it ran on.
   CHECK(a.gain_tests >= 1);
+
+  // Two losses in a row while on send the block to off, scores cleared, learning again; it stays there across days.
+  for (int i = 0; i < 2; i++) autoAddTest(a, 6, pair(true, true, 6, 3), T0 + 50000 + i * 700, DAY);
+  CHECK(!a.b[6].best && a.b[6].on_w == 0 && a.b[6].off_w == 0 && a.b[6].restart && !autoApplied(a, 6, 12));
+  autoDayTurn(a, DAY + 1, 4);
+  CHECK(!autoApplied(a, 6, 12) && autoApplied(a, 6, 13));   // undecided again: alternating
+  // A neighbour heard only with the LNA on turns the block on at once, and vetoes off for two weeks.
+  autoAddTest(a, 6, pair(false, true, 0, 4), T0 + 90000, DAY + 1);
+  CHECK(a.b[6].veto_off == 14 && autoApplied(a, 6, 12) && autoApplied(a, 6, 13));
+  for (int i = 0; i < 2; i++) autoAddTest(a, 6, pair(true, true, 6, 3), T0 + 91000 + i * 700, DAY + 1);
+  CHECK(autoApplied(a, 6, 12));   // losses do not override the veto
 
   // Freezes in a block while on count against on.
   uint16_t off_w = a.b[2].off_w;
@@ -71,55 +75,56 @@ int main() {
   CHECK(a.b[2].off_w == off_w + 10);
 
   // Scores fade: 0.95 a day.
-  autoInit(a, true, DAY);
+  autoInit(a, DAY);
   for (int i = 0; i < 20; i++) autoAddTest(a, 1, pair(true, true, 6, 3), T0 + i * 700, DAY);
   uint16_t w = a.b[1].off_w;
   autoDayTurn(a, DAY + 1, 4);
   CHECK(a.b[1].off_w == w * 95 / 100);
 
   // Retire: after the learning week, a block within 3% over 30+ tests stops testing.
-  autoInit(a, false, DAY);
+  autoInit(a, DAY);
   for (int i = 0; i < 40; i++) autoAddTest(a, 4, pair(true, true, i % 2 ? 6 : 3, i % 2 ? 3 : 6), T0 + i * 700, DAY + 7);
   autoDayTurn(a, DAY + 7, 4);
   CHECK(a.b[4].retired && !autoTestDue(a, T0 + 7 * 86400 + 99999, DAY + 7, 4));
 
   // Park: dead LNA (floor barely moves), too few neighbours, nothing left to learn.
-  autoInit(a, true, DAY);
+  autoInit(a, DAY);
   for (int i = 0; i < 6; i++) {
     AutoTest t = pair(true, true, 3, 3);
     t.floor_dbm[1] = -114;
     autoAddTest(a, 0, t, T0 + i * 700, DAY);
   }
   autoDayTurn(a, DAY + 1, 4);
-  CHECK(a.park == AUTO_PARK_DEAD && autoApplied(a, 0) && !autoTestDue(a, T0 + 99999, DAY + 1, 0));
+  CHECK(a.park == AUTO_PARK_DEAD && !autoApplied(a, 0, 1) && !autoTestDue(a, T0 + 99999, DAY + 1, 0));
   autoStatusText(a, 0, text, sizeof(text));
   CHECK_STR(text, "auto (parked: LNA not working)");
   // A parked auto rechecks after 90 days by learning again.
   autoDayTurn(a, DAY + 1 + 90, 4);
   CHECK(a.park == AUTO_ACTIVE && a.start_day == DAY + 91 && a.enabled);
-  autoInit(a, true, DAY);
+  autoInit(a, DAY);
   for (int d = 1; d <= 14; d++) autoDayTurn(a, DAY + d, 1);
   CHECK(a.park == AUTO_PARK_FEW_NB);
   autoStatusText(a, 0, text, sizeof(text));
   CHECK_STR(text, "auto (parked: too few neighbours)");
-  autoInit(a, true, DAY);
+  autoInit(a, DAY);
   for (int b = 0; b < AUTO_BLOCKS; b++) a.b[b].retired = 1;
   autoDayTurn(a, DAY + 8, 4);
   CHECK(a.park == AUTO_PARK_NO_BENEFIT);
   autoStatusText(a, 0, text, sizeof(text));
-  CHECK_STR(text, "auto (parked: no benefit, on)");
+  CHECK_STR(text, "auto (parked: no benefit, off)");
+  CHECK(!autoApplied(a, 4, 9));
 
-  // Disabled or default-off: the default rules, and on wins only significantly.
-  autoInit(a, false, DAY);
-  for (int i = 0; i < 14; i++) autoAddTest(a, 10, pair(false, true, 0, 5), T0 + i * 700, DAY);
-  CHECK(autoApplied(a, 10) && !autoApplied(a, 0));
+  // Disabled: off, and no tests.
+  autoInit(a, DAY);
+  for (int i = 0; i < 14; i++) autoAddTest(a, 10, pair(true, true, 3, 6), T0 + i * 700, DAY);
+  CHECK(autoApplied(a, 10) && !autoApplied(a, 0, 0));
   autoStatusText(a, 0, text, sizeof(text));
   CHECK_STR(text, "auto (off, on 20-22)");
   a.enabled = 0;
-  CHECK(!autoApplied(a, 10) && !autoTestDue(a, T0 + 99999, DAY, 10));
+  CHECK(!autoApplied(a, 10, 21) && !autoTestDue(a, T0 + 99999, DAY, 10));
 
   // A test over a busy channel is skipped and counted.
-  autoInit(a, false, DAY);
+  autoInit(a, DAY);
   CHECK(autoChannelOk(a, 25) && !autoChannelOk(a, 26) && a.busy == 1);
 
   // Noise that changed between the halves: once the usual shift is known, a pair far off it is thrown out.
@@ -130,8 +135,8 @@ int main() {
   CHECK(!autoAddTest(a, 3, jumped, T0 + 9000, DAY) && a.noisy == 1 && a.b[3].on_w == 0);
 
   // The audit: block 10 learned on, but its on hours decode worse than its off hours, so on is banned there.
-  autoInit(a, false, DAY);
-  for (int i = 0; i < 14; i++) autoAddTest(a, 10, pair(false, true, 0, 5), T0 + i * 700, DAY);
+  autoInit(a, DAY);
+  for (int i = 0; i < 14; i++) autoAddTest(a, 10, pair(true, true, 3, 6), T0 + i * 700, DAY);
   CHECK(autoApplied(a, 10));
   for (int h = 0; h < 6; h++) autoAddHour(a, 10, false, 100, 2, 0, 3, -117);
   for (int h = 0; h < 5; h++) autoAddHour(a, 10, true, 100, 12, 0, 3, -95);
@@ -155,26 +160,32 @@ int main() {
     {100, 2, 0, 3, -95, AUTO_R_NONE},
   };
   for (auto& k : cases) {
-    autoInit(a, false, DAY);
-    for (int i = 0; i < 14; i++) autoAddTest(a, 10, pair(false, true, 0, 5), T0 + i * 700, DAY);
+    autoInit(a, DAY);
+    for (int i = 0; i < 14; i++) autoAddTest(a, 10, pair(true, true, 3, 6), T0 + i * 700, DAY);
     for (int h = 0; h < 6; h++) autoAddHour(a, 10, false, 100, 2, 0, 3, -117);
     for (int h = 0; h < 6; h++) autoAddHour(a, 10, true, k.recv, k.errors, k.freezes, k.heard, k.floor);
     CHECK(autoAudit(a, 10) == k.why);
   }
 
-  // A default-on block the engine finds overloaded runs off while the ban lasts, then on again.
-  autoInit(a, true, DAY);
+  // An undecided block the engine finds overloaded runs off in every hour while the ban lasts.
+  autoInit(a, DAY);
   autoBan(a, 1UL << 7, true, AUTO_R_OVERLOAD);   // 7am: block 3
-  CHECK(!autoApplied(a, 3) && autoApplied(a, 2));
+  CHECK(!autoApplied(a, 3, 7) && autoApplied(a, 2, 5));
+  // The audit judges an undecided block's on hours against its off hours.
+  for (int h = 0; h < 6; h++) autoAddHour(a, 8, false, 100, 2, 0, 3, -117);
+  for (int h = 0; h < 6; h++) autoAddHour(a, 8, true, 100, 12, 0, 3, -95);
+  CHECK(autoAudit(a, 8) == AUTO_R_DECODES && !autoApplied(a, 8, 17));
+  autoInit(a, DAY);
+  autoBan(a, 1UL << 7, true, AUTO_R_OVERLOAD);
   CHECK(autoBanText(a, text, sizeof(text)));
   CHECK_STR(text, "on 06-08 banned 7d: overload");
 
-  // A block away from its default runs the default one day in 14, so both records stay current.
-  autoInit(a, false, DAY);
-  for (int i = 0; i < 14; i++) autoAddTest(a, 10, pair(false, true, 0, 5), T0 + i * 700, DAY);
+  // A block running on runs off one day in 14, so both records stay current.
+  autoInit(a, DAY);
+  for (int i = 0; i < 14; i++) autoAddTest(a, 10, pair(true, true, 3, 6), T0 + i * 700, DAY);
   int refreshed = 0;
   for (int d = 1; d <= 14; d++) {
-    for (int i = 0; i < 2; i++) autoAddTest(a, 10, pair(false, true, 0, 5), T0 + d * 86400UL + i * 700, DAY + d);
+    for (int i = 0; i < 2; i++) autoAddTest(a, 10, pair(true, true, 3, 6), T0 + d * 86400UL + i * 700, DAY + d);
     autoDayTurn(a, DAY + d, 4);
     refreshed += !autoApplied(a, 10);
   }
