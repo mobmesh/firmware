@@ -103,6 +103,11 @@ static void powerOffNow(uint32_t secs) {
   modBoardDeepSleep(secs);
 }
 
+// Safe sleep takes the same power-down as poweroff.
+void powerGuardSleepNow(uint32_t secs) {
+  powerOffNow(secs);
+}
+
 void powerGuardLoop() {
   if (poweroff_secs != 0 && millis() - poweroff_at_ms >= POWER_GUARD_POWEROFF_GRACE_MS) {
     powerOffNow(poweroff_secs);

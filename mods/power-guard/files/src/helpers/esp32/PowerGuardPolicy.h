@@ -60,6 +60,9 @@
     (POWER_GUARD_RESUME_MV > 0 ? POWER_GUARD_RESUME_MV - 1 : 0)
 #endif
 
+// The integration's power-down and deep sleep: rails off and the radio asleep before the board sleeps.
+void powerGuardSleepNow(uint32_t secs);
+
 class PowerGuardPolicy {
   unsigned long _next_sample_at;
   uint8_t _agree;
@@ -153,7 +156,7 @@ public:
                       mv, (unsigned)_sleep_mv,
                       (unsigned)(POWER_GUARD_SAMPLE_INTERVAL_MS / 1000
                                  * POWER_GUARD_CONSECUTIVE_SAMPLES));
-        modBoardDeepSleep(POWER_GUARD_SAFE_SECS);   // does not return
+        powerGuardSleepNow(POWER_GUARD_SAFE_SECS);   // does not return
       }
     } else {
       _sleep_agree = 0;
