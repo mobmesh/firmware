@@ -16,7 +16,7 @@ enum TrafficKind : uint8_t {
   TRAFFIC_UNKNOWN,                     // no activity check ran
   TRAFFIC_QUIET,                       // no LoRa, no energy
   TRAFFIC_OURS,                        // LoRa that decoded: this mesh
-  TRAFFIC_FOREIGN,                     // LoRa at our settings that never decoded: another network
+  TRAFFIC_FOREIGN,                     // LoRa at the node's settings that never decoded: another network
   TRAFFIC_NOT_LORA,                    // energy with no LoRa: interference
 };
 
@@ -75,7 +75,7 @@ struct ScanFinding {
   int16_t blocker_khz;
   int8_t blocker_db;
   float peak_mhz;                      // where the energy on the channel peaks
-  int16_t peak_khz;                    // that peak against our frequency; 0 = exactly on it
+  int16_t peak_khz;                    // that peak against the node's frequency; 0 = exactly on it
   uint8_t traffic;                     // TrafficKind on the channel during the scan
 };
 

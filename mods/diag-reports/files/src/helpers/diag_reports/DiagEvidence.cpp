@@ -133,7 +133,7 @@ void evidenceBuild(DiagEvidence& e, const EvidenceSources& in) {
     e.scan_explains_loud = s.scan.kind == SCAN_K_MESH_STEADY && e.scan_in_loud;
   }
   e.scan_empty_at_trigger = s.scan_capture.at && s.scan_capture.kind == 0 && e.freezes;
-  // Weak packets of our own make orphan preambles too: another network needs two hours of them with none of ours decoded.
+  // Weak packets of this mesh make orphan preambles too: another network needs two hours of them with none of this mesh's decoded.
   int foreign_hours = 0;
   for (int i = 0; i < STORE_HOURS; i++) {
     const StoreHour& h = s.h[i];

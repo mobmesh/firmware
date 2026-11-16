@@ -268,3 +268,21 @@ bool directRetryHandleCli(const ModCliContext& context, char* command, char* rep
   }
   return true;
 }
+
+bool directRetryTotals(uint32_t* retried, uint32_t* won) {
+  if (!booted) boot();
+  if (!enabled) return false;
+  *retried = count_retried;
+  *won = count_won;
+  return true;
+}
+
+int directRetryHopRecords(DrHop* out, int max) {
+  if (!booted) boot();
+  if (!enabled) return 0;
+  int n = 0;
+  for (int i = 0; i < DR_HOPS && n < max; i++) {
+    if (hops[i].len && hops[i].retried) out[n++] = hops[i];
+  }
+  return n;
+}

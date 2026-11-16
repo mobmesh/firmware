@@ -20,7 +20,7 @@ struct Rig {
   float margin;
   bool use_ev = true;
 
-  // A healthy node: quiet channel, three solid links that hear us, steady battery, light load.
+  // A healthy node: quiet channel, three solid links that hear this node, steady battery, light load.
   void healthy() {
     storeInit(store);
     linkInit(links);

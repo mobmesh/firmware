@@ -430,10 +430,10 @@ static void traffic_cases() {
   // Passive flag reads and the decoder name what was on the channel.
   TrafficCheck t = {};
   CHECK(trafficClassify(t, true) == TRAFFIC_UNKNOWN);
-  // Our packet: preamble, then a header, then the flags clear on receipt.
+  // A packet of this mesh: preamble, then a header, then the flags clear on receipt.
   trafficPeek(t, 0x0004); trafficPeek(t, 0x0014); trafficPeek(t, 0);
   CHECK(t.preambles == 1 && t.orphans == 0 && t.pending == 0);
-  // A header error still reached our header stage: not an orphan.
+  // A header error still reached the header stage: not an orphan.
   trafficPeek(t, 0x0004); trafficPeek(t, 0x0024); trafficPeek(t, 0);
   CHECK(t.preambles == 2 && t.orphans == 0);
   // Another sync word: the preamble times out with no header, once per preamble however long it is held.
@@ -511,7 +511,7 @@ static void scan_spill_case() {
   }
   f = scanAnalyse(d);
   CHECK(f.kind == SCAN_K_MESH_STEADY && !f.blocker);
-  // The peak says whether it sits exactly on our frequency or a measured step off it.
+  // The peak says whether it sits exactly on the node's frequency or a measured step off it.
   CHECK(f.peak_khz == 0 && fabsf(f.peak_mhz - 910.525f) < 0.001f && f.db == 18);
   char text[40];
   scanSummary(f, text, sizeof(text));
@@ -709,10 +709,10 @@ static void engine_cases() {
   base();
   in.errors = 110;
   runIt();
-  // One hour of orphan preambles can be weak packets of our own: no verdict.
+  // One hour of orphan preambles can be weak packets of this mesh: no verdict.
   CHECK(!ev.foreign_lora && r.cause != CAUSE_FOREIGN_LORA);
   CHECK(!outHas("other LoRa"));
-  // A second hour of them with none of ours decoded names the other network.
+  // A second hour of them with none of this mesh's decoded names the other network.
   storeLoraSeen(store, at(15), true, false);
   build();
   base();
@@ -727,7 +727,7 @@ static void engine_cases() {
   store.noise_capture = {at(9), 0, -104, -90, -100, 3};
   storeLoraSeen(store, at(9), true, false);
   storeLoraSeen(store, at(11), true, false);
-  // An hour that also decoded ours does not count.
+  // An hour that also decoded this mesh's packets does not count.
   storeLoraSeen(store, at(14), true, true);
   build();
   base();
@@ -736,7 +736,7 @@ static void engine_cases() {
   OUT("Noise    \U0001F7E1 Loud 8am-5pm, other LoRa");
   relateNoise(ev, links, noise, note);
   NOTE("network shares our frequency.");
-  // Orphans in an hour that also decoded ours are our own weak packets: one clean hour is not enough.
+  // Orphans in an hour that also decoded this mesh's packets are its own weak packets: one clean hour is not enough.
   quietDay();
   loud(8, 17, -104, 100, 1);
   storeLoraSeen(store, at(9), true, false);

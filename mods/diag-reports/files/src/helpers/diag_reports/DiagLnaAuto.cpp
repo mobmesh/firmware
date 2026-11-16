@@ -176,7 +176,7 @@ bool autoAddTest(LnaAutoState& a, uint8_t block, const AutoTest& t, uint32_t epo
     if (a.silent < 0xFFFF) a.silent++;
     return false;
   }
-  // The neighbour's view of our ping does not depend on our LNA; if it moved, the path faded and the pair says nothing.
+  // The neighbour's view of the ping does not depend on this node's LNA; if it moved, the path faded and the pair says nothing.
   if (t.reply[0] && t.reply[1] && fabsf(t.out_db[0] - t.out_db[1]) > FADING_DB) {
     if (a.faded < 0xFFFF) a.faded++;
     return false;

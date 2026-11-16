@@ -79,9 +79,6 @@ int linkClockSummary(const LinkTable& t, uint32_t now_ms, char* out, size_t len)
 bool linkWeakest(const LinkTable& t, uint8_t sf, uint32_t now_ms, float* margin_db, char* id, size_t len);
 void linkFormat(const LinkTable& t, uint8_t sf, uint32_t now_ms, const LinkContext* context, const DiagNote* note, DiagOut& o);
 
-// direct-retry's `get direct.retry.stats` reply: packets that needed a resend and those then confirmed; false when absent.
-bool linkRetryParse(const char* reply, uint32_t* retried, uint32_t* won);
-
 struct LinkRetryHop {
   uint16_t id;
   uint8_t id_len;
@@ -90,7 +87,5 @@ struct LinkRetryHop {
 #define LINK_RETRY_HOPS 8
 #define LINK_RETRY_MIN  5              // resends to a hop before its record counts as evidence
 
-// direct-retry's `get direct.retry.hops` reply: "> a6b2:12/9 c5:3/3"; returns the hops read.
-int linkRetryHops(const char* reply, LinkRetryHop* out, int max);
 // The judged neighbour whose resends mostly go unconfirmed (under half of LINK_RETRY_MIN or more), worst first, or -1.
 int linkRetryOneWay(const LinkTable& t, const LinkRetryHop* hops, int n, uint32_t now_ms, int* hop_index);

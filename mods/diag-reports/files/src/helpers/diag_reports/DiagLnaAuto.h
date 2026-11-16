@@ -87,7 +87,7 @@ struct LnaAutoState {
 struct AutoTest {
   bool reply[2];                       // index 0 = LNA off, 1 = on
   float back_db[2];                    // SNR of the reply at this node: the LNA affects it
-  float out_db[2];                     // SNR of our ping at the neighbour: the LNA does not, so a mismatch means fading
+  float out_db[2];                     // SNR of the ping at the neighbour: the LNA does not, so a mismatch means fading
   int8_t floor_dbm[2];                 // idle floor just before each ping
 };
 

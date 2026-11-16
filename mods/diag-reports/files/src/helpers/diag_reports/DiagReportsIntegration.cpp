@@ -16,6 +16,9 @@
 #include <helpers/diag_reports/DiagEvidence.h>
 #include <helpers/diag_reports/DiagRelate.h>
 #include <helpers/diag_reports/DiagLinks.h>
+#ifdef WITH_DIRECT_RETRY
+#include <helpers/direct_retry/DirectRetryIntegration.h>
+#endif
 #include <helpers/diag_reports/DiagLna.h>
 #include <helpers/diag_reports/DiagNoise.h>
 #include <helpers/diag_reports/DiagOut.h>
@@ -343,25 +346,37 @@ static const ProbeResult* recentPing() {
 
 static bool lockedNow(const uint8_t state[2]);
 
-// direct-retry through its CLI, so a build without it, or with it off, shows nothing.
-static bool retryOn() {
-  char reply[160] = "";
-  modCliDispatch(0, (char*)"get direct.retry", reply);
-  return strstr(reply, "> on") != nullptr;
+// direct-retry's counters when the build carries it; without it, or with it off, nothing shows.
+static bool retryCounts(uint32_t* retried, uint32_t* won) {
+#ifdef WITH_DIRECT_RETRY
+  return directRetryTotals(retried, won);
+#else
+  (void)retried;
+  (void)won;
+  return false;
+#endif
 }
 
-static bool retryCounts(uint32_t* retried, uint32_t* won) {
-  if (!retryOn()) return false;
-  char reply[160] = "";
-  modCliDispatch(0, (char*)"get direct.retry.stats", reply);
-  return linkRetryParse(reply, retried, won);
+static bool retryOn() {
+  uint32_t r, w;
+  return retryCounts(&r, &w);
 }
 
 static int retryHops(LinkRetryHop* hops) {
-  if (!retryOn()) return 0;
-  char reply[160] = "";
-  modCliDispatch(0, (char*)"get direct.retry.hops", reply);
-  return linkRetryHops(reply, hops, LINK_RETRY_HOPS);
+#ifdef WITH_DIRECT_RETRY
+  DrHop raw[LINK_RETRY_HOPS];
+  int n = directRetryHopRecords(raw, LINK_RETRY_HOPS);
+  for (int i = 0; i < n; i++) {
+    hops[i].id = raw[i].len == 2 ? (uint16_t)((raw[i].id[0] << 8) | raw[i].id[1]) : raw[i].id[0];
+    hops[i].id_len = raw[i].len;
+    hops[i].retried = raw[i].retried;
+    hops[i].won = raw[i].won;
+  }
+  return n;
+#else
+  (void)hops;
+  return 0;
+#endif
 }
 
 // The counters restart at boot: the first sample after it counts everything since boot.
@@ -902,7 +917,7 @@ static void burstTick(uint32_t now_ms) {
   burst_traffic.decoded = (uint16_t)(recv_now >= burst_recv0 ? recv_now - burst_recv0 : 0);
   burst_traffic.errors = (uint16_t)(err_now >= burst_err0 ? err_now - burst_err0 : 0);
   uint8_t lora = trafficClassify(burst_traffic, raised || burst_packets > 0);
-  // Another network's LoRa is neither our traffic nor a carrier: kept as its own kind.
+  // Another network's LoRa is neither this mesh's traffic nor a carrier: kept as its own kind.
   storeLoraSeen(store, clockHour() ? modClockGet() : 0, lora == TRAFFIC_FOREIGN, lora == TRAFFIC_OURS);
   if (lora == TRAFFIC_FOREIGN) steady = 3;
   else if (lora == TRAFFIC_NOT_LORA && raised) steady = 1;

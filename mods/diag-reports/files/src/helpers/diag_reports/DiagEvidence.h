@@ -65,7 +65,7 @@ struct DiagEvidence {
   int8_t live_floor_shift;             // last diag probe lna check, on minus off; 0 = none
   bool lna_freezes_only_on;            // freezes logged only in hours with the LNA on
 
-  // The last direct ping: SNR at the neighbour (out) and back at us.
+  // The last direct ping: SNR at the neighbour (out) and back at this node.
   bool ping_ok;
   uint16_t ping_id;
   float ping_out_db, ping_back_db;

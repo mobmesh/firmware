@@ -35,7 +35,7 @@ struct StoreHour {
   uint8_t load_pct;                    // airtime share of the hour, 0-100
   int8_t temp_max;                     // CPU die, whole °C, or STORE_NO_TEMP
   uint8_t strong;                      // AGC resets that met a strong signal on the channel
-  uint8_t lora;                        // captures in the hour: bit 0 saw another network's LoRa, bit 1 decoded ours
+  uint8_t lora;                        // captures in the hour: bit 0 saw another network's LoRa, bit 1 decoded this mesh's
   uint8_t pad;
 };
 

@@ -460,39 +460,6 @@ int linkClockSummary(const LinkTable& t, uint32_t now_ms, char* out, size_t len)
   return DIAG_CAUTION;
 }
 
-bool linkRetryParse(const char* reply, uint32_t* retried, uint32_t* won) {
-  const char* r = strstr(reply, "retried=");
-  const char* w = strstr(reply, "won=");
-  if (!r || !w) return false;
-  *retried = strtoul(r + 8, nullptr, 10);
-  *won = strtoul(w + 4, nullptr, 10);
-  return true;
-}
-
-int linkRetryHops(const char* reply, LinkRetryHop* out, int max) {
-  int n = 0;
-  const char* p = strchr(reply, '>');
-  if (!p) return 0;
-  p++;
-  while (*p && n < max) {
-    while (*p == ' ') p++;
-    char* end = nullptr;
-    unsigned long id = strtoul(p, &end, 16);
-    if (end == p || *end != ':') break;
-    int digits = (int)(end - p);
-    unsigned long tried = strtoul(end + 1, &end, 10);
-    if (*end != '/') break;
-    unsigned long won = strtoul(end + 1, &end, 10);
-    out[n].id = (uint16_t)id;
-    out[n].id_len = digits >= 4 ? 2 : 1;
-    out[n].retried = (uint16_t)tried;
-    out[n].won = (uint16_t)won;
-    n++;
-    p = end;
-  }
-  return n;
-}
-
 int linkRetryOneWay(const LinkTable& t, const LinkRetryHop* hops, int n, uint32_t now_ms, int* hop_index) {
   int best = -1, best_hop = -1;
   float worst = 0.5f;

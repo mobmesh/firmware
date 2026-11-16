@@ -114,11 +114,9 @@ int main() {
   CHECK(linkVerdict(t, SF, LINKS_STALE_MS + 10) == LINK_V_SOLID);
   CHECK(linkPathsSummary(t, LINKS_STALE_MS + 10, text, sizeof(text)) == DIAG_CAUTION);
   CHECK_STR(text, "all via 2222");
-  // direct-retry's hops: parsed at either width; a judged neighbour whose resends mostly fail is named.
-  LinkRetryHop hops[LINK_RETRY_HOPS];
-  CHECK(linkRetryHops("> none", hops, LINK_RETRY_HOPS) == 0 && linkRetryHops("Unknown command", hops, LINK_RETRY_HOPS) == 0);
-  int hn = linkRetryHops("> a6b2:12/2 c5:3/0 4ea1:20/19", hops, LINK_RETRY_HOPS);
-  CHECK(hn == 3 && hops[0].id == 0xA6B2 && hops[0].id_len == 2 && hops[1].id == 0xC5 && hops[1].id_len == 1 && hops[2].won == 19);
+  // direct-retry's hop records: a judged neighbour whose resends mostly fail is named.
+  LinkRetryHop hops[LINK_RETRY_HOPS] = {{0xA6B2, 2, 12, 2}, {0xC5, 1, 3, 0}, {0x4EA1, 2, 20, 19}};
+  int hn = 3;
   static LinkTable rt;
   linkInit(rt);
   int ra = linkIndex(rt, 0xA6B2, 2, NOW), rc = linkIndex(rt, 0xC5FB, 2, NOW);
@@ -129,13 +127,9 @@ int main() {
   int hop = -1;
   CHECK(linkRetryOneWay(rt, hops, hn, NOW, &hop) == ra && hop == 0);
   // Too few resends, or half or more confirmed, names no one; a 1-byte hop matches its 2-byte neighbour.
-  hn = linkRetryHops("> a6b2:4/0 c5:6/1", hops, LINK_RETRY_HOPS);
-  CHECK(linkRetryOneWay(rt, hops, hn, NOW, &hop) == rc && hop == 1);
-  hn = linkRetryHops("> a6b2:10/5", hops, LINK_RETRY_HOPS);
-  CHECK(linkRetryOneWay(rt, hops, hn, NOW, &hop) == -1 && hop == -1);
-  // direct-retry's stats: retried and won read from its reply; absent or unknown command reads nothing.
-  uint32_t retried = 0, won = 0;
-  CHECK(linkRetryParse("> resent=5 echo=3 reply=1 exhausted=1 replied=0 noslot=0 stale=0 retried=4 won=3", &retried, &won) && retried == 4 && won == 3);
-  CHECK(!linkRetryParse("Unknown command", &retried, &won) && !linkRetryParse("", &retried, &won));
+  LinkRetryHop few[2] = {{0xA6B2, 2, 4, 0}, {0xC5, 1, 6, 1}};
+  CHECK(linkRetryOneWay(rt, few, 2, NOW, &hop) == rc && hop == 1);
+  LinkRetryHop half[1] = {{0xA6B2, 2, 10, 5}};
+  CHECK(linkRetryOneWay(rt, half, 1, NOW, &hop) == -1 && hop == -1);
   DONE();
 }

@@ -61,7 +61,7 @@ void trafficPeek(TrafficCheck& t, uint16_t irq) {
 uint8_t trafficClassify(const TrafficCheck& t, bool energy) {
   if (t.peeks == 0 && t.decoded == 0) return TRAFFIC_UNKNOWN;
   if (t.decoded > 0) return TRAFFIC_OURS;
-  // Preambles at our spreading factor and bandwidth that never reached a header carry another sync word.
+  // Preambles at the node's spreading factor and bandwidth that never reached a header carry another sync word.
   if (t.orphans >= TRAFFIC_FOREIGN_MIN) return TRAFFIC_FOREIGN;
   // A preamble too few to name: LoRa of some kind, so never called interference.
   if (t.preambles > 0) return TRAFFIC_UNKNOWN;
@@ -177,7 +177,7 @@ static ScanFinding finding(const Steps& s) {
     }
   }
   int edge = s.avg[s.mesh - s.edge] >= s.avg[s.mesh + s.edge] ? s.mesh - s.edge : s.mesh + s.edge;
-  // Where the energy within the channel peaks: exactly our frequency, or a measured offset inside it.
+  // Where the energy within the channel peaks: exactly the node's frequency, or a measured offset inside it.
   int peak = s.mesh;
   for (int b = s.mesh - s.chan; b <= s.mesh + s.chan; b++) if (s.avg[b] > s.avg[peak]) peak = b;
   f.peak_khz = offsetKhz(s, peak);
