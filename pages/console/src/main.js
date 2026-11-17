@@ -7,7 +7,7 @@ import {initializeCompanion,authenticateRepeater} from './transports/diagnostic-
 import {TemporaryTargets} from './transports/temporary-targets.js';
 import {loadCatalog,parseBuild} from './core/catalog.js';import {complete} from './core/completion.js';import {helpRequest,helpText,helpOverview,HELP_KEY_WIDTH,UNAVAILABLE,unavailable} from './core/help.js';import {History} from './core/editor.js';import {wireInput} from './core/grammar.js';import {sensitive,safeDraft,safeRecord} from './core/redaction.js';
 // Nothing is persisted yet, so the transcript shows secrets as typed; redaction applies once sessions are saved.
-const PERSISTENT=false;const recordText=(text,secret=false)=>PERSISTENT?safeRecord(text,secret):text;import {ConnectionStatus} from './core/connection-status.js';import {retained} from './core/output.js';import {transportFactory} from './transports/browser.js';import {directCommand,displayReply} from './transports/direct.js';import {RemoteProbe,RemoteReplyTimeout,packetCounters,keyBytes,tailActive,startStream,stopStream,streamPulling} from './transports/remote.js';import Constants from './vendor/meshcore/constants.js';import {fullKey,frameSummary,directReply} from './protocol.js';
+const PERSISTENT=false;const recordText=(text,secret=false)=>PERSISTENT?safeRecord(text,secret):text;import {ConnectionStatus} from './core/connection-status.js';import {retained} from './core/output.js';import {transportFactory} from './transports/browser.js';import {directCommand,displayReply,setDirectIdle} from './transports/direct.js';import {RemoteProbe,RemoteReplyTimeout,packetCounters,keyBytes,tailActive,startStream,stopStream,streamPulling} from './transports/remote.js';import Constants from './vendor/meshcore/constants.js';import {fullKey,frameSummary,directReply} from './protocol.js';
 const $=id=>document.getElementById(id),status=new ConnectionStatus(),writerId=crypto.randomUUID(),credentials=new CredentialVault();
 let passwordRevision=0,linkTx=0,linkRx=0;const activityTimers={};
 // Plain bytes until 10,000, then KB (and MB past 10,000 KB) so the status bar stays short.
@@ -81,6 +81,7 @@ async function restorePassword(){const key=targetKey,revision=++passwordRevision
 // A row that arrives while a command waits belongs to an earlier command, so it goes above the one waiting.
 let waitingCommand=null;
 function printLate(text){const r=add('reply',text);const at=waitingCommand?records.indexOf(waitingCommand):-1;if(at>=0){records=records.filter(x=>x!==r);records.splice(at,0,r);display();}return r;}
+setDirectIdle(printLate);
 function add(kind,text,secret=false){const r={eventId:crypto.randomUUID(),sessionId:session?.sessionId||'provisional',writerId,sequence:sequence++,timestamp:Date.now(),kind,safeText:recordText(text,secret),promptHost:kind==='command'?$('prompt-host').textContent:null,targetKey,route:route(),redacted:secret};records.push(r);const keep=retained(records);records=keep.records;if(keep.truncated)$('assistance').textContent='Oldest output records truncated at 2 MiB.';display();return r;}
 function live(text){$('live').textContent=($('live').textContent+text).slice(-65536);}
 async function release(){writable=false;}

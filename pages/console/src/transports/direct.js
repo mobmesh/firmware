@@ -1,10 +1,18 @@
 import {wireInput} from '../core/grammar.js';
 const SLOW_REPLIES={'get ota.slot':30000,'ota wan join':30000,'ota wan check':75000};
+// Output that arrives between commands, such as a late reply, prints above the prompt instead of being dropped.
+let idlePrint=null;
+export function setDirectIdle(print){idlePrint=print;}
+function idleReceiver(){
+  let buffer='',quiet=null;
+  const flush=()=>{quiet=null;const text=buffer.replace(/\r\n?/g,'\n').split('\n').map(line=>line.startsWith('  -> ')?line.slice(5):line).join('\n').replace(/^\n+|\n+$/g,'');buffer='';if(text.trim())idlePrint?.(text);};
+  return chunk=>{if(chunk===null||!idlePrint)return;buffer+=chunk;clearTimeout(quiet);quiet=setTimeout(flush,250);};
+}
 export function directCommand(transport,raw,{kind='marked',signal}={}){
   const text=wireInput(raw,'direct');
   return new Promise((resolve,reject)=>{
     let content='',idle,done=false,replyStarted=false;const stream=kind==='stream'||kind==='eof'||kind==='interactive';
-    const finish=(err,value)=>{if(done)return;done=true;clearTimeout(timer);clearTimeout(idle);signal?.removeEventListener('abort',abort);transport.receive(()=>{});err?reject(err):resolve(value);};
+    const finish=(err,value)=>{if(done)return;done=true;clearTimeout(timer);clearTimeout(idle);signal?.removeEventListener('abort',abort);transport.receive(idleReceiver());err?reject(err):resolve(value);};
     const abort=()=>finish(Error('Wait cancelled; execution outcome uncertain'));
     const result=basis=>({text:content,completionBasis:basis});
     const expired=()=>finish(Error('Reply deadline reached; execution outcome uncertain'));
