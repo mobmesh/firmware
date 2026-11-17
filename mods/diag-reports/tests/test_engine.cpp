@@ -284,6 +284,21 @@ int main() {
   HAS("Guard    \U0001F534 Off, not restored");
   HAS("guard off, not restored");
   HAS("See: reboot");
+  // A board whose build never sets the guard bit: off and past off counts are its normal state, not a fault.
+  rig.healthy();
+  storeGuardOff(rig.store, (NOW - 1) * 3600, 0x04, 0x04);
+  rig.in.guard_known = false;
+  rig.in.guard_on = false;
+  rig.run();
+  CAUSE_IS(CAUSE_NONE);
+  HAS("Guard    \U0001F7E2 No Freezes");
+  // The same board with the AGC reset off and no freeze: still nothing to chase.
+  rig.healthy();
+  rig.in.guard_known = false;
+  rig.in.guard_on = false;
+  rig.in.agc_interval = 0;
+  rig.run();
+  CAUSE_IS(CAUSE_NONE);
   // Frozen at this moment.
   rig.healthy();
   rig.in.frozen_now = true;

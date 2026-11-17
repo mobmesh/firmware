@@ -34,6 +34,12 @@
 #define BATT_ABSENT_READS  3
 #define TICK_EVERY_MS      1000UL
 #define CLOCK_JUMP_S       120
+// Upstream sets the guard bit (0x08B5 bit 0) only on boards built with SX126X_REGISTER_PATCH; elsewhere it is off by design.
+#ifdef SX126X_REGISTER_PATCH
+#define GUARD_SET          true
+#else
+#define GUARD_SET          false
+#endif
 #define SCAN_STALE_MS      86400000UL
 #define SCAN_BREAK_MS      1500UL
 #define SCAN_START_WAIT_MS 10000UL
@@ -466,7 +472,7 @@ static void buildInput(EngineInput& in, NoiseView& nv, BattView& bv, StoreDay* h
   in.agc_interval = agcInterval();
   uint8_t guard, state[2];
   if (modRadioGuardRead(&guard, state)) {
-    in.guard_known = true;
+    in.guard_known = GUARD_SET;
     in.guard_on = guard & 1;
     in.frozen_now = lockedNow(state);
   }
@@ -704,7 +710,7 @@ void diagReportsAgcReset() {
   if (!modRadioGuardRead(&guard, state)) return;
   // The busy state also shows while a strong signal is simply on air; only one that outlasts it is a lock.
   if (state[0] == 0x08 && state[1] == 0x12 && !lock_check_ms) lock_check_ms = (millis() + 2000) | 1;
-  if (!(guard & 1)) {
+  if (GUARD_SET && !(guard & 1)) {
     t4_pending = true;
     t4_before = guard;
   }
@@ -1669,15 +1675,17 @@ static void probeGuard() {
     return;
   }
   bool busy = state[0] == 0x08 && state[1] == 0x12, frozen = lockedNow(state);
-  outLine(out, "Guard %s (0x%02X), %s.", guard & 1 ? "on" : "OFF", guard, frozen ? "FROZEN now" : busy ? "busy with a strong signal" : "not frozen now");
+  const char* now_text = frozen ? "FROZEN now" : busy ? "busy with a strong signal" : "not frozen now";
+  if (GUARD_SET) outLine(out, "Guard %s (0x%02X), %s.", guard & 1 ? "on" : "OFF", guard, now_text);
+  else outLine(out, "Guard bit not used on this board; %s.", now_text);
   uint32_t now = modClockGet();
   if (store.guard.last_freeze && now > store.guard.last_freeze) {
     uint32_t ago = (now - store.guard.last_freeze) / 60;
     if (ago < 120) outLine(out, "Last freeze %lum ago.", (unsigned long)ago);
     else outLine(out, "Last freeze %luh ago.", (unsigned long)(ago / 60));
   }
-  if (store.guard.off && (store.guard.off_after & 1)) outLine(out, "Found off %ux; the reset restored it.", store.guard.off);
-  else if (store.guard.off) outLine(out, "Found off %ux; the reset left it off (%02X).", store.guard.off, store.guard.off_after);
+  if (GUARD_SET && store.guard.off && (store.guard.off_after & 1)) outLine(out, "Found off %ux; the reset restored it.", store.guard.off);
+  else if (GUARD_SET && store.guard.off) outLine(out, "Found off %ux; the reset left it off (%02X).", store.guard.off, store.guard.off_after);
   if (store.guard.strong) outLine(out, "Strong signal at %u resets, not locks.", store.guard.strong);
   if (agcInterval() == 0) outLine(out, "AGC reset off: nothing clears a freeze.");
 }

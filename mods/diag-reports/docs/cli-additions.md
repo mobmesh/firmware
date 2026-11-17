@@ -53,7 +53,7 @@ diag radio
 | Guard line | Meaning |
 | --- | --- |
 | `🟢 No Freezes` | All clear |
-| `🟡 Off 2x, restored` | The lock-up protection bit was found cleared; the AGC reset restored it |
+| `🟡 Off 2x, restored` | The lock-up protection bit was found cleared; the AGC reset restored it. The `Off` lines appear only on boards whose build sets the bit (heltec_v4, rak3401); elsewhere it is off by design and only freezes are judged |
 | `🔴 Off, not restored` | The bit is still cleared with the AGC reset running; summary `guard off, not restored`, fix: reboot |
 | `🟡 3 Freezes, Cleared` | The receiver froze; each freeze lasted up to one AGC reset interval |
 | `🔴 3 Freezes, blocker` | Freezes, with a strong signal found beside the channel |
@@ -106,7 +106,7 @@ diag auto pause [minutes]
 | T1 | 2 freezes within an hour | An interference scan | 3 a day, 1 an hour, none within an hour of another scan |
 | T2 | The first sample of a 4-hour block 6 dB over the floor | 2 s RSSI burst | 24 a day, 1 an hour |
 | T3 | 3 failed decodes inside a minute | 2 s RSSI burst | 24 a day, 1 an hour |
-| T4 | The guard found off at an AGC reset | The guard read again after the reset | every time |
+| T4 | The guard found off at an AGC reset, on boards whose build sets it | The guard read again after the reset | every time |
 
 Captures never run mid-packet, with the clock unset, or when the last hour's load was over 25%. They never transmit. A capture with 3+ preambles that never reach our header and nothing decoded counts toward another LoRa network; it is named only after two such hours in a day with none of ours decoded, since weak packets of our own leave orphan preambles too.
 

@@ -409,7 +409,7 @@ static void areas(const EngineInput& in, const Evidence& e, EngineResult& r) {
     } else if (in.guard_known && !in.guard_on) {
       snprintf(a->text, sizeof(a->text), "Off, not restored");
       a->level = DIAG_PROBLEM;
-    } else if (e.off_count) {
+    } else if (in.guard_known && e.off_count) {
       snprintf(a->text, sizeof(a->text), "Off %ux, restored", e.off_count);
       a->level = DIAG_CAUTION;
     } else {

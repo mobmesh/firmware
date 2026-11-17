@@ -44,7 +44,7 @@ See: diag radio.rfscan
 
 ## Guard
 
-SX126x receivers can lock up after a strong signal. The guard reads the radio's lock-up protection bit and receiver state just before each AGC reset. A busy state that outlasts the signal, with the channel back at its floor, counts as a freeze: freezes are labelled in the noise report and kept out of the floor. A busy state that clears with the signal counts as a strong signal at the reset, not a freeze. Protection found off, or freezes with the AGC reset off, are problems in their own right.
+SX126x receivers can lock up after a strong signal. The guard reads the radio's lock-up protection bit and receiver state just before each AGC reset. A busy state that outlasts the signal, with the channel back at its floor, counts as a freeze: freezes are labelled in the noise report and kept out of the floor. A busy state that clears with the signal counts as a strong signal at the reset, not a freeze. Protection found off (judged only on boards whose build sets the bit: heltec_v4, rak3401), or freezes with the AGC reset off, are problems in their own right.
 
 ## Probes and captures
 
