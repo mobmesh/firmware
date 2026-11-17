@@ -258,6 +258,83 @@
 			]
 		},
 		{
+			"maker": "heltec",
+			"name": "Heltec v4 R8 + Expansion Kit (Touch)",
+			"tooltip": "<img class='device' src='/img/heltec_v4_r8_exp.svg'>",
+			"icon": "/img/lora.svg",
+			"type": "esp32",
+			"firmware": [
+				{
+					"class": "ripple",
+					"role": "gui",
+					"notice": "rippleUserGuide",
+					"github-ripple": {
+						"type": "heltec-v4r8",
+						"files": {
+							"flash-wipe": "Ripple-HeltecV4R8-[^-]+-merged\\.bin",
+							"flash-update": "Ripple-HeltecV4R8-[^-]+\\.bin"
+						}
+					}
+				},
+				{
+					"class": "ripple",
+					"role": "guiSD",
+					"notice": "rippleUserGuide",
+					"github-ripple": {
+						"type": "heltec-v4r8",
+						"files": {
+							"flash-wipe": "Ripple-HeltecV4R8-SD-[^-]+-merged\\.bin",
+							"flash-update": "Ripple-HeltecV4R8-SD-[^-]+\\.bin"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "companionBle",
+					"github": {
+						"type": "companion",
+						"files": {
+							"flash-wipe": "heltec_v4_r8_tft_companion_radio_ble.*?-merged\\.bin",
+							"flash-update": "heltec_v4_r8_tft_companion_radio_ble.*?-[a-f0-9]{7}\\.bin"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "companionUsb",
+					"github": {
+						"type": "companion",
+						"files": {
+							"flash-wipe": "heltec_v4_r8_tft_companion_radio_usb.*?-merged\\.bin",
+							"flash-update": "heltec_v4_r8_tft_companion_radio_usb.*?-[a-f0-9]{7}\\.bin"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "repeater",
+					"github": {
+						"type": "repeater",
+						"files": {
+							"flash-wipe": "heltec_v4_r8_tft_[rR]epeater.*?-merged\\.bin",
+							"flash-update": "heltec_v4_r8_tft_[rR]epeater.*?-[a-f0-9]{7}\\.bin"
+						}
+					}
+				},
+				{
+					"class": "community",
+					"role": "roomServer",
+					"github": {
+						"type": "room-server",
+						"files": {
+							"flash-wipe": "heltec_v4_r8_tft_room_server.*?-merged\\.bin",
+							"flash-update": "heltec_v4_r8_tft_room_server.*?-[a-f0-9]{7}\\.bin"
+						}
+					}
+				}
+			]
+		},
+		{
 			"maker": "lilygo",
 			"name": "LilyGo T-Deck",
 			"tooltip": "<img class='device' src='/img/lilygo_tdeck.svg'>",
