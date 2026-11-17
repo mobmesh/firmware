@@ -7,7 +7,7 @@ import {initializeCompanion,authenticateRepeater} from './transports/diagnostic-
 import {TemporaryTargets} from './transports/temporary-targets.js';
 import {loadCatalog,parseBuild} from './core/catalog.js';import {complete} from './core/completion.js';import {helpRequest,helpText,helpOverview,HELP_KEY_WIDTH,UNAVAILABLE,unavailable} from './core/help.js';import {History} from './core/editor.js';import {wireInput} from './core/grammar.js';import {sensitive,safeDraft,safeRecord} from './core/redaction.js';
 // Nothing is persisted yet, so the transcript shows secrets as typed; redaction applies once sessions are saved.
-const PERSISTENT=false;const recordText=(text,secret=false)=>PERSISTENT?safeRecord(text,secret):text;import {ConnectionStatus} from './core/connection-status.js';import {retained} from './core/output.js';import {transportFactory} from './transports/browser.js';import {directCommand,displayReply} from './transports/direct.js';import {RemoteProbe,RemoteReplyTimeout,packetCounters,keyBytes,tailActive} from './transports/remote.js';import Constants from './vendor/meshcore/constants.js';import {fullKey,frameSummary,directReply} from './protocol.js';
+const PERSISTENT=false;const recordText=(text,secret=false)=>PERSISTENT?safeRecord(text,secret):text;import {ConnectionStatus} from './core/connection-status.js';import {retained} from './core/output.js';import {transportFactory} from './transports/browser.js';import {directCommand,displayReply} from './transports/direct.js';import {RemoteProbe,RemoteReplyTimeout,packetCounters,keyBytes,tailActive,startStream,stopStream,streamPulling} from './transports/remote.js';import Constants from './vendor/meshcore/constants.js';import {fullKey,frameSummary,directReply} from './protocol.js';
 const $=id=>document.getElementById(id),status=new ConnectionStatus(),writerId=crypto.randomUUID(),credentials=new CredentialVault();
 let passwordRevision=0,linkTx=0,linkRx=0;const activityTimers={};
 // Plain bytes until 10,000, then KB (and MB past 10,000 KB) so the status bar stays short.
@@ -78,6 +78,9 @@ function highlightTranscript(visible){
  for(const name of ['cli-prompt-host','cli-prompt-symbol','cli-help-prose','cli-command','cli-argument','cli-number','cli-help','cli-error','cli-key','cli-success','cli-unavailable'])CSS.highlights.set(name,new Highlight(...(groups.get(name)||[])));
 }
 async function restorePassword(){const key=targetKey,revision=++passwordRevision;$('password').value='';$('credential-status').textContent='Saved on this browser only.';if(!key||mode==='direct')return;const password=await credentials.read(key);if(targetKey!==key||passwordRevision!==revision)return;if(password!==null){$('password').value=password;$('credential-status').textContent=password?'Saved password recalled for this repeater.':'Saved: this repeater accepts a blank password.';}else if(credentials.error)$('credential-status').textContent='Password storage unavailable in this browser.';}
+// A row that arrives while a command waits belongs to an earlier command, so it goes above the one waiting.
+let waitingCommand=null;
+function printLate(text){const r=add('reply',text);const at=waitingCommand?records.indexOf(waitingCommand):-1;if(at>=0){records=records.filter(x=>x!==r);records.splice(at,0,r);display();}return r;}
 function add(kind,text,secret=false){const r={eventId:crypto.randomUUID(),sessionId:session?.sessionId||'provisional',writerId,sequence:sequence++,timestamp:Date.now(),kind,safeText:recordText(text,secret),promptHost:kind==='command'?$('prompt-host').textContent:null,targetKey,route:route(),redacted:secret};records.push(r);const keep=retained(records);records=keep.records;if(keep.truncated)$('assistance').textContent='Oldest output records truncated at 2 MiB.';display();return r;}
 function live(text){$('live').textContent=($('live').textContent+text).slice(-65536);}
 async function release(){writable=false;}
@@ -308,7 +311,7 @@ async function relogin(key=lastLink?.targetKey||targetKey,saved=null){
  if(saved!==null)await login(saved);else askPassword(name);
 }
 async function cleanupTemporary(){if(!temporaryTargets.created.size)return;if(!transport?.connected||transport.protocol?.closed){add('status','Temporary companion entries may remain; device disconnected before cleanup.');return;}try{await readContacts();await temporaryTargets.cleanup(transport.protocol,contacts,note=>add('status',note));}catch(e){add('status','Temporary entries may remain; cleanup unavailable: '+e.message);}}
-async function close(){stopRadioPoll();epoch++;abort?.abort();for(const cancel of [...transport?.protocol?.pending||[]])cancel();await cleanupTemporary();await factory?.close();transport=null;auth=false;blocked=false;region=false;busy=false;$('remote').hidden=true;history.reset();add('boundary','Disconnected.');await release();update();}
+async function close(){stopRadioPoll();await stopStream();epoch++;abort?.abort();for(const cancel of [...transport?.protocol?.pending||[]])cancel();await cleanupTemporary();await factory?.close();transport=null;auth=false;blocked=false;region=false;busy=false;$('remote').hidden=true;history.reset();add('boundary','Disconnected.');await release();update();}
 async function login(providedPassword=null){
  if(busy||!transport?.protocol||!targetKey)return;
  const fromDialog=typeof providedPassword!=='string';
@@ -326,10 +329,10 @@ async function login(providedPassword=null){
   const remembered=password,remember=$('remember-password').checked!==false;const result=await authenticateRepeater(c,key,password,note=>{notes.push(note);const attempt=note.match(/^Login dispatch · attempt (\d+)\/(\d+)/);if(attempt)$('assistance').textContent='Logging in to '+name+' · attempt '+attempt[1]+' of '+attempt[2];else if(/^Login reply not heard/.test(note))$('assistance').textContent='No reply from '+name+' yet · retrying';});password='';if(remember){const saved=await credentials.save(key,remembered);$('credential-status').textContent=saved?'Password saved for this repeater.':'Password could not be saved · '+credentials.error;}else await credentials.forget(key);
   for(const note of notes)add('transport',note);
   applyBuild(await new RemoteProbe(c,()=>{}).cli(key,'ver').then(r=>r.text,e=>{add('transport','Build · ver not read: '+e.message);return '';}));
-  auth=true;blocked=false;if(lastLink)lastLink.targetKey=key;rememberRepeater(key);if(result.login?.gatewaySent?.viaFlood)routeStale=true;if(!session)await chooseSession();$('assistance').textContent='';
+  auth=true;blocked=false;await startStream(c,key,printLate,()=>document.visibilityState!=='hidden'&&(typeof document.hasFocus!=='function'||document.hasFocus()));if(lastLink)lastLink.targetKey=key;rememberRepeater(key);if(result.login?.gatewaySent?.viaFlood)routeStale=true;if(!session)await chooseSession();$('assistance').textContent='';
   // The companion's next-step line is rewritten once login completes.
   if(stepLine&&records.includes(stepLine)){stepLine.safeText='Connected · repeater admin access verified.';stepLine=null;display();}else add('status','Connected · repeater admin access verified.');status.update({lastTargetResponseAt:Date.now()});closeConnection();
- }catch(e){failure=e.message;for(const note of notes)add('transport',note);if(stepLine&&records.includes(stepLine)){stepLine.safeText=recordText('Login stopped: '+failure);stepLine=null;display();}else add('status','Login stopped: '+failure);$('assistance').textContent='Login stopped: '+failure;auth=false;if(transport?.protocol&&transport.connected){blocked=false;session=null;writable=false;keptHistory=history;}else{blocked=true;await factory?.close();transport=null;$('remote').hidden=true;}}
+ }catch(e){failure=e.message;await stopStream();for(const note of notes)add('transport',note);if(stepLine&&records.includes(stepLine)){stepLine.safeText=recordText('Login stopped: '+failure);stepLine=null;display();}else add('status','Login stopped: '+failure);$('assistance').textContent='Login stopped: '+failure;auth=false;if(transport?.protocol&&transport.connected){blocked=false;session=null;writable=false;keptHistory=history;}else{blocked=true;await factory?.close();transport=null;$('remote').hidden=true;}}
  finally{password='';busy=false;delete document.body.dataset.login;update();refreshRoute();}
  if(failure&&transport?.connected){if(fromDialog){await restorePassword();showConnection();$('connection-feedback').textContent='Login stopped: '+failure;$('password').focus();}else askPassword(name);}
 }
@@ -349,7 +352,7 @@ async function submit(){clearChoices();tabState=null;
     if(local.name==='clear')clearTerminal();
     else if(local.name==='exit')await close();
     else if(local.name==='login'){if(!transport?.protocol){add('status','login needs a companion connection.');return;}await openTarget(local.target);}
-    else if(local.name==='logout'){if(!auth||!transport?.protocol){add('status','Not logged in to a repeater.');return;}const key=targetKey;await transport.protocol.sendToRadioFrame(Uint8Array.from([29,...keyBytes(key)])).catch(()=>{});keptHistory=history;auth=false;session=null;writable=false;add('status','Logged out of '+(contacts.find(c=>fullKey(c.publicKey)===key)?.advName||key.slice(0,12))+'. Back at the companion.');update();}
+    else if(local.name==='logout'){if(!auth||!transport?.protocol){add('status','Not logged in to a repeater.');return;}await stopStream();const key=targetKey;await transport.protocol.sendToRadioFrame(Uint8Array.from([29,...keyBytes(key)])).catch(()=>{});keptHistory=history;auth=false;session=null;writable=false;add('status','Logged out of '+(contacts.find(c=>fullKey(c.publicKey)===key)?.advName||key.slice(0,12))+'. Back at the companion.');update();}
     else if(local.name==='reconnect'){if(busy){add('status','Busy. Wait for the current step to finish.');return;}if(transport?.connected){if(auth&&!blocked||mode==='direct'){add('status','Already connected.');return;}await relogin();return;}if(!lastLink){add('status','Nothing to reconnect. Use connect first.');return;}if(transport)await close();await open(lastLink);}
     else if(local.transport){if(transport||busy){add('status','Already connected. Type exit first.');return;}selectTransport(local.transport);await open(null,!!(local.target||local.companionOnly));if(local.target&&transport?.connected)await openTarget(local.target);}
     else showConnection();
@@ -376,7 +379,7 @@ async function submit(){clearChoices();tabState=null;
   let text;try{text=wireInput(raw,mode);}catch(e){add('status',e.message);return;}
   const entry=catalog.resolve(raw);if(mode!=='direct'&&entry?.remote===false){add('status','This command is only available over direct serial.');return;}
   const missing=entry&&catalog.availability(entry);if(missing)add('status',unavailable(missing).trim()+'. Sending anyway.');
-  const secret=sensitive(raw,catalog);$('assistance').textContent='Sending command…';busy=true;abort=new AbortController();update();add('command',raw,secret);if(!secret)history.add(raw);$('command').value='';
+  const secret=sensitive(raw,catalog);$('assistance').textContent='Sending command…';busy=true;abort=new AbortController();update();waitingCommand=add('command',raw,secret);if(!secret)history.add(raw);$('command').value='';
   // Grey placeholder under the command; the reply replaces it, a failure removes it.
   const pending=add('pending','...');
   try{
@@ -388,7 +391,7 @@ async function submit(){clearChoices();tabState=null;
     // The repeater holds the login; only a lost link or a wrong identity ends it.
     const keep=mode!=='direct'&&transport?.connected&&auth&&!/public key does not match/.test(e.message);
     if(abort?.signal.aborted&&keep){$('assistance').textContent='Ready · stopped waiting for the previous reply';}else if(e instanceof RemoteReplyTimeout&&keep){add('status','No reply received. You can send another command.');$('assistance').textContent='Ready · previous command received no reply';}else if(keep){add('status','Command did not complete: '+e.message+'. Still logged in; you can send another command.');$('assistance').textContent='Ready · previous command did not complete';}else{blocked=true;add('status','Command stopped. Open diagnostics for details.');$('assistance').textContent='Command stopped · check diagnostics';}}
-  finally{if(pending.kind==='pending'){records=records.filter(r=>r!==pending);display();}busy=false;abort=null;update();refreshRoute();$('command').focus();}}
+  finally{waitingCommand=null;if(pending.kind==='pending'){records=records.filter(r=>r!==pending);display();}busy=false;abort=null;update();refreshRoute();$('command').focus();}}
 // Root command names render as a two-column list; every other match list is one line split by middle dots.
 function showChoices(result){
  const box=$('completion-choices');
@@ -472,7 +475,7 @@ $('login').onclick=errorAction(login);$('refresh-contacts').onclick=errorAction(
 async function readRadioTotals(quiet=false){const probe=new RemoteProbe(transport.protocol);const bytes=await probe.wait([24],()=>transport.protocol.sendToRadioFrame(Uint8Array.of(56,2)),5000,f=>f[1]===2);const counts=packetCounters(bytes);$('radio-tx').textContent=String(counts.tx);$('radio-rx').textContent=String(counts.rx);if(!quiet)add('transport','Companion radio totals · TX '+counts.tx+' · RX '+counts.rx+' · direct TX '+counts.txDirect+' · flood TX '+counts.txFlood+' (all traffic; compare before/after).');return counts;}
 // While a companion is connected the totals refresh every 10 s; a tick is skipped while a command is in flight.
 let radioPoll=null;
-function startRadioPoll(){stopRadioPoll();radioPoll=setInterval(()=>{if(transport?.connected&&transport.protocol&&!busy&&!tailActive()){readRadioTotals(true).catch(()=>{});refreshRoute();}},10000);radioPoll.unref?.();}
+function startRadioPoll(){stopRadioPoll();radioPoll=setInterval(()=>{if(transport?.connected&&transport.protocol&&!busy&&!tailActive()&&!streamPulling()){readRadioTotals(true).catch(()=>{});refreshRoute();}},10000);radioPoll.unref?.();}
 function stopRadioPoll(){clearInterval(radioPoll);radioPoll=null;}
 if($('packet-stats'))$('packet-stats').onclick=errorAction(async()=>{if(busy||!transport?.protocol)throw Error('Connect a companion and wait for the current command first');busy=true;update();try{await readRadioTotals();}finally{busy=false;update();}});
 $('radio-refresh').onclick=()=>$('packet-stats').click();

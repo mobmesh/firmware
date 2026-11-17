@@ -15,6 +15,29 @@ export const REPLY_QUIET_MS=3000;
 let tail=null;
 export function tailActive(){return !!tail;}
 export async function stopTail(){const t=tail;if(!t)return;t.stop();await t.done;}
+// The listener's pauses never hold a page or process open on their own.
+const sleep=ms=>new Promise(resolve=>{const timer=setTimeout(resolve,ms);timer.unref?.();});
+// While logged in, one listener pulls the companion's queue and prints each CLI row from the repeater as it arrives, so late replies show whenever they land.
+let stream=null;
+export function streamPulling(){return !!stream?.pulling;}
+export async function startStream(c,key,print,active=()=>true,idleMs=1000){
+  await stopStream();await stopTail();
+  const s={c,key,print,active,stopped:false,held:0,pulling:false};
+  const probe=new RemoteProbe(c);
+  s.done=(async()=>{
+    while(!s.stopped&&!c.closed){
+      // Paused while a command runs or the console is not in focus: queued messages stay with the companion.
+      let on=false;try{on=!s.held&&s.active();}catch{}
+      if(!on){await sleep(250);continue;}
+      let f=null;s.pulling=true;
+      try{f=await probe.wait([7,8,10,16,17],()=>c.sendCommandSyncNextMessage(),5000);}catch{if(c.closed)break;}finally{s.pulling=false;}
+      if(!f||f[0]===10){await sleep(idleMs);continue;}
+      const m=message(f);if(m&&m.senderPrefix===key.slice(0,12)&&m.textType===1)s.print(m.text);
+    }
+  })();
+  stream=s;return s;
+}
+export async function stopStream(){const s=stream;if(!s)return;s.stopped=true;stream=null;await s.done;}
 export class RemoteReplyTimeout extends Error {constructor(detail){super(detail);this.name='RemoteReplyTimeout';}}
 export function packetCounters(frame){if(frame[0]!==24||frame[1]!==2||frame.length<26)throw Error('Invalid packet counter response');const v=new DataView(frame.buffer,frame.byteOffset,frame.byteLength);return {rx:v.getUint32(2,true),tx:v.getUint32(6,true),txFlood:v.getUint32(10,true),txDirect:v.getUint32(14,true),rxFlood:v.getUint32(18,true),rxDirect:v.getUint32(22,true)};}
 function sent(frame){if(frame.length<10)throw Error('Truncated SENT response');const estimatedTimeoutMs=new DataView(frame.buffer,frame.byteOffset+6,4).getUint32(0,true);return {viaFlood:!!frame[1],estimatedTimeoutMs};}
@@ -80,8 +103,12 @@ export class RemoteProbe {
     await stopTail();
     const c=this.c,rows=[];let unmatched=0,polls=0,stale=0,lastRow=0,handedOff=false;
     const fromTarget=f=>{const m=message(f);return m&&m.senderPrefix===key.slice(0,12)&&m.textType===1?m:null;};
-    // Drop anything already queued, so a leftover message is never taken as this command's reply.
-    for(;;){let f;try{f=await this.wait([7,8,10,16,17],()=>c.sendCommandSyncNextMessage(),2000);}catch(e){if(c.closed||e.message!=='Companion response timed out')throw e;break;}if(f[0]===10)break;stale++;}
+    // A listener for this repeater pauses while the command runs and prints whatever comes after its first row.
+    const live=stream&&stream.c===c&&stream.key===key?stream:null;
+    if(live){live.held++;while(live.pulling)await sleep(20);}
+    try{
+    // Clear the queue first, so a leftover message is never taken as this command's reply; the repeater's own earlier rows are printed, not lost.
+    for(;;){let f;try{f=await this.wait([7,8,10,16,17],()=>c.sendCommandSyncNextMessage(),2000);}catch(e){if(c.closed||e.message!=='Companion response timed out')throw e;break;}if(f[0]===10)break;const early=live&&fromTarget(f);if(early)live.print(early.text);else stale++;}
     if(stale)this.notify('Discarded '+stale+' queued message'+(stale>1?'s':'')+' before sending');
     const capture=f=>{const m=fromTarget(f);if(m){rows.push(m);lastRow=Date.now();}else if([7,16].includes(f[0]))unmatched++;};
     const joined=()=>{const sorted=[...rows].sort((x,y)=>x.senderTimestamp-y.senderTimestamp);return {...sorted[0],text:sorted.map(r=>r.text).join('\n'),rows:sorted.length};};
@@ -106,7 +133,8 @@ export class RemoteProbe {
         const found=reply.text.match(/(?:^|\s)([a-f0-9]{64})(?=$|\s)/i);
         if(!found||found[1].toLowerCase()!==key)throw Error('Remote public key does not match the selected V4 identity');
       }
-      // Later rows of the same reply arrive in the background until REPLY_QUIET_MS pass without one or the next command starts.
+      if(live)return {command,gatewaySent:ack,...reply,completionBasis:'matching-sender-cli-type'};
+      // Without a listener, later rows of the same reply arrive in the background until REPLY_QUIET_MS pass without one or the next command starts.
       let stopped=false,seen=rows.length;
       const done=(async()=>{try{
         await null;
@@ -118,5 +146,6 @@ export class RemoteProbe {
       tail={stop:()=>{stopped=true;},done};handedOff=true;
       return {command,gatewaySent:ack,...reply,completionBasis:'matching-sender-cli-type'};
     }finally{if(!handedOff)c.off('wire',capture);}
+    }finally{if(live)live.held--;}
   }
 }
