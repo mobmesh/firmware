@@ -34,6 +34,9 @@
 static PowerGuardPolicy power_guard;
 RTC_DATA_ATTR static uint32_t boot_pwr_check_magic;
 RTC_DATA_ATTR static uint32_t boot_pwr_check_fails;
+RTC_DATA_ATTR static uint32_t safe_sleep_magic;   // set by safe sleep, read once on the boot that resumes
+static bool recovery_pending = false;
+#define POWER_GUARD_SAFE_MAGIC 0x53414645UL
 static uint32_t poweroff_secs = 0;
 static uint32_t poweroff_at_ms = 0;
 
@@ -51,6 +54,9 @@ static void bootPowerCheck() {
     boot_pwr_check_fails = 0;
   }
   if (mv >= POWER_GUARD_RESUME_MV) {
+    // Back from safe sleep or a low-battery boot check: return in power saving.
+    recovery_pending = safe_sleep_magic == POWER_GUARD_SAFE_MAGIC || boot_pwr_check_fails > 0;
+    safe_sleep_magic = 0;
     boot_pwr_check_fails = 0;
     return;
   }
@@ -103,14 +109,20 @@ static void powerOffNow(uint32_t secs) {
   modBoardDeepSleep(secs);
 }
 
-// Safe sleep takes the same power-down as poweroff.
+// Safe sleep takes the same power-down as poweroff, and marks the next resume as a recovery.
 void powerGuardSleepNow(uint32_t secs) {
+  safe_sleep_magic = POWER_GUARD_SAFE_MAGIC;
   powerOffNow(secs);
 }
 
 void powerGuardLoop() {
   if (poweroff_secs != 0 && millis() - poweroff_at_ms >= POWER_GUARD_POWEROFF_GRACE_MS) {
     powerOffNow(poweroff_secs);
+  }
+  if (recovery_pending) {
+    recovery_pending = false;
+    power_guard.startRecovery();
+    Serial.println("power-guard: back from low-battery sleep -- power saving on until release");
   }
   power_guard.loop();
 }
@@ -193,8 +205,9 @@ bool powerGuardHandleCli(const ModCliContext& context, char* command, char* repl
       && (command[16] == 0 || command[16] == ' ')) {
     const char* arg = command[16] == ' ' ? command + 17 : "";
     if (*arg == 0) {
-      sprintf(reply, "auto %s, active %s, transitions %u", power_guard.isAuto() ? "on" : "off",
-              power_guard.isActive() ? "yes" : "no", (unsigned)power_guard.transitionCount());
+      sprintf(reply, "auto %s, active %s%s, transitions %u", power_guard.isAuto() ? "on" : "off",
+              power_guard.isActive() ? "yes" : "no", power_guard.isRecovering() ? " (recovering)" : "",
+              (unsigned)power_guard.transitionCount());
     } else if (strcmp(arg, "on") == 0 || strcmp(arg, "off") == 0) {
       power_guard.setAuto(arg[1] == 'n');
       sprintf(reply, "OK - auto %s", power_guard.isAuto() ? "on" : "off");

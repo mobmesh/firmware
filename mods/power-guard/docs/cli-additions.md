@@ -79,12 +79,14 @@ powersaving auto <on|off>
 | `on` | Allow the board's voltage ladder to control automatic power saving |
 | `off` | Disable automatic control and release any active automatic saving |
 
-**Response:** `auto <on|off>, active <yes|no>, transitions <count>` when reading;
+**Response:** `auto <on|off>, active <yes|no>[ (recovering)], transitions <count>` when reading;
 `OK - auto <on|off>` when setting; `ERR: usage: powersaving auto [on|off]` for invalid input.
 
 **Storage:** Runtime-only. Reboot restores the board's configured default.
 
 **Scope:** `on` enables automatic control; `active yes` means voltage has engaged it.
+`(recovering)`: the node is back from safe sleep or a low-battery boot check, and power saving
+stays on, whatever `auto` says, until the release mark; `off` does not release it.
 Safe sleep is controlled separately. Voltage thresholds come from board configuration.
 
 ## poweroff / shutdown

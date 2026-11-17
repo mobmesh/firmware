@@ -69,6 +69,7 @@ class PowerGuardPolicy {
   uint8_t _sleep_agree;
   bool _auto;
   bool _active;
+  bool _recovering;        // back from a low-battery sleep: saving held on until the release mark
   bool _lna_was_enabled;   // hardware state captured at engage
   uint16_t _last_mv;
   uint32_t _transitions;
@@ -98,7 +99,7 @@ class PowerGuardPolicy {
 public:
   PowerGuardPolicy()
     : _next_sample_at(0), _agree(0), _sleep_agree(0),
-      _auto(POWER_GUARD_AUTO_DEFAULT), _active(false),
+      _auto(POWER_GUARD_AUTO_DEFAULT), _active(false), _recovering(false),
       _lna_was_enabled(false), _last_mv(0), _transitions(0),
       _sleep_mv(POWER_GUARD_SAFE_MV), _safe_on(SAFE_UNSET), _loaded(false) { }
 
@@ -106,7 +107,15 @@ public:
   // inhibit_sleep is set, which covers OTA on every path.
   bool isActive() const { return _active; }
   bool isAuto() const { return _auto; }
-  void setAuto(bool on) { _auto = on; if (!on && _active) setActive(false); }
+  void setAuto(bool on) { _auto = on; if (!on && _active && !_recovering) setActive(false); }
+  bool isRecovering() const { return _recovering; }
+
+  // After a low-battery sleep the node returns in power saving, whatever `auto` says, until the release mark.
+  void startRecovery() {
+    _recovering = true;
+    _agree = 0;
+    if (!_active) setActive(true);
+  }
 
   uint16_t sleepMilliVolts() { ensureLoaded(); return _sleep_mv; }
   bool safeEnabled() { ensureLoaded(); return _safe_on == 1; }
@@ -143,6 +152,7 @@ public:
     if (mv == 0) {
       _agree = 0;
       _sleep_agree = 0;
+      _recovering = false;
       if (_active) setActive(false);
       return;
     }
@@ -160,6 +170,16 @@ public:
       }
     } else {
       _sleep_agree = 0;
+    }
+
+    // Recovery holds saving on until the release mark, read the same consecutive way as auto.
+    if (_recovering) {
+      if (mv < POWER_GUARD_AUTO_OFF_MV) { _agree = 0; return; }
+      if (++_agree < POWER_GUARD_CONSECUTIVE_SAMPLES) return;
+      _agree = 0;
+      _recovering = false;
+      if (_active) setActive(false);
+      return;
     }
 
     if (!_auto || POWER_GUARD_AUTO_ON_MV == 0) {

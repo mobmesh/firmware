@@ -13,19 +13,22 @@ at dawn and a node flat by morning.
 
 Every board sets its own thresholds. The heltec_v4 values below are an example, not a
 default to copy -- they come from bench measurement.
-The power-saving steps apply when `powersaving auto` is on; safe sleep is controlled
-separately by `powersaving safe`.
+The power-saving steps apply when `powersaving auto` is on, and always after a low-battery
+sleep (below); safe sleep is controlled separately by `powersaving safe`.
 
 The order matters: the safe mark must sit below the resume mark, or a node leaves service
 and immediately qualifies to run again.
 
-<img src="assets/battery-ladder.svg" width="700" alt="Heltec V4 example: as voltage falls, power saving starts at 3300 mV and safe sleep begins below 2800 mV; as it rises, the radio may resume at 3150 mV and power saving stops at 3600 mV; measured boot floor is 2400 mV">
+<img src="assets/battery-ladder.svg" width="700" alt="Heltec V4 example: as voltage falls, power saving starts at 3300 mV and safe sleep begins below 2800 mV; as it rises, the radio may resume at 2950 mV in power saving, which stops at 3600 mV; measured boot floor is 2400 mV">
 
 After leaving service, the node checks the battery before powering the radio on each wake.
 If it is still below the resume mark, it sleeps again with progressively longer intervals.
+Once it resumes, it runs in power saving, whatever `powersaving auto` says, until the battery
+reaches the release mark; then `auto`, if on, takes over. The low draw is what lets the resume
+mark sit close to the safe mark.
 Several agreeing readings are required before a transition, so a transmit dip cannot trigger one.
 
-<img src="assets/sleep-recovery.svg" width="700" alt="Below the safe mark, the repeater sleeps; on each wake it checks the higher resume mark before starting the radio, sleeping again if the battery is still too low">
+<img src="assets/sleep-recovery.svg" width="700" alt="Below the safe mark, the repeater sleeps; on each wake it checks the higher resume mark before starting the radio, sleeping again if the battery is still too low; once resumed it runs in power saving until the release mark">
 
 Values are gauge millivolts, not volts at the pins.
 

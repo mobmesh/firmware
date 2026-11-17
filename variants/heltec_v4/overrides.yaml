@@ -34,7 +34,7 @@ build_values:
   POWER_GUARD_AUTO_ON_MV: 3300    # engage saving at or below
 
   # Safe-sleep recovery requires this voltage before restarting the radio.
-  POWER_GUARD_RESUME_MV: 3150
+  POWER_GUARD_RESUME_MV: 2950
 
   # A nonzero safe threshold enables safe sleep by default; saved settings override it.
   POWER_GUARD_SAFE_MV: 2800       # 0 disables the safe rung
