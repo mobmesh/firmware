@@ -3,21 +3,21 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "1e6ac22ad9c2672973e73c8c22e10aa33941e0be",
-  "sourceRows": 285,
-  "effectiveSignatures": 282,
+  "mobmeshCommit": "3520f2a9e845ed1c8199e6002e9c1883a7d175e2",
+  "sourceRows": 295,
+  "effectiveSignatures": 292,
   "cliAdditionFiles": [
     {
       "path": "mods/core/docs/cli-additions.md",
-      "sha256": "8fb55e5cb29694e1235f916f396a34c0c1808f90cf3d50da410456d67c7fa86f"
+      "sha256": "bf8595f92bec0bb923da42943335e09e32173027cfdddf38d7bdad05e50743d1"
     },
     {
-      "path": "mods/diag-report/docs/cli-additions.md",
-      "sha256": "4add91b3ee0573fd37986a16e5d61e274398d359b7186589058b76efac3cdc13"
+      "path": "mods/diag-reports/docs/cli-additions.md",
+      "sha256": "464985e22d070325a2261598c372f36a1c0fc5c5c5e8fe6a3017c28c624c3ac9"
     },
     {
       "path": "mods/direct-retry/docs/cli-additions.md",
-      "sha256": "103fbe84dfbd9af37ac2a9f3d391e62c4b485c81de1c7519c88f45d6ec0597e5"
+      "sha256": "a0c095bcf0285344cd06cf3d08c32d782d3aabd4ff9612b055ae3382d06764b8"
     },
     {
       "path": "mods/flood-gate/docs/cli-additions.md",
@@ -25,11 +25,11 @@
     },
     {
       "path": "mods/hotspot-ota/docs/cli-additions.md",
-      "sha256": "ee9a626d3b3b8c3a880446ec62569589ce31b371f3dbba32183f49bd4ef36cb7"
+      "sha256": "48e26e234b13141dcdc5ded0a4069a94f9c580203144e05d6e50365786cdd636"
     },
     {
       "path": "mods/power-guard/docs/cli-additions.md",
-      "sha256": "c0c639b5285f86e0fad315f80c6e4ad4601aa55b52a4d3771816f662763f72d6"
+      "sha256": "5cc5d602e13d18d9d3169d77724578b9f8395a29a1967744c1b17b06c8920a5d"
     },
     {
       "path": "mods/sync-settings/docs/cli-additions.md",
@@ -557,6 +557,86 @@
     [
       "1e6ac22",
       "2026-11-13"
+    ],
+    [
+      "0f20528",
+      "2026-11-14"
+    ],
+    [
+      "ea101ff",
+      "2026-11-14"
+    ],
+    [
+      "13bba6f",
+      "2026-11-14"
+    ],
+    [
+      "5c5441a",
+      "2026-11-14"
+    ],
+    [
+      "722ca09",
+      "2026-11-14"
+    ],
+    [
+      "73f0869",
+      "2026-11-14"
+    ],
+    [
+      "b97c4c1",
+      "2026-11-14"
+    ],
+    [
+      "8c02081",
+      "2026-11-15"
+    ],
+    [
+      "30407fc",
+      "2026-11-15"
+    ],
+    [
+      "b0fef75",
+      "2026-11-15"
+    ],
+    [
+      "35ce660",
+      "2026-11-16"
+    ],
+    [
+      "a98e120",
+      "2026-11-16"
+    ],
+    [
+      "cf10644",
+      "2026-11-16"
+    ],
+    [
+      "c7600b5",
+      "2026-11-16"
+    ],
+    [
+      "f50974e",
+      "2026-11-16"
+    ],
+    [
+      "7304ff2",
+      "2026-11-16"
+    ],
+    [
+      "2ef7b72",
+      "2026-11-16"
+    ],
+    [
+      "6a2a9f7",
+      "2026-11-16"
+    ],
+    [
+      "fb29aee",
+      "2026-11-17"
+    ],
+    [
+      "3520f2a",
+      "2026-11-17"
     ]
   ]
 }
