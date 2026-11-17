@@ -17,6 +17,8 @@ export const CONNECT_TRANSPORTS=Object.freeze({usb:'auto',bluetooth:'ble'});
 export function localCommand(raw){
   const text=raw.trim(),[typed,...args]=text.split(/\s+/),name=LOCAL_ALIASES[typed]||typed;
   if(!Object.hasOwn(LOCAL_COMMANDS,name))return null;
+  // Only a bare clear is the console's own; clear with arguments (clear diag, clear stats) belongs to the repeater.
+  if(name==='clear'&&args.length)return null;
   if(name==='connect'&&args.length){
     // Optional repeater after the transport: a full public key, a bare name, or a name in double or single quotes.
     const m=text.match(/^\S+\s+(\S+)(?:\s+(?:"([^"]+)"|'([^']+)'|(\S+)))?\s*$/);
