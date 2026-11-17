@@ -409,25 +409,29 @@ $('mode-usb').onclick=errorAction(()=>{selectTransport('auto');return open();});
 $('connection-panel').onclick=showConnection;$('connection-close').onclick=closeConnection;
 $('connection-dialog').addEventListener?.('click',e=>{if(e.target===$('connection-dialog')){const bounds=e.target.getBoundingClientRect();if(e.clientX<bounds.left||e.clientX>bounds.right||e.clientY<bounds.top||e.clientY>bounds.bottom)closeConnection();}});
 $('diagnostics-toggle').onclick=()=>{$('diagnostics').hidden=!$('diagnostics').hidden;};$('diagnostics-close').onclick=()=>{$('diagnostics').hidden=true;};$('manual-toggle').onclick=()=>toggleManual();
-// Phones have no arrow keys: a two-finger swipe in the terminal walks history, up for older and down for newer; one finger still scrolls.
+// Phones have no arrow keys: a one-finger vertical swipe on the command line walks history, up for older and down for newer.
 function recall(step){if(region||passwordPrompt)return;const input=$('command'),value=history.move(step,input.value,input.selectionStart);input.value=value.text;input.setSelectionRange(value.cursor,value.cursor);tabState=null;clearChoices();resizePrompt();$('prompt-host').textContent=promptHost(contacts.find(c=>fullKey(c.publicKey)===targetKey));}
-let swipe=null;
-const fingers=e=>{const [a,b]=e.touches;return {y:(a.clientY+b.clientY)/2,spread:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)};};
-$('terminal-scroll').addEventListener?.('touchstart',e=>{swipe=e.touches.length===2?{...fingers(e),last:fingers(e)}:null;},{passive:true});
-$('terminal-scroll').addEventListener?.('touchmove',e=>{if(!swipe||e.touches.length!==2)return;swipe.last=fingers(e);e.preventDefault();},{passive:false});
-$('terminal-scroll').addEventListener?.('touchend',()=>{if(!swipe)return;const dy=swipe.last.y-swipe.y,pinch=Math.abs(swipe.last.spread-swipe.spread);swipe=null;
- // A pinch changes the finger spread; a swipe keeps it, so only steady two-finger moves recall.
- if(Math.abs(dy)>=30&&pinch<Math.abs(dy)*.5){recall(dy<0?-1:1);$('command').focus();}});
-// One finger on the command line: a vertical swipe walks history too. It keeps its own start, separate from the terminal's two-finger swipe.
+// The command-line swipe keeps its own start, separate from the tap counter.
 let promptSwipe=null;
 $('command-form').addEventListener?.('touchstart',e=>{promptSwipe=e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY}:null;},{passive:true});
 $('command-form').addEventListener?.('touchend',e=>{if(!promptSwipe||e.touches.length)return;const t=e.changedTouches[0],dx=t.clientX-promptSwipe.x,dy=t.clientY-promptSwipe.y;promptSwipe=null;if(Math.abs(dy)>=24&&Math.abs(dy)>Math.abs(dx)*1.5)recall(dy<0?-1:1);});$('manual-close').onclick=()=>{$('manual').hidden=true;};
-// Phones have no Tab key: a two-finger double tap anywhere in the console completes like Tab.
-let tap=null,lastTap=0;
-document.addEventListener?.('touchstart',e=>{if(e.touches.length===2)tap={at:Date.now(),start:new Map([...e.touches].map(f=>[f.identifier,[f.clientX,f.clientY]])),still:true};else if(e.touches.length>2)tap=null;},{passive:true});
-document.addEventListener?.('touchmove',e=>{if(!tap)return;for(const f of e.changedTouches){const s=tap.start.get(f.identifier);if(s&&Math.hypot(f.clientX-s[0],f.clientY-s[1])>20)tap.still=false;}},{passive:true});
-document.addEventListener?.('touchend',e=>{if(!tap||e.touches.length)return;const ok=tap.still&&Date.now()-tap.at<300;tap=null;if(!ok)return;
- const now=Date.now();if(now-lastTap<400){lastTap=0;const input=$('command');input.focus();escapeTab=false;input.onkeydown({key:'Tab',shiftKey:false,ctrlKey:false,preventDefault(){}});}else lastTap=now;},{passive:true});
+// Phones have no Tab key: a one-finger double tap in the terminal or on the command line completes like Tab, a triple tap like Tab pressed twice.
+function pressTab(){const input=$('command');input.focus();escapeTab=false;input.onkeydown({key:'Tab',shiftKey:false,ctrlKey:false,preventDefault(){}});}
+let oneTap=null,taps=0,tapTimer=null;
+for(const id of ['terminal-scroll','command-form']){
+ $(id).addEventListener?.('touchstart',e=>{oneTap=e.touches.length===1&&!e.target.closest?.('button')?{x:e.touches[0].clientX,y:e.touches[0].clientY,at:Date.now()}:null;},{passive:true});
+ $(id).addEventListener?.('touchend',e=>{const t=oneTap;oneTap=null;if(!t||e.touches.length)return;const f=e.changedTouches[0];if(Date.now()-t.at>300||Math.hypot(f.clientX-t.x,f.clientY-t.y)>12){taps=0;return;}
+  taps++;clearTimeout(tapTimer);tapTimer=setTimeout(()=>{const n=taps;taps=0;if(n===2)pressTab();else if(n>=3){pressTab();pressTab();}},350);},{passive:true});
+}
+// Two fingers anywhere: spreading them opens the manual (F1), pinching closes it, and a quick still double tap clears the terminal.
+const spreadOf=e=>{const [a,b]=e.touches;return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);};
+let tap=null,lastTap=0,spread=null;
+document.addEventListener?.('touchstart',e=>{if(e.touches.length===2){tap={at:Date.now(),start:new Map([...e.touches].map(f=>[f.identifier,[f.clientX,f.clientY]])),still:true};spread={start:spreadOf(e),last:spreadOf(e)};}else if(e.touches.length>2){tap=null;spread=null;}},{passive:true});
+document.addEventListener?.('touchmove',e=>{if(spread&&e.touches.length===2)spread.last=spreadOf(e);if(!tap)return;for(const f of e.changedTouches){const s=tap.start.get(f.identifier);if(s&&Math.hypot(f.clientX-s[0],f.clientY-s[1])>20)tap.still=false;}},{passive:true});
+document.addEventListener?.('touchend',e=>{if(e.touches.length)return;
+ if(spread){const d=spread.last-spread.start;spread=null;if(d>=60){if($('manual').hidden)toggleManual();tap=null;return;}if(d<=-60){$('manual').hidden=true;tap=null;return;}}
+ if(!tap)return;const ok=tap.still&&Date.now()-tap.at<300;tap=null;if(!ok)return;
+ const now=Date.now();if(now-lastTap<400){lastTap=0;clearTerminal();}else lastTap=now;},{passive:true});
 // Touch and hold a past command line for a small menu: run it again, or put it on the command line to edit.
 function commandAtPoint(x,y){
  const caret=document.caretRangeFromPoint?.(x,y)||document.caretPositionFromPoint?.(x,y),node=caret?.startContainer||caret?.offsetNode,offset=caret?.startOffset??caret?.offset;
@@ -454,7 +458,6 @@ $('output').addEventListener?.('contextmenu',e=>{if(commandAtPoint(e.clientX,e.c
 document.addEventListener?.('pointerdown',e=>{if($('command-menu')&&!$('command-menu').contains(e.target))closeCommandMenu();});
 $('terminal-scroll').addEventListener?.('scroll',closeCommandMenu,{passive:true});
 $('clear-terminal').onclick=clearTerminal;
-$('brand-back').onclick=e=>{if(history.length>1&&document.referrer.startsWith(location.origin)){e.preventDefault();history.back();}};
 $('fullscreen').onclick=()=>{const action=document.fullscreenElement?document.exitFullscreen?.():document.documentElement?.requestFullscreen?.();Promise.resolve(action).catch(()=>{$('assistance').textContent='Full screen is unavailable in this browser.';});};
 $('terminal-scroll').onclick=e=>{if(!globalThis.getSelection?.()?.toString()&&['terminal-scroll','output','welcome'].includes(e.target.id))$('command').focus();};
 document.addEventListener?.('keydown',e=>{if(e.isComposing)return;if(e.key==='F2'){e.preventDefault();if($('connection-dialog').open)closeConnection();else showConnection();}else if(e.key==='F3'){e.preventDefault();$('diagnostics-toggle').click();}else if(e.key==='F1'){e.preventDefault();toggleManual();}else if(e.ctrlKey&&e.shiftKey&&e.key==='Enter'){e.preventDefault();$('fullscreen').click();}else if(e.ctrlKey&&!e.shiftKey&&!e.altKey&&!e.metaKey&&e.key.toLowerCase()==='c'&&busy){const input=$('command');if(globalThis.getSelection?.()?.toString()||input.selectionStart!==input.selectionEnd)return;e.preventDefault();$('cancel').click();}});

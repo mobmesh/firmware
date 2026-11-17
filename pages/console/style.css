@@ -1481,3 +1481,8 @@ body[data-embed] .app-shell {
 body[data-embed] .app-bar,body[data-embed] .workspace-strip {
   display:none
 }
+
+/* The console owns pinch, spread and double tap on phones; the page still scrolls */
+html,body {
+  touch-action:pan-x pan-y
+}
