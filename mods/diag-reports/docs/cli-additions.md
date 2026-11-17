@@ -232,7 +232,7 @@ set radio.fem.rxgain auto
 get radio.fem.rxgain
 ```
 
-**Response:** `OK - auto (learning, starts off)`; `get` shows `> auto (off, on 12-18)`, `> auto (on)`, `> auto (off)` (with `; learning, on now` or `; learning, off now` while the current block alternates), or a parked state, followed by `; on 06-08 banned 7d: decodes worse` while a ban is in force. `ERR: no switchable LNA on this board` where the LNA cannot be switched.
+**Response:** `OK - auto (learning, starts off)`; `get` shows the mode, the LNA's state now, then the learned on-hours in local time (a run across midnight is joined): `> mode:auto now:off; on 22:00-04:00`, `> mode:auto now:on (learning); off all day` while the current block alternates, `> mode:auto now:off (clock not set); on 22:00-04:00` before the clock is set (auto holds the LNA off until then), `> mode:auto now:on; on all day`; the `diag` 📶 row shows the part before the `;`, or a parked state, followed by `; on 06-08 banned 7d: decodes worse` while a ban is in force. `ERR: no switchable LNA on this board` where the LNA cannot be switched.
 
 **Effect:** each 2-hour local block keeps the state its ping tests last proved best. Until a block is decided it alternates, on in odd local hours and off in even ones, so neighbours heard only with the LNA on are found and the audit gets both records; a decided block switches only when the tests show, with significance, that the other state does better there. A test pings a neighbour (rotating among the 3 weakest heard recently) with the LNA in one state, flips it, pings again and flips back; it scores which state got the reply, or the clearer one. A test whose outbound SNR changed between the pings (fading), or whose idle floor moved more than 6 dB off the LNA's usual shift (noise changed mid-test), is discarded; no test runs while the last hour's load is over 25%.
 
@@ -244,7 +244,7 @@ get radio.fem.rxgain
 | Lost-neighbour veto | A neighbour that answers only with the LNA on turns that block on at once and keeps it on for 14 days |
 | Fade | Scores fade by 5% a day (half-life about 14 days) |
 | Retire | After the learning week, a block within 3% over 30 or more tests stops testing and runs off |
-| Park | Floor moving less than 10 dB between states: `auto (parked: LNA not working)`, 🔴 in `diag`. Fewer than 2 pingable neighbours for 14 days: `parked: too few neighbours`. Every block retired: `parked: no benefit, off`, which runs off. A parked auto learns again after 90 days |
+| Park | Floor moving less than 10 dB between states: `mode:auto parked (LNA not working)`, 🔴 in `diag`. Fewer than 2 pingable neighbours for 14 days: `mode:auto parked (too few neighbours)`. Every block retired: `mode:auto now:off; parked (no benefit)`, which runs off. A parked auto learns again after 90 days |
 | Freezes | A freeze in a block while the LNA was on counts against on there |
 | Audit | Every closed hour adds to its block's record for the state it ran: packets decoded, failed decodes, neighbours heard, freezes and idle floor. Once both states have 6 hours, a block's running state (on, for a block still alternating) is banned for 7 days when it is clearly worse than the other: failed-decode rate up 2 points and by half, packets down 30%, a neighbour fewer per hour, twice the freezes, or (LNA on) the floor more than 6 dB above the usual shift. A ban sends the block to the other state, and the banned state must re-earn it from new tests |
 | Refresh | A block running on runs off one day in 14, so both records stay current |

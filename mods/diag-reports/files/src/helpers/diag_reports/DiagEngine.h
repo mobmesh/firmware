@@ -77,7 +77,7 @@ struct EngineInput {
   uint8_t retry_one_way;               // 1 + links index whose direct-retry resends mostly go unconfirmed; 0 = none
   uint16_t retry_tried, retry_won;     // that hop's resends and those confirmed
   const DiagEvidence* ev;              // the shared evidence; built by the caller from the same sources
-  const char* lna_auto;                // LNA auto status ("auto (on, off 12-14)"), or nullptr when auto is off
+  const char* lna_auto;                // LNA auto status ("auto: off now; on 12-14"), or nullptr when auto is off
   bool lna_auto_dead;                  // auto parked because the LNA does not work
 };
 

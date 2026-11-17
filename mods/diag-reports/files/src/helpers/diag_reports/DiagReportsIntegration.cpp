@@ -482,9 +482,12 @@ static void buildInput(EngineInput& in, NoiseView& nv, BattView& bv, StoreDay* h
   if (ping) in.cleared_one_way = ping->width >= 2 ? (uint16_t)((ping->hash[0][0] << 8) | ping->hash[0][1]) : ping->hash[0][0];
   buildEvidence(nv);
   in.ev = &evidence;
-  static char auto_text[48];
+  static char auto_text[80];
   if (in.lna_available && store.lna_auto.enabled) {
-    autoStatusText(store.lna_auto, autoLocalHour(), auto_text, sizeof(auto_text));
+    autoStatusText(store.lna_auto, autoLocalHour(), modFemLnaGet() ? 1 : 0, auto_text, sizeof(auto_text));
+    // The summary row has room for the state only; the schedule is in get radio.fem.rxgain and diag radio.lna.
+    char* cut = strstr(auto_text, "; ");
+    if (cut && !strstr(auto_text, "parked")) *cut = 0;
     in.lna_auto = auto_text;
     in.lna_auto_dead = store.lna_auto.park == AUTO_PARK_DEAD;
   }
@@ -1221,7 +1224,11 @@ static bool autoPingDone(uint32_t now_ms, int idx) {
 static void autoTick(uint32_t now_ms) {
   if (!modFemLnaAvailable() || run) return;
   uint32_t hour = clockHour();
-  if (!hour) return;
+  // Without a clock no block applies: hold the LNA off, auto's start state, until the time is known.
+  if (!hour) {
+    if (auto_step == AUTO_IDLE && auto_set != 0 && !(auto_hold_until && (int32_t)(now_ms - auto_hold_until) < 0)) autoSet(false);
+    return;
+  }
   uint8_t local_hour = storeLocalHour(hour, modTzHours());
   uint8_t block = autoBlockOf(local_hour);
   uint32_t day = storeLocalDay(hour, modTzHours());
@@ -1484,7 +1491,7 @@ static void runLnaReport() {
   if (store.lna_auto.enabled) {
     const LnaAutoState& au = store.lna_auto;
     char text[80], row[AUTO_BLOCKS + 1];
-    autoStatusText(au, autoLocalHour(), text, sizeof(text));
+    autoStatusText(au, autoLocalHour(), modFemLnaGet() ? 1 : 0, text, sizeof(text));
     autoBlockRow(au, row);
     outSep(out);
     outLine(out, "%s", text);
@@ -1856,7 +1863,7 @@ bool diagReportsHandleCli(const ModCliContext& context, char* command, char* rep
   }
   if (strcmp(command, "get radio.fem.rxgain") == 0 && store.lna_auto.enabled && modFemLnaAvailable()) {
     char text[80], banned[48];
-    autoStatusText(store.lna_auto, autoLocalHour(), text, sizeof(text));
+    autoStatusText(store.lna_auto, autoLocalHour(), modFemLnaGet() ? 1 : 0, text, sizeof(text));
     if (autoBanText(store.lna_auto, banned, sizeof(banned))) sprintf(reply, "> %s; %s", text, banned);
     else sprintf(reply, "> %s", text);
     return true;

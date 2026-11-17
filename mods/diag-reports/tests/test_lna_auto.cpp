@@ -20,7 +20,7 @@ static AutoTest pair(bool off_reply, bool on_reply, float off_back, float on_bac
 
 int main() {
   static LnaAutoState a;
-  char text[48], row[AUTO_BLOCKS + 1];
+  char text[80], row[AUTO_BLOCKS + 1];
 
   // Blocks follow local even hours.
   CHECK(autoBlockOf(0) == 0 && autoBlockOf(13) == 6 && autoBlockOf(23) == 11);
@@ -28,10 +28,10 @@ int main() {
   // Learning starts undecided: odd local hours on, even off; tests every 10 minutes, under a daily cap.
   autoInit(a, DAY);
   CHECK(!autoApplied(a, 6, 12) && autoApplied(a, 6, 13) && autoLearning(a, DAY, 6));
-  autoStatusText(a, 13, text, sizeof(text));
-  CHECK_STR(text, "auto (off; learning, on now)");
-  autoStatusText(a, 12, text, sizeof(text));
-  CHECK_STR(text, "auto (off; learning, off now)");
+  autoStatusText(a, 13, -1, text, sizeof(text));
+  CHECK_STR(text, "mode:auto now:on (learning); off all day");
+  autoStatusText(a, 12, -1, text, sizeof(text));
+  CHECK_STR(text, "mode:auto now:off (learning); off all day");
   CHECK(autoTestDue(a, T0 + 100, DAY, 6));
   autoAddTest(a, 6, pair(true, true, 3, 3), T0 + 100, DAY);
   CHECK(!autoTestDue(a, T0 + 400, DAY, 6) && autoTestDue(a, T0 + 700, DAY, 6));
@@ -42,10 +42,34 @@ int main() {
   CHECK(!autoApplied(a, 6, 12));   // 7 decided: still alternating
   for (int i = 0; i < 6; i++) autoAddTest(a, 6, pair(true, true, 3, 6), T0 + 6000 + i * 700, DAY);
   CHECK(autoApplied(a, 6, 12) && autoApplied(a, 6, 13) && !autoApplied(a, 5, 10));
-  autoStatusText(a, -1, text, sizeof(text));
-  CHECK_STR(text, "auto (off, on 12-14)");
-  autoStatusText(a, 12, text, sizeof(text));
-  CHECK_STR(text, "auto (off, on 12-14)");   // a decided block adds nothing
+  autoStatusText(a, -1, -1, text, sizeof(text));
+  CHECK_STR(text, "mode:auto; on 12:00-14:00");
+  autoStatusText(a, 12, -1, text, sizeof(text));
+  CHECK_STR(text, "mode:auto now:on; on 12:00-14:00");   // a decided block takes its state from the hour
+  // With the real LNA state known, the status always ends with it.
+  autoStatusText(a, 12, 1, text, sizeof(text));
+  CHECK_STR(text, "mode:auto now:on; on 12:00-14:00");
+  autoStatusText(a, 10, 1, text, sizeof(text));
+  CHECK_STR(text, "mode:auto now:on (learning); on 12:00-14:00");
+  autoStatusText(a, -1, 0, text, sizeof(text));
+  CHECK_STR(text, "mode:auto now:off (clock not set); on 12:00-14:00");
+  // A run that crosses midnight is joined, and separate runs are listed in order after an off block.
+  LnaAutoState wrap = a;
+  for (int b = 0; b < AUTO_BLOCKS; b++) {
+    wrap.b[b].best = 0;
+    wrap.b[b].retired = 1;
+  }
+  const int on_blocks[] = {11, 0, 1};
+  for (int b : on_blocks) {
+    wrap.b[b].best = 1;
+    wrap.b[b].retired = 0;
+  }
+  autoStatusText(wrap, 9, 0, text, sizeof(text));
+  CHECK_STR(text, "mode:auto now:off; on 22:00-04:00");
+  wrap.b[6].best = 1;
+  wrap.b[6].retired = 0;
+  autoStatusText(wrap, 9, 0, text, sizeof(text));
+  CHECK_STR(text, "mode:auto now:off; on 12:00-14:00, 22:00-04:00");
   autoBlockRow(a, row);
   CHECK(row[6] == '+' && row[5] == '.');
 
@@ -102,30 +126,30 @@ int main() {
   }
   autoDayTurn(a, DAY + 1, 4);
   CHECK(a.park == AUTO_PARK_DEAD && !autoApplied(a, 0, 1) && !autoTestDue(a, T0 + 99999, DAY + 1, 0));
-  autoStatusText(a, -1, text, sizeof(text));
-  CHECK_STR(text, "auto (parked: LNA not working)");
+  autoStatusText(a, -1, -1, text, sizeof(text));
+  CHECK_STR(text, "mode:auto parked (LNA not working)");
   // A parked auto rechecks after 90 days by learning again.
   autoDayTurn(a, DAY + 1 + 90, 4);
   CHECK(a.park == AUTO_ACTIVE && a.start_day == DAY + 91 && a.enabled);
   autoInit(a, DAY);
   for (int d = 1; d <= 14; d++) autoDayTurn(a, DAY + d, 1);
   CHECK(a.park == AUTO_PARK_FEW_NB);
-  autoStatusText(a, -1, text, sizeof(text));
-  CHECK_STR(text, "auto (parked: too few neighbours)");
+  autoStatusText(a, -1, -1, text, sizeof(text));
+  CHECK_STR(text, "mode:auto parked (too few neighbours)");
   autoInit(a, DAY);
   for (int b = 0; b < AUTO_BLOCKS; b++) a.b[b].retired = 1;
   autoDayTurn(a, DAY + 8, 4);
   CHECK(a.park == AUTO_PARK_NO_BENEFIT);
-  autoStatusText(a, -1, text, sizeof(text));
-  CHECK_STR(text, "auto (parked: no benefit, off)");
+  autoStatusText(a, -1, -1, text, sizeof(text));
+  CHECK_STR(text, "mode:auto now:off; parked (no benefit)");
   CHECK(!autoApplied(a, 4, 9));
 
   // Disabled: off, and no tests.
   autoInit(a, DAY);
   for (int i = 0; i < 14; i++) autoAddTest(a, 10, pair(true, true, 3, 6), T0 + i * 700, DAY);
   CHECK(autoApplied(a, 10) && !autoApplied(a, 0, 0));
-  autoStatusText(a, -1, text, sizeof(text));
-  CHECK_STR(text, "auto (off, on 20-22)");
+  autoStatusText(a, -1, -1, text, sizeof(text));
+  CHECK_STR(text, "mode:auto; on 20:00-22:00");
   a.enabled = 0;
   CHECK(!autoApplied(a, 10, 21) && !autoTestDue(a, T0 + 99999, DAY, 10));
 
@@ -151,8 +175,8 @@ int main() {
   CHECK(autoAudit(a, 10) == AUTO_R_DECODES && !autoApplied(a, 10));
   CHECK(autoBanText(a, text, sizeof(text)));
   CHECK_STR(text, "on 20-22 banned 7d: decodes worse");
-  autoStatusText(a, -1, text, sizeof(text));
-  CHECK_STR(text, "auto (off)");
+  autoStatusText(a, -1, -1, text, sizeof(text));
+  CHECK_STR(text, "mode:auto; off all day");
   // The ban runs out after 7 day turns; on must then re-earn the block from new tests.
   for (int d = 1; d <= 7; d++) autoDayTurn(a, DAY + d, 4);
   CHECK(a.b[10].ban_days == 0 && !autoApplied(a, 10));
