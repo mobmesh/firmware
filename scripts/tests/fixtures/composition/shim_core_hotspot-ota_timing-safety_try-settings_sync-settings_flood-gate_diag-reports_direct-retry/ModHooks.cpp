@@ -4,15 +4,13 @@
 #include <helpers/CoreIntegration.h>
 #include <helpers/esp32/HotspotOtaIntegration.h>
 #include <helpers/esp32/TrySetIntegration.h>
-#include <helpers/esp32/PowerGuardIntegration.h>
 #include <helpers/sync_settings/SyncIntegration.h>
 #include <helpers/esp32/FloodGateIntegration.h>
-#include <helpers/diag_report/DiagReportIntegration.h>
+#include <helpers/diag_reports/DiagReportsIntegration.h>
 #include <helpers/direct_retry/DirectRetryIntegration.h>
 
 bool modRadioInit(const char* build_id) {
   hotspotOtaBeforeRadioInit();
-  powerGuardBeforeRadioInit();
   return hotspotOtaRadioInit(build_id);
 }
 
@@ -20,10 +18,9 @@ void modLoop() {
   coreLoop();
   hotspotOtaLoop();
   trySetLoop();
-  powerGuardLoop();
   syncLoop();
   floodGateLoop();
-  diagReportLoop();
+  diagReportsLoop();
   directRetryLoop();
 }
 
@@ -56,7 +53,7 @@ void modObserveRecv(const mesh::Packet* packet, bool accepted,
                     const uint8_t scope_key[16]) {
   coreRecv(packet, accepted, scope_key);
   syncRecv(packet, accepted, scope_key);
-  diagReportRecv(packet, accepted, scope_key);
+  diagReportsRecv(packet, accepted, scope_key);
 }
 
 void modObserveTx(uint32_t packet_id, bool succeeded) {
@@ -64,15 +61,14 @@ void modObserveTx(uint32_t packet_id, bool succeeded) {
 }
 
 bool modWantsPowerSaving() {
-  return powerGuardWantsPowerSaving();
+  return false;
 }
 
 bool modLoadAllowed() {
-  return powerGuardLoadAllowed();
+  return true;
 }
 
 void modBeforeDeepSleep() {
-  powerGuardBeforeDeepSleep();
 }
 
 bool     modBoardRadioInit()               { return radio_init(); }
@@ -94,6 +90,7 @@ bool     modRadioRssiNow(float* out) {
   return true;
 }
 void     modBeforeAgcReset() {
+  diagReportsAgcReset();
 }
 void     modRadioCounters(uint32_t* recv, uint32_t* errors) {
   *recv = radio_driver.getPacketsRecv();

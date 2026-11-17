@@ -21,7 +21,7 @@ Select a mod link below for its own README, including behavior and requirements.
 | [try‑settings](mods/try-settings/README.md) | Timed setting trials that revert unless the operator confirms the node still works. |
 | [power‑guard](mods/power-guard/README.md) | Battery-aware power saving, brownout protection, safe sleep and recovery for supported repeaters. |
 | [flood‑gate](mods/flood-gate/README.md) | Allows an operator to temporarily opt out of repeating specified channel floods. Doesn't stop an attack, but provides an option to not participate in one. |
-| [diag‑report](mods/diag-report/README.md) | Diagnostics with plain verdicts and one action: a one-screen summary, a 24-hour battery report, link and noise checks, a nearby-interference scan and an LNA study. |
+| [diag‑reports](mods/diag-reports/README.md) | Diagnostics that relate what the node sees: each symptom matched to the cause that explains it, one fix, a live probe on request, and LNA auto per 2-hour block. |
 | [direct‑retry](mods/direct-retry/README.md) | Keeps direct traffic moving: resends a direct packet and listens for the next hop's repeat. Off by default. |
 | [timing‑safety](mods/timing-safety/README.md) | Timer rollover and post-reboot clock fixes. |
 | [shim](mods/shim/README.md) | Shared upstream hooks that connect selected mods to MeshCore. |

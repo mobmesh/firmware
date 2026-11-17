@@ -1,3 +1,6 @@
 # macOS
 .DS_Store
 ._*
+
+# Retired mod kept locally as reference; replaced by diag-reports
+mods/diag-report/

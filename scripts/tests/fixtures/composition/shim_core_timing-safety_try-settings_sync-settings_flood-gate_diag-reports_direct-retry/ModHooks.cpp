@@ -2,24 +2,24 @@
 #include <helpers/ModHooks.h>
 #include <target.h>
 #include <helpers/CoreIntegration.h>
-#include <helpers/esp32/HotspotOtaIntegration.h>
 #include <helpers/esp32/TrySetIntegration.h>
 #include <helpers/sync_settings/SyncIntegration.h>
 #include <helpers/esp32/FloodGateIntegration.h>
-#include <helpers/diag_report/DiagReportIntegration.h>
+#include <helpers/diag_reports/DiagReportsIntegration.h>
+#include <helpers/direct_retry/DirectRetryIntegration.h>
 
 bool modRadioInit(const char* build_id) {
-  hotspotOtaBeforeRadioInit();
-  return hotspotOtaRadioInit(build_id);
+
+  return modBoardRadioInit();
 }
 
 void modLoop() {
   coreLoop();
-  hotspotOtaLoop();
   trySetLoop();
   syncLoop();
   floodGateLoop();
-  diagReportLoop();
+  diagReportsLoop();
+  directRetryLoop();
 }
 
 bool modResolveRegion(mesh::Packet* packet, RegionMap* base, ModRegionMatch* out) {
@@ -44,17 +44,14 @@ size_t modOwnerInfoMarker(uint8_t out[4]) {
 }
 
 bool modDirectEvent(ModDirectEvent event, const mesh::Packet* packet, uint32_t delay_millis) {
-  (void)event;
-  (void)packet;
-  (void)delay_millis;
-  return false;
+  return directRetryDirect(event, packet, delay_millis);
 }
 
 void modObserveRecv(const mesh::Packet* packet, bool accepted,
                     const uint8_t scope_key[16]) {
   coreRecv(packet, accepted, scope_key);
   syncRecv(packet, accepted, scope_key);
-  diagReportRecv(packet, accepted, scope_key);
+  diagReportsRecv(packet, accepted, scope_key);
 }
 
 void modObserveTx(uint32_t packet_id, bool succeeded) {
@@ -91,6 +88,7 @@ bool     modRadioRssiNow(float* out) {
   return true;
 }
 void     modBeforeAgcReset() {
+  diagReportsAgcReset();
 }
 void     modRadioCounters(uint32_t* recv, uint32_t* errors) {
   *recv = radio_driver.getPacketsRecv();
