@@ -1861,6 +1861,11 @@ bool diagReportsHandleCli(const ModCliContext& context, char* command, char* rep
     strcpy(reply, "OK - auto (learning, starts off)");
     return true;
   }
+  // Upstream answers "??" where the board has no LNA switch; say what is missing instead.
+  if (strcmp(command, "get radio.fem.rxgain") == 0 && !modFemLnaAvailable()) {
+    strcpy(reply, "ERR: no switchable LNA on this board");
+    return true;
+  }
   if (strcmp(command, "get radio.fem.rxgain") == 0 && store.lna_auto.enabled && modFemLnaAvailable()) {
     char text[80], banned[48];
     autoStatusText(store.lna_auto, autoLocalHour(), modFemLnaGet() ? 1 : 0, text, sizeof(text));
