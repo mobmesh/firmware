@@ -210,7 +210,7 @@ diag radio.lna stop
 | --- | --- |
 | `hours` | Study length, 6-168; omitted means 48 |
 
-**Response:** progress (`📶 LNA: ⚪ Studying, <h> of <h>h`, pairs, neighbours, a leaning) while a study runs; otherwise the last result, its freezes per state, `~`, and the advice; `📶 LNA: ⚪ No Study Yet` before the first. `ERR: no switchable LNA on this board`, `ERR: study already running (diag radio.lna stop)`, `ERR: hours 6-168`, `ERR: no study running`.
+**Response:** progress (`📶 LNA: ⚪ Studying, <h> of <h>h`, pairs, neighbours, a leaning) while a study runs; otherwise the last result, its freezes per state, `~`, and the advice; `📶 LNA: ⚪ No Study Yet` before the first. `ERR: no switchable LNA on this board` for every form on boards without one, `ERR: study already running (diag radio.lna stop)`, `ERR: hours 6-168`, `ERR: no study running`.
 
 | Result | Meaning |
 | --- | --- |

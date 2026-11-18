@@ -1909,7 +1909,8 @@ bool diagReportsHandleCli(const ModCliContext& context, char* command, char* rep
     return true;
   } else if (isWord(command, "diag radio.lna")) {
     const char* arg = argAfter(command, "diag radio.lna");
-    if (*arg == 0) runLnaReport();
+    if (!modFemLnaAvailable()) outLine(out, "ERR: no switchable LNA on this board");
+    else if (*arg == 0) runLnaReport();
     else if (isWord(arg, "start")) startStudy(argAfter(arg, "start"));
     else if (strcmp(arg, "stop") == 0) {
       if (!run) outLine(out, "ERR: no study running");
