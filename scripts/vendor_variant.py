@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -13,7 +14,12 @@ RAW = 'https://raw.githubusercontent.com/{repo}/{commit}/{path}'
 
 
 def fetch(url):
-    request = urllib.request.Request(url, headers={'User-Agent': 'mobmesh-vendor-variant'})
+    headers = {'User-Agent': 'mobmesh-vendor-variant'}
+    # Anonymous API calls share the runner IP's 60/hour limit; the workflow token lifts it.
+    token = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
+    if token and url.startswith('https://api.github.com/'):
+        headers['Authorization'] = f'Bearer {token}'
+    request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(request, timeout=30) as response:
         return response.read()
 
