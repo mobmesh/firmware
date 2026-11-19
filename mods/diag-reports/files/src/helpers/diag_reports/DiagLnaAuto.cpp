@@ -344,3 +344,40 @@ bool autoBanText(const LnaAutoState& a, char* out, size_t len) {
   }
   return false;
 }
+
+static bool muteActive(const AutoMute& m, uint32_t now_ms) {
+  return m.until_ms && (int32_t)(now_ms - m.until_ms) < 0;
+}
+
+bool autoMuted(const AutoMutes& t, const char* id, uint32_t now_ms) {
+  for (const AutoMute& m : t.m) {
+    if (m.id[0] && strcmp(m.id, id) == 0) return muteActive(m, now_ms);
+  }
+  return false;
+}
+
+void autoMuteRecord(AutoMutes& t, const char* id, bool answered, uint32_t now_ms) {
+  AutoMute* slot = nullptr;
+  for (AutoMute& m : t.m) {
+    if (m.id[0] && strcmp(m.id, id) == 0) { slot = &m; break; }
+  }
+  if (slot == nullptr) {
+    if (answered) return;
+    // A free slot first, else the entry sitting out nothing with the fewest misses.
+    for (AutoMute& m : t.m) {
+      if (!m.id[0]) { slot = &m; break; }
+      if (!muteActive(m, now_ms) && (slot == nullptr || m.misses < slot->misses)) slot = &m;
+    }
+    if (slot == nullptr) return;
+    memset(slot, 0, sizeof(*slot));
+    strncpy(slot->id, id, sizeof(slot->id) - 1);
+  }
+  if (answered) {
+    slot->misses = 0;
+    slot->until_ms = 0;
+    return;
+  }
+  if (++slot->misses < AUTO_MUTE_MISSES) return;
+  slot->misses = 0;
+  slot->until_ms = (now_ms + AUTO_MUTE_MS) | 1;
+}

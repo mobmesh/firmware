@@ -2,6 +2,8 @@
 
 #include "check.h"
 
+#include <stdio.h>
+
 #define DAY 20000
 #define T0  (DAY * 86400UL)
 
@@ -220,5 +222,34 @@ int main() {
     refreshed += !autoApplied(a, 10);
   }
   CHECK(refreshed == 1);
+
+  // A neighbour unanswered in both states three tests in a row sits out 24 h; any reply clears its misses.
+  static AutoMutes mutes;
+  const uint32_t now = 4250000000UL;   // the 24 h runs past the millis() wrap
+  autoMuteRecord(mutes, "5347", false, now);
+  autoMuteRecord(mutes, "5347", false, now + 1);
+  CHECK(!autoMuted(mutes, "5347", now + 2));
+  autoMuteRecord(mutes, "5347", true, now + 3);
+  autoMuteRecord(mutes, "5347", false, now + 4);
+  autoMuteRecord(mutes, "5347", false, now + 5);
+  CHECK(!autoMuted(mutes, "5347", now + 6));
+  autoMuteRecord(mutes, "5347", false, now + 7);
+  CHECK(autoMuted(mutes, "5347", now + 8) && !autoMuted(mutes, "c5fb", now + 8));
+  // Across the millis() wrap, and back in the rotation once the day is up.
+  CHECK(autoMuted(mutes, "5347", (uint32_t)(now + 7 + AUTO_MUTE_MS - 1000)));
+  CHECK(!autoMuted(mutes, "5347", (uint32_t)(now + 7 + AUTO_MUTE_MS + 1000)));
+  // A full table takes a newcomer over an entry sitting out nothing, never over one sitting out.
+  static AutoMutes full;
+  char id[8];
+  for (int i = 0; i < AUTO_MUTE_MAX; i++) {
+    snprintf(id, sizeof(id), "a%d", i);
+    for (int k = 0; k < AUTO_MUTE_MISSES; k++) autoMuteRecord(full, id, false, 1000);
+  }
+  autoMuteRecord(full, "b0", false, 2000);
+  CHECK(autoMuted(full, "a0", 3000) && autoMuted(full, "a7", 3000));
+  autoMuteRecord(full, "a3", true, 3000);
+  autoMuteRecord(full, "b0", false, 3000);
+  for (int k = 1; k < AUTO_MUTE_MISSES; k++) autoMuteRecord(full, "b0", false, 3000);
+  CHECK(autoMuted(full, "b0", 4000) && !autoMuted(full, "a3", 4000) && autoMuted(full, "a0", 4000));
   DONE();
 }

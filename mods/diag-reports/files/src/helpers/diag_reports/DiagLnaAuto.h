@@ -21,6 +21,9 @@
 #define AUTO_BAN_DAYS      7           // a state the audit or the overload verdict caught stays banned this long
 #define AUTO_REFRESH_DAYS  14          // a block running on runs off one day in this many
 #define AUTO_TARGETS       3           // tests rotate among this many weakest judged neighbours
+#define AUTO_MUTE_MISSES   3           // tests in a row unanswered in both states before a neighbour sits out
+#define AUTO_MUTE_MS       86400000UL  // how long it sits out of the rotation
+#define AUTO_MUTE_MAX      8
 
 enum AutoReason : uint8_t {
   AUTO_R_NONE,
@@ -92,6 +95,21 @@ struct AutoTest {
   float out_db[2];                     // SNR of the ping at the neighbour: the LNA does not, so a mismatch means fading
   int8_t floor_dbm[2];                 // idle floor just before each ping
 };
+
+// Neighbours that answer neither ping sit out of the test rotation for a while. RAM only; millis() based.
+struct AutoMute {
+  char id[8];                          // lower-case hash label; empty = free
+  uint8_t misses;                      // tests in a row unanswered in both states
+  uint32_t until_ms;                   // sits out until this millis(); 0 = in the rotation
+};
+
+struct AutoMutes {
+  AutoMute m[AUTO_MUTE_MAX];
+};
+
+// One finished test against its target: any reply clears the misses; the third miss in a row sits it out.
+void autoMuteRecord(AutoMutes& t, const char* id, bool answered, uint32_t now_ms);
+bool autoMuted(const AutoMutes& t, const char* id, uint32_t now_ms);
 
 void autoInit(LnaAutoState& a, uint32_t day);
 uint8_t autoBlockOf(uint8_t local_hour);

@@ -149,6 +149,8 @@ static uint8_t auto_block;
 static bool auto_first_on;              // the state the first ping ran in
 static uint32_t auto_ping_ms;
 static char auto_target[8];
+static char auto_key[8];                // the target as picked; the ping may shorten auto_target
+static AutoMutes auto_mutes;
 static AutoTest auto_test;
 static uint32_t auto_last_check_ms;
 static int8_t auto_set = -1;            // the state auto applied last; -1 = none
@@ -216,10 +218,15 @@ static uint8_t lnaNow() {
   return modFemLnaGet() ? STORE_LNA_ON : STORE_LNA_OFF;
 }
 
+static int autoPlanned();
+
 // The state the node runs in outside a study; noise hours are compared only within one state.
 static uint8_t lnaSettled() {
   if (!modFemLnaAvailable()) return STORE_LNA_NA;
-  return run ? run->study.start_lna : lnaNow();
+  if (run) return run->study.start_lna;
+  int planned = autoPlanned();
+  if (planned >= 0) return planned ? STORE_LNA_ON : STORE_LNA_OFF;
+  return lnaNow();
 }
 
 static bool readFloor(int8_t* out_dbm) {
@@ -575,6 +582,8 @@ static void closeHour() {
   }
 }
 
+static void autoHourTurn(uint32_t now_ms);
+
 // A clock set or jump closes nothing: that hour's epoch is not the one it was sampled in.
 static void hourTick() {
   uint32_t hour = clockHour();
@@ -591,6 +600,7 @@ static void hourTick() {
   cur_day = day;
   for (int b = 0; b < 6; b++) block_loud[b] = block_loud[b] && hour && (hour % 24) / 4 == (uint32_t)b;
   startHour(hour);
+  autoHourTurn(millis());
   if (next) saveStore();
 }
 
@@ -1173,8 +1183,12 @@ static void autoSet(bool on) {
 static bool autoPickTarget(char* out, size_t len) {
   int order[LINKS_MAX], k = 0;
   uint8_t sf = currentSf();
+  char label[8];
   for (int i = 0; i < links.count; i++) {
-    if (links.nb[i].packets >= LINKS_MIN_PKTS && millis() - links.nb[i].last_ms < LINKS_STALE_MS) order[k++] = i;
+    if (links.nb[i].packets < LINKS_MIN_PKTS || millis() - links.nb[i].last_ms >= LINKS_STALE_MS) continue;
+    linkLabel(links, i, label, sizeof(label));
+    for (char* c = label; *c; c++) if (*c >= 'A' && *c <= 'F') *c += 32;
+    if (!autoMuted(auto_mutes, label, millis())) order[k++] = i;
   }
   if (k == 0) return false;
   for (int i = 1; i < k; i++) {
@@ -1220,13 +1234,43 @@ static bool autoPingDone(uint32_t now_ms, int idx) {
   return true;
 }
 
+// Runs the block in its learned state; false while another feature (power-guard's low-battery drop) holds the LNA.
+static bool autoApplyBlock(uint32_t now_ms, uint8_t block, uint8_t local_hour) {
+  if (auto_set >= 0 && modFemLnaGet() != (auto_set == 1)) {
+    auto_hold_until = now_ms + 900000UL;
+    auto_set = -1;
+  }
+  if (auto_hold_until && (int32_t)(now_ms - auto_hold_until) < 0) return false;
+  auto_hold_until = 0;
+  bool applied = autoApplied(store.lna_auto, block, local_hour);
+  if (modFemLnaGet() != applied) autoSet(applied);
+  else auto_set = applied ? 1 : 0;
+  return true;
+}
+
+// The state auto plans for the noise watch's hour: 1 on, 0 off; -1 when auto is not steering the LNA.
+static int autoPlanned() {
+  if (!store.lna_auto.enabled || !modFemLnaAvailable() || run || !cur_hour) return -1;
+  if (auto_hold_until && (int32_t)(millis() - auto_hold_until) < 0) return -1;
+  uint8_t local_hour = storeLocalHour(cur_hour, modTzHours());
+  return autoApplied(store.lna_auto, autoBlockOf(local_hour), local_hour) ? 1 : 0;
+}
+
+// A new noise hour: switch to its planned state now rather than at the next minute's check.
+static void autoHourTurn(uint32_t now_ms) {
+  if (!store.lna_auto.enabled || !modFemLnaAvailable() || run || !cur_hour || auto_step != AUTO_IDLE) return;
+  uint8_t local_hour = storeLocalHour(cur_hour, modTzHours());
+  autoApplyBlock(now_ms, autoBlockOf(local_hour), local_hour);
+}
+
 // Once a minute: run each block in its learned state; a paired ping test when one is due.
 static void autoTick(uint32_t now_ms) {
   if (!modFemLnaAvailable() || run) return;
-  uint32_t hour = clockHour();
+  // The noise watch's hour, not the clock's: the LNA switches only once that hour is closed.
+  uint32_t hour = cur_hour;
   // Without a clock no block applies: hold the LNA off, auto's start state, until the time is known.
   if (!hour) {
-    if (auto_step == AUTO_IDLE && auto_set != 0 && !(auto_hold_until && (int32_t)(now_ms - auto_hold_until) < 0)) autoSet(false);
+    if (!clockHour() && auto_step == AUTO_IDLE && auto_set != 0 && !(auto_hold_until && (int32_t)(now_ms - auto_hold_until) < 0)) autoSet(false);
     return;
   }
   uint8_t local_hour = storeLocalHour(hour, modTzHours());
@@ -1243,6 +1287,7 @@ static void autoTick(uint32_t now_ms) {
     return;
   }
   if (auto_step == AUTO_PING_B && autoPingDone(now_ms, auto_first_on ? 0 : 1)) {
+    autoMuteRecord(auto_mutes, auto_key, auto_test.reply[0] || auto_test.reply[1], now_ms);
     autoAddTest(store.lna_auto, auto_block, auto_test, modClockGet(), day);
     auto_step = AUTO_IDLE;
     autoSet(autoApplied(store.lna_auto, block, local_hour));
@@ -1251,21 +1296,14 @@ static void autoTick(uint32_t now_ms) {
   }
   if (auto_step != AUTO_IDLE || now_ms - auto_last_check_ms < 60000UL) return;
   auto_last_check_ms = now_ms;
-  // Another feature (power-guard's low-battery drop) moved the LNA: it wins, and auto waits.
-  if (auto_set >= 0 && modFemLnaGet() != (auto_set == 1)) {
-    auto_hold_until = now_ms + 900000UL;
-    auto_set = -1;
-  }
-  if (auto_hold_until && (int32_t)(now_ms - auto_hold_until) < 0) return;
-  auto_hold_until = 0;
+  if (!autoApplyBlock(now_ms, block, local_hour)) return;
   bool applied = autoApplied(store.lna_auto, block, local_hour);
-  if (modFemLnaGet() != applied) autoSet(applied);
-  else auto_set = applied ? 1 : 0;
   // Tests transmit, so they stop with the automatic captures and on a low battery.
   SchedConditions c = conditions(false);
   if (c.auto_off || c.paused || probe_ping_id[0] || schedTestBatteryLow(c.batt_mv)) return;
   if (!autoTestDue(store.lna_auto, modClockGet(), day, block) || !autoChannelOk(store.lna_auto, c.load_pct)) return;
   if (!autoPickTarget(auto_target, sizeof(auto_target))) return;
+  strcpy(auto_key, auto_target);
   memset(&auto_test, 0, sizeof(auto_test));
   auto_block = block;
   auto_first_on = applied;
@@ -1289,6 +1327,7 @@ static void boot() {
   linkInit(links);
   have_key = modPublisherKey(self_key);
   startHour(clockHour());
+  autoHourTurn(millis());
   cur_day = cur_hour ? storeLocalDay(cur_hour, modTzHours()) : 0;
   LnaStudy* saved = (LnaStudy*)malloc(sizeof(LnaStudy));
   bool resume = saved && readFile(STUDY_PATH, LNA_STUDY_MAGIC, saved, sizeof(LnaStudy)) && saved->active;
