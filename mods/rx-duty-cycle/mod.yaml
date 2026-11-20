@@ -1,0 +1,15 @@
+name: rx-duty-cycle
+
+env_flags: [WITH_RX_DUTY_CYCLE]
+
+requirements:
+  required: [sx1262_radio]
+
+integration:
+  header: helpers/rx_duty_cycle/RxDutyCycleIntegration.h
+  hooks:
+    rx_mode: rxdcRxMode
+    agc_reset: rxdcAgcReset
+    cli:
+      handler: rxdcHandleCli
+      priority: 120

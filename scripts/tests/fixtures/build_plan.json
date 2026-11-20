@@ -27,7 +27,8 @@
         "sync-settings",
         "flood-gate",
         "diag-reports",
-        "direct-retry"
+        "direct-retry",
+        "rx-duty-cycle"
       ],
       "build_flags_append": [
         "-UDISPLAY_CLASS"
@@ -39,7 +40,8 @@
         "battery_measurement": "available",
         "external_power_control": "available",
         "fem_lna_control": "available",
-        "deep_sleep_rail_shutdown": "available"
+        "deep_sleep_rail_shutdown": "available",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -73,7 +75,8 @@
         "battery_measurement": "available",
         "external_power_control": "available",
         "fem_lna_control": "available",
-        "deep_sleep_rail_shutdown": "available"
+        "deep_sleep_rail_shutdown": "available",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -109,7 +112,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -143,7 +147,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -179,7 +184,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -213,7 +219,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -251,7 +258,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -285,7 +293,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -321,7 +330,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -355,7 +365,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -391,7 +402,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -425,7 +437,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -461,7 +474,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -495,7 +509,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -531,7 +546,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -565,7 +581,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "esp32"
     },
@@ -601,7 +618,8 @@
         "battery_measurement": "absent",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "absent"
       },
       "platform": "esp32"
     },
@@ -635,7 +653,8 @@
         "battery_measurement": "absent",
         "external_power_control": "unverified",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "absent"
       },
       "platform": "esp32"
     },
@@ -670,7 +689,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "absent",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "nrf52"
     },
@@ -705,7 +725,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "absent",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "nrf52"
     },
@@ -740,7 +761,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "absent",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "nrf52"
     },
@@ -775,7 +797,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "absent",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "nrf52"
     },
@@ -810,7 +833,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "absent",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "nrf52"
     },
@@ -845,7 +869,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "absent",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "nrf52"
     },
@@ -880,7 +905,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "absent",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "nrf52"
     },
@@ -915,7 +941,8 @@
         "battery_measurement": "unverified",
         "external_power_control": "absent",
         "fem_lna_control": "absent",
-        "deep_sleep_rail_shutdown": "absent"
+        "deep_sleep_rail_shutdown": "absent",
+        "sx1262_radio": "available"
       },
       "platform": "nrf52"
     }

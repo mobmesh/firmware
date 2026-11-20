@@ -10,6 +10,7 @@ capabilities:
   external_power_control: unverified
   fem_lna_control: false
   deep_sleep_rail_shutdown: false
+  sx1262_radio: true
 
 # Injected into this board's variant platformio.ini envs; which mods get injected is decided
 # in build-targets.yaml, not here.

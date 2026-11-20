@@ -23,6 +23,7 @@ Select a mod link below for its own README, including behavior and requirements.
 | [flood‑gate](mods/flood-gate/README.md) | Allows an operator to temporarily opt out of repeating specified channel floods. Doesn't stop an attack, but provides an option to not participate in one. |
 | [diag‑reports](mods/diag-reports/README.md) | Diagnostics that relate what the node sees: each symptom matched to the cause that explains it, one fix, a live probe on request, and LNA auto per 2-hour block. |
 | [direct‑retry](mods/direct-retry/README.md) | Keeps direct traffic moving: resends a direct packet and listens for the next hop's repeat. Off by default. |
+| [rx‑duty‑cycle](mods/rx-duty-cycle/README.md) | While power saving runs, the radio sleeps between short listen windows; about 3.6 mA less on a Heltec V4 repeater. |
 | [timing‑safety](mods/timing-safety/README.md) | Timer rollover and post-reboot clock fixes. |
 | [shim](mods/shim/README.md) | Shared upstream hooks that connect selected mods to MeshCore. |
 | [core](mods/core/README.md) | Shared code every target carries. |

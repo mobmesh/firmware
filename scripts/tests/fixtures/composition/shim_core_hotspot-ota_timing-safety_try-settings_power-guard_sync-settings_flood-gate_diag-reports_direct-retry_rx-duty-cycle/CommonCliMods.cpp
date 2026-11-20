@@ -10,6 +10,7 @@
 #include <helpers/esp32/FloodGateIntegration.h>
 #include <helpers/diag_reports/DiagReportsIntegration.h>
 #include <helpers/direct_retry/DirectRetryIntegration.h>
+#include <helpers/rx_duty_cycle/RxDutyCycleIntegration.h>
 
 bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
                          const char* fw_version, const char* fw_build_date) {
@@ -20,6 +21,7 @@ bool modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
   if (directRetryHandleCli(context, command, reply)) return true;
   if (diagReportsHandleCli(context, command, reply)) return true;
   if (floodGateHandleCli(context, command, reply)) return true;
+  if (rxdcHandleCli(context, command, reply)) return true;
   if (trySetHandleCli(context, command, reply)) return true;
   if (syncCli(context, command, reply)) return true;
   if (coreHandleCli(context, command, reply)) return true;

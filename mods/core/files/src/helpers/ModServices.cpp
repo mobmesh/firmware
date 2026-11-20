@@ -17,6 +17,10 @@ const ModBindings* modBindings() {
   return &bound;
 }
 
+bool modPowerSavingOn() {
+  return (bound.prefs != nullptr && bound.prefs->powersaving_enabled) || modWantsPowerSaving();
+}
+
 void modCliDispatch(uint32_t sender_timestamp, char* command, char* reply) {
   if (bound.cli) bound.cli->handleCommand(sender_timestamp, command, reply);
 }

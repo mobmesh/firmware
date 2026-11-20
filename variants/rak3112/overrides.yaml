@@ -9,6 +9,7 @@ capabilities:
   external_power_control: unverified
   fem_lna_control: false
   deep_sleep_rail_shutdown: false
+  sx1262_radio: true
 
 build_values:
   PIN_HOTSPOT_PWR: 38   # WB_IO5 on the RAK3312 core; IO1/IO2 are left for slot A modules

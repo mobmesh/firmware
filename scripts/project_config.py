@@ -25,6 +25,7 @@ class Capability(str, Enum):
     EXTERNAL_POWER_CONTROL = "external_power_control"
     FEM_LNA_CONTROL = "fem_lna_control"
     DEEP_SLEEP_RAIL_SHUTDOWN = "deep_sleep_rail_shutdown"
+    SX1262_RADIO = "sx1262_radio"
 
 
 class CapabilityState(str, Enum):
@@ -53,6 +54,7 @@ class IntegrationPhase(str, Enum):
     LOAD_ALLOWED = "load_allowed"
     BEFORE_DEEP_SLEEP = "before_deep_sleep"
     AGC_RESET = "agc_reset"
+    RX_MODE = "rx_mode"
     CLI = "cli"
 
 

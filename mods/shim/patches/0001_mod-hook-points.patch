@@ -195,7 +195,7 @@ index 61b6c149..90b5dabd 100644
    if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
      acl.save(_fs);
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
-index d475b13d..238df83c 100644
+index d475b13d..e4651a12 100644
 --- a/examples/simple_repeater/main.cpp
 +++ b/examples/simple_repeater/main.cpp
 @@ -2,6 +2,8 @@
@@ -270,7 +270,7 @@ index d475b13d..238df83c 100644
    external_watchdog.loop();
  #endif
 -  if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
-+  if ((the_mesh.getNodePrefs()->powersaving_enabled || modWantsPowerSaving()) && !the_mesh.hasPendingWork() && !modDirectEvent(MOD_DIRECT_BUSY, nullptr, 0)) {
++  if ((the_mesh.getNodePrefs()->powersaving_enabled || modWantsPowerSaving()) && !the_mesh.hasPendingWork() && !modDirectEvent(MOD_DIRECT_BUSY, nullptr, 0) && !modRxMode(MOD_RX_BUSY, nullptr)) {
  #if defined(NRF52_PLATFORM)
      board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
  #else
@@ -600,8 +600,36 @@ index 04199e24..4cfc57bb 100644
      return builder.encodeTo(app_data);
    }
  }
+diff --git a/src/helpers/radiolib/CustomSX1262Wrapper.h b/src/helpers/radiolib/CustomSX1262Wrapper.h
+index be314471..d96ec0f5 100644
+--- a/src/helpers/radiolib/CustomSX1262Wrapper.h
++++ b/src/helpers/radiolib/CustomSX1262Wrapper.h
+@@ -3,6 +3,7 @@
+ #include "CustomSX1262.h"
+ #include "RadioLibWrappers.h"
+ #include "SX126xReset.h"
++#include <helpers/ModHooks.h>
+ 
+ #ifndef USE_SX1262
+ #define USE_SX1262
+@@ -13,6 +14,7 @@ public:
+   CustomSX1262Wrapper(CustomSX1262& radio, mesh::MainBoard& board) : RadioLibWrapper(radio, board) { }
+ 
+   void setParams(float freq, float bw, uint8_t sf, uint8_t cr) override {
++    modRxMode(MOD_RX_PARAMS, _radio);
+     ((CustomSX1262 *)_radio)->setFrequency(freq);
+     ((CustomSX1262 *)_radio)->setSpreadingFactor(sf);
+     ((CustomSX1262 *)_radio)->setBandwidth(bw);
+@@ -24,6 +26,7 @@ public:
+   }
+ 
+   bool isReceivingPacket() override { 
++    if (modRxMode(MOD_RX_ASLEEP, _radio)) return false;
+     return ((CustomSX1262 *)_radio)->isReceiving();
+   }
+   float getCurrentRSSI() override {
 diff --git a/src/helpers/radiolib/RadioLibWrappers.cpp b/src/helpers/radiolib/RadioLibWrappers.cpp
-index e4d2ba1c..a7190aeb 100644
+index e4d2ba1c..5e3296d2 100644
 --- a/src/helpers/radiolib/RadioLibWrappers.cpp
 +++ b/src/helpers/radiolib/RadioLibWrappers.cpp
 @@ -1,6 +1,7 @@
@@ -612,7 +640,15 @@ index e4d2ba1c..a7190aeb 100644
  
  #define STATE_IDLE       0
  #define STATE_RX         1
-@@ -75,6 +76,7 @@ void RadioLibWrapper::resetAGC() {
+@@ -55,6 +56,7 @@ void RadioLibWrapper::setTxPower(int8_t dbm) {
+ }
+ 
+ void RadioLibWrapper::idle() {
++  modRxMode(MOD_RX_STOP, _radio);
+   _radio->standby();
+   state = STATE_IDLE;   // need another startReceive()
+ }
+@@ -75,6 +77,7 @@ void RadioLibWrapper::resetAGC() {
    // make sure we're not mid-receive of packet!
    if ((state & STATE_INT_READY) != 0 || isReceivingPacket()) return;
  
@@ -620,3 +656,69 @@ index e4d2ba1c..a7190aeb 100644
    doResetAGC();
    state = STATE_IDLE;   // trigger a startReceive()
  
+@@ -88,7 +91,13 @@ void RadioLibWrapper::resetAGC() {
+ }
+ 
+ void RadioLibWrapper::loop() {
+-  if (state == STATE_RX && _num_floor_samples < NUM_NOISE_FLOOR_SAMPLES) {
++  int16_t rx_flags = modRxMode(MOD_RX_LOOP, _radio);
++  if (rx_flags & MOD_RX_FRESH_FLOOR) {
++    _num_floor_samples = 0;
++    _floor_sample_sum = 0;
++  }
++  if ((rx_flags & MOD_RX_RESTART) && state == STATE_RX) state = STATE_IDLE;   // never over a pending packet or a transmit
++  if (state == STATE_RX && _num_floor_samples < NUM_NOISE_FLOOR_SAMPLES && modRxMode(MOD_RX_SAMPLE_OK, _radio)) {
+     if (!isReceivingPacket()) {
+       int rssi = getCurrentRSSI();
+       if (rssi < _noise_floor + SAMPLING_THRESHOLD) {  // only consider samples below current floor + sampling THRESHOLD
+@@ -102,6 +111,7 @@ void RadioLibWrapper::loop() {
+       _noise_floor = -120;    // clamp to lower bound of -120dBi
+     }
+     _floor_sample_sum = 0;
++    modRxMode(MOD_RX_FLOOR_DONE, _radio);
+ 
+     #ifdef MESH_DEBUG_NOISE_FLOOR
+     MESH_DEBUG_PRINTLN("RadioLibWrapper: noise_floor = %d", (int)_noise_floor);
+@@ -113,7 +123,8 @@ void RadioLibWrapper::startRecv() {
+   #if defined(USE_LR2021)
+   _radio->standby(); // without this LR2021 can throw -706 when calling startReceive after hardware CAD when side detectors are enabled
+   #endif
+-  int err = _radio->startReceive();
++  int err = modRxMode(MOD_RX_START, _radio);
++  if (err == MOD_RX_PASS) err = _radio->startReceive();
+   if (err == RADIOLIB_ERR_NONE) {
+     state = STATE_RX;
+   } else {
+@@ -149,7 +160,8 @@ int RadioLibWrapper::recvRaw(uint8_t* bytes, int sz) {
+   }
+ 
+   if (state != STATE_RX) {
+-    int err = _radio->startReceive();
++    int err = modRxMode(MOD_RX_START, _radio);
++    if (err == MOD_RX_PASS) err = _radio->startReceive();
+     if (err == RADIOLIB_ERR_NONE) {
+       state = STATE_RX;
+     } else {
+@@ -165,6 +177,7 @@ uint32_t RadioLibWrapper::getEstAirtimeFor(int len_bytes) {
+ 
+ bool RadioLibWrapper::startSendRaw(const uint8_t* bytes, int len) {
+   _board->onBeforeTransmit();
++  modRxMode(MOD_RX_STOP, _radio);
+   int err = _radio->startTransmit((uint8_t *) bytes, len);
+   if (err == RADIOLIB_ERR_NONE) {
+     state = STATE_TX_WAIT;
+@@ -192,12 +205,13 @@ void RadioLibWrapper::onSendFinished() {
+ }
+ 
+ int16_t RadioLibWrapper::performChannelScan() {
++  modRxMode(MOD_RX_STOP, _radio);
+   return _radio->scanChannel();
+ }
+ 
+ bool RadioLibWrapper::isChannelActive() {
+   // int.thresh: RSSI-based interference detection (relative to noise floor)
+-  if (_threshold != 0 && getCurrentRSSI() > _noise_floor + _threshold) return true;
++  if (_threshold != 0 && !modRxMode(MOD_RX_ASLEEP, _radio) && getCurrentRSSI() > _noise_floor + _threshold) return true;
+ 
+   // cad: hardware channel activity detection
+   if (_cad_enabled) {

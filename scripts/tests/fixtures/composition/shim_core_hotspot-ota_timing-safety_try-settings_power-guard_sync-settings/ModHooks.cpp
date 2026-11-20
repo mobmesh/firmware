@@ -49,6 +49,11 @@ bool modDirectEvent(ModDirectEvent event, const mesh::Packet* packet, uint32_t d
   return false;
 }
 
+int16_t modRxMode(ModRxEvent event, PhysicalLayer* radio) {
+  (void)radio;
+  return event == MOD_RX_START ? MOD_RX_PASS : event == MOD_RX_SAMPLE_OK ? 1 : 0;
+}
+
 void modObserveRecv(const mesh::Packet* packet, bool accepted,
                     const uint8_t scope_key[16]) {
   coreRecv(packet, accepted, scope_key);
@@ -85,9 +90,18 @@ void     modBoardInhibitSleep(bool inhibit) { (void)inhibit; }
 uint32_t modClockGet()                     { return rtc_clock.getCurrentTime(); }
 uint32_t modAirtimeFor(int len)            { return radio_driver.getEstAirtimeFor(len); }
 bool     modRadioRssiNow(float* out) {
-  if (radio_driver.isReceiving()) return false;
-  *out = radio_driver.getCurrentRSSI();
-  return true;
+  uint32_t asked = millis();
+  while (modRxMode(MOD_RX_PAUSE, nullptr) == 1) {   // a duty-cycled receiver opens a settled continuous window first
+    if (millis() - asked > 250) {
+      modRxMode(MOD_RX_RESUME, nullptr);
+      return false;
+    }
+    delay(2);
+  }
+  bool ok = !radio_driver.isReceiving();
+  if (ok) *out = radio_driver.getCurrentRSSI();
+  modRxMode(MOD_RX_RESUME, nullptr);
+  return ok;
 }
 void     modBeforeAgcReset() {
 }

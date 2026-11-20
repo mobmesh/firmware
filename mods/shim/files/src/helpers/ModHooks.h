@@ -9,6 +9,7 @@ class NodePrefs;
 class ClientACL;
 struct TransportKey;
 namespace mesh { class Packet; class Mesh; class PacketManager; class Radio; }
+class PhysicalLayer;
 
 // One hook surface for every mod, so upstream's main.cpp carries one-line calls instead
 // of each mod's code inline, and two mods never edit the same region of it.
@@ -22,6 +23,7 @@ struct ModCliContext {
 bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
 void modLoop();                            // called first in loop()
 bool modWantsPowerSaving();                // OR'd with the operator's powersaving_enabled
+bool modPowerSavingOn();                   // the operator's powersaving_enabled OR modWantsPowerSaving()
 bool modLoadAllowed();                     // AND of mods that veto a heavy load; true when none
 void modBeforeDeepSleep();                 // before a mod's own sleep while the radio is not running
 
@@ -63,6 +65,22 @@ enum ModDirectEvent {
 // The value MOD_DIRECT_APPLY takes in delay_millis.
 enum ModDirectSetting { MOD_ROUTE_KEEP, MOD_ROUTE_OFF, MOD_ROUTE_ON };
 bool modDirectEvent(ModDirectEvent event, const mesh::Packet* packet, uint32_t delay_millis);
+
+// Receive mode, one owner (a duty-cycled receiver). The radio wrapper asks at each point; with no owner every answer is upstream's.
+enum ModRxEvent {
+  MOD_RX_START,                        // returns MOD_RX_PASS for upstream's startReceive(), else a RadioLib status
+  MOD_RX_STOP,                         // before standby, transmit or channel scan
+  MOD_RX_ASLEEP,                       // 1 while the radio sleeps: no SPI, no RSSI
+  MOD_RX_SAMPLE_OK,                    // 1 when the wrapper may take a noise-floor sample
+  MOD_RX_LOOP,                         // MOD_RX_RESTART and/or MOD_RX_FRESH_FLOOR
+  MOD_RX_PARAMS,                       // radio settings about to change
+  MOD_RX_PAUSE,                        // a real reading wanted: 0 read now, 1 wait while a continuous window opens and settles
+  MOD_RX_RESUME,                       // the reading is done; the window closes
+  MOD_RX_FLOOR_DONE,                   // the wrapper just published a noise floor
+  MOD_RX_BUSY,                         // 1 holds the CPU awake: a calibration window or a pause is open
+};
+enum { MOD_RX_PASS = 1, MOD_RX_RESTART = 1, MOD_RX_FRESH_FLOOR = 2 };
+int16_t modRxMode(ModRxEvent event, PhysicalLayer* radio);
 bool modDirectResend(const mesh::Packet* packet);
 bool modDirectReply(const uint8_t* data, size_t len, uint32_t delay_millis);
 uint32_t modAirtimeFor(int len);

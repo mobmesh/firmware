@@ -9,6 +9,7 @@ capabilities:
   external_power_control: unverified
   fem_lna_control: false
   deep_sleep_rail_shutdown: false
+  sx1262_radio: true
 
 build_values:
   PIN_HOTSPOT_PWR: 7   # J3 pin 18, plain GPIO; 47/48/26 are upstream GPS pins on this board

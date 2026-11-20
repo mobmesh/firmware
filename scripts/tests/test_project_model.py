@@ -60,7 +60,7 @@ class CurrentProjectModelTestCase(unittest.TestCase):
         self.assertEqual(rows[("heltec_v4", "room_server")].ota_role_id, 2)
         self.assertEqual(rows[("heltec_v4", "repeater")].mods,
                          ("shim", "core", "hotspot-ota", "timing-safety", "try-settings", "power-guard", "sync-settings",
-                          "flood-gate", "diag-reports", "direct-retry"))
+                          "flood-gate", "diag-reports", "direct-retry", "rx-duty-cycle"))
         self.assertEqual(rows[("xiao_c3", "repeater")].mods,
                          ("shim", "core", "hotspot-ota", "timing-safety", "try-settings", "sync-settings", "flood-gate",
                           "diag-reports", "direct-retry"))
@@ -99,6 +99,13 @@ class CurrentProjectModelTestCase(unittest.TestCase):
     def test_build_plan_has_no_unused_schema(self):
         self.assertNotIn("schema", self.model.build_plan.as_dict())
 
+    def test_rx_duty_cycle_is_gated_to_sx1262_boards(self):
+        from project_config import Capability
+        mod = self.model.mods["rx-duty-cycle"]
+        self.assertIn(Capability.SX1262_RADIO, mod.required_capabilities)
+        self.assertFalse(self.model.boards["waveshare_esp32s3_lr1121"].capability(Capability.SX1262_RADIO).satisfies_requirement)
+        self.assertTrue(self.model.boards["heltec_v4"].capability(Capability.SX1262_RADIO).satisfies_requirement)
+
     def test_capability_state_is_present_in_every_target(self):
         for target in self.model.build_plan.targets:
             self.assertEqual(set(target.capabilities), {
@@ -108,6 +115,7 @@ class CurrentProjectModelTestCase(unittest.TestCase):
                 "external_power_control",
                 "fem_lna_control",
                 "deep_sleep_rail_shutdown",
+                "sx1262_radio",
             })
 
 

@@ -28,7 +28,7 @@ targets:
     build_env: heltec_v4_repeater
     vendor_flasher_assets: true
     # heltec_v4 only: its battery divider is the one that has been bench-measured.
-    mods: [hotspot-ota, timing-safety, try-settings, power-guard, sync-settings, flood-gate, diag-reports, direct-retry]
+    mods: [hotspot-ota, timing-safety, try-settings, power-guard, sync-settings, flood-gate, diag-reports, direct-retry, rx-duty-cycle]
     # Headless: drops the OLED and the button's long-press power-off.
     # Joined form -- PlatformIO splits "-U FOO" into a bare -U.
     build_flags_append: ["-UDISPLAY_CLASS"]

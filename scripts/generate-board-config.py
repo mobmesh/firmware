@@ -171,6 +171,7 @@ def load_integrations(mods: list) -> list:
     region_export_owner = None
     owner_info_owner = None
     direct_owner = None
+    rx_mode_owner = None
     for order, mod_name in enumerate(mods):
         definition = load_mod_definition(mod_name)
         integration = definition.integration
@@ -241,6 +242,12 @@ def load_integrations(mods: list) -> list:
                         f"direct is exclusive but claimed by '{direct_owner}' and '{mod_name}'"
                     )
                 direct_owner = mod_name
+            if phase is IntegrationPhase.RX_MODE:
+                if rx_mode_owner is not None:
+                    raise ValueError(
+                        f"rx_mode is exclusive but claimed by '{rx_mode_owner}' and '{mod_name}'"
+                    )
+                rx_mode_owner = mod_name
         integrations.append(parsed)
     return integrations
 
@@ -277,11 +284,15 @@ def render_mod_hooks(integrations: list) -> str:
               for item in integrations if "before_deep_sleep" in item["hooks"]]
     agc_resets = [item["hooks"]["agc_reset"]["symbol"]
                   for item in integrations if "agc_reset" in item["hooks"]]
+    rx_modes = [item["hooks"]["rx_mode"]["symbol"]
+                for item in integrations if "rx_mode" in item["hooks"]]
 
     before_calls = "\n".join(f"  {symbol}();" for symbol in before)
     loop_calls = "\n".join(f"  {symbol}();" for symbol in loops)
     sleep_calls = "".join(f"  {symbol}();\n" for symbol in sleeps)
     agc_reset_calls = "".join(f"  {symbol}();\n" for symbol in agc_resets)
+    rx_mode_call = (f"return {rx_modes[0]}(event, radio);" if rx_modes
+                    else "(void)radio;\n  return event == MOD_RX_START ? MOD_RX_PASS : event == MOD_RX_SAMPLE_OK ? 1 : 0;")
     radio_call = f"{radio[0]}(build_id)" if radio else "modBoardRadioInit()"
     route_call = f"{routes[0]}(packet, base, out)" if routes else "false"
     allow_forward_expr = " && ".join(f"{symbol}(packet, scope_known)" for symbol in allow_forwards) or "true"
@@ -347,6 +358,10 @@ bool modDirectEvent(ModDirectEvent event, const mesh::Packet* packet, uint32_t d
   {direct_call}
 }}
 
+int16_t modRxMode(ModRxEvent event, PhysicalLayer* radio) {{
+  {rx_mode_call}
+}}
+
 {recv_block}
 
 {tx_block}
@@ -376,9 +391,18 @@ void     modBoardInhibitSleep(bool inhibit) {{ (void)inhibit; }}
 uint32_t modClockGet()                     {{ return rtc_clock.getCurrentTime(); }}
 uint32_t modAirtimeFor(int len)            {{ return radio_driver.getEstAirtimeFor(len); }}
 bool     modRadioRssiNow(float* out) {{
-  if (radio_driver.isReceiving()) return false;
-  *out = radio_driver.getCurrentRSSI();
-  return true;
+  uint32_t asked = millis();
+  while (modRxMode(MOD_RX_PAUSE, nullptr) == 1) {{   // a duty-cycled receiver opens a settled continuous window first
+    if (millis() - asked > 250) {{
+      modRxMode(MOD_RX_RESUME, nullptr);
+      return false;
+    }}
+    delay(2);
+  }}
+  bool ok = !radio_driver.isReceiving();
+  if (ok) *out = radio_driver.getCurrentRSSI();
+  modRxMode(MOD_RX_RESUME, nullptr);
+  return ok;
 }}
 void     modBeforeAgcReset() {{
 {agc_reset_calls}}}
@@ -918,6 +942,8 @@ def cmd_inject_env(args):
         build_values["MOBMESH_HAS_EXTERNAL_POWER"] = 1
     if board_profile.capability(Capability.BATTERY_MEASUREMENT).satisfies_requirement:
         build_values["MOBMESH_HAS_BATTERY_MEASUREMENT"] = 1
+    if board_profile.capability(Capability.SX1262_RADIO).satisfies_requirement:
+        build_values["MOBMESH_HAS_SX1262"] = 1
     for key, value in build_values.items():
         if isinstance(value, str):
             override_flag_lines.append(f'-D {key}=\'"{value}"\'')

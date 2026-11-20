@@ -9,6 +9,7 @@ capabilities:
   external_power_control: unverified
   fem_lna_control: false
   deep_sleep_rail_shutdown: false
+  sx1262_radio: false
 
 build_values:
   PIN_HOTSPOT_PWR: 1   # LR1121 takes 38-42, 45 and 46; 0, 3, 45 and 46 are strapping pins; 19 and 20 are USB

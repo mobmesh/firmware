@@ -11,6 +11,7 @@ capabilities:
   external_power_control: false
   fem_lna_control: false
   deep_sleep_rail_shutdown: false
+  sx1262_radio: true
 
 # Pin numbers are the nRF52840's own; this board's app links after S140 7.x, at 0x27000.
 qemu:

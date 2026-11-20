@@ -13,6 +13,7 @@ on:
       - 'mods/**/patches/**'
       - 'mods/**/files/**'
       - 'mods/**/mod.yaml'
+      - 'mods/*/docs/cli-additions.md'   # the CLI-clash test reads these
       - 'build-targets.yaml'
       - 'variants/**/overrides.yaml'
       - '.github/workflows/patch-drift-canary.yml'

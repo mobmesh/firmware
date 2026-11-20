@@ -133,6 +133,21 @@ class InvalidCompositionTestCase(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "radio_init_policy is exclusive"):
             gbc.load_integrations(["first", "second"])
 
+    def test_two_rx_mode_owners_are_rejected(self):
+        self.write_header("first", "int16_t firstRx(ModRxEvent, PhysicalLayer*);\n")
+        self.write_manifest("first", self.integration("firstRx", "rx_mode").replace("name: feature", "name: first"))
+        self.write_header("second", "int16_t secondRx(ModRxEvent, PhysicalLayer*);\n")
+        self.write_manifest("second", self.integration("secondRx", "rx_mode").replace("name: feature", "name: second"))
+        with self.assertRaisesRegex(ValueError, "rx_mode is exclusive"):
+            gbc.load_integrations(["first", "second"])
+
+    def test_rx_mode_owner_receives_every_event(self):
+        self.write_header("feature", "int16_t featureRx(ModRxEvent, PhysicalLayer*);\n")
+        self.write_manifest("feature", self.integration("featureRx", "rx_mode"))
+        hooks = gbc.render_mod_hooks(gbc.load_integrations(["feature"]))
+        self.assertIn("return featureRx(event, radio);", hooks)
+        self.assertNotIn("MOD_RX_PASS :", hooks)
+
     def test_unknown_phase_is_rejected(self):
         self.write_header("feature", "void testHook();\n")
         self.write_manifest("feature", self.integration("testHook", "unknown_phase"))
