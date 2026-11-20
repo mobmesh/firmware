@@ -21,6 +21,7 @@
 #define AUTO_BAN_DAYS      7           // a state the audit or the overload verdict caught stays banned this long
 #define AUTO_REFRESH_DAYS  14          // a block running on runs off one day in this many
 #define AUTO_TARGETS       3           // tests rotate among this many weakest judged neighbours
+#define AUTO_STRIKES       2           // confirmed on-failures in a row (off answered before and after) that ban on
 #define AUTO_MUTE_MISSES   3           // tests in a row unanswered in both states before a neighbour sits out
 #define AUTO_MUTE_MS       86400000UL  // how long it sits out of the rotation
 #define AUTO_MUTE_MAX      8
@@ -32,6 +33,7 @@ enum AutoReason : uint8_t {
   AUTO_R_NEIGHBOURS,                   // fewer neighbours heard
   AUTO_R_FREEZES,                      // more receiver freezes
   AUTO_R_OVERLOAD,                     // floor raised beyond the LNA's usual shift, or the engine's overload verdict
+  AUTO_R_ON_LOST,                      // with the LNA on, a neighbour off reaches went unanswered (confirmed twice)
 };
 
 // One state's record in one block, from closed hours: halved when it grows, so it follows recent weeks.
@@ -56,7 +58,7 @@ struct AutoBlock {
   uint8_t veto_off;                    // days left on a lost-neighbour veto against off
   uint8_t retired;
   uint8_t losses;                      // tests in a row lost by the applied state this block
-  uint8_t spare;
+  uint8_t strikes;                     // confirmed on-failures in a row; AUTO_STRIKES bans on
   uint8_t restart;                     // back to the fast test rate after a contradiction
   uint8_t ban_days;                    // days left on a ban of one state
   uint8_t ban_on;                      // the banned state: 1 on, 0 off
@@ -94,6 +96,7 @@ struct AutoTest {
   float back_db[2];                    // SNR of the reply at this node: the LNA affects it
   float out_db[2];                     // SNR of the ping at the neighbour: the LNA does not, so a mismatch means fading
   int8_t floor_dbm[2];                 // idle floor just before each ping
+  int8_t confirm;                      // off re-ping after a failed on-ping: 1 answered, 0 not, -1 not tried
 };
 
 // Neighbours that answer neither ping sit out of the test rotation for a while. RAM only; millis() based.
@@ -113,11 +116,12 @@ bool autoMuted(const AutoMutes& t, const char* id, uint32_t now_ms);
 
 void autoInit(LnaAutoState& a, uint32_t day);
 uint8_t autoBlockOf(uint8_t local_hour);
-// The state the block runs in: its proven best; undecided blocks alternate (odd local hours on); a ban, retirement, a dead LNA or no benefit run off.
+// The state the block runs in: its proven best; undecided blocks run off; a ban, retirement, a dead LNA or no benefit run off.
 bool autoApplied(const LnaAutoState& a, uint8_t block, uint8_t local_hour = 0);
 bool autoLearning(const LnaAutoState& a, uint32_t day, uint8_t block);
-// Whether a test is due now for the block; respects the daily cap and the rate for the block.
-bool autoTestDue(const LnaAutoState& a, uint32_t epoch, uint32_t day, uint8_t block);
+// Whether a test is due now for the block; respects the daily cap and the rate for the block. A nonzero phase (from the
+// node's identity) offsets the first test and lengthens the spacing, so neighbouring nodes do not switch together.
+bool autoTestDue(const LnaAutoState& a, uint32_t epoch, uint32_t day, uint8_t block, uint32_t phase_s = 0);
 // Scores a finished test; returns false when it was discarded (fading, or neither ping answered).
 bool autoAddTest(LnaAutoState& a, uint8_t block, const AutoTest& t, uint32_t epoch, uint32_t day);
 // A freeze in a block while the LNA was on counts against on there.

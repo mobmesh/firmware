@@ -143,10 +143,9 @@ static ModReplyTarget probe_target;
 static DiagNote note;
 
 // LNA auto: the paired ping test in progress, and the state auto last set.
-enum AutoStep : uint8_t { AUTO_IDLE, AUTO_PING_A, AUTO_PING_B };
+enum AutoStep : uint8_t { AUTO_IDLE, AUTO_PING_A, AUTO_PING_B, AUTO_PING_C };   // off, on, off again after a failed on
 static AutoStep auto_step;
 static uint8_t auto_block;
-static bool auto_first_on;              // the state the first ping ran in
 static uint32_t auto_ping_ms;
 static char auto_target[8];
 static char auto_key[8];                // the target as picked; the ping may shorten auto_target
@@ -1222,16 +1221,26 @@ static bool autoPingStart() {
   return pingQuiet(auto_target, reply);
 }
 
-// Fills one side of the test from core's quiet ping; false while it is still out.
+// Fills one ping's result (idx 0 off, 1 on, 2 the off re-ping); false while it is still out.
 static bool autoPingDone(uint32_t now_ms, int idx) {
   uint32_t age = 0;
   const ProbeResult* r = coreProbeLast(&age);
   bool done = r && age < now_ms - auto_ping_ms;
   if (!done && now_ms - auto_ping_ms < 15000UL) return false;
-  auto_test.reply[idx] = done && r->received;
+  bool got = done && r->received;
+  if (idx == 2) {
+    auto_test.confirm = got ? 1 : 0;
+    return true;
+  }
+  auto_test.reply[idx] = got;
   auto_test.back_db[idx] = done ? r->back_q[0] / 4.0f : 0;
   auto_test.out_db[idx] = done ? r->out_q[0] / 4.0f : 0;
   return true;
+}
+
+// This node's slot for tests, from its identity, so neighbouring auto nodes do not switch together; never 0.
+static uint32_t autoPhase() {
+  return have_key ? ((uint32_t)self_key[0] << 8 | self_key[1]) % 7199 + 1 : 1;
 }
 
 // Runs the block in its learned state; false while another feature (power-guard's low-battery drop) holds the LNA.
@@ -1263,6 +1272,15 @@ static void autoHourTurn(uint32_t now_ms) {
   autoApplyBlock(now_ms, autoBlockOf(local_hour), local_hour);
 }
 
+// Scores the finished test and puts the block back in its learned state.
+static void autoFinish(uint32_t now_ms, uint32_t day, uint8_t block, uint8_t local_hour) {
+  autoMuteRecord(auto_mutes, auto_key, auto_test.reply[0] || auto_test.reply[1], now_ms);
+  autoAddTest(store.lna_auto, auto_block, auto_test, modClockGet(), day);
+  auto_step = AUTO_IDLE;
+  autoSet(autoApplied(store.lna_auto, block, local_hour));
+  saveStore();
+}
+
 // Once a minute: run each block in its learned state; a paired ping test when one is due.
 static void autoTick(uint32_t now_ms) {
   if (!modFemLnaAvailable() || run) return;
@@ -1276,22 +1294,32 @@ static void autoTick(uint32_t now_ms) {
   uint8_t local_hour = storeLocalHour(hour, modTzHours());
   uint8_t block = autoBlockOf(local_hour);
   uint32_t day = storeLocalDay(hour, modTzHours());
-  if (auto_step == AUTO_PING_A && autoPingDone(now_ms, auto_first_on ? 1 : 0)) {
-    // Second half: the other state, after its floor reading.
-    autoSet(!auto_first_on);
+  // The test runs off, on, and off again: the LNA is on only for its own ping, never left on to see what happens.
+  if (auto_step == AUTO_PING_A && autoPingDone(now_ms, 0)) {
+    autoSet(true);
     delay(20);
-    autoFloor(auto_first_on ? 0 : 1);
+    autoFloor(1);
     auto_ping_ms = now_ms;
     auto_step = autoPingStart() ? AUTO_PING_B : AUTO_IDLE;
     if (auto_step == AUTO_IDLE) autoSet(autoApplied(store.lna_auto, auto_block, local_hour));
     return;
   }
-  if (auto_step == AUTO_PING_B && autoPingDone(now_ms, auto_first_on ? 0 : 1)) {
-    autoMuteRecord(auto_mutes, auto_key, auto_test.reply[0] || auto_test.reply[1], now_ms);
-    autoAddTest(store.lna_auto, auto_block, auto_test, modClockGet(), day);
-    auto_step = AUTO_IDLE;
-    autoSet(autoApplied(store.lna_auto, block, local_hour));
-    saveStore();
+  if (auto_step == AUTO_PING_B && autoPingDone(now_ms, 1)) {
+    autoSet(false);
+    // On missed a neighbour off reached: ping again with it off to tell a costly LNA from a neighbour gone quiet.
+    if (auto_test.reply[0] && !auto_test.reply[1]) {
+      delay(20);
+      auto_ping_ms = now_ms;
+      if (autoPingStart()) {
+        auto_step = AUTO_PING_C;
+        return;
+      }
+    }
+    autoFinish(now_ms, day, block, local_hour);
+    return;
+  }
+  if (auto_step == AUTO_PING_C && autoPingDone(now_ms, 2)) {
+    autoFinish(now_ms, day, block, local_hour);
     return;
   }
   if (auto_step != AUTO_IDLE || now_ms - auto_last_check_ms < 60000UL) return;
@@ -1301,15 +1329,21 @@ static void autoTick(uint32_t now_ms) {
   // Tests transmit, so they stop with the automatic captures and on a low battery.
   SchedConditions c = conditions(false);
   if (c.auto_off || c.paused || probe_ping_id[0] || schedTestBatteryLow(c.batt_mv)) return;
-  if (!autoTestDue(store.lna_auto, modClockGet(), day, block) || !autoChannelOk(store.lna_auto, c.load_pct)) return;
+  if (!autoTestDue(store.lna_auto, modClockGet(), day, block, autoPhase()) || !autoChannelOk(store.lna_auto, c.load_pct)) return;
   if (!autoPickTarget(auto_target, sizeof(auto_target))) return;
   strcpy(auto_key, auto_target);
   memset(&auto_test, 0, sizeof(auto_test));
+  auto_test.confirm = -1;
   auto_block = block;
-  auto_first_on = applied;
-  autoFloor(applied ? 1 : 0);
+  // Every test starts from off, whatever the block runs.
+  if (applied) {
+    autoSet(false);
+    delay(20);
+  }
+  autoFloor(0);
   auto_ping_ms = now_ms;
   if (autoPingStart()) auto_step = AUTO_PING_A;
+  else if (applied) autoSet(true);
 }
 
 // ---------------------------------------------------------------- boot and loop

@@ -27,11 +27,11 @@ int main() {
   // Blocks follow local even hours.
   CHECK(autoBlockOf(0) == 0 && autoBlockOf(13) == 6 && autoBlockOf(23) == 11);
 
-  // Learning starts undecided: odd local hours on, even off; tests every 10 minutes, under a daily cap.
+  // Learning starts undecided and runs off in every hour (on is earned by tests alone); tests every 10 minutes, under a daily cap.
   autoInit(a, DAY);
-  CHECK(!autoApplied(a, 6, 12) && autoApplied(a, 6, 13) && autoLearning(a, DAY, 6));
+  CHECK(!autoApplied(a, 6, 12) && !autoApplied(a, 6, 13) && autoLearning(a, DAY, 6));
   autoStatusText(a, 13, -1, text, sizeof(text));
-  CHECK_STR(text, "mode:auto now:on (learning); off all day");
+  CHECK_STR(text, "mode:auto now:off (learning); off all day");
   autoStatusText(a, 12, -1, text, sizeof(text));
   CHECK_STR(text, "mode:auto now:off (learning); off all day");
   CHECK(autoTestDue(a, T0 + 100, DAY, 6));
@@ -94,7 +94,7 @@ int main() {
   for (int i = 0; i < 2; i++) autoAddTest(a, 6, pair(true, true, 6, 3), T0 + 50000 + i * 700, DAY);
   CHECK(!a.b[6].best && a.b[6].on_w == 0 && a.b[6].off_w == 0 && a.b[6].restart && !autoApplied(a, 6, 12));
   autoDayTurn(a, DAY + 1, 4);
-  CHECK(!autoApplied(a, 6, 12) && autoApplied(a, 6, 13));   // undecided again: alternating
+  CHECK(!autoApplied(a, 6, 12) && !autoApplied(a, 6, 13));   // undecided again: off
   // A neighbour heard only with the LNA on turns the block on at once, and vetoes off for two weeks.
   autoAddTest(a, 6, pair(false, true, 0, 4), T0 + 90000, DAY + 1);
   CHECK(a.b[6].veto_off == 14 && autoApplied(a, 6, 12) && autoApplied(a, 6, 13));
@@ -199,14 +199,14 @@ int main() {
     CHECK(autoAudit(a, 10) == k.why);
   }
 
-  // An undecided block the engine finds overloaded runs off in every hour while the ban lasts.
+  // A ban from the engine's overload verdict holds a block off while it lasts.
   autoInit(a, DAY);
   autoBan(a, 1UL << 7, true, AUTO_R_OVERLOAD);   // 7am: block 3
-  CHECK(!autoApplied(a, 3, 7) && autoApplied(a, 2, 5));
-  // The audit judges an undecided block's on hours against its off hours.
+  CHECK(!autoApplied(a, 3, 7) && a.b[3].ban_days && a.b[3].ban_on);
+  // An undecided block runs off, and the audit judges only the state a block runs: worse on-hours ban nothing it does not run.
   for (int h = 0; h < 6; h++) autoAddHour(a, 8, false, 100, 2, 0, 3, -117);
   for (int h = 0; h < 6; h++) autoAddHour(a, 8, true, 100, 12, 0, 3, -95);
-  CHECK(autoAudit(a, 8) == AUTO_R_DECODES && !autoApplied(a, 8, 17));
+  CHECK(autoAudit(a, 8) == AUTO_R_NONE && !autoApplied(a, 8, 17));
   autoInit(a, DAY);
   autoBan(a, 1UL << 7, true, AUTO_R_OVERLOAD);
   CHECK(autoBanText(a, text, sizeof(text)));
@@ -222,6 +222,40 @@ int main() {
     refreshed += !autoApplied(a, 10);
   }
   CHECK(refreshed == 1);
+
+  // On failed where off answered before and after: a strike. Two in a row ban on (veto or not); an on answer clears the count.
+  autoInit(a, DAY);
+  AutoTest lost = pair(true, false, 4, 0);
+  lost.confirm = 1;
+  autoAddTest(a, 4, lost, T0 + 100, DAY);
+  CHECK(a.b[4].strikes == 1 && !a.b[4].ban_days);
+  AutoTest won = pair(true, true, 3, 3);
+  won.confirm = -1;
+  autoAddTest(a, 4, won, T0 + 800, DAY);
+  CHECK(a.b[4].strikes == 0);
+  autoAddTest(a, 4, lost, T0 + 1500, DAY);
+  a.b[4].veto_off = 14;
+  autoAddTest(a, 4, lost, T0 + 2200, DAY);
+  CHECK(a.b[4].ban_days == AUTO_BAN_DAYS && a.b[4].ban_on && a.b[4].ban_reason == AUTO_R_ON_LOST && !a.b[4].veto_off);
+  CHECK(!autoApplied(a, 4, 9) && strcmp(autoReasonText(AUTO_R_ON_LOST), "on lost a neighbour") == 0);
+  // The off re-ping also unanswered: the neighbour went away, not the LNA's doing; the pair is discarded.
+  AutoTest gone = pair(true, false, 4, 0);
+  gone.confirm = 0;
+  int faded = a.faded;
+  CHECK(!autoAddTest(a, 5, gone, T0 + 3000, DAY) && a.faded == faded + 1 && a.b[5].strikes == 0);
+  // A block that tests earned on is kept, and runs on.
+  for (int i = 0; i < 12; i++) autoAddTest(a, 7, pair(true, true, 2, 6), T0 + 4000 + i * 700, DAY);
+  CHECK(a.b[7].best && autoApplied(a, 7, 14));
+
+  // A per-node phase: the first test waits for the node's slot, and spacing differs per node, so two nodes drift apart.
+  autoInit(a, DAY);
+  // Phase 250: the first slot is when (epoch + 250) % 600 < 60, i.e. 350-409 s into the 10 minutes (T0 is a whole day).
+  CHECK(!autoTestDue(a, T0 + 100, DAY, 6, 250) && autoTestDue(a, T0 + 350, DAY, 6, 250));
+  a.last_test = T0 + 350;
+  // Then every 600 + 250 % 300 = 850 s, where a phase-0 node tests every 600 s.
+  CHECK(!autoTestDue(a, T0 + 350 + 600, DAY, 6, 250) && autoTestDue(a, T0 + 350 + 850, DAY, 6, 250));
+  // Phase 0 keeps the plain spacing.
+  CHECK(autoTestDue(a, T0 + 350 + 600, DAY, 6, 0));
 
   // A neighbour unanswered in both states three tests in a row sits out 24 h; any reply clears its misses.
   static AutoMutes mutes;

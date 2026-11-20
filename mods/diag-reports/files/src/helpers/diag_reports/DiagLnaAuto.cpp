@@ -50,8 +50,9 @@ static bool undecided(const AutoBlock& b) {
 bool autoApplied(const LnaAutoState& a, uint8_t block, uint8_t local_hour) {
   if (!a.enabled || block >= AUTO_BLOCKS || a.park == AUTO_PARK_DEAD || a.park == AUTO_PARK_NO_BENEFIT) return false;
   const AutoBlock& b = a.b[block];
-  // Alternating hours let neighbours heard only with the LNA on be found, and give the audit both records.
-  bool run = undecided(b) ? (local_hour & 1) != 0 : b.best && !b.retired;
+  (void)local_hour;
+  // Never trial the LNA by running it: an undecided block runs off, and on is earned by tests alone.
+  bool run = !undecided(b) && b.best && !b.retired;
   // A banned state is never run.
   if (b.ban_days && run == (bool)b.ban_on) return !b.ban_on;
   if (b.refresh && run && !(b.ban_days && !b.ban_on)) return false;
@@ -99,8 +100,7 @@ static void ban(AutoBlock& b, bool ban_on, uint8_t reason) {
 uint8_t autoAudit(LnaAutoState& a, uint8_t block) {
   if (!a.enabled || a.park != AUTO_ACTIVE || block >= AUTO_BLOCKS) return AUTO_R_NONE;
   AutoBlock& b = a.b[block];
-  // An undecided block runs both states: on, the riskier, is the one judged.
-  bool run_on = undecided(b) ? !(b.ban_days && b.ban_on) : autoApplied(a, block);
+  bool run_on = autoApplied(a, block);
   const AutoStats& r = b.st[run_on ? 1 : 0];
   const AutoStats& o = b.st[run_on ? 0 : 1];
   if (r.hours < AUTO_AUDIT_HOURS || o.hours < AUTO_AUDIT_HOURS) return AUTO_R_NONE;
@@ -145,6 +145,7 @@ const char* autoReasonText(uint8_t reason) {
     case AUTO_R_NEIGHBOURS: return "neighbours lost";
     case AUTO_R_FREEZES: return "freezes";
     case AUTO_R_OVERLOAD: return "overload";
+    case AUTO_R_ON_LOST: return "on lost a neighbour";
     default: return "";
   }
 }
@@ -153,12 +154,15 @@ bool autoLearning(const LnaAutoState& a, uint32_t day, uint8_t block) {
   return day < a.start_day + AUTO_LEARN_DAYS || (block < AUTO_BLOCKS && a.b[block].restart);
 }
 
-bool autoTestDue(const LnaAutoState& a, uint32_t epoch, uint32_t day, uint8_t block) {
+bool autoTestDue(const LnaAutoState& a, uint32_t epoch, uint32_t day, uint8_t block, uint32_t phase_s) {
   if (!a.enabled || a.park != AUTO_ACTIVE || block >= AUTO_BLOCKS || epoch == 0) return false;
   if (a.b[block].retired) return false;
   if (a.test_day == day && a.tests_today >= AUTO_DAILY_CAP) return false;
   uint32_t every = autoLearning(a, day, block) ? AUTO_LEARN_EVERY_S : 7200;
-  return a.last_test == 0 || epoch - a.last_test >= every;
+  if (phase_s == 0) return a.last_test == 0 || epoch - a.last_test >= every;
+  // The first test waits for this node's slot; later spacing differs per node, so two nodes drift apart.
+  if (a.last_test == 0) return (epoch + phase_s) % every < 60;
+  return epoch - a.last_test >= every + phase_s % (every / 2);
 }
 
 bool autoAddTest(LnaAutoState& a, uint8_t block, const AutoTest& t, uint32_t epoch, uint32_t day) {
@@ -190,6 +194,21 @@ bool autoAddTest(LnaAutoState& a, uint8_t block, const AutoTest& t, uint32_t epo
     return false;
   }
   AutoBlock& b = a.b[block];
+  // On failed where off answered: the off re-ping says whether the neighbour was still there.
+  if (t.reply[0] && !t.reply[1] && t.confirm == 0) {
+    if (a.faded < 0xFFFF) a.faded++;
+    return false;
+  }
+  if (t.reply[0] && !t.reply[1] && t.confirm == 1) {
+    // Off reached the neighbour before and after, on did not: the LNA cost it. Twice in a row bans on, veto or not.
+    if (++b.strikes >= AUTO_STRIKES) {
+      b.strikes = 0;
+      b.veto_off = 0;
+      ban(b, true, AUTO_R_ON_LOST);
+    }
+  } else if (t.reply[1]) {
+    b.strikes = 0;
+  }
   int winner = 0;                      // 1 on, -1 off
   if (t.reply[1] && !t.reply[0]) {
     winner = 1;
