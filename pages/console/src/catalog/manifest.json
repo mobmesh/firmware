@@ -3,9 +3,9 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "dbd28dcfba17ea96f2ec1f893148f5ceb7b613d1",
-  "sourceRows": 295,
-  "effectiveSignatures": 292,
+  "mobmeshCommit": "b86d6431e0e50c5d09b3d216f24c1c758fd0007e",
+  "sourceRows": 298,
+  "effectiveSignatures": 295,
   "cliAdditionFiles": [
     {
       "path": "mods/core/docs/cli-additions.md",
@@ -13,7 +13,7 @@
     },
     {
       "path": "mods/diag-reports/docs/cli-additions.md",
-      "sha256": "0e0ea6e8ee45c8acc1fe68892874f55efece0d9927ca2be96fbd82cf4a4cf1b0"
+      "sha256": "2cbee7341705bb892d5515301157775f6a0122c0696312d3d3088b6b32663c1e"
     },
     {
       "path": "mods/direct-retry/docs/cli-additions.md",
@@ -30,6 +30,10 @@
     {
       "path": "mods/power-guard/docs/cli-additions.md",
       "sha256": "5cc5d602e13d18d9d3169d77724578b9f8395a29a1967744c1b17b06c8920a5d"
+    },
+    {
+      "path": "mods/rx-duty-cycle/docs/cli-additions.md",
+      "sha256": "e459f1ddcc3f725bd48baabc55cc5cc773bf159332d83e6e5acce417b30e2de5"
     },
     {
       "path": "mods/sync-settings/docs/cli-additions.md",
@@ -717,6 +721,26 @@
     [
       "dbd28dc",
       "2026-11-19"
+    ],
+    [
+      "af1e350",
+      "2026-11-19"
+    ],
+    [
+      "3a2edac",
+      "2026-11-19"
+    ],
+    [
+      "95afd72",
+      "2026-11-19"
+    ],
+    [
+      "ef816c4",
+      "2026-11-20"
+    ],
+    [
+      "b86d643",
+      "2026-11-20"
     ]
   ]
 }
