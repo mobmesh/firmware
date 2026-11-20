@@ -23,7 +23,8 @@ void modCliBegin(uint32_t sender_timestamp) {
 
 bool modCliAddRow(uint32_t sender_timestamp, const char* text) {
   if (sender_timestamp == 0) {
-    Serial.print(serial_started ? "" : "  -> ");
+    // A multi-line reply starts on its own line after the arrow, so reports need no blank first line of their own.
+    if (!serial_started) Serial.print(strchr(text, '\n') ? "  ->\n" : "  -> ");
     Serial.println(text);
     serial_started = true;
     return true;

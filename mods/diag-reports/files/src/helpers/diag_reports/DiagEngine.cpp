@@ -861,8 +861,6 @@ void engineRun(const EngineInput& in, EngineResult& r) {
 }
 
 void engineFormat(const EngineInput& in, const EngineResult& r, DiagOut& o) {
-  // An empty first line, so the area rows start on their own line after the serial `-> ` prefix.
-  outLine(o, "%s", "");
   int unknown = 0;
   for (int i = 0; i < AREA_COUNT; i++) {
     const EngineArea& a = r.area[i];
