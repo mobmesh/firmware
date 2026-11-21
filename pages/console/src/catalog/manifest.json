@@ -3,9 +3,9 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "b86d6431e0e50c5d09b3d216f24c1c758fd0007e",
-  "sourceRows": 298,
-  "effectiveSignatures": 295,
+  "mobmeshCommit": "9156db9509c9af300c7459abcbb169552338225e",
+  "sourceRows": 302,
+  "effectiveSignatures": 302,
   "cliAdditionFiles": [
     {
       "path": "mods/core/docs/cli-additions.md",
@@ -33,7 +33,7 @@
     },
     {
       "path": "mods/rx-duty-cycle/docs/cli-additions.md",
-      "sha256": "e459f1ddcc3f725bd48baabc55cc5cc773bf159332d83e6e5acce417b30e2de5"
+      "sha256": "bd286bfea15afd48a7305c185776fb4d39bebe1129c91ac40ea57b605e2a3b81"
     },
     {
       "path": "mods/sync-settings/docs/cli-additions.md",
@@ -41,7 +41,7 @@
     },
     {
       "path": "mods/try-settings/docs/cli-additions.md",
-      "sha256": "bf284d4714d4624256f60deb0c299586125d083e29efa0f3f2137c07b8def9c7"
+      "sha256": "6ef4680c191d2418917e48f6a1f42f8adc2500e20edc3d4e342c76b6fb22e0a9"
     }
   ],
   "classification": "Every extracted seed signature is retained; duplicate exact signatures overlay with MobMesh precedence; stock poweroff/shutdown replaced. A full handler audit is still required.",
@@ -740,6 +740,22 @@
     ],
     [
       "b86d643",
+      "2026-11-20"
+    ],
+    [
+      "e9b8c81",
+      "2026-11-20"
+    ],
+    [
+      "5557309",
+      "2026-11-20"
+    ],
+    [
+      "06555e8",
+      "2026-11-20"
+    ],
+    [
+      "9156db9",
       "2026-11-20"
     ]
   ]
