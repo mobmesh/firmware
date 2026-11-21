@@ -20,6 +20,30 @@ void Fake::reset() {
   set_fails.clear();
   get_missing.clear();
   set_persists_before_failing.clear();
+  mod_prefs.clear();
+  mod_dispatched.clear();
+}
+
+// Stands in for the mods' CLI chain: answers only the keys in mod_prefs, as rx-duty-cycle answers radio.rxdc
+// (a status line after the mode, and a set that reads only the first word).
+bool modHandleCliCommand(uint32_t, char* command, char* reply, const char*, const char*) {
+  std::string c(command);
+  for (auto& kv : fake.mod_prefs) {
+    if (c == "get " + kv.first) {
+      fake.mod_dispatched.push_back(c);
+      sprintf(reply, "> %s, armed, rx 28016us sleep 44646us, arms 3, fails 0, calib 5s ago", kv.second.c_str());
+      return true;
+    }
+    if (c.rfind("set " + kv.first + " ", 0) == 0) {
+      fake.mod_dispatched.push_back(c);
+      std::string v = c.substr(kv.first.size() + 5);
+      v = v.substr(0, v.find_first_of(" ,"));
+      kv.second = v;
+      sprintf(reply, "OK - %s %s", kv.first.c_str(), v.c_str());
+      return true;
+    }
+  }
+  return false;
 }
 
 uint32_t modClockGet() { return fake.clock; }
@@ -59,6 +83,10 @@ void modCliDispatch(uint32_t, char* command, char* reply) {
     return;
   }
   if (c.rfind("tempradio", 0) == 0) { fake.temp_radio_live = true; strcpy(reply, "OK"); return; }
+  // Upstream's power saving command: the bare form reads, "on"/"off" write and echo the new state first.
+  if (c == "powersaving") { strcpy(reply, fake.prefs["powersaving"].c_str()); return; }
+  if (c == "powersaving on") { fake.prefs["powersaving"] = "on"; strcpy(reply, "on - After 2 minutes"); return; }
+  if (c == "powersaving off") { fake.prefs["powersaving"] = "off"; strcpy(reply, "off"); return; }
   strcpy(reply, "Unknown command");
 }
 

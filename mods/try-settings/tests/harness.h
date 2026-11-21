@@ -22,6 +22,9 @@ struct Fake {
   std::set<std::string> get_missing;                  // keys the board does not support
   std::set<std::string> set_persists_before_failing;  // refused, but the pref moved anyway
 
+  std::map<std::string, std::string> mod_prefs;       // keys a mod answers (radio.rxdc), not upstream
+  std::vector<std::string> mod_dispatched;
+
   void reset();
 };
 

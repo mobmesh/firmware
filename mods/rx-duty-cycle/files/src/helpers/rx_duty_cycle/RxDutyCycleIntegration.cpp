@@ -66,38 +66,156 @@ public:
 static Sx1262Radio radio_io;
 #endif
 
+#if defined(MOBMESH_HAS_SX1262) && defined(P_LORA_KCT8103L_PA_CTX) && defined(CONFIG_IDF_TARGET_ESP32S3)
+#define RXDC_FEM_GATE 1
+#include <soc/rtc_io_reg.h>
+#include <driver/rtc_io.h>
+#include <esp_sleep.h>
+#include <ulp_common.h>
+#include <esp32s3/ulp.h>
+#endif
+
 static RxdcEngine engine;
 static bool booted;
+static bool fem_gate = true;   // `set radio.fem.rxdc`; on by default, acts only where the LNA can be switched
 
+#if defined(RXDC_FEM_GATE)
+// During CPU light sleep only, the ULP-FSM copies BUSY (high while the radio sleeps) onto the KCT8103L's CTX (high = LNA
+// bypass). Both pads are RTC-muxed just before the sleep and handed back on wake, so the ULP never owns CTX while the
+// CPU can transmit. The Arduino core ships the ULP disabled with no reserved RTC memory, so the program sits at the top
+// of RTC slow memory, above what the app places there (checked at run time).
+#define FEM_ULP_PROG_W 0x780   // program at 0x50001E00
+#define FEM_ULP_FLAG_W 0x7FC   // [armed, running] at 0x50001FF0
+extern int _rtc_force_slow_end;
+static bool fem_loaded = false, fem_active = false;
+static uint32_t fem_sleeps = 0, fem_late = 0;
+static inline volatile uint32_t* femWord(uint32_t w) { return (volatile uint32_t*)(0x50000000UL + w * 4); }
+
+static bool femRtcFree() { return (uintptr_t)&_rtc_force_slow_end <= 0x50000000UL + FEM_ULP_PROG_W * 4; }
+
+static void femLoad() {
+  const uint32_t busy = rtc_io_number_get((gpio_num_t)P_LORA_BUSY);
+  const uint32_t ctx = rtc_io_number_get((gpio_num_t)P_LORA_KCT8103L_PA_CTX);
+  const ulp_insn_t prog[] = {
+    I_MOVI(R2, FEM_ULP_FLAG_W),
+    I_LD(R0, R2, 0),                                                                            // 1: armed?
+    I_BL(7, 1),                                                                                 // no: to 9
+    I_RD_REG(RTC_GPIO_IN_REG, RTC_GPIO_IN_NEXT_S + busy, RTC_GPIO_IN_NEXT_S + busy),            // BUSY
+    I_BL(3, 1),                                                                                 // low, listening: to 7
+    I_WR_REG(RTC_GPIO_OUT_W1TS_REG, RTC_GPIO_OUT_DATA_W1TS_S + ctx, RTC_GPIO_OUT_DATA_W1TS_S + ctx, 1),  // asleep: bypass
+    I_BXI(FEM_ULP_PROG_W + 1),
+    I_WR_REG(RTC_GPIO_OUT_W1TC_REG, RTC_GPIO_OUT_DATA_W1TC_S + ctx, RTC_GPIO_OUT_DATA_W1TC_S + ctx, 1),  // listening: LNA on
+    I_BXI(FEM_ULP_PROG_W + 1),
+    I_MOVI(R0, 0),                                                                              // 9: disarmed
+    I_ST(R0, R2, 1),                                                                            // running = 0
+    I_HALT(),
+  };
+  memcpy((void*)femWord(FEM_ULP_PROG_W), prog, sizeof(prog));
+  fem_loaded = true;
+}
+
+// Why the gate is not acting, or nullptr when it would act on the next sleep.
+static const char* femInactive() {
+  if (!femRtcFree()) return "RTC memory in use";
+  if (!modFemLnaAvailable()) return "no switchable LNA";
+  if (!modFemLnaGet()) return "LNA off";
+  if (engine.state() != RXDC_S_ARMED) return "rxdc not armed";
+  return nullptr;
+}
+
+// Pins back to digital GPIO with the LNA on, the ULP halted: the state every awake moment needs.
+static void femRelease() {
+  *femWord(FEM_ULP_FLAG_W) = 0;
+  uint32_t t0 = micros();
+  while ((*femWord(FEM_ULP_FLAG_W + 1) & 0xFFFF) != 0 && micros() - t0 < 2000) {}
+  if ((*femWord(FEM_ULP_FLAG_W + 1) & 0xFFFF) != 0) fem_late++;
+  ulp_timer_stop();
+  // Back to digital either way: an RTC_GPIO write after this cannot reach the pad.
+  rtc_gpio_deinit((gpio_num_t)P_LORA_KCT8103L_PA_CTX);
+  digitalWrite(P_LORA_KCT8103L_PA_CTX, LOW);
+  rtc_gpio_deinit((gpio_num_t)P_LORA_BUSY);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_AUTO);
+  fem_active = false;
+}
+
+static void femSleep() {
+  if (!fem_gate || fem_active || femInactive() != nullptr) return;
+  if (!fem_loaded) femLoad();
+  rtc_gpio_init((gpio_num_t)P_LORA_BUSY);
+  rtc_gpio_set_direction((gpio_num_t)P_LORA_BUSY, RTC_GPIO_MODE_INPUT_ONLY);
+  rtc_gpio_init((gpio_num_t)P_LORA_KCT8103L_PA_CTX);
+  rtc_gpio_set_direction((gpio_num_t)P_LORA_KCT8103L_PA_CTX, RTC_GPIO_MODE_OUTPUT_ONLY);
+  rtc_gpio_set_level((gpio_num_t)P_LORA_KCT8103L_PA_CTX, 0);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+  *femWord(FEM_ULP_FLAG_W) = 1;
+  *femWord(FEM_ULP_FLAG_W + 1) = 1;
+  ulp_set_wakeup_period(0, 100);
+  fem_active = true;
+  if (ulp_run(FEM_ULP_PROG_W) != ESP_OK) {
+    femRelease();
+    return;
+  }
+  fem_sleeps++;
+}
+
+static void femWake() {
+  if (fem_active) femRelease();
+}
+
+// A soft reset keeps the RTC domain: a ULP left running would still own CTX. Halted and released before anything sends.
+static void femBoot() {
+  ulp_timer_stop();
+  *femWord(FEM_ULP_FLAG_W) = 0;
+  rtc_gpio_deinit((gpio_num_t)P_LORA_KCT8103L_PA_CTX);
+  rtc_gpio_deinit((gpio_num_t)P_LORA_BUSY);
+}
+#endif
+
+// "mode": 0 off, 1 auto, 2 on. Files written before `on` existed carry only "auto" (1 auto, 0 off). "femrxdc": LNA gate.
 class SettingsFile : public ConfigSerializer {
-  uint8_t& _auto;
+  uint8_t& _mode;
+  uint8_t& _legacy;
+  uint8_t& _fem;
 public:
-  explicit SettingsFile(uint8_t& auto_on) : _auto(auto_on) { }
+  SettingsFile(uint8_t& mode, uint8_t& legacy, uint8_t& fem) : _mode(mode), _legacy(legacy), _fem(fem) { }
 protected:
   void structure() override {
-    def("auto", _auto);
+    def("mode", _mode);
+    def("auto", _legacy);
+    def("femrxdc", _fem);
   }
 };
 
+static const char* modeText(RxdcMode m) {
+  return m == RXDC_MODE_ON ? "on" : m == RXDC_MODE_OFF ? "off" : "auto";
+}
+
 static void boot() {
   booted = true;
-  uint8_t auto_on = 1;
+#if defined(RXDC_FEM_GATE)
+  femBoot();
+#endif
+  uint8_t mode = 0xFF, legacy = 1, fem = 1;
   if (ModFS.begin(true) && ModFS.exists(SETTINGS_PATH)) {
     File f = ModFS.open(SETTINGS_PATH, "r");
     if (f) {
-      SettingsFile file(auto_on);
+      SettingsFile file(mode, legacy, fem);
       file.loadSerial(f);
       f.close();
     }
   }
-  engine.setMode(auto_on != 0);
+  if (mode > RXDC_MODE_ON) mode = legacy ? RXDC_MODE_AUTO : RXDC_MODE_OFF;
+  engine.setMode((RxdcMode)mode);
+  fem_gate = fem != 0;
 }
 
 static bool saveSettings() {
-  uint8_t auto_on = engine.modeAuto() ? 1 : 0;
+  uint8_t mode = engine.mode();
+  uint8_t legacy = engine.mode() == RXDC_MODE_OFF ? 0 : 1;
+  uint8_t fem = fem_gate ? 1 : 0;
   File f = ModFS.open(SETTINGS_PATH, "w", true);
   if (!f) return false;
-  SettingsFile file(auto_on);
+  SettingsFile file(mode, legacy, fem);
   bool ok = file.saveSerial(f);
   f.close();
   return ok;
@@ -111,7 +229,12 @@ int16_t rxdcRxMode(ModRxEvent event, PhysicalLayer* radio) {
   uint32_t now = millis();
   switch (event) {
     case MOD_RX_START:      return engine.start(radio_io, now);
-    case MOD_RX_STOP:       engine.stop(radio_io); return 0;
+    case MOD_RX_STOP:
+#if defined(RXDC_FEM_GATE)
+      femWake();   // never expected awake; the radio only stops with the CPU running
+#endif
+      engine.stop(radio_io);
+      return 0;
     case MOD_RX_ASLEEP:     return engine.asleep(radio_io) ? 1 : 0;
     case MOD_RX_SAMPLE_OK:  return engine.sampleOk(now) ? 1 : 0;
     case MOD_RX_LOOP:
@@ -128,6 +251,13 @@ int16_t rxdcRxMode(ModRxEvent event, PhysicalLayer* radio) {
       return 0;
     case MOD_RX_FLOOR_DONE: engine.floorDone(now); return 0;
     case MOD_RX_BUSY:       return engine.busyHold() ? 1 : 0;
+#if defined(RXDC_FEM_GATE)
+    case MOD_RX_SLEEP:      femSleep(); return 0;
+    case MOD_RX_WAKE:       femWake(); return 0;
+#else
+    case MOD_RX_SLEEP:
+    case MOD_RX_WAKE:       return 0;
+#endif
   }
   return 0;
 #else
@@ -154,38 +284,99 @@ static const char* stateText(RxdcState s) {
   return "?";
 }
 
+// "<verb> <key>[ <arg>]" for exactly this key; nothing else under "set radio" or "get radio" belongs to this mod.
+static bool isKey(const char* command, const char* verb, const char* key, const char** arg) {
+  size_t v = strlen(verb), k = strlen(key);
+  if (strncmp(command, verb, v) != 0 || command[v] != ' ' || strncmp(command + v + 1, key, k) != 0) return false;
+  char next = command[v + 1 + k];
+  if (next != 0 && next != ' ') return false;
+  *arg = next == ' ' ? command + v + 2 + k : "";
+  return true;
+}
+
+// The first word of a value, so the full `get` line (as tryset snapshots it) can be given back.
+static void firstWord(const char* arg, char* word, size_t len) {
+  size_t n = 0;
+  while (arg[n] && arg[n] != ' ' && arg[n] != ',' && n < len - 1) { word[n] = arg[n]; n++; }
+  word[n] = 0;
+}
+
+static bool femCli(bool is_set, const char* arg, char* reply) {
+#if defined(RXDC_FEM_GATE)
+  if (is_set) {
+    char word[8];
+    firstWord(arg, word, sizeof(word));
+    if (strcmp(word, "on") != 0 && strcmp(word, "off") != 0) {
+      strcpy(reply, "ERR: usage: set radio.fem.rxdc on|off");
+      return true;
+    }
+    fem_gate = word[1] == 'n';
+    sprintf(reply, saveSettings() ? "OK - radio.fem.rxdc %s" : "ERR: radio.fem.rxdc %s, not saved", fem_gate ? "on" : "off");
+    return true;
+  }
+  if (!fem_gate) {
+    strcpy(reply, "> off");
+    return true;
+  }
+  const char* why = femInactive();
+  if (why) snprintf(reply, 160, "> on, inactive (%s), %lu gated sleeps", why, (unsigned long)fem_sleeps);
+  else snprintf(reply, 160, "> on, %lu gated sleeps", (unsigned long)fem_sleeps);
+#else
+  (void)is_set;
+  (void)arg;
+  strcpy(reply, "ERR: radio.fem.rxdc not supported on this board");
+#endif
+  return true;
+}
+
 bool rxdcHandleCli(const ModCliContext& context, char* command, char* reply) {
   (void)context;
-  if (strncmp(command, "powersaving rxdc", 16) != 0 || (command[16] != 0 && command[16] != ' ')) return false;
+  const char* arg;
+  bool is_set = isKey(command, "set", "radio.fem.rxdc", &arg);
+  if (is_set || isKey(command, "get", "radio.fem.rxdc", &arg)) {
+#if defined(MOBMESH_HAS_SX1262)
+    if (!booted) boot();
+#endif
+    return femCli(is_set, arg, reply);
+  }
+  is_set = isKey(command, "set", "radio.rxdc", &arg);
+  if (!is_set && !isKey(command, "get", "radio.rxdc", &arg)) return false;
 #if defined(MOBMESH_HAS_SX1262)
   if (!booted) boot();
-  const char* arg = command[16] == ' ' ? command + 17 : "";
-  if (strcmp(arg, "auto") == 0 || strcmp(arg, "off") == 0) {
-    engine.setMode(arg[0] == 'a');
-    sprintf(reply, saveSettings() ? "OK - rxdc %s" : "ERR: rxdc %s, not saved", engine.modeAuto() ? "auto" : "off");
+  if (is_set) {
+    char word[8];
+    firstWord(arg, word, sizeof(word));
+    RxdcMode m;
+    if (strcmp(word, "auto") == 0) m = RXDC_MODE_AUTO;
+    else if (strcmp(word, "on") == 0) m = RXDC_MODE_ON;
+    else if (strcmp(word, "off") == 0) m = RXDC_MODE_OFF;
+    else {
+      strcpy(reply, "ERR: usage: set radio.rxdc auto|on|off");
+      return true;
+    }
+    engine.setMode(m);
+    sprintf(reply, saveSettings() ? "OK - radio.rxdc %s" : "ERR: radio.rxdc %s, not saved", modeText(m));
     return true;
   }
-  if (*arg != 0) {
-    strcpy(reply, "ERR: usage: powersaving rxdc [auto|off]");
-    return true;
-  }
-  if (!engine.modeAuto()) {
-    strcpy(reply, "rxdc off");
+  RxdcMode m = engine.mode();
+  if (m == RXDC_MODE_OFF) {
+    strcpy(reply, "> off");
     return true;
   }
   RxdcState s = engine.state();
   const RxdcGeometry& g = engine.geometry();
   uint32_t calib_s = engine.lastCalibMs() ? (millis() - engine.lastCalibMs()) / 1000 : 0;
   if (s == RXDC_S_ARMED || s == RXDC_S_CALIBRATING || s == RXDC_S_PAUSED) {
-    snprintf(reply, 160, "rxdc auto, %s, rx %luus sleep %luus, arms %lu, fails %lu, calib %lus ago", stateText(s),
+    snprintf(reply, 160, "> %s, %s, rx %luus sleep %luus, arms %lu, fails %lu, calib %lus ago", modeText(m), stateText(s),
              (unsigned long)g.rx_us, (unsigned long)g.sleep_us, (unsigned long)engine.arms(), (unsigned long)engine.armFailures(),
              (unsigned long)calib_s);
   } else if (s == RXDC_S_FALLBACK) {
-    snprintf(reply, 160, "rxdc auto, %s, err %d", stateText(s), engine.lastError());
+    snprintf(reply, 160, "> %s, %s, err %d", modeText(m), stateText(s), engine.lastError());
   } else {
-    snprintf(reply, 160, "rxdc auto, %s", stateText(s));
+    snprintf(reply, 160, "> %s, %s", modeText(m), stateText(s));
   }
 #else
+  (void)arg;
   strcpy(reply, "ERR: rx duty cycle needs an SX1262");
 #endif
   return true;

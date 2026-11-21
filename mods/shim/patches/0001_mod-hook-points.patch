@@ -195,7 +195,7 @@ index 61b6c149..90b5dabd 100644
    if (dirty_contacts_expiry && millisHasNowPassed(dirty_contacts_expiry)) {
      acl.save(_fs);
 diff --git a/examples/simple_repeater/main.cpp b/examples/simple_repeater/main.cpp
-index d475b13d..e4651a12 100644
+index d475b13d..00a9f574 100644
 --- a/examples/simple_repeater/main.cpp
 +++ b/examples/simple_repeater/main.cpp
 @@ -2,6 +2,8 @@
@@ -265,7 +265,7 @@ index d475b13d..e4651a12 100644
    // Handle Serial CLI
    int len = strlen(command);
    // `command` must stay NUL-terminated within its bounds. If it ever isn't,
-@@ -205,13 +241,15 @@ void loop() {
+@@ -205,13 +241,17 @@ void loop() {
  #ifdef HAS_EXTERNAL_WATCHDOG
    external_watchdog.loop();
  #endif
@@ -275,7 +275,9 @@ index d475b13d..e4651a12 100644
      board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
  #else
      if (the_mesh.millisHasNowPassed(POWERSAVING_FIRSTSLEEP_SECS * 1000)) { // To check if it is time to sleep
++      modRxMode(MOD_RX_SLEEP, nullptr);   // the receive-mode owner may hand pins to the ULP for the sleep
        board.sleep(30); // Sleep. Wake up after a while or when receiving a LoRa packet
++      modRxMode(MOD_RX_WAKE, nullptr);
 +      return;
      }
  #endif
@@ -601,7 +603,7 @@ index 04199e24..4cfc57bb 100644
    }
  }
 diff --git a/src/helpers/radiolib/CustomSX1262Wrapper.h b/src/helpers/radiolib/CustomSX1262Wrapper.h
-index be314471..d96ec0f5 100644
+index be314471..bb88c48b 100644
 --- a/src/helpers/radiolib/CustomSX1262Wrapper.h
 +++ b/src/helpers/radiolib/CustomSX1262Wrapper.h
 @@ -3,6 +3,7 @@
@@ -620,7 +622,7 @@ index be314471..d96ec0f5 100644
      ((CustomSX1262 *)_radio)->setFrequency(freq);
      ((CustomSX1262 *)_radio)->setSpreadingFactor(sf);
      ((CustomSX1262 *)_radio)->setBandwidth(bw);
-@@ -24,6 +26,7 @@ public:
+@@ -24,13 +26,14 @@ public:
    }
  
    bool isReceivingPacket() override { 
@@ -628,8 +630,17 @@ index be314471..d96ec0f5 100644
      return ((CustomSX1262 *)_radio)->isReceiving();
    }
    float getCurrentRSSI() override {
+     return ((CustomSX1262 *)_radio)->getRSSI(false);
+   }
+-  float getLastRSSI() const override { return ((CustomSX1262 *)_radio)->getRSSI(); }
+-  float getLastSNR() const override { return ((CustomSX1262 *)_radio)->getSNR(); }
++  float getLastRSSI() const override { return modLastRssi(); }
++  float getLastSNR() const override { return modLastSnr(); }
+ 
+   float packetScore(float snr, int packet_len) override {
+     int sf = ((CustomSX1262 *)_radio)->spreadingFactor;
 diff --git a/src/helpers/radiolib/RadioLibWrappers.cpp b/src/helpers/radiolib/RadioLibWrappers.cpp
-index e4d2ba1c..5e3296d2 100644
+index e4d2ba1c..63b49daf 100644
 --- a/src/helpers/radiolib/RadioLibWrappers.cpp
 +++ b/src/helpers/radiolib/RadioLibWrappers.cpp
 @@ -1,6 +1,7 @@
@@ -689,7 +700,15 @@ index e4d2ba1c..5e3296d2 100644
    if (err == RADIOLIB_ERR_NONE) {
      state = STATE_RX;
    } else {
-@@ -149,7 +160,8 @@ int RadioLibWrapper::recvRaw(uint8_t* bytes, int sz) {
+@@ -139,6 +150,7 @@ int RadioLibWrapper::recvRaw(uint8_t* bytes, int sz) {
+       } else {
+       //  Serial.print("  readData() -> "); Serial.println(len);
+         n_recv++;
++        modRxPacketRead(_radio->getRSSI(), _radio->getSNR());
+       }
+     }
+     #if defined(USE_LR2021)
+@@ -149,7 +161,8 @@ int RadioLibWrapper::recvRaw(uint8_t* bytes, int sz) {
    }
  
    if (state != STATE_RX) {
@@ -699,7 +718,7 @@ index e4d2ba1c..5e3296d2 100644
      if (err == RADIOLIB_ERR_NONE) {
        state = STATE_RX;
      } else {
-@@ -165,6 +177,7 @@ uint32_t RadioLibWrapper::getEstAirtimeFor(int len_bytes) {
+@@ -165,6 +178,7 @@ uint32_t RadioLibWrapper::getEstAirtimeFor(int len_bytes) {
  
  bool RadioLibWrapper::startSendRaw(const uint8_t* bytes, int len) {
    _board->onBeforeTransmit();
@@ -707,7 +726,7 @@ index e4d2ba1c..5e3296d2 100644
    int err = _radio->startTransmit((uint8_t *) bytes, len);
    if (err == RADIOLIB_ERR_NONE) {
      state = STATE_TX_WAIT;
-@@ -192,12 +205,13 @@ void RadioLibWrapper::onSendFinished() {
+@@ -192,12 +206,13 @@ void RadioLibWrapper::onSendFinished() {
  }
  
  int16_t RadioLibWrapper::performChannelScan() {
@@ -722,3 +741,16 @@ index e4d2ba1c..5e3296d2 100644
  
    // cad: hardware channel activity detection
    if (_cad_enabled) {
+@@ -214,10 +229,10 @@ bool RadioLibWrapper::isChannelActive() {
+ }
+ 
+ float RadioLibWrapper::getLastRSSI() const {
+-  return _radio->getRSSI();
++  return modLastRssi();
+ }
+ float RadioLibWrapper::getLastSNR() const {
+-  return _radio->getSNR();
++  return modLastSnr();
+ }
+ 
+ // Approximate SNR threshold per SF for successful reception (based on Semtech datasheets)

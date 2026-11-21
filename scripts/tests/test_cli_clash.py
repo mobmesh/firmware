@@ -100,11 +100,11 @@ class CliClashTestCase(unittest.TestCase):
             self.assertGreater(cli_priority(winner), cli_priority(fallback), f"{winner} must answer `{name}` before {fallback}")
 
     def test_parser_reads_heads_and_prefixes(self):
-        self.assertEqual(text(command_head("powersaving rxdc [auto|off]")), "powersaving rxdc")
+        self.assertEqual(text(command_head("powersaving safe [on|off]")), "powersaving safe")
         self.assertEqual(text(command_head("get sync.<dataset>.publish.interval")), "get sync.…")
         self.assertIsNone(command_head("<upstream-version> (<date>)"))
         self.assertIsNone(command_head("Reply from c5fb: time=1334ms"))
-        self.assertTrue(covers(command_head("powersaving"), command_head("powersaving rxdc")))
+        self.assertTrue(covers(command_head("powersaving"), command_head("powersaving safe")))
         self.assertFalse(covers(command_head("powersaving safe"), command_head("powersaving safe.mv <mv>")))
         self.assertTrue(covers(command_head("get sync.<x>"), command_head("get sync.channel")))
 

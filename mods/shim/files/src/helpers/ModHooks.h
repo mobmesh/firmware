@@ -24,6 +24,9 @@ bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
 void modLoop();                            // called first in loop()
 bool modWantsPowerSaving();                // OR'd with the operator's powersaving_enabled
 bool modPowerSavingOn();                   // the operator's powersaving_enabled OR modWantsPowerSaving()
+void modRxPacketRead(float rssi, float snr);  // a packet was just read: its RSSI and SNR, before receive restarts
+float modLastRssi();                       // the last read packet's RSSI, as getLastRSSI() reports it
+float modLastSnr();                        // the last read packet's SNR, as getLastSNR() reports it
 bool modLoadAllowed();                     // AND of mods that veto a heavy load; true when none
 void modBeforeDeepSleep();                 // before a mod's own sleep while the radio is not running
 
@@ -78,6 +81,8 @@ enum ModRxEvent {
   MOD_RX_RESUME,                       // the reading is done; the window closes
   MOD_RX_FLOOR_DONE,                   // the wrapper just published a noise floor
   MOD_RX_BUSY,                         // 1 holds the CPU awake: a calibration window or a pause is open
+  MOD_RX_SLEEP,                        // the CPU is about to enter light sleep (radio nullptr)
+  MOD_RX_WAKE,                         // the CPU is back from light sleep (radio nullptr)
 };
 enum { MOD_RX_PASS = 1, MOD_RX_RESTART = 1, MOD_RX_FRESH_FLOOR = 2 };
 int16_t modRxMode(ModRxEvent event, PhysicalLayer* radio);

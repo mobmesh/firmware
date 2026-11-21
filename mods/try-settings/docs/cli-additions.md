@@ -57,6 +57,8 @@ tryset <seconds> <key> <value>
 | `flood.max.advert` | Maximum advert flood hops |
 | `repeat` | Message forwarding |
 | `dutycycle` | Transmit duty-cycle limit |
+| `radio.rxdc` | Receive duty cycle (`auto`, `on`, `off`), where the rx-duty-cycle mod is built in |
+| `powersaving` | Power saving (`on`, `off`); read and written with the native `powersaving` command |
 
 **Response:** `OK - tryset <seconds>s (reverts unless kept)` or `Error: ...`.
 Native setting-validation errors may also be returned.

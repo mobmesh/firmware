@@ -17,6 +17,17 @@ const ModBindings* modBindings() {
   return &bound;
 }
 
+// Kept from each packet as it is read: the radio forgets them once receive restarts, sooner still when it duty-cycles.
+static float last_rssi = 0, last_snr = 0;
+
+void modRxPacketRead(float rssi, float snr) {
+  last_rssi = rssi;
+  last_snr = snr;
+}
+
+float modLastRssi() { return last_rssi; }
+float modLastSnr() { return last_snr; }
+
 bool modPowerSavingOn() {
   return (bound.prefs != nullptr && bound.prefs->powersaving_enabled) || modWantsPowerSaving();
 }

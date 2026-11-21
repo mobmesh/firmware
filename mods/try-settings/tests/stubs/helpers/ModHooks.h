@@ -12,4 +12,6 @@ struct ModCliContext {
 uint32_t modClockGet();
 void     modClockSet(uint32_t epoch);
 void     modCliDispatch(uint32_t sender_timestamp, char* command, char* reply);
+bool     modHandleCliCommand(uint32_t sender_timestamp, char* command, char* reply,
+                             const char* fw_version, const char* fw_build_date);
 bool     modTempRadioGet(float* freq, float* bw, uint8_t* sf, uint8_t* cr);

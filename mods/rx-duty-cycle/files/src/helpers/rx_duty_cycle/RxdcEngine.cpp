@@ -1,7 +1,7 @@
 #include <helpers/rx_duty_cycle/RxdcEngine.h>
 
-void RxdcEngine::setMode(bool auto_on) {
-  _auto = auto_on;
+void RxdcEngine::setMode(RxdcMode mode) {
+  _mode = mode;
   _fails = 0;
 }
 

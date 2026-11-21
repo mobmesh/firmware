@@ -199,6 +199,36 @@ static void replyStaysInsideTheCallerBuffer() {
   check(strlen(guarded) < 160, "the reply fits the buffer");
 }
 
+static void rxdcTrialGoesThroughTheMod() {
+  start();
+  fake.mod_prefs["radio.rxdc"] = "auto";
+  std::string r = cli("tryset 300 radio.rxdc on");
+  check(r.rfind("OK", 0) == 0, "a radio.rxdc trial is accepted");
+  check(fake.mod_prefs["radio.rxdc"] == "on", "the trial mode reaches the mod");
+  bool upstream = false;
+  for (auto& d : fake.dispatched) upstream = upstream || d.find("radio.rxdc") != std::string::npos;
+  check(!upstream, "radio.rxdc never goes to upstream's CLI");
+  fake.ms += 301000;
+  trySetLoop();
+  check(fake.mod_prefs["radio.rxdc"] == "auto", "expiry restores the mode from the full status line");
+}
+
+static void powersavingTrialUsesTheNativeCommand() {
+  start("powersaving", "off");
+  std::string r = cli("tryset 300 powersaving on");
+  check(r.rfind("OK", 0) == 0, "a powersaving trial is accepted");
+  check(fake.prefs["powersaving"] == "on", "power saving is switched on");
+  check(std::string(fake.record.snapshot) == "off", "the record holds the original state");
+  fake.ms += 301000;
+  trySetLoop();
+  check(fake.prefs["powersaving"] == "off", "expiry switches power saving back off");
+  start("powersaving", "off");
+  r = cli("tryset 300 powersaving maybe");
+  check(r.rfind("OK", 0) != 0, "a value other than on or off is refused");
+  check(fake.prefs["powersaving"] == "off", "a refused value leaves power saving alone");
+  check(!fake.saved, "a refused value leaves no record");
+}
+
 int main(int argc, char** argv) {
   if (argc > 1 && strcmp(argv[1], "reboot") == 0) {
     rebootRestoresRatherThanResuming();
@@ -219,6 +249,8 @@ int main(int argc, char** argv) {
   radioRejectsPartialMinutes();
   unsupportedKeyIsDeclined();
   replyStaysInsideTheCallerBuffer();
+  rxdcTrialGoesThroughTheMod();
+  powersavingTrialUsesTheNativeCommand();
 
   if (failures) { printf("%d check(s) failed\n", failures); return 1; }
   printf("all checks passed\n");

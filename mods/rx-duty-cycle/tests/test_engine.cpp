@@ -86,11 +86,11 @@ int main() {
   e.resumeNow(r, t + 30);
   CHECK(r.arms == arms + 1 && e.state() == RXDC_S_ARMED && !e.busyHold());
   // Not duty-cycling: read straight away, no window.
-  e.setMode(false);
+  e.setMode(RXDC_MODE_OFF);
   e.loop(r, t + 40);
   e.start(r, t + 41);
   CHECK(e.pauseState(t + 42) == 0 && !e.busyHold());
-  e.setMode(true);
+  e.setMode(RXDC_MODE_AUTO);
   e.loop(r, t + 43);
   e.start(r, t + 44);
   t += 50;
@@ -130,9 +130,21 @@ int main() {
   e2.setPowerSaving(true);
   CHECK(e2.start(w, t) == RXDC_PASS && w.arms == 0 && e2.state() == RXDC_S_NO_GEOMETRY);
 
-  // `powersaving rxdc off` keeps continuous receive with power saving on.
-  e.setMode(false);
+  // `set radio.rxdc off` keeps continuous receive with power saving on.
+  e.setMode(RXDC_MODE_OFF);
   CHECK(e.loop(r, t + 30) & RXDC_RESTART);
   CHECK(e.start(r, t + 31) == RXDC_PASS && e.state() == RXDC_S_OFF && e.sampleOk(t + 31));
+
+  // `set radio.rxdc on` cycles with power saving off; auto then stops until power saving returns.
+  e.setPowerSaving(false);
+  e.setMode(RXDC_MODE_ON);
+  CHECK(e.loop(r, t + 40) & RXDC_RESTART);
+  CHECK(e.start(r, t + 41) == 0 && e.state() != RXDC_S_OFF);
+  e.setMode(RXDC_MODE_AUTO);
+  CHECK(e.loop(r, t + 50) & RXDC_RESTART);
+  CHECK(e.start(r, t + 51) == RXDC_PASS && e.state() == RXDC_S_OFF);
+  e.setPowerSaving(true);
+  CHECK(e.loop(r, t + 60) & RXDC_RESTART);
+  CHECK(e.start(r, t + 61) == 0);
   DONE();
 }

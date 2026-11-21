@@ -30,8 +30,27 @@ static const char* const TRY_SET_KEYS[] = {
   "flood.max.advert",
   "repeat",
   "dutycycle",
+  // Receive and power behaviour that can only be judged on site.
+  "radio.rxdc",
+  "powersaving",
   nullptr,
 };
+
+// Keys a mod answers rather than upstream; their reads and writes go through the mods first.
+static bool modOwned(const char* key) {
+  return strcmp(key, "radio.rxdc") == 0;
+}
+
+// `powersaving` is its own command, not a `set` key: read with `powersaving`, written with `powersaving on|off`.
+static bool isPowersaving(const char* key) {
+  return strcmp(key, "powersaving") == 0;
+}
+
+static void dispatch(const char* key, char* cmd, char* rep) {
+  rep[0] = 0;
+  if (modOwned(key) && modHandleCliCommand(0, cmd, rep, "", "")) return;
+  modCliDispatch(0, cmd, rep);
+}
 
 static TrySetSlot slot;
 static bool booted = false;
@@ -53,9 +72,16 @@ static bool keyAllowed(const char* key) {
 // board that cannot control what was asked for) means there is nothing to snapshot.
 static bool cliGet(const char* key, char* out, size_t out_len) {
   char cmd[64], rep[192];
+  if (isPowersaving(key)) {
+    snprintf(cmd, sizeof(cmd), "powersaving");
+    dispatch(key, cmd, rep);
+    // Upstream answers the bare command with "on" or "off".
+    if (strncmp(rep, "on", 2) != 0 && strncmp(rep, "off", 3) != 0) return false;
+    snprintf(out, out_len, "%s", rep[1] == 'n' ? "on" : "off");
+    return true;
+  }
   snprintf(cmd, sizeof(cmd), "get %s", key);
-  rep[0] = 0;
-  modCliDispatch(0, cmd, rep);
+  dispatch(key, cmd, rep);
   if (rep[0] != '>') return false;
   const char* v = rep + 1;
   while (*v == ' ') v++;
@@ -65,10 +91,20 @@ static bool cliGet(const char* key, char* out, size_t out_len) {
 }
 
 static bool cliSet(const char* key, const char* value, char* rep, size_t rep_len) {
+  (void)rep_len;
   char cmd[128];
+  if (isPowersaving(key)) {
+    if (strcmp(value, "on") != 0 && strcmp(value, "off") != 0) {
+      strcpy(rep, "Error: powersaving takes on or off");
+      return false;
+    }
+    snprintf(cmd, sizeof(cmd), "powersaving %s", value);
+    dispatch(key, cmd, rep);
+    // Upstream confirms with the new state first ("on - After 2 minutes", "off").
+    return strncmp(rep, value, strlen(value)) == 0;
+  }
   snprintf(cmd, sizeof(cmd), "set %s %s", key, value);
-  rep[0] = 0;
-  modCliDispatch(0, cmd, rep);
+  dispatch(key, cmd, rep);
   return strncmp(rep, "OK", 2) == 0;
 }
 
