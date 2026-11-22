@@ -3357,7 +3357,7 @@
     "origin": "mobmesh",
     "mod": "try-settings",
     "summary": "tryset setting",
-    "details": "## tryset setting\n\n```text\ntryset <seconds> <key> <value>\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `seconds` | Integer duration, 60–86400 seconds |\n| `key` | One of the keys below |\n| `value` | Same syntax and limits as the native `set <key>` command |\n\n| Valid key | Setting |\n| --- | --- |\n| `tx` | LoRa transmit power |\n| `radio.rxgain` | Radio chip receive gain |\n| `radio.fem.rxgain` | External FEM receive gain, where supported |\n| `radio.fem.txgain` | External FEM transmit gain, where supported |\n| `int.thresh` | Interference threshold |\n| `cad` | Channel Activity Detection |\n| `agc.reset.interval` | Receiver AGC reset interval |\n| `flood.max` | Maximum flood hops |\n| `flood.max.unscoped` | Maximum unscoped flood hops |\n| `flood.max.advert` | Maximum advert flood hops |\n| `repeat` | Message forwarding |\n| `dutycycle` | Transmit duty-cycle limit |\n| `radio.rxdc` | Receive duty cycle (`auto`, `on`, `off`), where the rx-duty-cycle mod is built in |\n| `powersaving` | Power saving (`on`, `off`); read and written with the native `powersaving` command |\n\n**Response:** `OK - tryset <seconds>s (reverts unless kept)` or `Error: ...`.\nNative setting-validation errors may also be returned.\n\n**Effect:** Records the original value before applying the trial value. Expiry or\nreboot restores it. A failed restore retains the recovery record and retries.\nClock corrections do not change the trial duration.\n\n**Restrictions:** One trial at a time, including radio trials. Unsupported keys or\nboard capabilities are refused. A rollback record must be saved before the setting changes.\n",
+    "details": "## tryset setting\n\n```text\ntryset <seconds> <key> <value>\n```\n\n| Parameter | Definition |\n| --- | --- |\n| `seconds` | Integer duration, 60–86400 seconds |\n| `key` | One of the keys below |\n| `value` | Same syntax and limits as the native `set <key>` command |\n\n| Valid key | Setting |\n| --- | --- |\n| `tx` | LoRa transmit power |\n| `radio.rxgain` | Radio chip receive gain |\n| `radio.fem.rxgain` | External FEM receive gain, where supported |\n| `radio.fem.txgain` | External FEM transmit gain, where supported |\n| `int.thresh` | Interference threshold |\n| `cad` | Channel Activity Detection |\n| `agc.reset.interval` | Receiver AGC reset interval |\n| `flood.max` | Maximum flood hops |\n| `flood.max.unscoped` | Maximum unscoped flood hops |\n| `flood.max.advert` | Maximum advert flood hops |\n| `repeat` | Message forwarding |\n| `dutycycle` | Transmit duty-cycle limit |\n| `radio.rxdc` | Receive duty cycle (`auto`, `off`), where the rx-duty-cycle mod is built in |\n| `powersaving` | Power saving (`on`, `off`); read and written with the native `powersaving` command |\n\n**Response:** `OK - tryset <seconds>s (reverts unless kept)` or `Error: ...`.\nNative setting-validation errors may also be returned.\n\n**Effect:** Records the original value before applying the trial value. Expiry or\nreboot restores it. A failed restore retains the recovery record and retries.\nClock corrections do not change the trial duration.\n\n**Restrictions:** One trial at a time, including radio trials. Unsupported keys or\nboard capabilities are refused. A rollback record must be saved before the setting changes.\n",
     "source": "https://github.com/mobmesh/firmware/blob/9156db9509c9af300c7459abcbb169552338225e/mods/try-settings/docs/cli-additions.md#L37",
     "grammarVerified": false,
     "remote": null,
@@ -5818,45 +5818,12 @@
     "origin": "mobmesh",
     "mod": "rx-duty-cycle",
     "summary": "set radio.rxdc",
-    "details": "## set radio.rxdc\n\n```text\nset radio.rxdc auto\nset radio.rxdc on\nset radio.rxdc off\n```\n\n| Parameter | Effect |\n| --- | --- |\n| `auto` | Duty-cycle the radio whenever power saving runs (default) |\n| `on` | Duty-cycle the radio whether or not power saving runs |\n| `off` | Keep continuous receive, with power saving on or off |\n\n| Response | Meaning |\n| --- | --- |\n| `OK - radio.rxdc <mode>` | Mode set and saved |\n| `ERR: radio.rxdc <mode>, not saved` | Mode set until reboot; the settings file could not be written |\n| `ERR: usage: set radio.rxdc auto\\|on\\|off` | Unknown mode |\n\nOnly the first word of the value is read, so the full `get radio.rxdc` line can be given back as a value (as `tryset` does when it restores).\n",
+    "details": "## set radio.rxdc\n\n```text\nset radio.rxdc auto\nset radio.rxdc off\n```\n\n| Parameter | Effect |\n| --- | --- |\n| `auto` | Duty-cycle the radio whenever power saving runs (default) |\n| `off` | Keep continuous receive, with power saving on or off |\n\n| Response | Meaning |\n| --- | --- |\n| `OK - radio.rxdc <mode>` | Mode set and saved |\n| `ERR: radio.rxdc <mode>, not saved` | Mode set until reboot; the settings file could not be written |\n| `ERR: usage: set radio.rxdc auto\\|off` | Unknown mode |\n\nOnly the first word of the value is read, so the full `get radio.rxdc` line can be given back as a value (as `tryset` does when it restores).\n",
     "source": "https://github.com/mobmesh/firmware/blob/9156db9509c9af300c7459abcbb169552338225e/mods/rx-duty-cycle/docs/cli-additions.md#L35",
     "grammarVerified": false,
     "remote": null,
     "sensitive": false,
     "brief": "Duty-cycle the radio whenever power saving runs (default).",
-    "since": "9156db9"
-  },
-  {
-    "id": "mobmesh.set.radio.rxdc.on.50dc0256",
-    "syntax": "set radio.rxdc on",
-    "path": [
-      "set",
-      "radio.rxdc",
-      "on"
-    ],
-    "elements": [
-      {
-        "kind": "literal",
-        "value": "set"
-      },
-      {
-        "kind": "literal",
-        "value": "radio.rxdc"
-      },
-      {
-        "kind": "literal",
-        "value": "on"
-      }
-    ],
-    "origin": "mobmesh",
-    "mod": "rx-duty-cycle",
-    "summary": "set radio.rxdc",
-    "details": "## set radio.rxdc\n\n```text\nset radio.rxdc auto\nset radio.rxdc on\nset radio.rxdc off\n```\n\n| Parameter | Effect |\n| --- | --- |\n| `auto` | Duty-cycle the radio whenever power saving runs (default) |\n| `on` | Duty-cycle the radio whether or not power saving runs |\n| `off` | Keep continuous receive, with power saving on or off |\n\n| Response | Meaning |\n| --- | --- |\n| `OK - radio.rxdc <mode>` | Mode set and saved |\n| `ERR: radio.rxdc <mode>, not saved` | Mode set until reboot; the settings file could not be written |\n| `ERR: usage: set radio.rxdc auto\\|on\\|off` | Unknown mode |\n\nOnly the first word of the value is read, so the full `get radio.rxdc` line can be given back as a value (as `tryset` does when it restores).\n",
-    "source": "https://github.com/mobmesh/firmware/blob/9156db9509c9af300c7459abcbb169552338225e/mods/rx-duty-cycle/docs/cli-additions.md#L36",
-    "grammarVerified": false,
-    "remote": null,
-    "sensitive": false,
-    "brief": "Duty-cycle the radio whether or not power saving runs.",
     "since": "9156db9"
   },
   {
@@ -5884,7 +5851,7 @@
     "origin": "mobmesh",
     "mod": "rx-duty-cycle",
     "summary": "set radio.rxdc",
-    "details": "## set radio.rxdc\n\n```text\nset radio.rxdc auto\nset radio.rxdc on\nset radio.rxdc off\n```\n\n| Parameter | Effect |\n| --- | --- |\n| `auto` | Duty-cycle the radio whenever power saving runs (default) |\n| `on` | Duty-cycle the radio whether or not power saving runs |\n| `off` | Keep continuous receive, with power saving on or off |\n\n| Response | Meaning |\n| --- | --- |\n| `OK - radio.rxdc <mode>` | Mode set and saved |\n| `ERR: radio.rxdc <mode>, not saved` | Mode set until reboot; the settings file could not be written |\n| `ERR: usage: set radio.rxdc auto\\|on\\|off` | Unknown mode |\n\nOnly the first word of the value is read, so the full `get radio.rxdc` line can be given back as a value (as `tryset` does when it restores).\n",
+    "details": "## set radio.rxdc\n\n```text\nset radio.rxdc auto\nset radio.rxdc off\n```\n\n| Parameter | Effect |\n| --- | --- |\n| `auto` | Duty-cycle the radio whenever power saving runs (default) |\n| `off` | Keep continuous receive, with power saving on or off |\n\n| Response | Meaning |\n| --- | --- |\n| `OK - radio.rxdc <mode>` | Mode set and saved |\n| `ERR: radio.rxdc <mode>, not saved` | Mode set until reboot; the settings file could not be written |\n| `ERR: usage: set radio.rxdc auto\\|off` | Unknown mode |\n\nOnly the first word of the value is read, so the full `get radio.rxdc` line can be given back as a value (as `tryset` does when it restores).\n",
     "source": "https://github.com/mobmesh/firmware/blob/9156db9509c9af300c7459abcbb169552338225e/mods/rx-duty-cycle/docs/cli-additions.md#L37",
     "grammarVerified": false,
     "remote": null,

@@ -38,6 +38,10 @@ bool modHandleCliCommand(uint32_t, char* command, char* reply, const char*, cons
       fake.mod_dispatched.push_back(c);
       std::string v = c.substr(kv.first.size() + 5);
       v = v.substr(0, v.find_first_of(" ,"));
+      if (kv.first == "radio.rxdc" && v != "auto" && v != "off") {
+        strcpy(reply, "ERR: usage: set radio.rxdc auto|off");
+        return true;
+      }
       kv.second = v;
       sprintf(reply, "OK - %s %s", kv.first.c_str(), v.c_str());
       return true;

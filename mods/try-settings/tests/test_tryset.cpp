@@ -203,14 +203,30 @@ static void rxdcTrialGoesThroughTheMod() {
   start();
   fake.mod_prefs["radio.rxdc"] = "auto";
   std::string r = cli("tryset 300 radio.rxdc on");
+  check(r == "ERR: usage: set radio.rxdc auto|off", "forced RXDC is refused");
+  check(!fake.saved, "the refused trial leaves no rollback record");
+  r = cli("tryset 300 radio.rxdc off");
   check(r.rfind("OK", 0) == 0, "a radio.rxdc trial is accepted");
-  check(fake.mod_prefs["radio.rxdc"] == "on", "the trial mode reaches the mod");
+  check(fake.mod_prefs["radio.rxdc"] == "off", "the trial mode reaches the mod");
   bool upstream = false;
   for (auto& d : fake.dispatched) upstream = upstream || d.find("radio.rxdc") != std::string::npos;
   check(!upstream, "radio.rxdc never goes to upstream's CLI");
   fake.ms += 301000;
   trySetLoop();
   check(fake.mod_prefs["radio.rxdc"] == "auto", "expiry restores the mode from the full status line");
+}
+
+static void rebootMigratesForcedRxdcSnapshot() {
+  fake.reset();
+  fake.mod_prefs["radio.rxdc"] = "off";
+  strcpy(fake.record.key, "radio.rxdc");
+  strcpy(fake.record.snapshot, "on, armed, rx 28016us");
+  strcpy(fake.record.trial, "off");
+  fake.record.expires_at = fake.clock + 3600;
+  fake.saved = true;
+  trySetLoop();
+  check(fake.mod_prefs["radio.rxdc"] == "auto", "the legacy rollback restores auto");
+  check(!fake.saved, "the migrated rollback record is cleared");
 }
 
 static void powersavingTrialUsesTheNativeCommand() {
@@ -230,6 +246,10 @@ static void powersavingTrialUsesTheNativeCommand() {
 }
 
 int main(int argc, char** argv) {
+  if (argc > 1 && strcmp(argv[1], "reboot-rxdc") == 0) {
+    rebootMigratesForcedRxdcSnapshot();
+    return failures ? 1 : 0;
+  }
   if (argc > 1 && strcmp(argv[1], "reboot") == 0) {
     rebootRestoresRatherThanResuming();
     if (failures) { printf("%d check(s) failed\n", failures); return 1; }

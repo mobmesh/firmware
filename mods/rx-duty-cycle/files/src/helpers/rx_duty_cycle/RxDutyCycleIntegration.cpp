@@ -171,7 +171,7 @@ static void femBoot() {
 }
 #endif
 
-// "mode": 0 off, 1 auto, 2 on. Files written before `on` existed carry only "auto" (1 auto, 0 off). "femrxdc": LNA gate.
+// Older settings can carry only "auto" (1 auto, 0 off).
 class SettingsFile : public ConfigSerializer {
   uint8_t& _mode;
   uint8_t& _legacy;
@@ -187,7 +187,7 @@ protected:
 };
 
 static const char* modeText(RxdcMode m) {
-  return m == RXDC_MODE_ON ? "on" : m == RXDC_MODE_OFF ? "off" : "auto";
+  return m == RXDC_MODE_OFF ? "off" : "auto";
 }
 
 static void boot() {
@@ -204,8 +204,7 @@ static void boot() {
       f.close();
     }
   }
-  if (mode > RXDC_MODE_ON) mode = legacy ? RXDC_MODE_AUTO : RXDC_MODE_OFF;
-  engine.setMode((RxdcMode)mode);
+  engine.setMode(rxdcStoredMode(mode, legacy));
   fem_gate = fem != 0;
 }
 
@@ -348,10 +347,9 @@ bool rxdcHandleCli(const ModCliContext& context, char* command, char* reply) {
     firstWord(arg, word, sizeof(word));
     RxdcMode m;
     if (strcmp(word, "auto") == 0) m = RXDC_MODE_AUTO;
-    else if (strcmp(word, "on") == 0) m = RXDC_MODE_ON;
     else if (strcmp(word, "off") == 0) m = RXDC_MODE_OFF;
     else {
-      strcpy(reply, "ERR: usage: set radio.rxdc auto|on|off");
+      strcpy(reply, "ERR: usage: set radio.rxdc auto|off");
       return true;
     }
     engine.setMode(m);

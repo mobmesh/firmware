@@ -112,7 +112,10 @@ static bool cliSet(const char* key, const char* value, char* rep, size_t rep_len
 // erasing on failure would strand the node on the trial value with nothing left to undo it.
 static bool restore(const TrySetSlot& s) {
   char rep[192];
-  return cliSet(s.key, s.snapshot, rep, sizeof(rep));
+  const char* value = s.snapshot;
+  if (modOwned(s.key) && strncmp(value, "on", 2) == 0 &&
+      (value[2] == 0 || value[2] == ',' || value[2] == ' ')) value = "auto";
+  return cliSet(s.key, value, rep, sizeof(rep));
 }
 
 static void clearSlot() {

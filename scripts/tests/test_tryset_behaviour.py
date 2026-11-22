@@ -52,6 +52,10 @@ class TrySetBehaviourTestCase(unittest.TestCase):
         result = subprocess.run([str(self.binary), "reboot"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_reboot_migrates_forced_rxdc_snapshot(self):
+        result = subprocess.run([str(self.binary), "reboot-rxdc"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -36,12 +36,19 @@ enum RxdcState : uint8_t {
   RXDC_S_FALLBACK,                     // arming failed too often
 };
 
-// `set radio.rxdc`: auto follows power saving, on cycles whatever power saving says, off never cycles.
-enum RxdcMode : uint8_t { RXDC_MODE_OFF = 0, RXDC_MODE_AUTO = 1, RXDC_MODE_ON = 2 };
+// Auto follows power saving; off keeps continuous receive.
+enum RxdcMode : uint8_t { RXDC_MODE_OFF = 0, RXDC_MODE_AUTO = 1 };
+
+inline RxdcMode rxdcStoredMode(uint8_t mode, uint8_t legacy_auto) {
+  // Saved mode 2 was forced on and now follows power saving.
+  if (mode == 2) return RXDC_MODE_AUTO;
+  if (mode <= RXDC_MODE_AUTO) return static_cast<RxdcMode>(mode);
+  return legacy_auto ? RXDC_MODE_AUTO : RXDC_MODE_OFF;
+}
 
 class RxdcEngine {
 public:
-  void setMode(RxdcMode mode);         // `set radio.rxdc auto|on|off`
+  void setMode(RxdcMode mode);         // `set radio.rxdc auto|off`
   RxdcMode mode() const { return _mode; }
   void setPowerSaving(bool on) { _power = on; }
 
@@ -67,7 +74,7 @@ public:
   uint32_t lastCalibMs() const { return _calib_last; }
 
 private:
-  bool wanted() const { return _mode == RXDC_MODE_ON || (_mode == RXDC_MODE_AUTO && _power); }
+  bool wanted() const { return _mode == RXDC_MODE_AUTO && _power; }
   bool refreshGeometry(RxdcRadio& r);
   void openPause(RxdcRadio& r, uint32_t now_ms);
 

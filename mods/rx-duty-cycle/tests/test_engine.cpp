@@ -135,12 +135,17 @@ int main() {
   CHECK(e.loop(r, t + 30) & RXDC_RESTART);
   CHECK(e.start(r, t + 31) == RXDC_PASS && e.state() == RXDC_S_OFF && e.sampleOk(t + 31));
 
-  // `set radio.rxdc on` cycles with power saving off; auto then stops until power saving returns.
-  e.setPowerSaving(false);
-  e.setMode(RXDC_MODE_ON);
+  CHECK(rxdcStoredMode(0, 1) == RXDC_MODE_OFF);
+  CHECK(rxdcStoredMode(1, 0) == RXDC_MODE_AUTO);
+  CHECK(rxdcStoredMode(2, 0) == RXDC_MODE_AUTO);
+  CHECK(rxdcStoredMode(0xFF, 0) == RXDC_MODE_OFF);
+  CHECK(rxdcStoredMode(0xFF, 1) == RXDC_MODE_AUTO);
+
+  // Auto disarms when power saving ends and arms again when it returns.
+  e.setMode(rxdcStoredMode(2, 0));
   CHECK(e.loop(r, t + 40) & RXDC_RESTART);
-  CHECK(e.start(r, t + 41) == 0 && e.state() != RXDC_S_OFF);
-  e.setMode(RXDC_MODE_AUTO);
+  CHECK(e.start(r, t + 41) == 0);
+  e.setPowerSaving(false);
   CHECK(e.loop(r, t + 50) & RXDC_RESTART);
   CHECK(e.start(r, t + 51) == RXDC_PASS && e.state() == RXDC_S_OFF);
   e.setPowerSaving(true);

@@ -11,7 +11,7 @@ Commands added by `rx-duty-cycle`, available over serial and authenticated remot
 | Command | Purpose |
 | --- | --- |
 | [`get radio.rxdc`](#get-radiorxdc) | Read the duty-cycle mode and what the radio is doing now |
-| [`set radio.rxdc <auto\|on\|off>`](#set-radiorxdc) | Choose when the radio duty-cycles |
+| [`set radio.rxdc <auto\|off>`](#set-radiorxdc) | Choose when the radio duty-cycles |
 | [`get radio.fem.rxdc`](#get-radiofemrxdc) | Read whether the LNA is bypassed while the radio sleeps |
 | [`set radio.fem.rxdc <on\|off>`](#set-radiofemrxdc) | Bypass the LNA while the radio sleeps, during CPU light sleep |
 
@@ -33,21 +33,19 @@ get radio.rxdc
 
 ```text
 set radio.rxdc auto
-set radio.rxdc on
 set radio.rxdc off
 ```
 
 | Parameter | Effect |
 | --- | --- |
 | `auto` | Duty-cycle the radio whenever power saving runs (default) |
-| `on` | Duty-cycle the radio whether or not power saving runs |
 | `off` | Keep continuous receive, with power saving on or off |
 
 | Response | Meaning |
 | --- | --- |
 | `OK - radio.rxdc <mode>` | Mode set and saved |
 | `ERR: radio.rxdc <mode>, not saved` | Mode set until reboot; the settings file could not be written |
-| `ERR: usage: set radio.rxdc auto\|on\|off` | Unknown mode |
+| `ERR: usage: set radio.rxdc auto\|off` | Unknown mode |
 
 Only the first word of the value is read, so the full `get radio.rxdc` line can be given back as a value (as `tryset` does when it restores).
 
