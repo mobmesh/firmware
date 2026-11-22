@@ -3,8 +3,8 @@
   "releaseCoveragePassed": false,
   "requirementsRevision": "console-requirements-2026-10-08-08",
   "upstreamCommit": "81dbae592ffad40b4212bc0b37e82b38da08f4bc",
-  "mobmeshCommit": "9156db9509c9af300c7459abcbb169552338225e",
-  "sourceRows": 302,
+  "mobmeshCommit": "2e3669ae19eaec435e04fa688cfdafb8c1c559d6",
+  "sourceRows": 301,
   "effectiveSignatures": 302,
   "cliAdditionFiles": [
     {
@@ -33,7 +33,7 @@
     },
     {
       "path": "mods/rx-duty-cycle/docs/cli-additions.md",
-      "sha256": "bd286bfea15afd48a7305c185776fb4d39bebe1129c91ac40ea57b605e2a3b81"
+      "sha256": "af5c1a1d1c30111dce800ac6d5e026719dc3c0e7030100b8d239bc3694f10888"
     },
     {
       "path": "mods/sync-settings/docs/cli-additions.md",
@@ -41,7 +41,7 @@
     },
     {
       "path": "mods/try-settings/docs/cli-additions.md",
-      "sha256": "6ef4680c191d2418917e48f6a1f42f8adc2500e20edc3d4e342c76b6fb22e0a9"
+      "sha256": "664bc2fb937d828b40fe7b1941a082882b987b78e1a303bdef2ef75f9437b2a7"
     }
   ],
   "classification": "Every extracted seed signature is retained; duplicate exact signatures overlay with MobMesh precedence; stock poweroff/shutdown replaced. A full handler audit is still required.",
@@ -757,6 +757,26 @@
     [
       "9156db9",
       "2026-11-20"
+    ],
+    [
+      "7fd44db",
+      "2026-11-21"
+    ],
+    [
+      "2ac6353",
+      "2026-11-21"
+    ],
+    [
+      "376d73c",
+      "2026-11-21"
+    ],
+    [
+      "0e64c97",
+      "2026-11-22"
+    ],
+    [
+      "2e3669a",
+      "2026-11-22"
     ]
   ]
 }
