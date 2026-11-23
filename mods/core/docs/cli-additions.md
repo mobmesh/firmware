@@ -99,7 +99,7 @@ ping last
 Reply 4ea1: time=1334ms hops=2 weakest(c5fb)=+10.50
 ```
 
-`time` is the round trip measured here, `hops` the hops to the destination one way, `weakest(<hash>)` the lowest link SNR on the path in either direction, in dB, named by the hop it sits on (`trace` lists that hop's two directions). No reply: `Request timed out.`, after a wait that grows with the hop count and the radio's airtime.
+`time` is the round trip measured here, `hops` the hops to the destination one way, `weakest(<hash>)` the lowest link SNR on the path in either direction, in dB, named by the hop at the far end of that link (`trace` shows both ends of it). No reply: `Request timed out.`, after a wait that grows with the hop count and the radio's airtime.
 
 Over the remote CLI nothing is sent until the result is in, so no reply crosses the mesh while the trace does; a not-in-neighbours note arrives as the first line of the result.
 
@@ -123,12 +123,12 @@ trace last
 
 Parameters, effect and errors as [`ping`](#ping).
 
-**Response:** a header line, then one numbered line per hop, as `tracert` lists them. `out` is how well that hop heard the one before it, `back` how well the one before heard it on the way back, in dB.
+**Response:** a header line, then one numbered line per link, nearer node first, numbered as `tracert` numbers hops. The SNR in brackets after a node is how well that node heard the other end of the link, in dB; `me` is this repeater.
 
 ```
 Trace to 4ea1 over 2 hops, 1334ms:
-  1  c5fb  out +11.50  back +11.50
-  2  4ea1  out +12.25  back +11.75
+1  me   (+11.50) <-> c5fb (+11.50)
+2  c5fb (+11.75) <-> 4ea1 (+12.25)
 ```
 
 A long trace that needs two replies ends the second with `Summary: time=<ms>ms hops=<n> weakest(<hash>)=<dB>`. No reply: `Trace to 4ea1 over 2 hops: no reply in 7s`.

@@ -65,7 +65,7 @@ int main() {
   CHECK(n == 1 && strcmp(lines[0], "Reply c5fb: time=412ms hops=1 weakest(c5fb)=+6.50") == 0);
   n = probeFormat(x, true, PROBE_AGE_NONE, lines, PROBE_LINES_MAX);
   CHECK(n == 2 && strcmp(lines[0], "Trace to c5fb over 1 hop, 412ms:") == 0);
-  CHECK(strcmp(lines[1], "  1  c5fb  out  +7.25  back  +6.50") == 0);
+  CHECK(strcmp(lines[1], "1  me    (+6.50) <-> c5fb  (+7.25)") == 0);
   CHECK(!probeFillLinks(x, one, 2, 26));
 
   // Three hops: out legs then return legs, the sender's own last; the weakest is the lowest either way.
@@ -78,19 +78,19 @@ int main() {
   x.rtt_ms = 2105;
   n = probeFormat(x, true, PROBE_AGE_NONE, lines, PROBE_LINES_MAX);
   CHECK(n == 4 && strcmp(lines[0], "Trace to c5fb over 3 hops, 2105ms:") == 0);
-  CHECK(strcmp(lines[1], "  1  a1b2  out  +9.25  back  +8.75") == 0);
-  CHECK(strcmp(lines[3], "  3  c5fb  out  +3.50  back  +4.00") == 0);
+  CHECK(strcmp(lines[1], "1  me    (+8.75) <-> a1b2  (+9.25)") == 0);
+  CHECK(strcmp(lines[3], "3  a2c4  (+4.00) <-> c5fb  (+3.50)") == 0);
   CHECK(probePack(x, true, lines, n, msgs) == 1);
   n = probeFormat(x, false, 125, lines, PROBE_LINES_MAX);
   CHECK(strcmp(lines[0], "Reply c5fb: time=2105ms hops=3 weakest(c5fb)=+3.50 (2m ago)") == 0);
   CHECK(x.out_q[0] == 37);
 
-  // At 1-byte hashes the hop column is two digits wide.
+  // At 1-byte hashes the node columns are two digits wide.
   CHECK(probeParse("trace c5", 1, &r, err, sizeof(err)) == PROBE_OK);
   x = made(r, true);
   probeFillLinks(x, one, 1, 26);
   n = probeFormat(x, true, PROBE_AGE_NONE, lines, PROBE_LINES_MAX);
-  CHECK(strcmp(lines[1], "  1  c5  out  +7.25  back  +6.50") == 0);
+  CHECK(strcmp(lines[1], "1  me  (+6.50) <-> c5  (+7.25)") == 0);
 
   // The weakest hop is where the lowest reading sits, out or back; the first wins a tie.
   probeParse("ping c5fb via a1b2,a2c4", 2, &r, err, sizeof(err));
@@ -109,7 +109,7 @@ int main() {
   n = probeFormat(x, false, PROBE_AGE_NONE, lines, PROBE_LINES_MAX);
   CHECK(any(lines, n, "weakest(c5fb)=-7.50"));
   n = probeFormat(x, true, PROBE_AGE_NONE, lines, PROBE_LINES_MAX);
-  CHECK(any(lines, n, "out  -7.50  back  -0.25"));
+  CHECK(any(lines, n, "(-0.25) <-> c5fb  (-7.50)"));
 
   // Six hops: two frames, the second ends with the summary; nothing exceeds a frame.
   probeParse("trace c5fb via a1b2,a2c4,b7e1,d4a9,e2f0", 2, &r, err, sizeof(err));

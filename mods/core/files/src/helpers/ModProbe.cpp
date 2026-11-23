@@ -180,13 +180,18 @@ int probeFormat(const ProbeResult& r, bool trace, uint32_t age_s, char lines[][P
     return n;
   }
   ADD("Trace to %s over %u hop%s, %lums%s:", dest, r.hops, plural, (unsigned long)r.rtt_ms, age);
-  // Numbered hops as tracert lists them; fixed-width fields keep the columns straight.
+  // One row per link, nearer node first; each bracketed SNR is how well the node before it heard the other end.
+  const int w = r.width * 2;
   for (int i = 0; i < r.hops; i++) {
-    char hop[2 * PROBE_HASH_MAX + 1], out[8], back[8];
-    probeHashText(r.hash[i], r.width, hop);
-    snrText(r.out_q[i], out, sizeof(out));
-    snrText(r.back_q[i], back, sizeof(back));
-    ADD("  %d  %s  out %6s  back %6s", i + 1, hop, out, back);
+    char near_hop[2 * PROBE_HASH_MAX + 1], far_hop[2 * PROBE_HASH_MAX + 1], snr[8], near_q[12], far_q[12];
+    if (i == 0) strcpy(near_hop, "me");
+    else probeHashText(r.hash[i - 1], r.width, near_hop);
+    probeHashText(r.hash[i], r.width, far_hop);
+    snrText(r.back_q[i], snr, sizeof(snr));
+    snprintf(near_q, sizeof(near_q), "(%s)", snr);
+    snrText(r.out_q[i], snr, sizeof(snr));
+    snprintf(far_q, sizeof(far_q), "(%s)", snr);
+    ADD("%d  %-*s %8s <-> %-*s %8s", i + 1, w, near_hop, near_q, w, far_hop, far_q);
   }
   return n;
 }
