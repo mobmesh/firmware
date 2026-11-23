@@ -1,3 +1,19 @@
+## v1.52.0 - 23/November/2026
+- added new companion setup flow via deep links and qr codes
+- added button to copy reverse path in view path screen menu
+- added a chats tab that shows conversations ordered by most recent messages
+- the chats tab includes buttons to quickly show all unread conversations
+- the chats tab includes a new chat button to quickly start a new conversation
+- the chats tab allows viewing conversation history for contacts and channels that have been deleted
+- the chats tab now allows you to view alert messages received from sensor nodes
+- contact names and channel names are now bold on the main screen
+- contact public keys now use monospace font and are moved to bottom in main screen contacts list
+- contact avatars have had a slight adjustment to their size, colours and borders
+- conversation viewer now starts at the oldest unread message when opening a conversation. this can be turned off in message settings
+- unread conversations count has moved from the contacts/channels tab icons to the chats tab icon
+- back button in conversation viewer now shows how many other unread conversations there are
+- telemetry is now cached in the app database and shown instantly when opening telemetry viewer
+
 ## v1.51.1 - 09/November/2026
 - fixed a bug where contacts with a 3-byte path would always reset to flood
 - fixed a bug where setting dm flood attempts to zero would show error message when a contact had no path
