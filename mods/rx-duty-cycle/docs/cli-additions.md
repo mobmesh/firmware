@@ -12,6 +12,8 @@ Commands added by `rx-duty-cycle`, available over serial and authenticated remot
 | --- | --- |
 | [`get radio.rxdc`](#get-radiorxdc) | Read the duty-cycle mode and what the radio is doing now |
 | [`set radio.rxdc <auto\|off>`](#set-radiorxdc) | Choose when the radio duty-cycles |
+| [`get radio.rxdc.timeout`](#get-radiorxdctimeout) | Read the saved false-preamble timeout setting |
+| [`set radio.rxdc.timeout <on\|off>`](#set-radiorxdctimeout) | Enable or disable the false-preamble timeout |
 | [`get radio.fem.rxdc`](#get-radiofemrxdc) | Read whether the LNA is bypassed while the radio sleeps |
 | [`set radio.fem.rxdc <on\|off>`](#set-radiofemrxdc) | Bypass the LNA while the radio sleeps, during CPU light sleep |
 
@@ -49,6 +51,37 @@ set radio.rxdc off
 
 Only the first word of the value is read, so the full `get radio.rxdc` line can be given back as a value (as `tryset` does when it restores).
 
+## get radio.rxdc.timeout
+
+```text
+get radio.rxdc.timeout
+```
+
+| Response | Meaning |
+| --- | --- |
+| `> on` | Enabled for eligible duty-cycle receive windows |
+| `> off` | Disabled |
+
+## set radio.rxdc.timeout
+
+```text
+set radio.rxdc.timeout on
+set radio.rxdc.timeout off
+```
+
+| Parameter | Effect |
+| --- | --- |
+| `on` | Use a 96-symbol timeout to end reception after a false preamble when the receive window and header fit |
+| `off` | Disable the timeout (default) |
+
+| Response | Meaning |
+| --- | --- |
+| `OK - radio.rxdc.timeout <on\|off>` | Set and saved |
+| `ERR: radio.rxdc.timeout <on\|off>, not saved` | Set until reboot; the settings file could not be written |
+| `ERR: usage: set radio.rxdc.timeout on\|off` | Unknown value |
+
+Changes apply when RX duty cycling next arms. The radio uses its regular timeout in continuous receive.
+
 ## get radio.fem.rxdc
 
 ```text
@@ -80,6 +113,6 @@ set radio.fem.rxdc off
 | `ERR: radio.fem.rxdc <on\|off>, not saved` | Set until reboot; the settings file could not be written |
 | `ERR: usage: set radio.fem.rxdc on\|off` | Unknown value |
 
-**Storage:** both settings persist across reboots and firmware updates.
+**Storage:** these settings persist across reboots and firmware updates.
 
 [↩ Back to rx-duty-cycle readme](../README.md)

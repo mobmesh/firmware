@@ -5,6 +5,11 @@ void RxdcEngine::setMode(RxdcMode mode) {
   _fails = 0;
 }
 
+void RxdcEngine::requestRearm() {
+  _fails = 0;
+  if (wanted()) _restart = true;
+}
+
 bool RxdcEngine::refreshGeometry(RxdcRadio& r) {
   if (_geo_dirty) {
     uint8_t sf = r.sf();

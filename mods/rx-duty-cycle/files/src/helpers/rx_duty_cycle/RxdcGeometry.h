@@ -26,3 +26,6 @@ uint32_t rxdcReloadTicks(uint32_t rx_ticks, uint32_t sleep_ticks);
 uint32_t rxdcNeedTicks(uint8_t sf, float bw_khz, uint8_t preamble);
 // Listen and sleep for a sender's preamble; false when no safe pair exists (sleep under the floor, or no window covers the header).
 bool rxdcGeometry(uint8_t sf, float bw_khz, uint8_t preamble, uint32_t transition_us, RxdcGeometry* out);
+
+// Hardware symbol timeout, or zero when the listen window and header do not fit.
+uint8_t rxdcSymbolTimeout(uint32_t rx_us, uint8_t sf, float bw_khz, uint8_t preamble);

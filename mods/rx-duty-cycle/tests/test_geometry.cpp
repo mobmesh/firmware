@@ -42,6 +42,7 @@ int main() {
       CHECK(x.rx_us >= rxdcSymbolUs(sf, bw));
       CHECK(x.sleep_us >= 6000 + RXDC_SLEEP_MARGIN_US);
       CHECK(x.reload_ticks >= rxdcNeedTicks(sf, bw, pre));
+      CHECK(rxdcSymbolTimeout(x.rx_us, sf, bw, pre) == 96);
       // Worst case the preamble starts as a window closes: what is left after the sleep is at least the catch.
       CHECK(pre - x.sleep_us / rxdcSymbolUs(sf, bw) >= RXDC_CATCH_SYMBOLS);
     }
@@ -53,5 +54,7 @@ int main() {
   CHECK(rxdcGeometry(9, 62.5f, 16, 6000, &g));
   // Nonsense in, refusal out.
   CHECK(!rxdcGeometry(4, 62.5f, 32, 6000, &g) && !rxdcGeometry(7, 0, 32, 6000, &g) && !rxdcGeometry(7, 62.5f, 10, 6000, &g));
+  CHECK(rxdcSymbolTimeout(207872, 8, 62.5f, 32) == 96);
+  CHECK(rxdcSymbolTimeout(207873, 8, 62.5f, 32) == 0);
   DONE();
 }

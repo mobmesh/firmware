@@ -51,6 +51,7 @@ public:
   void setMode(RxdcMode mode);         // `set radio.rxdc auto|off`
   RxdcMode mode() const { return _mode; }
   void setPowerSaving(bool on) { _power = on; }
+  void requestRearm();
 
   int16_t start(RxdcRadio& r, uint32_t now_ms);
   void stop(RxdcRadio& r);

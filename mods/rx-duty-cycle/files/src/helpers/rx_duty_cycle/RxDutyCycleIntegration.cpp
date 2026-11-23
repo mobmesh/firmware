@@ -11,6 +11,7 @@
 
 #if defined(MOBMESH_HAS_SX1262)
 #include <RadioLib.h>
+#include <Mesh.h>
 #if defined(ESP32)
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -27,7 +28,16 @@ static bool onRadioTask() { return radio_task != nullptr && xTaskGetCurrentTaskH
 class Sx1262Radio : public RxdcRadio {
 public:
   SX126x* r = nullptr;
+  bool timeout_enabled = false;
   int16_t arm(uint32_t rx_us, uint32_t sleep_us) override {
+    const uint8_t symbols = timeout_enabled ? rxdcSymbolTimeout(rx_us, sf(), bw(), sf() <= 8 ? 32 : 16) : 0;
+    if (symbols != 0) {
+      int16_t err = r->standby();
+      if (err != RADIOLIB_ERR_NONE) return err;
+      timeout_set = true;
+      err = setSymbolTimeout(symbols);
+      if (err != RADIOLIB_ERR_NONE) return err;
+    }
     keepThroughSleep();
     // The preamble flag is reported as upstream's continuous receive does, so listen-before-talk sees a packet starting.
     return r->startReceiveDutyCycle(rx_us, sleep_us, RADIOLIB_IRQ_RX_DEFAULT_FLAGS | (1UL << RADIOLIB_IRQ_PREAMBLE_DETECTED),
@@ -50,6 +60,11 @@ public:
   }
   void stop() override {
     r->standby();
+    if (timeout_set) {
+      const int16_t err = setSymbolTimeout(0);
+      timeout_set = err != RADIOLIB_ERR_NONE;
+      if (timeout_set) MESH_DEBUG_PRINTLN("RXDC symbol timeout clear failed: %d", err);
+    }
     // The sleep timer is stopped and its event cleared, or it can wake the chip into receive later.
     uint8_t zero = 0, ev = 0;
     r->writeRegister(RADIOLIB_SX126X_REG_RTC_CTRL, &zero, 1);
@@ -61,6 +76,18 @@ public:
   uint8_t sf() override { return r->spreadingFactor; }
   float bw() override { return r->bandwidthKhz; }
   uint32_t transitionUs() override { return r->tcxoDelay + 1000; }
+
+private:
+  bool timeout_set = false;
+
+  int16_t setSymbolTimeout(uint8_t symbols) {
+    const int16_t err = r->getMod()->SPIwriteStream(RADIOLIB_SX126X_CMD_SET_LORA_SYMB_NUM_TIMEOUT,
+                                                    &symbols, 1);
+    if (err != RADIOLIB_ERR_NONE || symbols == 0) return err;
+    // The 96-symbol sync timeout encodes mantissa 12 and exponent 1.
+    const uint8_t sync_timeout = 0x61;
+    return r->writeRegister(RADIOLIB_SX126X_REG_LORA_SYNC_TIMEOUT, &sync_timeout, 1);
+  }
 };
 
 static Sx1262Radio radio_io;
@@ -172,17 +199,20 @@ static void femBoot() {
 #endif
 
 // Older settings can carry only "auto" (1 auto, 0 off).
-class SettingsFile : public ConfigSerializer {
+class RxdcSettingsFile : public ConfigSerializer {
   uint8_t& _mode;
   uint8_t& _legacy;
   uint8_t& _fem;
+  uint8_t& _timeout;
 public:
-  SettingsFile(uint8_t& mode, uint8_t& legacy, uint8_t& fem) : _mode(mode), _legacy(legacy), _fem(fem) { }
+  RxdcSettingsFile(uint8_t& mode, uint8_t& legacy, uint8_t& fem, uint8_t& timeout)
+    : _mode(mode), _legacy(legacy), _fem(fem), _timeout(timeout) { }
 protected:
   void structure() override {
     def("mode", _mode);
     def("auto", _legacy);
     def("femrxdc", _fem);
+    def("timeout", _timeout);
   }
 };
 
@@ -195,26 +225,33 @@ static void boot() {
 #if defined(RXDC_FEM_GATE)
   femBoot();
 #endif
-  uint8_t mode = 0xFF, legacy = 1, fem = 1;
+  uint8_t mode = 0xFF, legacy = 1, fem = 1, timeout = 0;
   if (ModFS.begin(true) && ModFS.exists(SETTINGS_PATH)) {
     File f = ModFS.open(SETTINGS_PATH, "r");
     if (f) {
-      SettingsFile file(mode, legacy, fem);
+      RxdcSettingsFile file(mode, legacy, fem, timeout);
       file.loadSerial(f);
       f.close();
     }
   }
   engine.setMode(rxdcStoredMode(mode, legacy));
   fem_gate = fem != 0;
+#if defined(MOBMESH_HAS_SX1262)
+  radio_io.timeout_enabled = timeout == 1;
+#endif
 }
 
 static bool saveSettings() {
   uint8_t mode = engine.mode();
   uint8_t legacy = engine.mode() == RXDC_MODE_OFF ? 0 : 1;
   uint8_t fem = fem_gate ? 1 : 0;
+  uint8_t timeout = 0;
+#if defined(MOBMESH_HAS_SX1262)
+  timeout = radio_io.timeout_enabled;
+#endif
   File f = ModFS.open(SETTINGS_PATH, "w", true);
   if (!f) return false;
-  SettingsFile file(mode, legacy, fem);
+  RxdcSettingsFile file(mode, legacy, fem, timeout);
   bool ok = file.saveSerial(f);
   f.close();
   return ok;
@@ -337,6 +374,31 @@ bool rxdcHandleCli(const ModCliContext& context, char* command, char* reply) {
     if (!booted) boot();
 #endif
     return femCli(is_set, arg, reply);
+  }
+  is_set = isKey(command, "set", "radio.rxdc.timeout", &arg);
+  if (is_set || isKey(command, "get", "radio.rxdc.timeout", &arg)) {
+#if defined(MOBMESH_HAS_SX1262)
+    if (!booted) boot();
+    if (is_set) {
+      char word[8];
+      firstWord(arg, word, sizeof(word));
+      if (strcmp(word, "on") != 0 && strcmp(word, "off") != 0) {
+        strcpy(reply, "ERR: usage: set radio.rxdc.timeout on|off");
+        return true;
+      }
+      bool enabled = word[1] == 'n';
+      if (radio_io.timeout_enabled != enabled) {
+        radio_io.timeout_enabled = enabled;
+        engine.requestRearm();
+      }
+      sprintf(reply, saveSettings() ? "OK - radio.rxdc.timeout %s" : "ERR: radio.rxdc.timeout %s, not saved", word);
+    } else {
+      sprintf(reply, "> %s", radio_io.timeout_enabled ? "on" : "off");
+    }
+#else
+    strcpy(reply, "ERR: rx duty cycle needs an SX1262");
+#endif
+    return true;
   }
   is_set = isKey(command, "set", "radio.rxdc", &arg);
   if (!is_set && !isKey(command, "get", "radio.rxdc", &arg)) return false;

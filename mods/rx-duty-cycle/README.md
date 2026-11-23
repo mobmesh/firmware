@@ -5,6 +5,7 @@
 While the node runs power saving, the SX1262 sleeps between short listen windows instead of receiving continuously, waking inside each packet's preamble. On a Heltec V4 repeater (LNA off, power saving on) idle draw fell from 8.4 mA to 4.8 mA.
 
 - `set radio.rxdc auto` (default) runs it whenever power saving is enabled by the operator or requested by a mod such as power-guard. `set radio.rxdc off` keeps continuous receive.
+- `set radio.rxdc.timeout on` enables the 96-symbol false-preamble timeout during RX duty cycling when the listen window and header fit. It defaults to `off`.
 - With `radio.fem.rxdc` on (the default), boards with a KCT8103L FEM (Heltec V4.3) also bypass the LNA while the radio sleeps: during CPU light sleep the ESP32-S3's ULP coprocessor copies the radio's BUSY pin onto the FEM's CTX pin, and hands the pin back on every wake, so it never owns the FEM while the CPU can transmit. Heltec V4.3 repeater, power saving and LNA on: 15.0 mA to 9.5 mA. `set radio.fem.rxdc off` leaves the LNA as set.
 - Sleep is the preamble less 10.2 symbols still to catch. The listen window starts from the SX126x datasheet's timer rule and is lengthened to the SX1262's measured post-preamble timer, so preamble, sync and header always fit.
 - At SF7 / 62.5 kHz: listen ~28 ms, sleep 44.6 ms. Radio settings with no safe timing (SF7 at 500 kHz, for example) keep continuous receive.

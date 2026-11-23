@@ -42,3 +42,11 @@ bool rxdcGeometry(uint8_t sf, float bw_khz, uint8_t preamble, uint32_t transitio
   }
   return false;
 }
+
+uint8_t rxdcSymbolTimeout(uint32_t rx_us, uint8_t sf, float bw_khz, uint8_t preamble) {
+  constexpr uint8_t timeout = 96;
+  const float sync = sf <= 6 ? 6.25f : 4.25f;
+  const float window_symbols = rx_us / rxdcSymbolUs(sf, bw_khz);
+  return window_symbols + preamble + sync + RXDC_HEADER_SYMBOLS + RXDC_SLACK_SYMBOLS <= timeout
+             ? timeout : 0;
+}

@@ -151,5 +151,22 @@ int main() {
   e.setPowerSaving(true);
   CHECK(e.loop(r, t + 60) & RXDC_RESTART);
   CHECK(e.start(r, t + 61) == 0);
+  CHECK(e.loop(r, t + 62) & RXDC_FRESH_FLOOR);
+  CHECK(e.start(r, t + 63) == RXDC_PASS);
+  e.floorDone(t + 64);
+  CHECK(e.loop(r, t + 65) & RXDC_RESTART);
+  CHECK(e.start(r, t + 66) == 0);
+  // A timeout setting change schedules the stop and re-arm on the radio loop.
+  stops = r.stops;
+  arms = r.arms;
+  e.requestRearm();
+  CHECK(r.stops == stops && r.arms == arms && e.busyHold());
+  CHECK(e.loop(r, t + 72) & RXDC_RESTART);
+  CHECK(e.start(r, t + 73) == 0 && r.stops == stops + 1 && r.arms == arms + 1);
+  e.setPowerSaving(false);
+  e.loop(r, t + 74);
+  CHECK(e.start(r, t + 75) == RXDC_PASS);
+  e.requestRearm();
+  CHECK(e.loop(r, t + 76) == 0 && !e.busyHold());
   DONE();
 }
