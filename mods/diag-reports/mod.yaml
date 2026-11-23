@@ -12,6 +12,7 @@ integration:
   header: helpers/diag_reports/DiagReportsIntegration.h
   hooks:
     loop: diagReportsLoop
+    sleep_busy: diagReportsSleepBusy
     recv: diagReportsRecv
     agc_reset: diagReportsAgcReset
     cli:

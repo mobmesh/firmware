@@ -278,6 +278,8 @@ def render_mod_hooks(integrations: list) -> str:
            for item in integrations if "tx" in item["hooks"]]
     wants = [item["hooks"]["wants_power_saving"]["symbol"]
              for item in integrations if "wants_power_saving" in item["hooks"]]
+    sleep_busy = [item["hooks"]["sleep_busy"]["symbol"]
+                  for item in integrations if "sleep_busy" in item["hooks"]]
     loads = [item["hooks"]["load_allowed"]["symbol"]
              for item in integrations if "load_allowed" in item["hooks"]]
     sleeps = [item["hooks"]["before_deep_sleep"]["symbol"]
@@ -316,6 +318,7 @@ def render_mod_hooks(integrations: list) -> str:
         + "\n}"
         if txs else "void modObserveTx(uint32_t, bool) {}"
     )
+    sleep_busy_expr = " || ".join(f"{symbol}()" for symbol in sleep_busy) or "false"
     wants_expr = " || ".join(f"{symbol}()" for symbol in wants) or "false"
     load_expr = " && ".join(f"{symbol}()" for symbol in loads) or "true"
     region_load_skip_expr = " || ".join(f"{symbol}(line)" for symbol in region_load_skips) or "false"
@@ -370,6 +373,10 @@ bool modWantsPowerSaving() {{
   return {wants_expr};
 }}
 
+bool modSleepBusy() {{
+  return {sleep_busy_expr};
+}}
+
 bool modLoadAllowed() {{
   return {load_expr};
 }}
@@ -416,7 +423,7 @@ extern RADIO_CLASS radio;
 
 bool  modRadioScanAvailable()          {{ return true; }}
 void  modRadioScanEnter(float bw_khz) {{
-  radio.standby();
+  radio_driver.idle();
   radio.setBandwidth(bw_khz);
 }}
 void  modRadioScanCalibrate(float mhz) {{ radio.calibrateImage(mhz); }}
@@ -433,7 +440,7 @@ float modRadioScanRead(float mhz) {{
   return sum / 16;
 }}
 void  modRadioScanLeave(float freq, float bw, uint8_t sf, uint8_t cr) {{
-  radio.standby();
+  radio_driver.idle();
   radio_driver.setParams(freq, bw, sf, cr);
   radio_driver.resetAGC();
 }}

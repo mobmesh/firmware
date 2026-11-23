@@ -70,6 +70,10 @@ bool modWantsPowerSaving() {
   return powerGuardWantsPowerSaving();
 }
 
+bool modSleepBusy() {
+  return false;
+}
+
 bool modLoadAllowed() {
   return powerGuardLoadAllowed();
 }
@@ -117,7 +121,7 @@ extern RADIO_CLASS radio;
 
 bool  modRadioScanAvailable()          { return true; }
 void  modRadioScanEnter(float bw_khz) {
-  radio.standby();
+  radio_driver.idle();
   radio.setBandwidth(bw_khz);
 }
 void  modRadioScanCalibrate(float mhz) { radio.calibrateImage(mhz); }
@@ -134,7 +138,7 @@ float modRadioScanRead(float mhz) {
   return sum / 16;
 }
 void  modRadioScanLeave(float freq, float bw, uint8_t sf, uint8_t cr) {
-  radio.standby();
+  radio_driver.idle();
   radio_driver.setParams(freq, bw, sf, cr);
   radio_driver.resetAGC();
 }

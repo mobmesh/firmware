@@ -22,6 +22,7 @@ struct ModCliContext {
 
 bool modRadioInit(const char* build_id);   // wraps upstream's radio_init()
 void modLoop();                            // called first in loop()
+bool modSleepBusy();                       // a mod job needs the main loop awake
 bool modWantsPowerSaving();                // OR'd with the operator's powersaving_enabled
 bool modPowerSavingOn();                   // the operator's powersaving_enabled OR modWantsPowerSaving()
 void modRxPacketRead(float rssi, float snr);  // a packet was just read: its RSSI and SNR, before receive restarts

@@ -270,7 +270,7 @@ index d475b13d..00a9f574 100644
    external_watchdog.loop();
  #endif
 -  if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
-+  if ((the_mesh.getNodePrefs()->powersaving_enabled || modWantsPowerSaving()) && !the_mesh.hasPendingWork() && !modDirectEvent(MOD_DIRECT_BUSY, nullptr, 0) && !modRxMode(MOD_RX_BUSY, nullptr)) {
++  if ((the_mesh.getNodePrefs()->powersaving_enabled || modWantsPowerSaving()) && !the_mesh.hasPendingWork() && !modDirectEvent(MOD_DIRECT_BUSY, nullptr, 0) && !modRxMode(MOD_RX_BUSY, nullptr) && !modSleepBusy()) {
  #if defined(NRF52_PLATFORM)
      board.sleep(0); // nrf ignores seconds param, sleeps whenever possible
  #else
@@ -754,3 +754,20 @@ index e4d2ba1c..63b49daf 100644
  }
  
  // Approximate SNR threshold per SF for successful reception (based on Semtech datasheets)
+diff --git a/src/helpers/radiolib/RadioLibWrappers.h b/src/helpers/radiolib/RadioLibWrappers.h
+--- a/src/helpers/radiolib/RadioLibWrappers.h
++++ b/src/helpers/radiolib/RadioLibWrappers.h
+@@ -22,7 +22,6 @@
+   int32_t _floor_sample_sum;
+   uint8_t _preamble_sf;
+
+-  void idle();
+   void startRecv();
+   float packetScoreInt(float snr, int sf, int packet_len);
+   virtual bool isReceivingPacket() =0;
+@@ -34,4 +33,5 @@
+   void begin() override;
++  void idle();
+   virtual void powerOff() { _radio->sleep(); }
+   int recvRaw(uint8_t* bytes, int sz) override;
+   uint32_t getEstAirtimeFor(int len_bytes) override;

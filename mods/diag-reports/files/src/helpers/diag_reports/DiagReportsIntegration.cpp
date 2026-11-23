@@ -1382,6 +1382,10 @@ static void boot() {
   free(saved);
 }
 
+bool diagReportsSleepBusy() {
+  return scan_state != SCAN_IDLE;
+}
+
 void diagReportsLoop() {
   if (!booted) boot();
   uint32_t now = millis();

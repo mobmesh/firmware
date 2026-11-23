@@ -51,6 +51,7 @@ class IntegrationPhase(str, Enum):
     RECV = "recv"
     TX = "tx"
     WANTS_POWER_SAVING = "wants_power_saving"
+    SLEEP_BUSY = "sleep_busy"
     LOAD_ALLOWED = "load_allowed"
     BEFORE_DEEP_SLEEP = "before_deep_sleep"
     AGC_RESET = "agc_reset"

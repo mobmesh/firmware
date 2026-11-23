@@ -192,7 +192,7 @@ diag radio.rfscan
 
 Or `ERR: rfscan needs an SX126x radio`, `ERR: radio busy, try again`, `ERR: radio settings unavailable`.
 
-**Method:** floor from 26 readings 1 MHz apart (25th percentile); 6 sweeps of 33 steps, 250 kHz apart, in two runs of three with 1.5 s back on the mesh between them. Each run is off channel for about 1.3 s; the node keeps running between them. Never transmits, leaves the LNA as it is. A steady signal beside the channel (within 1 MHz), 10 dB over the floor and 6 dB over the channel itself, is kept as a possible receiver blocker.
+**Method:** floor from 26 readings 1 MHz apart (25th percentile); 6 sweeps of 33 steps, 250 kHz apart, in two runs of three with 1.5 s back on the mesh between them. Each run is off channel for about 1.3 s. The CPU stays awake until the scan finishes or times out. If RXDC is active, each run stops it before retuning and restores normal receive on the mesh channel afterward. The scan leaves the LNA setting alone and sends no probe packets. A steady signal beside the channel (within 1 MHz), 10 dB over the floor and 6 dB over the channel itself, is kept as a possible receiver blocker.
 
 Energy on the channel is reported as where it peaks: `on our freq, <n> dB` when it sits exactly on the mesh frequency, or `<offset>k off ours, <n> dB` when it peaks a measured half-bandwidth step away; the diag fix states the same (`confirmed on 910.525 MHz, 18 dB over the floor.`).
 
