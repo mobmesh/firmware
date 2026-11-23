@@ -230,7 +230,7 @@ static uint8_t lnaSettled() {
 
 static bool readFloor(int8_t* out_dbm) {
   float rssi;
-  if (!modRadioRssiNow(&rssi)) return false;
+  if (!coreRadioRssiNow(&rssi)) return false;
   if (rssi < -127) rssi = -127;
   if (rssi > 0) rssi = 0;
   *out_dbm = (int8_t)lroundf(rssi);
@@ -626,7 +626,7 @@ static SchedConditions conditions(bool for_scan) {
   c.auto_off = store.auto_off;
   c.paused = paused;
   float rssi;
-  c.packet_arriving = !modRadioRssiNow(&rssi);
+  c.packet_arriving = !coreRadioRssiNow(&rssi);
   c.batt_mv = batt_zeros < BATT_ABSENT_READS ? modBoardBattMilliVolts() : 0;
   c.load_pct = lastHourLoad();
   c.scan_age_s = have_scan ? (millis() - scan_ms) / 1000 : 0xFFFFFFFF;
@@ -790,17 +790,17 @@ static void battTick(uint32_t now_ms) {
 
 static void scanChunk(int first_sweep) {
   in_scan = true;
-  modRadioScanEnter(scan.bw_khz);
+  coreRadioScanEnter(scan.bw_khz);
   if (first_sweep == 0) {
     modRadioScanCalibrate(scanBandFreq(scan_ch.freq, SCAN_BAND_STEPS / 2));
-    for (int b = 0; b < SCAN_BAND_STEPS; b++) scan.band[b] = scanPack(modRadioScanRead(scanBandFreq(scan_ch.freq, b)));
+    for (int b = 0; b < SCAN_BAND_STEPS; b++) scan.band[b] = scanPack(coreRadioScanRead(scanBandFreq(scan_ch.freq, b)));
   }
   modRadioScanCalibrate(scan_ch.freq);
   for (int sw = first_sweep; sw < first_sweep + SCAN_SWEEPS / 2; sw++) {
-    for (int b = 0; b < scan.steps; b++) scan.raw[sw][b] = scanPack(modRadioScanRead(scanStepFreq(scan, b)));
+    for (int b = 0; b < scan.steps; b++) scan.raw[sw][b] = scanPack(coreRadioScanRead(scanStepFreq(scan, b)));
     scan.sweeps = (uint8_t)(sw + 1);
   }
-  modRadioScanLeave(scan_ch.freq, scan_ch.bw, scan_ch.sf, scan_ch.cr);
+  coreRadioScanLeave(scan_ch.freq, scan_ch.bw, scan_ch.sf, scan_ch.cr);
   in_scan = false;
   skip_samples = AFTER_SCAN_SKIP;
 }
@@ -871,7 +871,7 @@ static void scanTick(uint32_t now_ms) {
     case SCAN_WAIT_A:
     case SCAN_WAIT_B:
       // Never leave the channel mid-packet; give up when the channel never goes quiet.
-      if (!modRadioRssiNow(&rssi)) {
+      if (!coreRadioRssiNow(&rssi)) {
         if (now_ms - scan_job_ms > SCAN_START_WAIT_MS) {
           if (scan_for != FOR_T1) lateLine(scan_target, "ERR: radio busy, try again");
           scan_state = SCAN_IDLE;

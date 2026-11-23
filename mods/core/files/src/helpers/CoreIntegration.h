@@ -18,3 +18,8 @@ bool coreTzCli(char* command, char* reply);
 
 const ModBindings* modBindings();
 uint32_t modCliStamp(uint32_t sender_timestamp);
+
+bool coreRadioRssiNow(float* out);
+void coreRadioScanEnter(float bw);
+float coreRadioScanRead(float mhz);
+void coreRadioScanLeave(float freq, float bw, uint8_t sf, uint8_t cr);

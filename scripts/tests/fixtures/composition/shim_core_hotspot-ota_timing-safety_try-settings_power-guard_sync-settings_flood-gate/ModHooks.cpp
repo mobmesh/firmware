@@ -95,20 +95,8 @@ void     modBoardInhibitSleep(bool inhibit) { (void)inhibit; }
 #endif
 uint32_t modClockGet()                     { return rtc_clock.getCurrentTime(); }
 uint32_t modAirtimeFor(int len)            { return radio_driver.getEstAirtimeFor(len); }
-bool     modRadioRssiNow(float* out) {
-  uint32_t asked = millis();
-  while (modRxMode(MOD_RX_PAUSE, nullptr) == 1) {   // a duty-cycled receiver opens a settled continuous window first
-    if (millis() - asked > 250) {
-      modRxMode(MOD_RX_RESUME, nullptr);
-      return false;
-    }
-    delay(2);
-  }
-  bool ok = !radio_driver.isReceiving();
-  if (ok) *out = radio_driver.getCurrentRSSI();
-  modRxMode(MOD_RX_RESUME, nullptr);
-  return ok;
-}
+bool     modRadioIsReceiving()            { return radio_driver.isReceiving(); }
+float    modRadioCurrentRssi()            { return radio_driver.getCurrentRSSI(); }
 void     modBeforeAgcReset() {
 }
 void     modRadioCounters(uint32_t* recv, uint32_t* errors) {
@@ -120,38 +108,32 @@ void     modRadioCounters(uint32_t* recv, uint32_t* errors) {
 extern RADIO_CLASS radio;
 
 bool  modRadioScanAvailable()          { return true; }
-void  modRadioScanEnter(float bw_khz) {
-  radio_driver.idle();
-  radio.setBandwidth(bw_khz);
-}
+void  modRadioIdle()                   { radio_driver.idle(); }
+void  modRadioSetScanBandwidth(float bw) { radio.setBandwidth(bw); }
 void  modRadioScanCalibrate(float mhz) { radio.calibrateImage(mhz); }
-float modRadioScanRead(float mhz) {
-  radio.standby();
-  radio.setFrequency(mhz, true);
-  radio.startReceive();
-  delayMicroseconds(5000);
-  float sum = 0;
-  for (int i = 0; i < 16; i++) {
-    sum += radio.getRSSI(false);
-    delayMicroseconds(100);
-  }
-  return sum / 16;
-}
-void  modRadioScanLeave(float freq, float bw, uint8_t sf, uint8_t cr) {
-  radio_driver.idle();
+void  modRadioRawStandby()             { radio.standby(); }
+void  modRadioRawTune(float mhz)        { radio.setFrequency(mhz, true); }
+void  modRadioRawStartReceive()         { radio.startReceive(); }
+float modRadioRawRssi()                 { return radio.getRSSI(false); }
+void  modRadioSetParams(float freq, float bw, uint8_t sf, uint8_t cr) {
   radio_driver.setParams(freq, bw, sf, cr);
-  radio_driver.resetAGC();
 }
+void  modRadioResetAgc()                { radio_driver.resetAGC(); }
 bool  modRadioGuardRead(uint8_t* guard, uint8_t state[2]) {
   return radio.readRegister(0x08B5, guard, 1) == RADIOLIB_ERR_NONE && radio.readRegister(0x08BF, state, 2) == RADIOLIB_ERR_NONE;
 }
 uint16_t modRadioIrqPeek()               { return (uint16_t)radio.getIrqFlags(); }
 #else
 bool  modRadioScanAvailable()          { return false; }
-void  modRadioScanEnter(float)         { }
-void  modRadioScanCalibrate(float)     { }
-float modRadioScanRead(float)          { return 0; }
-void  modRadioScanLeave(float, float, uint8_t, uint8_t) { }
+void  modRadioIdle()                    { }
+void  modRadioSetScanBandwidth(float)   { }
+void  modRadioScanCalibrate(float)      { }
+void  modRadioRawStandby()              { }
+void  modRadioRawTune(float)            { }
+void  modRadioRawStartReceive()         { }
+float modRadioRawRssi()                 { return 0; }
+void  modRadioSetParams(float, float, uint8_t, uint8_t) { }
+void  modRadioResetAgc()                { }
 bool  modRadioGuardRead(uint8_t*, uint8_t*) { return false; }
 uint16_t modRadioIrqPeek()               { return 0; }
 #endif
