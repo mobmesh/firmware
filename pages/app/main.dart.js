@@ -225623,8 +225623,8 @@ q=this.c
 if(s===a){s=A.d2(8)
 $.cM()
 return A.du(!1,B.z,!0,s,A.cR(o,A.x(r,o,o,o,o,o,o,o,q.d9(B.h),o,o,o),B.p,o,o,o,o,o,o,o,new A.as(4,0,4,0),o,o,o),B.p,B.r2,1,o,o,o,o,o,B.ad)}else{s=A.d2(8)
-p=B.mmMention
-return A.du(!1,B.z,!0,s,A.cR(o,A.x(r,o,o,o,o,o,o,o,q.dE(B.mmTeal),o,o,o),B.p,o,o,o,o,o,o,o,new A.as(4,0,4,0),o,o,o),B.p,p,0,o,o,o,o,o,B.ad)}}},
+p=A.bj(200,B.h.F()>>>16&255,B.h.F()>>>8&255,B.h.F()&255)
+return A.du(!1,B.z,!0,s,A.cR(o,A.x(r,o,o,o,o,o,o,o,q,o,o,o),B.p,o,o,o,o,o,o,o,new A.as(4,0,4,0),o,o,o),B.p,p,0,o,o,o,o,o,B.ad)}}},
 $imt:1}
 A.adC.prototype={
 D(a){var s,r=this,q=null,p=A.d2(25),o=A.d2(25),n=r.c.length>2?new A.as(4,2,4,2):new A.as(2,2,2,2),m=r.e
@@ -245566,7 +245566,6 @@ B.mmRxBubble=new A.M(1,0.054901960784313725,0.12156862745098039,0.2,B.j)
 B.mmLine=new A.M(1,0.13333333333333333,0.22745098039215686,0.34509803921568627,B.j)
 B.mmInk=new A.M(1,0.9098039215686274,0.9411764705882353,0.9725490196078431,B.j)
 B.mmMuted=new A.M(1,0.6196078431372549,0.7098039215686275,0.807843137254902,B.j)
-B.mmMention=new A.M(0.16,0.17647058823529413,0.8196078431372549,0.7411764705882353,B.j)
 B.mmTeal=new A.M(1,0.17647058823529413,0.8196078431372549,0.7411764705882353,B.j)
 B.a03=new A.WM(B.t,!0,null,null)
 B.yF=new A.WS(0,"none")
