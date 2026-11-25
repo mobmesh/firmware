@@ -1,0 +1,33 @@
+/* MobMesh settings page shown over the app; colours follow the app skin. */
+@font-face{font-family:Inter;src:url(assets/fonts/Inter-var.ttf) format('truetype');font-weight:100 900}
+:root{--bg:#061320;--card:#0E1F33;--line:#223A58;--ink:#E8F0F8;--meta:#9EB5CE;--teal:#2DD1BD;--danger:#E8637A;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 Inter,system-ui,sans-serif}
+.bar{position:sticky;top:0;display:flex;align-items:center;gap:12px;height:56px;padding:0 8px;background:#0b1b2e;border-bottom:1px solid var(--line);z-index:1}
+.bar h1{margin:0;font-size:20px;font-weight:500}
+.icon{width:40px;height:40px;border:0;border-radius:50%;background:none;color:var(--ink);cursor:pointer;display:grid;place-items:center}
+.icon:hover{background:#ffffff14}
+.icon svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+main{max-width:760px;margin:0 auto;padding:12px 12px 32px}
+.state{color:var(--meta);margin:8px 4px}
+.state.error{color:var(--danger)}
+.field{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0}
+.head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.label{font-weight:600;flex:1;min-width:120px}
+.hint{color:var(--meta);font-size:13px;margin-top:2px}
+.reply{margin:8px 0 0;padding:8px 10px;background:#06132080;border-radius:8px;color:var(--ink);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
+.reply:empty{display:none}
+.reply.wait{color:var(--meta)}
+.inputs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+input{flex:1;min-width:140px;height:38px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:#061320;color:var(--ink);font:inherit}
+input:focus{outline:2px solid var(--teal);outline-offset:-1px}
+button.act{height:36px;padding:0 14px;border:1px solid var(--teal);border-radius:18px;background:none;color:var(--teal);font:inherit;font-weight:600;cursor:pointer}
+button.act.fill{background:var(--teal);color:#03201C}
+button.act.danger{border-color:var(--danger);color:var(--danger)}
+button.act:disabled{border-color:var(--line);background:none;color:#5d7390;cursor:default}
+select{height:38px;padding:0 8px;border:1px solid var(--line);border-radius:8px;background:#061320;color:var(--ink);font:inherit}
+input:disabled,select:disabled{opacity:.45}
+.preview{flex:1;min-width:200px;align-self:center;padding:8px 10px;border-radius:8px;background:#06132080;color:var(--teal);font:13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all}
+.reply.proposed{border:1px dashed var(--line);color:var(--meta)}
+.icon.refresh{width:36px;height:36px;color:var(--teal)}
+.icon.refresh:disabled{color:#5d7390;cursor:default}

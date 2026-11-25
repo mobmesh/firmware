@@ -6,6 +6,8 @@ const FONTS = 'mm-fonts';
 const scope = new URL(self.registration.scope);
 // The full CanvasKit build, which the skin makes every browser load, so one copy serves all.
 const CANVASKIT = ['canvaskit/canvaskit.js', 'canvaskit/canvaskit.wasm'];
+// Console modules the settings page imports sit outside the app's folder; they are precached and served like app files.
+const SHARED = new Set(FILES.filter(f => f.startsWith('../')).map(f => new URL(f, scope).href));
 
 self.addEventListener('install', event => {
   const urls = ['./', ...FILES, ...CANVASKIT].map(f => new Request(new URL(f, scope), { cache: 'reload' }));
@@ -35,9 +37,10 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   // Fallback fonts Flutter downloads for emoji and other scripts are kept across versions.
   if (url.origin === 'https://fonts.gstatic.com') { event.respondWith(fromCache(FONTS, request)); return; }
-  if (!url.href.startsWith(scope.href)) return;
+  if (!url.href.startsWith(scope.href) && !SHARED.has(url.origin + url.pathname)) return;
   if (request.mode === 'navigate') {
-    event.respondWith(caches.open(CACHE).then(cache => cache.match(scope.href)).then(hit => hit || fetch(request)));
+    // A page of its own (the settings page) loads itself; every other app route loads the app.
+    event.respondWith(caches.open(CACHE).then(async cache => await cache.match(request, { ignoreSearch: true }) || await cache.match(scope.href)).then(hit => hit || fetch(request)));
     return;
   }
   event.respondWith(fromCache(CACHE, request));

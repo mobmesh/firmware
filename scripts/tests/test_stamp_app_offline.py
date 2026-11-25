@@ -47,6 +47,35 @@ class Stamp(unittest.TestCase):
             stamper.stamp(root)
             self.assertNotEqual(stamped(root)[0], first)
 
+    def test_modules_imported_from_outside_the_app_are_precached_and_versioned(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pages = Path(tmp)
+            root = pages / 'app'
+            root.mkdir()
+            make_app(root)
+            (pages / 'console/src').mkdir(parents=True)
+            (root / 'mm-page.js').write_text("import {a} from '../console/src/a.js';\n")
+            (root / 'index.html').write_text('<script type="module">import {bg} from "../console/src/bg.js";</script>')
+            (pages / 'console/src/bg.js').write_text('export const bg = 1;\n')
+            (pages / 'console/src/a.js').write_text("export {b} from './b.js';\nimport('./lazy.js');\n")
+            (pages / 'console/src/b.js').write_text('export const b = 1;\n')
+            (pages / 'console/src/lazy.js').write_text('export default 1;\n')
+            stamper.stamp(root)
+            first, files = stamped(root)
+            self.assertEqual([f for f in files if f.startswith('../')], ['../console/src/a.js', '../console/src/b.js', '../console/src/bg.js', '../console/src/lazy.js'])
+            (pages / 'console/src/b.js').write_text('export const b = 2;\n')
+            stamper.stamp(root)
+            self.assertNotEqual(stamped(root)[0], first, 'a shared module change is a new offline version')
+
+    def test_missing_imported_module_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'app'
+            root.mkdir()
+            make_app(root)
+            (root / 'mm-page.js').write_text("import {a} from '../console/src/gone.js';\n")
+            with self.assertRaises(SystemExit):
+                stamper.stamp(root)
+
     def test_worker_without_stamp_lines_is_refused(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
