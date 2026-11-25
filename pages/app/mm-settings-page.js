@@ -38,9 +38,13 @@ const GROUPS={
   updates:{title:'Updates',fields:[
     {label:'Regions',mod:'sync-settings',regions:true,hint:'Replace the region list with the current one for this repeater\u2019s zone.'},
     {label:'Wi-Fi',ota:true,mod:'hotspot-ota',hint:'Network for updates. The saved name is not shown; a blank password saves an open network.',wifi:true},
-    {label:'Auto updates',ota:true,mod:'hotspot-ota',get:'get ota.wan.auto',toggle:v=>'set ota.wan.auto '+v,hint:'Turning on needs a passed Verify.'},
-    {label:'Verify',ota:true,mod:'hotspot-ota',hint:'Checks internet and time over Wi-Fi; run again for the result.',run:'ota wan verify'},
-    {label:'Update now',ota:true,mod:'hotspot-ota',hint:'Download and install the newest firmware over Wi-Fi.',run:'start ota wan update',confirm:'Start a firmware update on this repeater now?'},
+    {label:'Verify',ota:true,mod:'hotspot-ota',get:'get ota.wan.health',after:['Verify','Wi-Fi set'],hint:'Checks that the repeater can reach the internet and get the time over Wi-Fi.',run:'ota wan verify'},
+    {label:'OTA slots',ota:true,mod:'hotspot-ota',get:'get ota.slot',readFirst:true,hint:'The two firmware slots: which runs, and whether the other still holds a good image.',choices:[
+      ['Boot A','ota slot boot A',null,t=>/A=[^|]*standby/.test(t),'Reboot this repeater into slot A?'],
+      ['Boot B','ota slot boot B',null,t=>/B=[^|]*standby/.test(t),'Reboot this repeater into slot B?'],
+      ['Confirm','ota slot confirm',null,t=>/active, pending/.test(t),'Keep the running firmware and end its probation now?']]},
+    {label:'Auto updates',ota:true,mod:'hotspot-ota',get:'get ota.wan.auto',readFirst:true,choices:[['On','set ota.wan.auto on'],['Off','set ota.wan.auto off']],hint:'Turning on needs a passed Verify.'},
+    {label:'Update now',ota:true,mod:'hotspot-ota',refreshOf:'Verify',status:'get ota.status',after:'Verify',statusAfterRun:true,doneWhen:/^\s*>?\s*OK/,hint:'Download and install the newest firmware over Wi-Fi.',run:'start ota wan update',confirm:'Start a firmware update on this repeater now?'},
     {label:'Local upload',ota:true,mod:'hotspot-ota',hint:'Open the repeater’s own Wi-Fi for a nearby upload.',run:'start ota',confirm:'Open the local upload access point on this repeater?'}]},
   radio:{title:'Radio & Power',fields:[
     {label:'Try radio settings',get:'get radio',tryradio:true,mod:'try-settings',hint:'Applied for the minutes given, then reverts unless you press Keep.'},
@@ -61,9 +65,14 @@ $('title').textContent='MobMesh · '+group.title;
 $('back').onclick=()=>parent.mmSettingsClose?.();
 
 let probe=null,key=null,busy=false,target=null,mods=null;
+// Reads (by card label) and events such as 'Wi-Fi set' seen this visit; a card's after: names what must happen first.
+const readDone=new Set();
+// Built cards by label, so one card's glyph can stand in for another's.
+const cardsByLabel=new Map();
 const buttons=new Set();
 const state=(text,error=false)=>{$('state').textContent=text;$('state').classList.toggle('error',error);$('state').hidden=!text;};
-const refresh=()=>{for(const b of buttons)b.disabled=busy||b.blocked?.();};
+// A gated button (gate) is hidden, not greyed, until its gate opens.
+const refresh=()=>{for(const b of buttons){b.disabled=busy||b.blocked?.();if(b.gate)b.hidden=!b.gate();}};
 const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
 const button=(text,onclick,cls='act',blocked=null)=>{const b=el('button',cls,text);b.type='button';b.onclick=onclick;b.blocked=()=>b.off||!!blocked?.();buttons.add(b);return b;};
 
@@ -285,17 +294,28 @@ function sinkhole(box,head,out){
 
 function field(f){
   const box=el('section','field'),head=el('div','head'),out=el('pre','reply'),before=new Set(buttons);
+  box.dataset.label=f.label;
   head.append(el('span','label',f.label));box.append(head);
   if(f.hint)box.append(el('div','hint',f.hint));
   // A run of several commands (clear diag, then its confirm) stops at the first that fails.
   // Values are read only on request, as elsewhere in the app: the refresh glyph reads this card's current value.
-  if(f.get&&!f.sinkhole){const r=button('',()=>card.load(),'icon refresh');r.title='Get current value';r.setAttribute('aria-label','Get current value');r.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>';head.append(r);}
-  if(f.run)head.append(button(f.runLabel||'Run',async()=>{if(f.confirm&&!confirm(f.confirm))return;for(const c of [].concat(f.run)){const text=await send(c,out);if(text===null||/err|unknown/i.test(text))break;}},f.confirm?'act danger':'act'));
+  if((f.get&&!f.sinkhole)||f.refreshOf){const r=button('',()=>f.refreshOf?cardsByLabel.get(f.refreshOf)?.load():card.load(),'icon refresh');r.title='Get current value';r.setAttribute('aria-label','Get current value');r.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>';head.append(r);}
+  // Over LoRa a command can need several presses; Run stays available until a reply matching doneWhen arrives, then locks for this visit.
+  if(f.run){const run=button(f.runLabel||'Run',async()=>{
+    if(f.confirm&&!confirm(f.confirm))return;
+    box.classList.remove('attention');if(status)status.hidden=false;refresh();
+    for(const c of [].concat(f.run)){const text=await send(c,out);if(f.doneWhen&&text&&f.doneWhen.test(text)){run.off=true;refresh();}if(text===null||/err|unknown/i.test(text))break;}
+  },f.confirm?'act danger':'act');if(f.after)run.gate=()=>[].concat(f.after).some(a=>readDone.has(a));head.append(run);}
+  // A status read beside an action, such as an update's progress.
+  // statusAfterRun keeps Status hidden until Run has been pressed once.
+  const status=f.status?button('Status',()=>send(f.status,out)):null;
+  if(status){status.hidden=!!f.statusAfterRun;head.append(status);}
   if(f.toggle)head.append(button('On',()=>send(f.toggle('on'),out)),button('Off',()=>send(f.toggle('off'),out)));
   // A choice tied to a mod is left out where the board's release build lacks that mod.
   // readFirst cards keep their choices hidden until the current value has been read.
   const choices=[];
-  if(f.choices)for(const [text,command,mod] of f.choices)if(!mod||!mods||mods.has(mod)){const b=button(text,()=>send(command,out));b.hidden=!!f.readFirst;choices.push(b);head.append(b);}
+  // A choice may carry a condition on the last read (shown only when it holds) and a confirmation question.
+  if(f.choices)for(const [text,command,mod,when,ask] of f.choices)if(!mod||!mods||mods.has(mod)){const b=button(text,()=>{if(ask&&!confirm(ask))return;send(command,out);},ask?'act danger':'act');b.hidden=!!f.readFirst;b.when=when;choices.push(b);head.append(b);}
   if(f.minutes){
     const input=el('input');input.placeholder=f.minutes.placeholder;input.inputMode='numeric';
     const ok=()=>/^\d+$/.test(input.value.trim())&&+input.value>=1&&+input.value<=1440;
@@ -321,7 +341,18 @@ function field(f){
       if(s.includes(','))out.textContent='The network name cannot contain a comma.';
       else if(bytes(s)>31)out.textContent='The network name is limited to 31 bytes.';
       else if(bytes(p)>63)out.textContent='The password is limited to 63 bytes.';
-      else if(await send('set ota.wan.wifi '+s+','+p,out)!==null)pass.value='';
+      else{
+        const text=await send('set ota.wan.wifi '+s+','+p,out);
+        // New credentials clear the proven Wi-Fi state, so Verify is flagged as the next step.
+        if(text!==null&&!/err/i.test(text)){
+          pass.value='';
+          // A completed set opens Verify's Run without a read first (Update now still waits for a Verify read).
+          readDone.add('Wi-Fi set');refresh();
+          out.textContent+='\n\nNext: run Verify below. Until it passes, Auto updates cannot be turned on.';
+          const verify=document.querySelector('.field[data-label="Verify"]');
+          if(verify){verify.classList.add('attention');verify.scrollIntoView({behavior:'smooth',block:'center'});}
+        }
+      }
       refresh();
     },'act fill',()=>!ssid.value);
     ssid.oninput=pass.oninput=refresh;const row=el('div','inputs');row.append(ssid,pass,set);box.append(row);
@@ -335,8 +366,9 @@ function field(f){
   const card={box,out,get:f.get,ota:!!f.ota,fill(text){
     if(radio){radio.fill(text);return;}
     const value=input&&text.match(/[-+]?\d+/);
+    readDone.add(f.label);refresh();
     if(inputRow)inputRow.hidden=false;
-    if(!/^\s*>?\s*err/i.test(text))for(const b of choices)b.hidden=false;
+    if(!/^\s*>?\s*err/i.test(text))for(const b of choices)b.hidden=!!(b.when&&!b.when(text));
     if(value){saved=String(+value[0]);input.value=saved;out.textContent='';refresh();}else out.textContent=text;
   },async load(){
     const text=await send(f.get,out);
@@ -344,6 +376,7 @@ function field(f){
     if(text&&UNKNOWN.test(text)){card.missing();return false;}
     return true;
   },missing(){for(const b of own)b.off=true;for(const i of box.querySelectorAll('input,select'))i.disabled=true;out.textContent='Not in this build.';refresh();}};
+  cardsByLabel.set(f.label,card);
   return card;
 }
 

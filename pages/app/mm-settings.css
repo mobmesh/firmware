@@ -32,3 +32,5 @@ input:disabled,select:disabled{opacity:.45}
 .icon.refresh{width:36px;height:36px;color:var(--teal)}
 .icon.refresh:disabled{color:#5d7390;cursor:default}
 [hidden]{display:none!important}
+.field.attention{border-color:var(--teal);box-shadow:0 0 0 2px #2dd1bd55}
+.field.attention .label::after{content:' \2190  next step';color:var(--teal);font-weight:500;font-size:13px}
