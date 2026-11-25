@@ -31,3 +31,4 @@ input:disabled,select:disabled{opacity:.45}
 .reply.proposed{border:1px dashed var(--line);color:var(--meta)}
 .icon.refresh{width:36px;height:36px;color:var(--teal)}
 .icon.refresh:disabled{color:#5d7390;cursor:default}
+[hidden]{display:none!important}

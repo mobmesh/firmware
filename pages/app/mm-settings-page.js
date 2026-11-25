@@ -18,6 +18,8 @@ function releaseMods(board,role){
   if(esp32)mods.add('hotspot-ota');
   if(role!=='room')for(const m of ['flood-gate','diag-reports'])mods.add(m);
   if(role!=='room'&&/^Heltec V4|^Heltec Tracker V2$/.test(board))mods.add('rx-duty-cycle');
+  // A switchable LNA (KCT8103L front end) is a board fact, not a mod.
+  if(/^Heltec V4|^Heltec Tracker V2$/.test(board))mods.add('lna');
   if(role!=='room'&&/^Heltec V4/.test(board))mods.add('power-guard');
   return mods;
 }
@@ -25,12 +27,13 @@ function releaseMods(board,role){
 // Each group: its title, the get that shows whether the build has it, and its fields.
 const GROUPS={
   diag:{title:'Diagnostics',probe:'get tz',missing:'This repeater is not running MobMesh firmware.',fields:[
-    {label:'Time zone',hint:'Whole hours from UTC, used for local report times.',get:'get tz',input:{placeholder:'e.g. -6',set:v=>'set tz '+v,check:v=>/^[+-]?\d{1,2}$/.test(v)&&+v>=-12&&+v<=14?'':'Whole hours, -12 to +14'}},
+    {label:'Time zone',hint:'Whole hours from UTC, used for local report times.',get:'get tz',input:{placeholder:'e.g. -5',set:v=>'set tz '+v,check:v=>/^[+-]?\d{1,2}$/.test(v)&&+v>=-12&&+v<=14?'':'Whole hours, -12 to +14'}},
     {label:'Summary',mod:'diag-reports',hint:'Links, LNA, interference, noise and battery.',run:'diag'},
     {label:'RF scan',mod:'diag-reports',hint:'Interference within 4 MHz of the mesh frequency; about 5 s.',run:'diag radio.rfscan'},
     {label:'Links',mod:'diag-reports',hint:'Signal margin for each heard neighbour.',run:'diag radio.links'},
     {label:'Noise',mod:'diag-reports',hint:'Noise floor and failed decodes, last 24 hours.',run:'diag radio.noise'},
     {label:'Battery',mod:'diag-reports',hint:'24 hours of battery history.',run:'diag batt'},
+    {label:'LNA study',mod:['diag-reports','lna'],hint:'Result of comparing the LNA on and off, or progress while a study runs.',lnastudy:true},
     {label:'Clear history',mod:'diag-reports',hint:'Erase every diagnostic history; the time zone is kept.',run:['clear diag','clear diag confirm'],runLabel:'Clear',confirm:'Clear every diagnostic history on this repeater? This cannot be undone.'}]},
   updates:{title:'Updates',fields:[
     {label:'Regions',mod:'sync-settings',regions:true,hint:'Replace the region list with the current one for this repeater\u2019s zone.'},
@@ -43,6 +46,7 @@ const GROUPS={
     {label:'RX duty cycle',mod:'rx-duty-cycle',get:'get radio.rxdc',choices:[['Auto','set radio.rxdc auto'],['Off','set radio.rxdc off']],hint:'Sleep the radio between listens while power saving runs.'},
     {label:'Preamble filter',mod:'rx-duty-cycle',get:'get radio.rxdc.timeout',choices:[['On','set radio.rxdc.timeout on'],['Off','set radio.rxdc.timeout off']],hint:'End a listen early after a false preamble.'},
     {label:'RX LNA duty cycle',mod:'rx-duty-cycle',get:'get radio.fem.rxdc',choices:[['Auto','set radio.fem.rxdc on'],['Off','set radio.fem.rxdc off']],hint:'Bypass the LNA while the radio sleeps.'},
+    {label:'RX gain (LNA)',mod:'lna',get:'get radio.fem.rxgain',choices:[['On','set radio.fem.rxgain on'],['Off','set radio.fem.rxgain off'],['Auto','set radio.fem.rxgain auto','diag-reports']],hint:'The receive amplifier; Auto learns on or off for each 2-hour block.'},
     {label:'Try radio settings',get:'get radio',tryradio:true,mod:'try-settings',hint:'Applied for the minutes given, then reverts unless you press Keep.'},
     {label:'Power saving',get:'powersaving',choices:[['On','powersaving on'],['Off','powersaving off'],['Auto','powersaving auto on','power-guard']]},
     {label:'Safe mode',mod:'power-guard',get:'powersaving safe',choices:[['On','powersaving safe on'],['Off','powersaving safe off']],hint:'Sleep on low battery until it recovers.'},
@@ -239,6 +243,24 @@ async function saveRegions(found,out,card){
   out.textContent='Saved zone '+found.label+', checked before saving.\n\nRegion tree:\n'+read.text;
 }
 
+// LNA study: Report first; its answer decides whether Stop (a study is running) or Start with a length is offered.
+function lnastudy(box,head,out){
+  const row=el('div','inputs'),hours=el('input');row.hidden=true;
+  hours.placeholder='Hours 6-168 (48 if blank)';hours.inputMode='numeric';
+  const ok=()=>{const v=hours.value.trim();return !v||(/^\d+$/.test(v)&&+v>=6&&+v<=168);};
+  const start=button('Start',async()=>{const v=hours.value.trim()||'48';if(!confirm('Start a '+v+'-hour LNA study? The LNA switches on and off in short blocks until it ends; the saved setting is not changed.'))return;if(await send('diag radio.lna start'+(hours.value.trim()?' '+v:''),out)!==null)row.hidden=true;},'act fill',()=>!ok());
+  const stop=button('Stop',async()=>{if(!confirm('Stop the LNA study? The LNA goes back to how it was before the study.'))return;if(await send('diag radio.lna stop',out)!==null)stop.hidden=true;},'act danger');stop.hidden=true;
+  hours.oninput=refresh;row.append(hours,start);
+  head.append(button('Report',async()=>{
+    row.hidden=stop.hidden=true;
+    const text=await send('diag radio.lna',out);
+    if(text===null||/^\s*ERR/i.test(text))return;
+    if(/Studying/i.test(text))stop.hidden=false;else row.hidden=false;
+    refresh();
+  }),stop);
+  box.append(row);
+}
+
 function sinkhole(box,head,out){
   const action=el('select'),inputs={};
   for(const [v,t] of [['add','Block'],['watch','Watch'],['remove','Remove']])action.append(new Option(t,v));
@@ -279,14 +301,15 @@ function field(f){
     input.oninput=refresh;const row=el('div','inputs');row.append(input,go);box.append(row);
   }
   // A value field opens with the repeater's current value; Set lights up only once it is changed.
-  let input=null,saved=null;
+  let input=null,saved=null,inputRow=null;
   if(f.input){
     input=el('input');input.placeholder=f.input.placeholder;input.inputMode='numeric';
     const set=button('Set',async()=>{
       const v=input.value.trim(),bad=f.input.check(v);if(bad){out.textContent=bad;return;}
       const text=await send(f.input.set(v),out);if(text!==null&&!/err|unknown|invalid/i.test(text))saved=v;refresh();
     },'act fill',()=>!input.value.trim()||input.value.trim()===saved);
-    input.oninput=refresh;const row=el('div','inputs');row.append(input,set);box.append(row);
+    // The field appears only once the current value has been read.
+    input.oninput=refresh;inputRow=el('div','inputs');inputRow.hidden=true;inputRow.append(input,set);box.append(inputRow);
   }
   if(f.wifi){
     const ssid=el('input'),pass=el('input');ssid.placeholder='Network name (SSID)';ssid.autocomplete='off';pass.placeholder='Password';pass.type='password';pass.autocomplete='new-password';
@@ -302,6 +325,7 @@ function field(f){
     ssid.oninput=pass.oninput=refresh;const row=el('div','inputs');row.append(ssid,pass,set);box.append(row);
   }
   if(f.sinkhole)sinkhole(box,head,out);
+  if(f.lnastudy)lnastudy(box,head,out);
   const radio=f.tryradio?tryradio(box,head,out):null,region=f.regions?regions(box,head,out):null;
   box.append(out);
   const own=[...buttons].filter(b=>!before.has(b));
@@ -309,6 +333,7 @@ function field(f){
   const card={box,out,get:f.get,ota:!!f.ota,fill(text){
     if(radio){radio.fill(text);return;}
     const value=input&&text.match(/[-+]?\d+/);
+    if(inputRow)inputRow.hidden=false;
     if(value){saved=String(+value[0]);input.value=saved;out.textContent='';refresh();}else out.textContent=text;
   },async load(){
     const text=await send(f.get,out);
@@ -346,7 +371,7 @@ async function check(){
   if(board==null){try{board=(await probe.cli(key,'board')).text.replace(/^\s*>\s*/,'').trim();parent.mmSettingsBoard?.set(key,board);}catch(e){failed('No reply from the repeater: '+e.message);return;}}
   mods=releaseMods(board,role);
   state('');
-  const built=group.fields.filter(f=>!mods||!f.mod||mods.has(f.mod)).map(field);
+  const built=group.fields.filter(f=>!mods||!f.mod||[].concat(f.mod).every(m=>mods.has(m))).map(field);
   $('fields').replaceChildren(...built.map(b=>b.box));refresh();
   if(!built.length)state('Nothing on this page applies to this repeater\u2019s build.');
 }
