@@ -36005,7 +36005,10 @@ bXs:function bXs(a,b){this.a=a
 this.b=b},
 bXr:function bXr(a,b){this.b=a
 this.c=b},
-Nk(a,b,c){if(b instanceof A.J2&&b.cy==null)b.cy=B.mmSolid
+Nk(a,b,c){if(b instanceof A.iX)b.mmSolid=!0
+if(b instanceof A.f9){const f=b.c;b.c={$1:x=>{const w=f.$1(x);if(w instanceof A.J2&&w.cy==null)w.cy=B.mmSolid
+return w}}}
+if(b instanceof A.J2&&b.cy==null)b.cy=B.mmSolid
 var s,r,q,p,o,n,m,l,k,j,i=null,h=A.d5r(a)
 h.toString
 h=A.dV(h,!1)
@@ -168623,7 +168626,7 @@ d=A.C(B.fy,h,h,h,h,h,h,h,h,h,h,h,h,h)
 c=A.c(a,B.b,g)
 e.push(A.bN(d,!1,c.ghc(c),h,h,new A.bNg(i),h,h))
 e.push(A.bN(A.C(B.ba,h,h,h,h,h,h,h,h,h,h,h,h,h),!1,A.c(a,B.b,g).glC(),h,h,new A.bNh(i),h,h))
-return new A.bK(A.bs(f,h,A.bf(!0,A.dw(A.ap(e,B.G,B.i,B.l,0),h,B.F),!0,B.o,!0,!0),h,h,h,h),h)}}
+return new A.bK(A.bs(f,this.a.mmSolid?B.mmSolid:h,A.bf(!0,A.dw(A.ap(e,B.G,B.i,B.l,0),h,B.F),!0,B.o,!0,!0),h,h,h,h),h)}}
 A.bNq.prototype={
 $1(a){var s,r,q,p
 if(a!=null){s={}
