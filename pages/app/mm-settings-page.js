@@ -43,12 +43,12 @@ const GROUPS={
     {label:'Update now',ota:true,mod:'hotspot-ota',hint:'Download and install the newest firmware over Wi-Fi.',run:'start ota wan update',confirm:'Start a firmware update on this repeater now?'},
     {label:'Local upload',ota:true,mod:'hotspot-ota',hint:'Open the repeater’s own Wi-Fi for a nearby upload.',run:'start ota',confirm:'Open the local upload access point on this repeater?'}]},
   radio:{title:'Radio & Power',fields:[
-    {label:'RX duty cycle',mod:'rx-duty-cycle',get:'get radio.rxdc',choices:[['Auto','set radio.rxdc auto'],['Off','set radio.rxdc off']],hint:'Sleep the radio between listens while power saving runs.'},
-    {label:'Preamble filter',mod:'rx-duty-cycle',get:'get radio.rxdc.timeout',choices:[['On','set radio.rxdc.timeout on'],['Off','set radio.rxdc.timeout off']],hint:'End a listen early after a false preamble.'},
-    {label:'RX LNA duty cycle',mod:'rx-duty-cycle',get:'get radio.fem.rxdc',choices:[['Auto','set radio.fem.rxdc on'],['Off','set radio.fem.rxdc off']],hint:'Bypass the LNA while the radio sleeps.'},
-    {label:'RX gain (LNA)',mod:'lna',get:'get radio.fem.rxgain',choices:[['On','set radio.fem.rxgain on'],['Off','set radio.fem.rxgain off'],['Auto','set radio.fem.rxgain auto','diag-reports']],hint:'The receive amplifier; Auto learns on or off for each 2-hour block.'},
     {label:'Try radio settings',get:'get radio',tryradio:true,mod:'try-settings',hint:'Applied for the minutes given, then reverts unless you press Keep.'},
     {label:'Power saving',get:'powersaving',choices:[['On','powersaving on'],['Off','powersaving off'],['Auto','powersaving auto on','power-guard']]},
+    {label:'RX duty cycle',mod:'rx-duty-cycle',readFirst:true,get:'get radio.rxdc',choices:[['Auto','set radio.rxdc auto'],['Off','set radio.rxdc off']],hint:'Sleep the radio between listens while power saving runs.'},
+    {label:'Preamble filter',mod:'rx-duty-cycle',readFirst:true,get:'get radio.rxdc.timeout',choices:[['On','set radio.rxdc.timeout on'],['Off','set radio.rxdc.timeout off']],hint:'End a listen early after a false preamble.'},
+    {label:'RX LNA duty cycle',mod:'rx-duty-cycle',readFirst:true,get:'get radio.fem.rxdc',choices:[['Auto','set radio.fem.rxdc on'],['Off','set radio.fem.rxdc off']],hint:'Bypass the LNA while the radio sleeps.'},
+    {label:'RX gain (LNA)',mod:'lna',readFirst:true,get:'get radio.fem.rxgain',choices:[['On','set radio.fem.rxgain on'],['Off','set radio.fem.rxgain off'],['Auto','set radio.fem.rxgain auto','diag-reports']],hint:'The receive amplifier; Auto learns on or off for each 2-hour block.'},
     {label:'Safe mode',mod:'power-guard',get:'powersaving safe',choices:[['On','powersaving safe on'],['Off','powersaving safe off']],hint:'Sleep on low battery until it recovers.'},
     {label:'Reboot',run:'reboot',runLabel:'Reboot',confirm:'Reboot this repeater now?'},
     {label:'Timed power off',mod:'power-guard',minutes:{placeholder:'Minutes, 1-1440',send:m=>'poweroff '+m*60,confirm:m=>'Power this repeater off for '+m+' minutes? It wakes by itself.'},hint:'Deep sleep for a while, then wake.'}]},
@@ -293,7 +293,9 @@ function field(f){
   if(f.run)head.append(button(f.runLabel||'Run',async()=>{if(f.confirm&&!confirm(f.confirm))return;for(const c of [].concat(f.run)){const text=await send(c,out);if(text===null||/err|unknown/i.test(text))break;}},f.confirm?'act danger':'act'));
   if(f.toggle)head.append(button('On',()=>send(f.toggle('on'),out)),button('Off',()=>send(f.toggle('off'),out)));
   // A choice tied to a mod is left out where the board's release build lacks that mod.
-  if(f.choices)for(const [text,command,mod] of f.choices)if(!mod||!mods||mods.has(mod))head.append(button(text,()=>send(command,out)));
+  // readFirst cards keep their choices hidden until the current value has been read.
+  const choices=[];
+  if(f.choices)for(const [text,command,mod] of f.choices)if(!mod||!mods||mods.has(mod)){const b=button(text,()=>send(command,out));b.hidden=!!f.readFirst;choices.push(b);head.append(b);}
   if(f.minutes){
     const input=el('input');input.placeholder=f.minutes.placeholder;input.inputMode='numeric';
     const ok=()=>/^\d+$/.test(input.value.trim())&&+input.value>=1&&+input.value<=1440;
@@ -329,17 +331,17 @@ function field(f){
   const radio=f.tryradio?tryradio(box,head,out):null,region=f.regions?regions(box,head,out):null;
   box.append(out);
   const own=[...buttons].filter(b=>!before.has(b));
-  // load runs the field's opening get, leaving Retry in its header after a timeout; missing keeps the card, says the build lacks it, and greys its buttons.
+  // load reads the card's current value (the refresh glyph reads again after a timeout); missing keeps the card, says the build lacks it, and greys its buttons.
   const card={box,out,get:f.get,ota:!!f.ota,fill(text){
     if(radio){radio.fill(text);return;}
     const value=input&&text.match(/[-+]?\d+/);
     if(inputRow)inputRow.hidden=false;
+    if(!/^\s*>?\s*err/i.test(text))for(const b of choices)b.hidden=false;
     if(value){saved=String(+value[0]);input.value=saved;out.textContent='';refresh();}else out.textContent=text;
   },async load(){
     const text=await send(f.get,out);
     if(text!==null&&!UNKNOWN.test(text))card.fill(text);
     if(text&&UNKNOWN.test(text)){card.missing();return false;}
-    if(text===null&&!head.querySelector('.retry')){const r=button('Retry',async()=>{r.remove();buttons.delete(r);await card.load();},'act retry');head.append(r);refresh();}
     return true;
   },missing(){for(const b of own)b.off=true;for(const i of box.querySelectorAll('input,select'))i.disabled=true;out.textContent='Not in this build.';refresh();}};
   return card;
