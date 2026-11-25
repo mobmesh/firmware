@@ -123,15 +123,15 @@ trace last
 
 Parameters, effect and errors as [`ping`](#ping).
 
-**Response:** a header line, then one numbered line per link, nearer node first, numbered as `tracert` numbers hops. The SNR in brackets after a node is how well that node heard the other end of the link, in dB; `me` is this repeater.
+**Response:** a header line, then one numbered line per link, numbered as `tracert` numbers hops. Each link shows the way out, then the way back; the SNR in brackets is how well the node at the arrowhead heard the signal, in dB. `me` is this repeater.
 
 ```
 Trace to 4ea1 over 2 hops, 1334ms:
-1  me   (+11.50) <-> c5fb (+11.50)
-2  c5fb (+11.75) <-> 4ea1 (+12.25)
+1  me→c5fb(+11.50) c5fb→me(+11.50)
+2  c5fb→4ea1(+12.25) 4ea1→c5fb(+11.75)
 ```
 
-A long trace that needs two replies ends the second with `Summary: time=<ms>ms hops=<n> weakest(<hash>)=<dB>`. No reply: `Trace to 4ea1 over 2 hops: no reply in 7s`.
+A long trace that needs more than one reply ends the last with `Summary: time=<ms>ms hops=<n> weakest(<hash>)=<dB>`. No reply: `Trace to 4ea1 over 2 hops: no reply in 7s`.
 
 ## tz
 
