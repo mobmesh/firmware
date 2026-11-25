@@ -28,6 +28,9 @@ jobs:
       - name: Stamp the console catalog with build history
         run: python3 scripts/console/catalog_lifespans.py | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Stamp the app's offline version
+        run: python3 scripts/stamp_app_offline.py | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Configure Pages
         uses: actions/configure-pages@v6
 

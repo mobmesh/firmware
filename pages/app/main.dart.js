@@ -36005,7 +36005,8 @@ bXs:function bXs(a,b){this.a=a
 this.b=b},
 bXr:function bXr(a,b){this.b=a
 this.c=b},
-Nk(a,b,c){var s,r,q,p,o,n,m,l,k,j,i=null,h=A.d5r(a)
+Nk(a,b,c){if(b instanceof A.J2&&b.cy==null)b.cy=B.mmSolid
+var s,r,q,p,o,n,m,l,k,j,i=null,h=A.d5r(a)
 h.toString
 h=A.dV(h,!1)
 s=$.dp().xr
@@ -172238,6 +172239,7 @@ p.push(new A.aT(A.C(B.bU,f,f,f,f,f,f,f,f,f,f,f,f,f),A.c(a,B.b,s).gvY(),f,new A.c
 if(A.lf()&&g.f!=null)p.push(new A.aT(A.C(B.kK,f,f,f,f,f,f,f,f,f,f,f,f,f),A.c(a,B.b,s).gyk(),f,new A.c2o(g),f))
 p.push(new A.aT(A.C(B.dI,f,f,f,f,f,f,f,f,f,f,f,f,f),A.c(a,B.b,s).go0(),f,new A.c2p(),f))
 p.push(new A.aT(A.C(B.a3v,f,f,f,f,f,f,f,f,f,f,f,f,f),A.c(a,B.b,s).gpw(),f,new A.c2r(),f))
+if(self.mmCanInstall&&self.mmCanInstall())p.push(new A.aT(A.C(B.kG,f,f,f,f,f,f,f,f,f,f,f,f,f),"Install MobMesh app",f,Object.assign(new A.c2r(),{$0:function(){self.mmInstall()}}),f))
 if(g.d)p.push(new A.aT(A.C(B.A1,f,f,f,f,f,f,f,f,f,f,f,f,f),"Developer Menu",f,new A.c2s(),f))
 p.push(new A.aT(A.C(B.b1,f,f,f,f,f,f,f,f,f,f,f,f,f),A.c(a,B.b,s).gmr(),f,new A.c2t(g),f))
 r.push(new A.ds(f,p,B.h,f))
@@ -191363,7 +191365,7 @@ n=A.nI(h,new A.cqk(),A.c(a,B.b,j).gqj(),k,n,k)
 h=A.C(B.A2,k,k,k,k,k,k,k,k,k,k,k,k,k)
 m=A.c(a,B.b,j).gk6()
 l=t.p
-return new A.bK(A.bs(i,k,A.bf(!0,A.dw(new A.aP(B.aD,A.ap(A.a([A.ap(A.a([g,s,r,q,p,o,n,A.nI(h,new A.cql(),A.c(a,B.b,j).gCJ(),k,m,k)],l),B.m,B.i,B.l,4)],l),B.m,B.i,B.N,0),k),k,B.F),!0,B.o,!0,!0),k,k,k,k),k)}}
+return new A.bK(A.bs(i,k,A.bf(!0,A.dw(new A.aP(B.aD,A.ap(A.a([A.ap(A.a([g,s,r,q,p,o,n,A.nI(h,new A.cql(),A.c(a,B.b,j).gCJ(),k,m,k)].concat(self.mmCanInstall&&self.mmCanInstall()?[A.nI(A.C(B.kG,k,k,k,k,k,k,k,k,k,k,k,k,k),Object.assign(new A.cql(),{$0:function(){self.mmInstall()}}),"Standalone app on phone or computer",k,"Install MobMesh app",k)]:[]),l),B.m,B.i,B.l,4)],l),B.m,B.i,B.N,0),k),k,B.F),!0,B.o,!0,!0),k,k,k,k),k)}}
 A.cqe.prototype={
 $0(){A.ay($.R(),new A.cqd(),!0,null,t.z)},
 $S:0}
@@ -225623,7 +225625,7 @@ q=this.c
 if(s===a){s=A.d2(8)
 $.cM()
 return A.du(!1,B.z,!0,s,A.cR(o,A.x(r,o,o,o,o,o,o,o,q.d9(B.h),o,o,o),B.p,o,o,o,o,o,o,o,new A.as(4,0,4,0),o,o,o),B.p,B.r2,1,o,o,o,o,o,B.ad)}else{s=A.d2(8)
-p=A.bj(200,B.h.F()>>>16&255,B.h.F()>>>8&255,B.h.F()&255)
+p=B.mmMention
 return A.du(!1,B.z,!0,s,A.cR(o,A.x(r,o,o,o,o,o,o,o,q,o,o,o),B.p,o,o,o,o,o,o,o,new A.as(4,0,4,0),o,o,o),B.p,p,0,o,o,o,o,o,B.ad)}}},
 $imt:1}
 A.adC.prototype={
@@ -225739,7 +225741,7 @@ Z(){this.a0()
 var s=this.a
 this.d=s.f||!s.c},
 agT(){if(this.a.c){$.cM()
-return B.r2}return B.mmRxBubble},
+return B.mmTxBubble}return B.mmRxBubble},
 agZ(){var s=this.a
 if(!s.c)return A.Wn(s.d.r)
 return""},
@@ -225794,9 +225796,9 @@ k=g.agT()
 j=A.a([],p)
 if(!g.a.c){i=g.agZ()
 $.bX()
-j.push(A.x(i,f,f,f,f,f,f,f,A.bD(f,f,A.afp(1,g.agZ(),35),f,f,f,f,f,f,f,f,12,f,f,B.as,f,f,!0,f,f,f,f,f,f,f,f),f,f,f))}i=g.aul()
+j.push(A.x(i,f,f,f,f,f,f,f,A.bD(f,f,A.afp(1,g.agZ(),72),f,f,f,f,f,f,f,f,12,f,f,B.as,f,f,!0,f,f,f,f,f,f,f,f),f,f,f))}i=g.aul()
 h=g.a.c
-j.push(new A.EW(i,A.bD(f,f,h?B.h:B.mmInk,f,f,f,f,f,f,f,f,16,f,f,f,f,f,!0,f,f,f,f,f,f,f,f),h,f))
+j.push(new A.EW(i,A.bD(f,f,h?B.mmTxInk:B.mmRxInk,f,f,f,f,f,f,f,f,16,f,f,f,f,f,!0,f,f,f,f,f,f,f,f),h,f))
 n=A.a([A.h7(f,A.nJ(l,A.cR(f,A.ap(j,B.G,B.i,B.l,0),B.p,f,f,new A.dS(k,f,k===B.mmRxBubble?A.LN(B.mmLine,1):f,f,f,f,B.ax),f,f,f,f,B.rE,f,f,f),B.ab),B.ac,!1,f,f,f,f,f,f,f,n,f,f,f,f,f,f,f,f,f,f,new A.bHa(g),f,f,f,f,f,f,!1,B.aQ)],p)
 l=g.a
 if(l.c){l=l.d
@@ -225812,7 +225814,7 @@ n.push(A.bz(A.a([l,k,A.C(g.a.d.y>0?B.fw:B.a31,f,f,B.bj,f,f,f,f,f,f,f,16,f,f)],p)
 l=p?B.dh:B.cy
 k=!p?4:0
 p=p?4:0
-j=A.x(e,f,f,f,f,f,f,f,A.bD(f,f,A.a7(a).ax.a===B.aq?B.mmMuted:B.bj,f,f,f,f,f,f,f,f,12,f,f,f,f,f,!0,f,f,f,f,f,f,f,f),f,f,f)
+j=A.x(e,f,f,f,f,f,f,f,A.bD(f,f,B.mmMeta,f,f,f,f,f,f,f,f,12,f,f,f,f,f,!0,f,f,f,f,f,f,f,f),f,f,f)
 i=g.d?B.mX:B.rq
 n.push(A.cG5(l,i,B.z,new A.aP(new A.as(0,4,0,0),B.fb,f),B.AL,new A.aP(new A.as(k,4,p,0),j,f),B.AM,B.a7))}o.push(new A.kJ(1,B.d5,A.ap(n,m,B.i,B.l,0),f))
 if(!g.a.c)o.push(B.pq)
@@ -226009,7 +226011,7 @@ return B.c.aN(r,"\n")},
 agT(){var s=this.a,r=s.d.c
 if(r==="failed"||r==="cancelled"){$.cM()
 return B.r8}if(s.c){$.cM()
-return B.r2}return B.mmRxBubble},
+return B.mmTxBubble}return B.mmRxBubble},
 bjF(){var s,r,q=this,p=q.a,o=p.d
 switch(o.c){case"sending":s=o.b
 r=o.ch
@@ -226060,7 +226062,7 @@ s=r+" <"+q+"...>"}if(d)r=f
 else{r=e.ax
 if(r==null)r=e.r}if(r!=null){$.bX()
 r=e.ax
-p=A.afp(1,r==null?e.r:r,35)}else p=B.bj
+p=A.afp(1,r==null?e.r:r,72)}else p=B.bj
 r=g.a.c?B.dh:B.cy
 q=t.p
 o=A.a([],q)
@@ -226090,7 +226092,7 @@ if(j)k.push(A.x(s,f,f,f,f,f,f,f,A.bD(f,f,p,f,f,f,f,f,f,f,f,12,f,f,B.as,f,f,!0,f,
 j=g.a
 i=j.d
 j=j.c
-k.push(new A.EW(i.x,A.bD(f,f,j?B.h:B.mmInk,f,f,f,f,f,f,f,f,16,f,f,f,f,f,!0,f,f,f,f,f,f,f,f),j,f))
+k.push(new A.EW(i.x,A.bD(f,f,j?B.mmTxInk:B.mmRxInk,f,f,f,f,f,f,f,f,16,f,f,f,f,f,!0,f,f,f,f,f,f,f,f),j,f))
 d=A.h7(f,A.nJ(m,A.cR(f,A.ap(k,B.G,B.i,B.l,0),B.p,l,f,f,f,f,f,f,B.rE,f,f,f),B.ab),B.ac,!1,f,f,f,f,f,f,f,d,f,f,f,f,f,f,f,f,f,f,new A.bKV(g),f,f,f,f,f,f,!1,B.aQ)
 m=g.bjD()
 l=g.a.c
@@ -226098,7 +226100,7 @@ k=l?B.dh:B.cy
 j=!l?4:0
 l=l?4:0
 i=g.agy()
-i=A.x(i,f,f,f,f,f,f,f,A.bD(f,f,A.a7(a).ax.a===B.aq?B.mmMuted:B.bj,f,f,f,f,f,f,f,f,12,f,f,f,f,f,!0,f,f,f,f,f,f,f,f),f,f,f)
+i=A.x(i,f,f,f,f,f,f,f,A.bD(f,f,B.mmMeta,f,f,f,f,f,f,f,f,12,f,f,f,f,f,!0,f,f,f,f,f,f,f,f),f,f,f)
 h=g.d?B.mX:B.rq
 o.push(new A.kJ(1,B.d5,A.ap(A.a([d,m,A.cG5(k,h,B.z,B.fb,B.AL,new A.aP(new A.as(j,4,l,8),i,f),B.AM,B.a7)],q),n,B.i,B.l,0),f))
 if(!g.a.c)o.push(B.pq)
@@ -245563,9 +245565,13 @@ B.mmErrFill=new A.M(1,0.19215686274509805,0.16470588235294117,0.2431372549019607
 B.mmErrIcon=new A.M(1,0.9372549019607843,0.6901960784313725,0.6039215686274509,B.j)
 B.mmDanger=new A.M(1,0.9098039215686274,0.38823529411764707,0.47843137254901963,B.j)
 B.mmRxBubble=new A.M(1,0.054901960784313725,0.12156862745098039,0.2,B.j)
+B.mmRxInk=new A.M(1,0.9098039215686274,0.9411764705882353,0.9725490196078431,B.j)
+B.mmTxBubble=new A.M(1,0.12156862745098039,0.5607843137254902,0.5098039215686274,B.j)
+B.mmTxInk=new A.M(1,1.0,1.0,1.0,B.j)
+B.mmMention=new A.M(1,0.10588235294117647,0.2,0.3215686274509804,B.j)
+B.mmMeta=new A.M(1,0.6196078431372549,0.7098039215686275,0.807843137254902,B.j)
 B.mmLine=new A.M(1,0.13333333333333333,0.22745098039215686,0.34509803921568627,B.j)
-B.mmInk=new A.M(1,0.9098039215686274,0.9411764705882353,0.9725490196078431,B.j)
-B.mmMuted=new A.M(1,0.6196078431372549,0.7098039215686275,0.807843137254902,B.j)
+B.mmSolid=new A.M(1,0.023529411764705882,0.07450980392156863,0.12549019607843137,B.j)
 B.mmTeal=new A.M(1,0.17647058823529413,0.8196078431372549,0.7411764705882353,B.j)
 B.a03=new A.WM(B.t,!0,null,null)
 B.yF=new A.WS(0,"none")

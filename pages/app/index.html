@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-<head><script src="mm-tap.js"></script><script src="mm-panel.js" defer></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><script>(()=>{const w=/\uE906?\uE900\uE901\uE902\uE900\uE903\uE904\uE905/g;const fix=()=>{const t=document.title,n=t.replace(w,'MobMesh').replace(/^MeshCore$/,'MobMesh');if(n!==t)document.title=n;};new MutationObserver(fix).observe(document.head,{subtree:true,childList:true,characterData:true});})();</script><script>try{if(localStorage.getItem('flutter.app_theme')===null)localStorage.setItem('flutter.app_theme','"dark"');}catch(e){}</script>
+<head><script src="mm-tap.js"></script><script src="mm-panel.js" defer></script><script src="mm-install.js" defer></script><meta name="viewport" content="width=device-width, initial-scale=1.0"><script>(()=>{const w=/\uE906?\uE900\uE901\uE902\uE900\uE903\uE904\uE905/g;const fix=()=>{const t=document.title,n=t.replace(w,'MobMesh').replace(/^MeshCore$/,'MobMesh');if(n!==t)document.title=n;};new MutationObserver(fix).observe(document.head,{subtree:true,childList:true,characterData:true});})();</script><script>try{if(localStorage.getItem('flutter.app_theme')===null)localStorage.setItem('flutter.app_theme','"dark"');}catch(e){}</script>
     <!--
       If you are serving your web app in a path other than the root, change the
       href value below to reflect the base path you are serving from.
@@ -61,7 +61,7 @@
 
     </style>
 
-<style>html,body{background:linear-gradient(180deg,#03080f,#061320 45%,#03080f) fixed #03080f}</style></head>
+<style>html,body{background:linear-gradient(180deg,#03080f,#061320 45%,#03080f) fixed #03080f}</style><script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('mm-sw.js'))</script></head>
 <body><canvas id="mesh-canvas" aria-hidden="true" style="position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none;opacity:.65;filter:blur(.5px)"></canvas><script type="module">import {startMeshBackground} from "../console/src/core/mesh-bg.js";const bg=startMeshBackground(document.getElementById('mesh-canvas'));const phone=matchMedia('(pointer: coarse)').matches&&matchMedia('(max-width: 700px)').matches;let on=!phone;if(!phone)try{if(localStorage.getItem('console-background')==='off')on=false;}catch{}if(bg){if(on)bg.start();else{bg.start();bg.stop();}}</script>
 <div id="loading"><img src="mobmesh-wordmark.svg" alt="MobMesh" style="width:248px;animation:1s ease-in-out 0s infinite alternate breathe">
     <img class="logo" src="logo.svg" />
@@ -104,14 +104,14 @@ addEventListener("message", eventListener);
     if (!window._flutter) {
   window._flutter = {};
 }
-_flutter.buildConfig = {"engineRevision":"5a2a6a42cce67f965cf540fcecf616faca624aa1","builds":[{"compileTarget":"dart2js","renderer":"canvaskit","mainJsPath":"main.dart.js"},{}]};
+_flutter.buildConfig = {"useLocalCanvasKit":true,"engineRevision":"5a2a6a42cce67f965cf540fcecf616faca624aa1","builds":[{"compileTarget":"dart2js","renderer":"canvaskit","mainJsPath":"main.dart.js"},{}]};
 
 
     // find loading element
     var loadingElement = document.querySelector("#loading");
 
     // load flutter application
-    _flutter.loader.load({
+    _flutter.loader.load({config:{canvasKitVariant:"full"},
         onEntrypointLoaded: async function(engineInitializer) {
 
             // init flutter engine
