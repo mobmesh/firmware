@@ -78,6 +78,8 @@ function highlightTranscript(visible){
  for(const name of ['cli-prompt-host','cli-prompt-symbol','cli-help-prose','cli-command','cli-argument','cli-number','cli-help','cli-error','cli-key','cli-success','cli-unavailable'])CSS.highlights.set(name,new Highlight(...(groups.get(name)||[])));
 }
 async function restorePassword(){const key=targetKey,revision=++passwordRevision;$('password').value='';$('credential-status').textContent='Saved on this browser only.';if(!key||mode==='direct')return;const password=await credentials.read(key);if(targetKey!==key||passwordRevision!==revision)return;if(password!==null){$('password').value=password;$('credential-status').textContent=password?'Saved password recalled for this repeater.':'Saved: this repeater accepts a blank password.';}else if(credentials.error)$('credential-status').textContent='Password storage unavailable in this browser.';}
+// The late-reply listener pulls from the companion only while the console is visible and focused.
+const consoleActive=()=>document.visibilityState!=='hidden'&&(typeof document.hasFocus!=='function'||document.hasFocus());
 // A row that arrives while a command waits belongs to an earlier command, so it goes above the one waiting.
 let waitingCommand=null;
 function printLate(text){const r=add('reply',text);const at=waitingCommand?records.indexOf(waitingCommand):-1;if(at>=0){records=records.filter(x=>x!==r);records.splice(at,0,r);display();}return r;}
@@ -330,7 +332,7 @@ async function login(providedPassword=null){
   const remembered=password,remember=$('remember-password').checked!==false;const result=await authenticateRepeater(c,key,password,note=>{notes.push(note);const attempt=note.match(/^Login dispatch · attempt (\d+)\/(\d+)/);if(attempt)$('assistance').textContent='Logging in to '+name+' · attempt '+attempt[1]+' of '+attempt[2];else if(/^Login reply not heard/.test(note))$('assistance').textContent='No reply from '+name+' yet · retrying';});password='';if(remember){const saved=await credentials.save(key,remembered);$('credential-status').textContent=saved?'Password saved for this repeater.':'Password could not be saved · '+credentials.error;}else await credentials.forget(key);
   for(const note of notes)add('transport',note);
   applyBuild(await new RemoteProbe(c,()=>{}).cli(key,'ver').then(r=>r.text,e=>{add('transport','Build · ver not read: '+e.message);return '';}));
-  auth=true;blocked=false;await startStream(c,key,printLate,()=>document.visibilityState!=='hidden'&&(typeof document.hasFocus!=='function'||document.hasFocus()));if(lastLink)lastLink.targetKey=key;rememberRepeater(key);if(result.login?.gatewaySent?.viaFlood)routeStale=true;if(!session)await chooseSession();$('assistance').textContent='';
+  auth=true;blocked=false;await startStream(c,key,printLate,consoleActive);if(lastLink)lastLink.targetKey=key;rememberRepeater(key);if(result.login?.gatewaySent?.viaFlood)routeStale=true;if(!session)await chooseSession();$('assistance').textContent='';
   // The companion's next-step line is rewritten once login completes.
   if(stepLine&&records.includes(stepLine)){stepLine.safeText='Connected · repeater admin access verified.';stepLine=null;display();}else add('status','Connected · repeater admin access verified.');status.update({lastTargetResponseAt:Date.now()});closeConnection();
  }catch(e){failure=e.message;await stopStream();for(const note of notes)add('transport',note);if(stepLine&&records.includes(stepLine)){stepLine.safeText=recordText('Login stopped: '+failure);stepLine=null;display();}else add('status','Login stopped: '+failure);$('assistance').textContent='Login stopped: '+failure;auth=false;if(transport?.protocol&&transport.connected){blocked=false;session=null;writable=false;keptHistory=history;}else{blocked=true;await factory?.close();transport=null;$('remote').hidden=true;}}
@@ -519,6 +521,8 @@ async function adoptAppTarget(tap){
  contacts=appContacts(tap,transport.protocol);renderContacts();targetKey=key;$('target').value=key;
  if(records.length)add('boundary','── '+(contacts.find(c=>fullKey(c.publicKey)===key)?.advName||key.slice(0,12))+' ──');
  auth=true;blocked=false;session=null;await chooseSession();
+ // Late rows from the app's repeater print here too, as after a login made in the console.
+ await startStream(transport.protocol,key,printLate,consoleActive);
  add('status','Using the app’s companion link and its login to '+(contacts.find(c=>fullKey(c.publicKey)===key)?.advName||key.slice(0,12))+'.');
  busy=true;update();
  try{applyBuild(await new RemoteProbe(transport.protocol,()=>{}).cli(key,'ver').then(r=>r.text,e=>{add('transport','Build · ver not read: '+e.message);return '';}));}finally{busy=false;update();focusCommand();}

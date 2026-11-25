@@ -59,7 +59,9 @@
 
   // Bluetooth: one frame per write and per notification; GATT allows one operation at a time, so writes share a queue.
   if (self.BluetoothRemoteGATTCharacteristic) {
-    const C = BluetoothRemoteGATTCharacteristic.prototype, gatt = queued(), orig = {};
+    const C = BluetoothRemoteGATTCharacteristic.prototype, queue = queued(), orig = {};
+    // Chrome can still report the previous operation as in progress when the next one starts; that write is retried after a short wait.
+    const gatt = fn => queue(async () => { for (let i = 1; ; i++) { try { return await fn(); } catch (e) { if (i >= 6 || !/already in progress/i.test(e?.message || '')) throw e; await new Promise(r => setTimeout(r, 15 * i)); } } });
     for (const name of ['writeValueWithResponse', 'writeValueWithoutResponse']) {
       orig[name] = C[name];
       C[name] = function (value) {

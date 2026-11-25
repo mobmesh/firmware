@@ -24,17 +24,19 @@ export async function startStream(c,key,print,active=()=>true,idleMs=1000){
   await stopStream();await stopTail();
   const s={c,key,print,active,stopped:false,held:0,pulling:false};
   const probe=new RemoteProbe(c);
-  s.done=(async()=>{
+  // Rows print from every frame on the link, not only replies to this listener's pulls: the app sharing the link collects them too.
+  const onFrame=f=>{if(s.held||s.stopped)return;const m=message(f);if(m&&m.senderPrefix===key.slice(0,12)&&m.textType===1)s.print(m.text);};
+  c.on('wire',onFrame);
+  s.done=(async()=>{try{
     while(!s.stopped&&!c.closed){
       // Paused while a command runs or the console is not in focus: queued messages stay with the companion.
       let on=false;try{on=!s.held&&s.active();}catch{}
       if(!on){await sleep(250);continue;}
       let f=null;s.pulling=true;
       try{f=await probe.wait([7,8,10,16,17],()=>c.sendCommandSyncNextMessage(),5000);}catch{if(c.closed)break;}finally{s.pulling=false;}
-      if(!f||f[0]===10){await sleep(idleMs);continue;}
-      const m=message(f);if(m&&m.senderPrefix===key.slice(0,12)&&m.textType===1)s.print(m.text);
+      if(!f||f[0]===10)await sleep(idleMs);
     }
-  })();
+  }finally{c.off('wire',onFrame);}})();
   stream=s;return s;
 }
 export async function stopStream(){const s=stream;if(!s)return;s.stopped=true;stream=null;await s.done;}
