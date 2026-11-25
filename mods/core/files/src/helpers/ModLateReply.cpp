@@ -32,7 +32,7 @@ bool modReplyCapture(uint32_t sender_timestamp, ModReplyTarget* out) {
 void modReplyLate(const ModReplyTarget& target, const char* rows, size_t stride, int count) {
   if (!target.remote) {
     for (int i = 0; i < count; i++) {
-      if (i == 0) Serial.print(strchr(rows, '\n') ? "  ->\n" : "  -> ");
+      if (i == 0) Serial.print(strchr(rows, '\n') ? "  -> \n" : "  -> ");
       Serial.println(rows + i * stride);
     }
     return;
