@@ -18,7 +18,9 @@
     frame.contentWindow?.mmEmbedShown?.();
   }
   function hide() { if (frame) frame.hidden = true; }
-  self.mmNavTap = item => { if (terminal(item)) show(); else hide(); };
+  // Phones keep the app's own Command Line screen; same phone test as the mesh background in index.html.
+  const phone = () => matchMedia('(pointer: coarse)').matches && matchMedia('(max-width: 700px)').matches;
+  self.mmNavTap = item => { if (terminal(item) && !phone()) show(); else hide(); };
   self.mmNavGone = hide;
   addEventListener('hashchange', hide);
 })();
