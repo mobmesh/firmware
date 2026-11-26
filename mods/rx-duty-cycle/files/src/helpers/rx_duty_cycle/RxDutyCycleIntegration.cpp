@@ -107,36 +107,38 @@ static bool booted;
 static bool fem_gate = true;   // `set radio.fem.rxdc`; on by default, acts only where the LNA can be switched
 
 #if defined(RXDC_FEM_GATE)
-// During CPU light sleep only, the ULP-FSM copies BUSY (high while the radio sleeps) onto the KCT8103L's CTX (high = LNA
-// bypass). Both pads are RTC-muxed just before the sleep and handed back on wake, so the ULP never owns CTX while the
-// CPU can transmit. The Arduino core ships the ULP disabled with no reserved RTC memory, so the program sits at the top
-// of RTC slow memory, above what the app places there (checked at run time).
-#define FEM_ULP_PROG_W 0x780   // program at 0x50001E00
-#define FEM_ULP_FLAG_W 0x7FC   // [armed, running] at 0x50001FF0
+// The ULP owns CTX only during CPU light sleep, so never while the CPU can transmit.
+#define FEM_ULP_PROG_W 0x780
+#define FEM_ULP_FLAG_W 0x7FC   // armed, running, bypass observed
 extern int _rtc_force_slow_end;
 static bool fem_loaded = false, fem_active = false;
-static uint32_t fem_sleeps = 0, fem_late = 0;
-static inline volatile uint32_t* femWord(uint32_t w) { return (volatile uint32_t*)(0x50000000UL + w * 4); }
+static uint32_t fem_bypasses = 0, fem_late = 0;
+static inline volatile uint32_t* femWord(uint32_t w) { return RTC_SLOW_MEM + w; }
 
-static bool femRtcFree() { return (uintptr_t)&_rtc_force_slow_end <= 0x50000000UL + FEM_ULP_PROG_W * 4; }
+static bool femRtcFree() {
+  return reinterpret_cast<uintptr_t>(&_rtc_force_slow_end) <= reinterpret_cast<uintptr_t>(femWord(FEM_ULP_PROG_W));
+}
 
 static void femLoad() {
   const uint32_t busy = rtc_io_number_get((gpio_num_t)P_LORA_BUSY);
   const uint32_t ctx = rtc_io_number_get((gpio_num_t)P_LORA_KCT8103L_PA_CTX);
   const ulp_insn_t prog[] = {
     I_MOVI(R2, FEM_ULP_FLAG_W),
-    I_LD(R0, R2, 0),                                                                            // 1: armed?
-    I_BL(7, 1),                                                                                 // no: to 9
-    I_RD_REG(RTC_GPIO_IN_REG, RTC_GPIO_IN_NEXT_S + busy, RTC_GPIO_IN_NEXT_S + busy),            // BUSY
-    I_BL(3, 1),                                                                                 // low, listening: to 7
-    I_WR_REG(RTC_GPIO_OUT_W1TS_REG, RTC_GPIO_OUT_DATA_W1TS_S + ctx, RTC_GPIO_OUT_DATA_W1TS_S + ctx, 1),  // asleep: bypass
+    I_LD(R0, R2, 0),  // 1: armed flag
+    I_BL(9, 1),  // 2: disarmed? Jump to 11.
+    I_RD_REG(RTC_GPIO_IN_REG, RTC_GPIO_IN_NEXT_S + busy, RTC_GPIO_IN_NEXT_S + busy),
+    I_BL(5, 1),  // 4: BUSY low? Jump to 9.
+    I_WR_REG(RTC_GPIO_OUT_W1TS_REG, RTC_GPIO_OUT_DATA_W1TS_S + ctx, RTC_GPIO_OUT_DATA_W1TS_S + ctx, 1),
+    I_MOVI(R0, 1),
+    I_ST(R0, R2, 2),
     I_BXI(FEM_ULP_PROG_W + 1),
-    I_WR_REG(RTC_GPIO_OUT_W1TC_REG, RTC_GPIO_OUT_DATA_W1TC_S + ctx, RTC_GPIO_OUT_DATA_W1TC_S + ctx, 1),  // listening: LNA on
+    I_WR_REG(RTC_GPIO_OUT_W1TC_REG, RTC_GPIO_OUT_DATA_W1TC_S + ctx, RTC_GPIO_OUT_DATA_W1TC_S + ctx, 1),  // 9: listening, LNA on
     I_BXI(FEM_ULP_PROG_W + 1),
-    I_MOVI(R0, 0),                                                                              // 9: disarmed
-    I_ST(R0, R2, 1),                                                                            // running = 0
+    I_MOVI(R0, 0),  // 11: disarmed, halt
+    I_ST(R0, R2, 1),
     I_HALT(),
   };
+  static_assert(sizeof(prog) <= (FEM_ULP_FLAG_W - FEM_ULP_PROG_W) * sizeof(uint32_t), "ULP program overlaps flags");
   memcpy((void*)femWord(FEM_ULP_PROG_W), prog, sizeof(prog));
   fem_loaded = true;
 }
@@ -151,17 +153,19 @@ static const char* femInactive() {
 }
 
 // Pins back to digital GPIO with the LNA on, the ULP halted: the state every awake moment needs.
-static void femRelease() {
+static void femRelease(bool observe_bypass) {
   *femWord(FEM_ULP_FLAG_W) = 0;
   uint32_t t0 = micros();
   while ((*femWord(FEM_ULP_FLAG_W + 1) & 0xFFFF) != 0 && micros() - t0 < 2000) {}
   if ((*femWord(FEM_ULP_FLAG_W + 1) & 0xFFFF) != 0) fem_late++;
   ulp_timer_stop();
+  if (observe_bypass && (*femWord(FEM_ULP_FLAG_W + 2) & 0xFFFF) != 0) fem_bypasses++;
   // Back to digital either way: an RTC_GPIO write after this cannot reach the pad.
   rtc_gpio_deinit((gpio_num_t)P_LORA_KCT8103L_PA_CTX);
   digitalWrite(P_LORA_KCT8103L_PA_CTX, LOW);
   rtc_gpio_deinit((gpio_num_t)P_LORA_BUSY);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_AUTO);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_AUTO);
   fem_active = false;
 }
 
@@ -170,29 +174,34 @@ static void femSleep() {
   if (!fem_loaded) femLoad();
   rtc_gpio_init((gpio_num_t)P_LORA_BUSY);
   rtc_gpio_set_direction((gpio_num_t)P_LORA_BUSY, RTC_GPIO_MODE_INPUT_ONLY);
+  rtc_gpio_set_level((gpio_num_t)P_LORA_KCT8103L_PA_CTX, 0);
   rtc_gpio_init((gpio_num_t)P_LORA_KCT8103L_PA_CTX);
   rtc_gpio_set_direction((gpio_num_t)P_LORA_KCT8103L_PA_CTX, RTC_GPIO_MODE_OUTPUT_ONLY);
-  rtc_gpio_set_level((gpio_num_t)P_LORA_KCT8103L_PA_CTX, 0);
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);
   *femWord(FEM_ULP_FLAG_W) = 1;
   *femWord(FEM_ULP_FLAG_W + 1) = 1;
+  *femWord(FEM_ULP_FLAG_W + 2) = 0;
+  // The timer starts the ULP loop once.
   ulp_set_wakeup_period(0, 100);
   fem_active = true;
   if (ulp_run(FEM_ULP_PROG_W) != ESP_OK) {
-    femRelease();
-    return;
+    femRelease(false);
   }
-  fem_sleeps++;
 }
 
 static void femWake() {
-  if (fem_active) femRelease();
+  if (fem_active) femRelease(true);
 }
 
 // A soft reset keeps the RTC domain: a ULP left running would still own CTX. Halted and released before anything sends.
 static void femBoot() {
   ulp_timer_stop();
-  *femWord(FEM_ULP_FLAG_W) = 0;
+  if (femRtcFree()) {
+    *femWord(FEM_ULP_FLAG_W) = 0;
+  } else {
+    MESH_DEBUG_PRINTLN("FEM RXDC disabled: RTC memory in use");
+  }
   rtc_gpio_deinit((gpio_num_t)P_LORA_KCT8103L_PA_CTX);
   rtc_gpio_deinit((gpio_num_t)P_LORA_BUSY);
 }
@@ -241,14 +250,20 @@ static void boot() {
 #endif
 }
 
-static bool saveSettings() {
-  uint8_t mode = engine.mode();
-  uint8_t legacy = engine.mode() == RXDC_MODE_OFF ? 0 : 1;
-  uint8_t fem = fem_gate ? 1 : 0;
-  uint8_t timeout = 0;
+static bool timeoutSetting() {
 #if defined(MOBMESH_HAS_SX1262)
-  timeout = radio_io.timeout_enabled;
+  return radio_io.timeout_enabled;
+#else
+  return false;
 #endif
+}
+
+// Saves the given values; callers apply them only once this succeeds.
+static bool saveSettings(RxdcMode m, bool fem_on, bool timeout_on) {
+  uint8_t mode = m;
+  uint8_t legacy = m == RXDC_MODE_OFF ? 0 : 1;
+  uint8_t fem = fem_on ? 1 : 0;
+  uint8_t timeout = timeout_on ? 1 : 0;
   File f = ModFS.open(SETTINGS_PATH, "w", true);
   if (!f) return false;
   RxdcSettingsFile file(mode, legacy, fem, timeout);
@@ -346,17 +361,23 @@ static bool femCli(bool is_set, const char* arg, char* reply) {
       strcpy(reply, "ERR: usage: set radio.fem.rxdc on|off");
       return true;
     }
-    fem_gate = word[1] == 'n';
-    sprintf(reply, saveSettings() ? "OK - radio.fem.rxdc %s" : "ERR: radio.fem.rxdc %s, not saved", fem_gate ? "on" : "off");
+    const bool on = word[1] == 'n';
+    if (saveSettings(engine.mode(), on, timeoutSetting())) {
+      fem_gate = on;
+      sprintf(reply, "OK - radio.fem.rxdc %s", word);
+    } else {
+      sprintf(reply, "ERR: radio.fem.rxdc %s, not saved", word);
+    }
     return true;
   }
   if (!fem_gate) {
     strcpy(reply, "> off");
     return true;
   }
-  const char* why = femInactive();
-  if (why) snprintf(reply, 160, "> on, inactive (%s), %lu gated sleeps", why, (unsigned long)fem_sleeps);
-  else snprintf(reply, 160, "> on, %lu gated sleeps", (unsigned long)fem_sleeps);
+  const char* why = modPowerSavingOn() ? femInactive() : "MCU power saving off";
+  if (why) snprintf(reply, 160, "> on, inactive (%s), %lu observed bypasses", why, (unsigned long)fem_bypasses);
+  else if (fem_bypasses == 0) strcpy(reply, "> on, waiting for first bypass");
+  else snprintf(reply, 160, "> on, %lu observed bypasses", (unsigned long)fem_bypasses);
 #else
   (void)is_set;
   (void)arg;
@@ -387,11 +408,15 @@ bool rxdcHandleCli(const ModCliContext& context, char* command, char* reply) {
         return true;
       }
       bool enabled = word[1] == 'n';
+      if (!saveSettings(engine.mode(), fem_gate, enabled)) {
+        sprintf(reply, "ERR: radio.rxdc.timeout %s, not saved", word);
+        return true;
+      }
       if (radio_io.timeout_enabled != enabled) {
         radio_io.timeout_enabled = enabled;
         engine.requestRearm();
       }
-      sprintf(reply, saveSettings() ? "OK - radio.rxdc.timeout %s" : "ERR: radio.rxdc.timeout %s, not saved", word);
+      sprintf(reply, "OK - radio.rxdc.timeout %s", word);
     } else {
       sprintf(reply, "> %s", radio_io.timeout_enabled ? "on" : "off");
     }
@@ -414,8 +439,12 @@ bool rxdcHandleCli(const ModCliContext& context, char* command, char* reply) {
       strcpy(reply, "ERR: usage: set radio.rxdc auto|off");
       return true;
     }
+    if (!saveSettings(m, fem_gate, timeoutSetting())) {
+      sprintf(reply, "ERR: radio.rxdc %s, not saved", modeText(m));
+      return true;
+    }
     engine.setMode(m);
-    sprintf(reply, saveSettings() ? "OK - radio.rxdc %s" : "ERR: radio.rxdc %s, not saved", modeText(m));
+    sprintf(reply, "OK - radio.rxdc %s", modeText(m));
     return true;
   }
   RxdcMode m = engine.mode();

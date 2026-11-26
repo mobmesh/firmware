@@ -46,7 +46,7 @@ set radio.rxdc off
 | Response | Meaning |
 | --- | --- |
 | `OK - radio.rxdc <mode>` | Mode set and saved |
-| `ERR: radio.rxdc <mode>, not saved` | Mode set until reboot; the settings file could not be written |
+| `ERR: radio.rxdc <mode>, not saved` | Previous mode remains active until reboot; the settings file could not be written, so saved settings may be lost |
 | `ERR: usage: set radio.rxdc auto\|off` | Unknown mode |
 
 Only the first word of the value is read, so the full `get radio.rxdc` line can be given back as a value (as `tryset` does when it restores).
@@ -77,7 +77,7 @@ set radio.rxdc.timeout off
 | Response | Meaning |
 | --- | --- |
 | `OK - radio.rxdc.timeout <on\|off>` | Set and saved |
-| `ERR: radio.rxdc.timeout <on\|off>, not saved` | Set until reboot; the settings file could not be written |
+| `ERR: radio.rxdc.timeout <on\|off>, not saved` | Previous setting remains active until reboot; the settings file could not be written, so saved settings may be lost |
 | `ERR: usage: set radio.rxdc.timeout on\|off` | Unknown value |
 
 Changes apply when RX duty cycling next arms. The radio uses its regular timeout in continuous receive.
@@ -90,10 +90,13 @@ get radio.fem.rxdc
 
 | Response | Meaning |
 | --- | --- |
-| `> on, <n> gated sleeps` | Enabled and acting; `<n>` CPU light sleeps have gated the LNA since boot |
-| `> on, inactive (<reason>), <n> gated sleeps` | Enabled but not acting now: `LNA off`, `rxdc not armed`, `no switchable LNA` or `RTC memory in use` |
+| `> on, <n> observed bypasses` | Enabled; `<n>` light sleep windows since boot in which the ULP switched the LNA to bypass |
+| `> on, waiting for first bypass` | Enabled and eligible; no bypass has been observed since boot |
+| `> on, inactive (<reason>), <n> observed bypasses` | Enabled but not acting now: `LNA off`, `rxdc not armed`, `no switchable LNA`, `RTC memory in use` or `MCU power saving off` |
 | `> off` | Disabled |
 | `ERR: radio.fem.rxdc not supported on this board` | The board has no KCT8103L FEM on an ESP32-S3 |
+
+The counter records one bypass per sleep window. The wake hook does not distinguish a completed light sleep from a rejected sleep attempt.
 
 ## set radio.fem.rxdc
 
@@ -110,7 +113,7 @@ set radio.fem.rxdc off
 | Response | Meaning |
 | --- | --- |
 | `OK - radio.fem.rxdc <on\|off>` | Set and saved |
-| `ERR: radio.fem.rxdc <on\|off>, not saved` | Set until reboot; the settings file could not be written |
+| `ERR: radio.fem.rxdc <on\|off>, not saved` | Previous setting remains active until reboot; the settings file could not be written, so saved settings may be lost |
 | `ERR: usage: set radio.fem.rxdc on\|off` | Unknown value |
 
 **Storage:** these settings persist across reboots and firmware updates.
