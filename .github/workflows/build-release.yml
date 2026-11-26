@@ -590,6 +590,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      built: ${{ steps.inputs.outputs.built }}
     steps:
       - name: Checkout this repo
         uses: actions/checkout@v7
@@ -607,7 +609,14 @@ jobs:
           pattern: release-input-*
           path: release-inputs
 
+      # A run that built nothing (no new upstream tag, no forced rebuild) publishes nothing.
+      - id: inputs
+        name: Check whether any board was built
+        run: |
+          if [ -n "$(find release-inputs -type f 2>/dev/null | head -1)" ]; then echo "built=true" >> "$GITHUB_OUTPUT"; else echo "built=false" >> "$GITHUB_OUTPUT"; echo "Nothing built: no release, flasher or Pages update." >> "$GITHUB_STEP_SUMMARY"; fi
+
       - name: Assemble release assets and the web-flasher update
+        if: steps.inputs.outputs.built == 'true'
         run: |
           mkdir -p release-inputs release-assets
           python3 scripts/assemble-release.py \
@@ -628,7 +637,7 @@ jobs:
 
       - id: vendor
         name: Commit and push the assembled web-flasher update once
-        if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
+        if: steps.inputs.outputs.built == 'true' && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -651,7 +660,7 @@ jobs:
           done
 
       - name: Create or update each shared release once
-        if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
+        if: steps.inputs.outputs.built == 'true' && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -717,8 +726,11 @@ jobs:
             done
             echo REPORT_EOF
           } >> "$GITHUB_OUTPUT"
+          # No boot logs means nothing was built, which says nothing about the open issue.
+          if compgen -G 'boot-checks/boot-check-*' > /dev/null; then echo "ran=true" >> "$GITHUB_OUTPUT"; else echo "ran=false" >> "$GITHUB_OUTPUT"; fi
 
       - name: Open, update, or close the tracking issue
+        if: steps.collect.outputs.ran == 'true'
         uses: actions/github-script@v9
         env:
           REPORT: ${{ steps.collect.outputs.report }}
@@ -758,7 +770,7 @@ jobs:
     needs: publish
     # Only from the default branch, and never on a dry run. Without the ref guard a run
     # started on any branch deployed production Pages from that branch's tree.
-    if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
+    if: needs.publish.outputs.built == 'true' && github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
