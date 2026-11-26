@@ -45,7 +45,7 @@ const GROUPS={
       ['Confirm','ota slot confirm',null,t=>/active, pending/.test(t),'Keep the running firmware and end its probation now?']]},
     {label:'Auto updates',ota:true,mod:'hotspot-ota',get:'get ota.wan.auto',readFirst:true,choices:[['On','set ota.wan.auto on'],['Off','set ota.wan.auto off']],hint:'Turning on needs a passed Verify.'},
     {label:'Update now',ota:true,mod:'hotspot-ota',refreshOf:'Verify',status:'get ota.status',after:'Verify',statusAfterRun:true,doneWhen:/^\s*>?\s*OK/,hint:'Download and install the newest firmware over Wi-Fi.',run:'start ota wan update',confirm:'Start a firmware update on this repeater now?'},
-    {label:'Local upload',ota:true,mod:'hotspot-ota',hint:'Open the repeater’s own Wi-Fi for a nearby upload.',run:'start ota',confirm:'Open the local upload access point on this repeater?'}]},
+    {label:'Local upload',ota:true,mod:'hotspot-ota',stop:'stop ota',hint:'Open the repeater’s own Wi-Fi for a nearby upload.',run:'start ota',confirm:'Open the local upload access point on this repeater?'}]},
   radio:{title:'Radio & Power',fields:[
     {label:'Try radio settings',get:'get radio',tryradio:true,mod:'try-settings',hint:'Applied for the minutes given, then reverts unless you press Keep.'},
     {label:'Power saving',get:'powersaving',choices:[['On','powersaving on'],['Off','powersaving off'],['Auto','powersaving auto on','power-guard']]},
@@ -303,13 +303,16 @@ function field(f){
   // Over LoRa a command can need several presses; Run stays available until a reply matching doneWhen arrives, then locks for this visit.
   if(f.run){const run=button(f.runLabel||'Run',async()=>{
     if(f.confirm&&!confirm(f.confirm))return;
-    box.classList.remove('attention');if(status)status.hidden=false;refresh();
+    box.classList.remove('attention');if(status)status.hidden=false;if(stop)stop.hidden=false;refresh();
     for(const c of [].concat(f.run)){const text=await send(c,out);if(f.doneWhen&&text&&f.doneWhen.test(text)){run.off=true;refresh();}if(text===null||/err|unknown/i.test(text))break;}
   },f.confirm?'act danger':'act');if(f.after)run.gate=()=>[].concat(f.after).some(a=>readDone.has(a));head.append(run);}
   // A status read beside an action, such as an update's progress.
   // statusAfterRun keeps Status hidden until Run has been pressed once.
   const status=f.status?button('Status',()=>send(f.status,out)):null;
   if(status){status.hidden=!!f.statusAfterRun;head.append(status);}
+  // stop ends what Run started; it appears once Run has been pressed, since the start reply can be lost over LoRa.
+  const stop=f.stop?button('Stop',()=>send(f.stop,out),'act'):null;
+  if(stop){stop.hidden=true;head.append(stop);}
   if(f.toggle)head.append(button('On',()=>send(f.toggle('on'),out)),button('Off',()=>send(f.toggle('off'),out)));
   // A choice tied to a mod is left out where the board's release build lacks that mod.
   // readFirst cards keep their choices hidden until the current value has been read.
