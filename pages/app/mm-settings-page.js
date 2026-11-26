@@ -57,7 +57,7 @@ const GROUPS={
     {label:'Reboot',run:'reboot',runLabel:'Reboot',confirm:'Reboot this repeater now?'},
     {label:'Timed power off',mod:'power-guard',minutes:{placeholder:'Minutes, 1-1440',send:m=>'poweroff '+m*60,confirm:m=>'Power this repeater off for '+m+' minutes? It wakes by itself.'},hint:'Deep sleep for a while, then wake.'}]},
   routing:{title:'Routing',fields:[
-    {label:'Direct-retry',mod:'direct-retry',get:'get direct.retry',toggle:v=>'set direct.retry '+v,run:'get direct.retry.stats',runLabel:'Stats',hint:'Resend a direct packet when no echo is heard. Stats: resends, echoes and replies since boot.'},
+    {label:'Direct-retry',mod:'direct-retry',readFirst:true,get:'get direct.retry',choices:[['On','set direct.retry on'],['Off','set direct.retry off']],run:'get direct.retry.stats',runLabel:'Stats',hint:'Resend a direct packet when no echo is heard. Stats: resends, echoes and replies since boot.'},
     {label:'Sinkhole',mod:'flood-gate',get:'sinkhole',sinkhole:true,hint:'Temporarily control traffic that might be spamming the mesh using your repeater, or just watch it closely.'}]}
 };
 const group=GROUPS[params.get('group')]||GROUPS.diag;
@@ -313,7 +313,6 @@ function field(f){
   // stop ends what Run started; it appears once Run has been pressed, since the start reply can be lost over LoRa.
   const stop=f.stop?button('Stop',()=>send(f.stop,out),'act'):null;
   if(stop){stop.hidden=true;head.append(stop);}
-  if(f.toggle)head.append(button('On',()=>send(f.toggle('on'),out)),button('Off',()=>send(f.toggle('off'),out)));
   // A choice tied to a mod is left out where the board's release build lacks that mod.
   // readFirst cards keep their choices hidden until the current value has been read.
   const choices=[];
