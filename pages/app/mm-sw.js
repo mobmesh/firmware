@@ -39,7 +39,8 @@ self.addEventListener('fetch', event => {
   if (url.origin === 'https://fonts.gstatic.com') { event.respondWith(fromCache(FONTS, request)); return; }
   if (!url.href.startsWith(scope.href) && !SHARED.has(url.origin + url.pathname)) return;
   if (request.mode === 'navigate') {
-    // A page of its own (the settings page) loads itself; every other app route loads the app.
+    // A page of its own (the settings page) loads itself, even when not precached; every other app route loads the app.
+    if (/\.html$/.test(url.pathname) && !url.pathname.endsWith('/index.html')) { event.respondWith(fromCache(CACHE, request)); return; }
     event.respondWith(caches.open(CACHE).then(async cache => await cache.match(request, { ignoreSearch: true }) || await cache.match(scope.href)).then(hit => hit || fetch(request)));
     return;
   }
